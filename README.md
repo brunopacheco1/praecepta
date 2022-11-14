@@ -1,2 +1,2 @@
-# praecepta
-Simple Rules Engine in Java using Trie Tree
+# Praecepta
+A simple rules engine in Java using Trie Tree.
