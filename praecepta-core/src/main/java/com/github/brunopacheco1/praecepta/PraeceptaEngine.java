@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -66,7 +67,7 @@ public final class PraeceptaEngine<I, O> {
         return inputsByNumberOfAnyValues.entrySet().stream()
                 .sorted(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private void validate(List<Praeceptum> praecepta) {
@@ -103,17 +104,17 @@ public final class PraeceptaEngine<I, O> {
 
         var numberOfNodes = visitor.getNumberOfNodes();
 
-        log.info(String.format("Number of branches: %s%n", visitor.getPathLengths().size()));
-        log.info(String.format("Shortest path: %s%n", shortestPath));
-        log.info(String.format("Longest path: %s%n", longestPath));
-        log.info(String.format("Average path length: %s%n", averageLength));
-        log.info(String.format("Number of nodes: %s%n", numberOfNodes));
+        log.log(Level.INFO, "Number of branches: {0}", visitor.getPathLengths().size());
+        log.log(Level.INFO, "Shortest path: {0}", shortestPath);
+        log.log(Level.INFO, "Longest path: {0}", longestPath);
+        log.log(Level.INFO, "Average path length: {0}", averageLength);
+        log.log(Level.INFO, "Number of nodes: {0}", numberOfNodes);
     }
 
     private InputString buildInputString(Integer priority, Input input, UnaryOperator<String> sanitizeFunction) {
         var sanitizedValues = getInputValues(input).stream()
                 .map(sanitizeFunction)
-                .collect(Collectors.toList());
+                .toList();
         return new InputString(priority, sanitizedValues);
     }
 
@@ -139,7 +140,7 @@ public final class PraeceptaEngine<I, O> {
         return result.stream()
                 .map(outputs::get)
                 .map(outputStrategy::transform)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private String sanitizeValueForEvaluation(String value) {
@@ -151,7 +152,7 @@ public final class PraeceptaEngine<I, O> {
     private List<String> getInputValues(Input input) {
         return inputKeys.stream()
                 .map(it -> input.values().get(it))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     /**
