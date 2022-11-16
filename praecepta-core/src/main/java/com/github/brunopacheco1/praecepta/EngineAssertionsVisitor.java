@@ -46,13 +46,13 @@ public final class EngineAssertionsVisitor implements TrieTreeVisitor {
 
         if (node.getChildren().isEmpty()) {
             pathLengths.add(pathLength);
-            if (node.getPriorities().isEmpty()) {
+            if (node.getOutputs().isEmpty()) {
                 shouldHaveOutputs++;
             } else {
-                foundPraecepta.addAll(node.getPriorities());
+                foundPraecepta.addAll(node.getOutputs());
             }
         } else {
-            if (!node.getPriorities().isEmpty()) {
+            if (!node.getOutputs().isEmpty()) {
                 shouldNotHaveOutputs++;
             }
         }

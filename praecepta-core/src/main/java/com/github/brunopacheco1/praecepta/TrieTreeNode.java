@@ -1,13 +1,14 @@
 package com.github.brunopacheco1.praecepta;
 
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.PriorityBlockingQueue;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -23,18 +24,23 @@ final class TrieTreeNode {
 
     private int nodeLevel;
 
-    private HashMap<String, TrieTreeNode> children = new HashMap<>();
+    private Map<String, TrieTreeNode> children = new HashMap<>();
 
-    private Queue<Integer> priorities = new PriorityBlockingQueue<>();
+    private Collection<Integer> outputs;
 
     public TrieTreeNode(HitPolicy hitPolicy, String value, int nodeLevel) {
         this.hitPolicy = hitPolicy;
         this.value = value;
         this.nodeLevel = nodeLevel;
+        outputs = switch (hitPolicy) {
+            case FIRST, COLLECT -> new LinkedHashSet<>();
+            case ANY, UNIQUE, RULE_ORDER -> new TreeSet<>();
+            case PRIORITY, OUTPUT_ORDER -> new TreeSet<>(Comparator.reverseOrder());
+        };
     }
 
-    public List<Integer> getPriorities() {
-        return List.copyOf(priorities);
+    public List<Integer> getOutputs() {
+        return List.copyOf(outputs);
     }
 
     public Map<String, TrieTreeNode> getChildren() {
@@ -49,10 +55,13 @@ final class TrieTreeNode {
      * @param inputString This object contains all field values of a given input.
      * @return the output indexes found for a given input
      */
-    public Optional<Queue<Integer>> evaluate(InputString inputString) {
+    public Optional<List<Integer>> evaluate(InputString inputString) {
         // End of the chain, you found it.
         if (nodeLevel == inputString.size()) {
-            return Optional.of(priorities);
+            if (outputs.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(List.copyOf(outputs));
         }
 
         // Do you have the value I look for?
@@ -82,7 +91,7 @@ final class TrieTreeNode {
         var possibleValues = splitIntoPossibleValues(inputString.get(nodeLevel));
         for (var possibleValue : possibleValues) {
             addNodeToTree(possibleValue);
-            propagateChildrenAndPriorities(possibleValue, inputString);
+            propagateChildrenAndOutputs(possibleValue, inputString);
         }
     }
 
@@ -123,7 +132,7 @@ final class TrieTreeNode {
      * @param nodeToCopy node to copy from.
      */
     private void copyNode(TrieTreeNode nodeToCopy) {
-        addPriorities(nodeToCopy.priorities);
+        addOutputs(nodeToCopy.outputs);
         for (var otherChild : nodeToCopy.children.values()) {
             var child = new TrieTreeNode(hitPolicy, otherChild.value, otherChild.nodeLevel);
             children.put(child.value, child);
@@ -142,7 +151,7 @@ final class TrieTreeNode {
      * @param inputString the inputString holding all input values and the output
      *                    index.
      */
-    private void propagateChildrenAndPriorities(String value, InputString inputString) {
+    private void propagateChildrenAndOutputs(String value, InputString inputString) {
         Collection<TrieTreeNode> nodesToReceiveChildren = List.of(children.get(value));
         if (ANY.equals(value)) {
             nodesToReceiveChildren = children.values();
@@ -153,47 +162,38 @@ final class TrieTreeNode {
             if (isNoTheEndOfTheBranch) {
                 child.append(inputString);
             } else {
-                child.addPriority(inputString.priority());
+                child.addOutput(inputString.priority());
             }
         }
     }
 
     /**
      * In the case of conflicting branches (possible input combinations that could
-     * result in more than one priority),
-     * this method solves the conflict keeping in memory the highest priorities,
+     * result in more than one output),
+     * this method solves the conflict keeping in memory the highest outputs,
      * depending on the hit policy.
      *
-     * @param priorities the priorities queue
+     * @param outputs the outputs collection
      */
-    public void addPriorities(Queue<Integer> priorities) {
-        if (priorities != null) {
-            for (var priority : priorities) {
-                addPriority(priority);
+    public void addOutputs(Collection<Integer> outputs) {
+        if (outputs != null) {
+            for (var output : outputs) {
+                addOutput(output);
             }
         }
     }
 
     /**
      * In the case of conflicting branches (possible input combinations that could
-     * result in more than one priority),
-     * this method solves the conflict keeping in memory the highest priority,
+     * result in more than one output),
+     * this method solves the conflict keeping in memory the highest output,
      * depending on the hit policy.
      *
-     * @param priority the priority or index of an output
+     * @param output the index of an output
      */
-    public void addPriority(Integer priority) {
-        if (priority != null && !this.priorities.contains(priority)) {
-            if (HitPolicy.COLLECT == hitPolicy || this.priorities.isEmpty()) {
-                this.priorities.add(priority);
-            } else {
-                var existingPriority = priorities.poll();
-                if (priority.compareTo(existingPriority) < 0) {
-                    priorities.add(priority);
-                } else {
-                    priorities.add(existingPriority);
-                }
-            }
+    public void addOutput(Integer output) {
+        if (output != null) {
+            outputs.add(output);
         }
     }
 
@@ -219,8 +219,15 @@ final class TrieTreeNode {
             var anyNode = children.get(ANY);
             children = anyNode.children;
             nodeLevel = anyNode.nodeLevel;
-            priorities = anyNode.priorities;
+            outputs = anyNode.outputs;
         }
         children.values().forEach(TrieTreeNode::compress);
+
+        if (hitPolicy.isFindFirst()) {
+            var first = outputs.stream().findFirst();
+            if (first.isPresent()) {
+                outputs = List.of(first.get());
+            }
+        }
     }
 }
