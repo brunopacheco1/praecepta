@@ -28,39 +28,39 @@ class PraeceptaEngineTest {
 
     @Test
     void throws_an_exception_if_no_output_is_returned() {
-        var rule1 = new Praeceptum(OUTPUT_1_INDEX, ruleInput(INPUT_1, null), ruleOutput(OUTPUT_1));
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
 
-        var rule2 = new Praeceptum(OUTPUT_2_INDEX, ruleInput(null, INPUT_2), ruleOutput(OUTPUT_2));
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
 
-        var evaluator = new PraeceptaEngine<>(HitPolicy.UNIQUE, inputStrategy, outputStrategy);
-        evaluator.register(List.of(rule1, rule2));
+        var engine = new PraeceptaEngine<>(HitPolicy.UNIQUE, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
 
         var input = new DummyInput(null, null);
-        Assertions.assertThatThrownBy(() -> evaluator.evaluate(input)).isInstanceOf(MissingOutputException.class);
+        Assertions.assertThatThrownBy(() -> engine.evaluate(input)).isInstanceOf(MissingOutputException.class);
     }
 
     @Test
     void fails_when_there_are_praecepta_that_will_never_be_reached() {
-        var rule1 = new Praeceptum(OUTPUT_1_INDEX, ruleInput(null, null), ruleOutput(OUTPUT_1));
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(null, null), praeceptumOutput(OUTPUT_1));
 
-        var rule2 = new Praeceptum(OUTPUT_2_INDEX, ruleInput(null, INPUT_2), ruleOutput(OUTPUT_2));
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
 
-        var evaluator = new PraeceptaEngine<>(HitPolicy.UNIQUE, inputStrategy, outputStrategy);
+        var engine = new PraeceptaEngine<>(HitPolicy.UNIQUE, inputStrategy, outputStrategy);
 
-        var praecepta = List.of(rule1, rule2);
-        Assertions.assertThatThrownBy(() -> evaluator.register(praecepta)).isInstanceOf(InvalidPraeceptaException.class);
+        var praecepta = List.of(praeceptum2, praeceptum1);
+        Assertions.assertThatThrownBy(() -> engine.register(praecepta)).isInstanceOf(InvalidPraeceptaException.class);
     }
 
     @Test
     void does_not_fail_when_there_are_overlapping_praecepta_if_hit_policy_is_collect() {
-        var rule1 = new Praeceptum(OUTPUT_1_INDEX, ruleInput(null, null), ruleOutput(OUTPUT_1));
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(null, null), praeceptumOutput(OUTPUT_1));
 
-        var rule2 = new Praeceptum(OUTPUT_2_INDEX, ruleInput(null, INPUT_2), ruleOutput(OUTPUT_2));
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
 
-        var evaluator = new PraeceptaEngine<>(HitPolicy.COLLECT, inputStrategy, outputStrategy);
-        evaluator.register(List.of(rule1, rule2));
+        var engine = new PraeceptaEngine<>(HitPolicy.COLLECT, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
 
-        var actual = evaluator.evaluate(new DummyInput(null, INPUT_2));
+        var actual = engine.evaluate(new DummyInput(null, INPUT_2));
 
         var expected = List.of(
                 new DummyOutput(OUTPUT_1),
@@ -72,15 +72,15 @@ class PraeceptaEngineTest {
     }
 
     @Test
-    void should_return_rule1_as_it_has_bigger_priority() {
-        var rule1 = new Praeceptum(OUTPUT_1_INDEX, ruleInput(INPUT_1, null), ruleOutput(OUTPUT_1));
+    void should_return_praeceptum1_as_it_has_bigger_priority() {
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
 
-        var rule2 = new Praeceptum(OUTPUT_2_INDEX, ruleInput(null, INPUT_2), ruleOutput(OUTPUT_2));
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
 
-        var evaluator = new PraeceptaEngine<>(HitPolicy.UNIQUE, inputStrategy, outputStrategy);
-        evaluator.register(List.of(rule1, rule2));
+        var engine = new PraeceptaEngine<>(HitPolicy.UNIQUE, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
 
-        var actual = evaluator.evaluate(new DummyInput(INPUT_1, INPUT_2));
+        var actual = engine.evaluate(new DummyInput(INPUT_1, INPUT_2));
 
         var expected = List.of(
                 new DummyOutput(OUTPUT_1));
@@ -91,15 +91,15 @@ class PraeceptaEngineTest {
     }
 
     @Test
-    void should_return_rule1_and_rule2() {
-        var rule1 = new Praeceptum(OUTPUT_1_INDEX, ruleInput(INPUT_1, null), ruleOutput(OUTPUT_1));
+    void should_return_praeceptum1_and_praeceptum2() {
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
 
-        var rule2 = new Praeceptum(OUTPUT_2_INDEX, ruleInput(null, INPUT_2), ruleOutput(OUTPUT_2));
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
 
-        var evaluator = new PraeceptaEngine<>(HitPolicy.COLLECT, inputStrategy, outputStrategy);
-        evaluator.register(List.of(rule1, rule2));
+        var engine = new PraeceptaEngine<>(HitPolicy.COLLECT, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
 
-        var actual = evaluator.evaluate(new DummyInput(INPUT_1, INPUT_2));
+        var actual = engine.evaluate(new DummyInput(INPUT_1, INPUT_2));
 
         var expected = List.of(
                 new DummyOutput(OUTPUT_1),
@@ -111,15 +111,15 @@ class PraeceptaEngineTest {
     }
 
     @Test
-    void should_return_rule2_as_it_is_the_match() {
-        var rule1 = new Praeceptum(OUTPUT_1_INDEX, ruleInput(INPUT_1, null), ruleOutput(OUTPUT_1));
+    void should_return_praeceptum2_as_it_is_the_match() {
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
 
-        var rule2 = new Praeceptum(OUTPUT_2_INDEX, ruleInput(null, INPUT_2), ruleOutput(OUTPUT_2));
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
 
-        var evaluator = new PraeceptaEngine<>(HitPolicy.UNIQUE, inputStrategy, outputStrategy);
-        evaluator.register(List.of(rule1, rule2));
+        var engine = new PraeceptaEngine<>(HitPolicy.UNIQUE, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
 
-        var actual = evaluator.evaluate(new DummyInput(null, INPUT_2));
+        var actual = engine.evaluate(new DummyInput(null, INPUT_2));
 
         var expected = List.of(
                 new DummyOutput(OUTPUT_2));
@@ -130,15 +130,15 @@ class PraeceptaEngineTest {
     }
 
     @Test
-    void should_return_rule2_as_it_is_the_match_also_when_evaluating_all_praecepta() {
-        var rule1 = new Praeceptum(OUTPUT_1_INDEX, ruleInput(INPUT_1, null), ruleOutput(OUTPUT_1));
+    void should_return_praeceptum2_as_it_is_the_match_also_when_evaluating_all_praecepta() {
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
 
-        var rule2 = new Praeceptum(OUTPUT_2_INDEX, ruleInput(null, INPUT_2), ruleOutput(OUTPUT_2));
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
 
-        var evaluator = new PraeceptaEngine<>(HitPolicy.UNIQUE, inputStrategy, outputStrategy);
-        evaluator.register(List.of(rule1, rule2));
+        var engine = new PraeceptaEngine<>(HitPolicy.UNIQUE, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
 
-        var actual = evaluator.evaluate(new DummyInput(null, INPUT_2));
+        var actual = engine.evaluate(new DummyInput(null, INPUT_2));
 
         var expected = List.of(
                 new DummyOutput(OUTPUT_2));
@@ -148,14 +148,14 @@ class PraeceptaEngineTest {
                 .containsExactlyInAnyOrderElementsOf(expected);
     }
 
-    private Input ruleInput(String inputOne, String inputTwo) {
+    private Input praeceptumInput(String inputOne, String inputTwo) {
         var values = new HashMap<String, String>();
         values.put("inputOne", inputOne);
         values.put("inputTwo", inputTwo);
         return new Input(values);
     }
 
-    private Output ruleOutput(String output) {
+    private Output praeceptumOutput(String output) {
         var values = new HashMap<String, String>();
         values.put("output", output);
         return new Output(values);
