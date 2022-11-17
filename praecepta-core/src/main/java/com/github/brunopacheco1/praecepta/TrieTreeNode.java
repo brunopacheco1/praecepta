@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -55,13 +54,13 @@ final class TrieTreeNode {
      * @param inputString This object contains all field values of a given input.
      * @return the output indexes found for a given input
      */
-    public Optional<List<Integer>> evaluate(InputString inputString) {
+    public List<Integer> evaluate(InputString inputString) {
         // End of the chain, you found it.
         if (nodeLevel == inputString.size()) {
             if (outputs.isEmpty()) {
-                return Optional.empty();
+                return List.of();
             }
-            return Optional.of(List.copyOf(outputs));
+            return List.copyOf(outputs);
         }
 
         // Do you have the value I look for?
@@ -76,7 +75,7 @@ final class TrieTreeNode {
         }
 
         // Nothing found.
-        return Optional.empty();
+        return List.of();
     }
 
     /**

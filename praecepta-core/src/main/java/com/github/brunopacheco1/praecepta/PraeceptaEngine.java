@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BinaryOperator;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
@@ -17,7 +18,8 @@ public final class PraeceptaEngine<I, O> {
 
     private final InputStrategy<I> inputStrategy;
     private final OutputStrategy<O> outputStrategy;
-
+    private final HitPolicy hitPolicy;
+    private final AggregationOperator aggregationOperator;
     private final TrieTreeNode root;
 
     /**
@@ -34,6 +36,16 @@ public final class PraeceptaEngine<I, O> {
             HitPolicy hitPolicy,
             InputStrategy<I> inputStrategy,
             OutputStrategy<O> outputStrategy) {
+        this(hitPolicy, AggregationOperator.COLLECT, inputStrategy, outputStrategy);
+    }
+
+    public PraeceptaEngine(
+            HitPolicy hitPolicy,
+            AggregationOperator aggregationOperator,
+            InputStrategy<I> inputStrategy,
+            OutputStrategy<O> outputStrategy) {
+        this.hitPolicy = hitPolicy;
+        this.aggregationOperator = aggregationOperator;
         this.inputStrategy = inputStrategy;
         this.outputStrategy = outputStrategy;
         root = new TrieTreeNode(hitPolicy, TrieTreeNode.ROOT, 0);
@@ -136,11 +148,33 @@ public final class PraeceptaEngine<I, O> {
     public List<O> evaluate(I externalInput) {
         var input = inputStrategy.transform(externalInput);
         var inputString = buildInputString(0, input, this::sanitizeValueForEvaluation);
-        var result = root.evaluate(inputString).orElseThrow(MissingOutputException::new);
-        return result.stream()
+
+        var resultStream = root.evaluate(inputString)
+                .stream()
                 .map(outputs::get)
-                .map(outputStrategy::transform)
-                .toList();
+                .map(outputStrategy::transform);
+
+        List<O> result;
+        if (!hitPolicy.isFindFirst() && AggregationOperator.COLLECT != aggregationOperator) {
+            BinaryOperator<O> reduceFunction = switch (aggregationOperator) {
+                case SUM -> outputStrategy::sum;
+                case MIN -> outputStrategy::min;
+                case MAX -> outputStrategy::max;
+                default -> throw new IllegalArgumentException("Not expected aggregation");
+            };
+            result = resultStream
+                    .reduce(reduceFunction)
+                    .map(List::of)
+                    .orElseGet(List::of);
+        } else {
+            result = resultStream.toList();
+        }
+
+        if (result.isEmpty()) {
+            throw new MissingOutputException();
+        }
+
+        return result;
     }
 
     private String sanitizeValueForEvaluation(String value) {
