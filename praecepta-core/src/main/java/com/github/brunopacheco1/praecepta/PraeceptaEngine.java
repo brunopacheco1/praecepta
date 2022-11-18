@@ -18,7 +18,6 @@ public final class PraeceptaEngine<I, O> {
 
     private final InputStrategy<I> inputStrategy;
     private final OutputStrategy<O> outputStrategy;
-    private final HitPolicy hitPolicy;
     private final AggregationOperator aggregationOperator;
     private final TrieTreeNode root;
 
@@ -44,7 +43,6 @@ public final class PraeceptaEngine<I, O> {
             AggregationOperator aggregationOperator,
             InputStrategy<I> inputStrategy,
             OutputStrategy<O> outputStrategy) {
-        this.hitPolicy = hitPolicy;
         this.aggregationOperator = aggregationOperator;
         this.inputStrategy = inputStrategy;
         this.outputStrategy = outputStrategy;
@@ -86,11 +84,11 @@ public final class PraeceptaEngine<I, O> {
         var visitor = new EngineAssertionsVisitor();
         root.accept(visitor);
 
-        if (visitor.getShouldHaveOutputs() > 0) {
+        if (visitor.getShouldHaveRuleIds() > 0) {
             throw new InvalidPraeceptaException();
         }
 
-        if (visitor.getShouldNotHaveOutputs() > 0) {
+        if (visitor.getShouldNotHaveRuleIds() > 0) {
             throw new InvalidPraeceptaException();
         }
 
@@ -155,7 +153,7 @@ public final class PraeceptaEngine<I, O> {
                 .map(outputStrategy::transform);
 
         List<O> result;
-        if (!hitPolicy.isFindFirst() && AggregationOperator.COLLECT != aggregationOperator) {
+        if (AggregationOperator.COLLECT != aggregationOperator) {
             BinaryOperator<O> reduceFunction = switch (aggregationOperator) {
                 case SUM -> outputStrategy::sum;
                 case MIN -> outputStrategy::min;

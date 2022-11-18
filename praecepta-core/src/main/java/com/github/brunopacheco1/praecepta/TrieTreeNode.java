@@ -25,21 +25,21 @@ final class TrieTreeNode {
 
     private Map<String, TrieTreeNode> children = new HashMap<>();
 
-    private Collection<Integer> outputs;
+    private Collection<Integer> ruleIds;
 
     public TrieTreeNode(HitPolicy hitPolicy, String value, int nodeLevel) {
         this.hitPolicy = hitPolicy;
         this.value = value;
         this.nodeLevel = nodeLevel;
-        outputs = switch (hitPolicy) {
+        ruleIds = switch (hitPolicy) {
             case FIRST, COLLECT -> new LinkedHashSet<>();
             case ANY, UNIQUE, RULE_ORDER -> new TreeSet<>();
             case PRIORITY, OUTPUT_ORDER -> new TreeSet<>(Comparator.reverseOrder());
         };
     }
 
-    public List<Integer> getOutputs() {
-        return List.copyOf(outputs);
+    public List<Integer> getRuleIds() {
+        return List.copyOf(ruleIds);
     }
 
     public Map<String, TrieTreeNode> getChildren() {
@@ -52,15 +52,15 @@ final class TrieTreeNode {
      * and recursively goes throw all other fields, until the end of the branch.
      *
      * @param inputString This object contains all field values of a given input.
-     * @return the output indexes found for a given input
+     * @return the ruleId indexes found for a given input
      */
     public List<Integer> evaluate(InputString inputString) {
         // End of the chain, you found it.
         if (nodeLevel == inputString.size()) {
-            if (outputs.isEmpty()) {
+            if (ruleIds.isEmpty()) {
                 return List.of();
             }
-            return List.copyOf(outputs);
+            return List.copyOf(ruleIds);
         }
 
         // Do you have the value I look for?
@@ -79,12 +79,11 @@ final class TrieTreeNode {
     }
 
     /**
-     * This method append a inputString (input values and a priority/output index)
+     * This method append a inputString (input values and ruleId)
      * into the tree,
      * either matching existing branches or creating new ones.
      *
-     * @param inputString an object containing values for further matching and a
-     *                    output index.
+     * @param inputString an object containing values for further matching and ruleId.
      */
     public void append(InputString inputString) {
         var possibleValues = splitIntoPossibleValues(inputString.get(nodeLevel));
@@ -131,7 +130,7 @@ final class TrieTreeNode {
      * @param nodeToCopy node to copy from.
      */
     private void copyNode(TrieTreeNode nodeToCopy) {
-        addOutputs(nodeToCopy.outputs);
+        addRuleIds(nodeToCopy.ruleIds);
         for (var otherChild : nodeToCopy.children.values()) {
             var child = new TrieTreeNode(hitPolicy, otherChild.value, otherChild.nodeLevel);
             children.put(child.value, child);
@@ -147,8 +146,7 @@ final class TrieTreeNode {
      * will receive the following values in order to keep the tree consistent.
      *
      * @param value       the current value, previously added to the tree.
-     * @param inputString the inputString holding all input values and the output
-     *                    index.
+     * @param inputString the inputString holding all input values and the ruleId.
      */
     private void propagateChildrenAndOutputs(String value, InputString inputString) {
         Collection<TrieTreeNode> nodesToReceiveChildren = List.of(children.get(value));
@@ -161,38 +159,38 @@ final class TrieTreeNode {
             if (isNoTheEndOfTheBranch) {
                 child.append(inputString);
             } else {
-                child.addOutput(inputString.priority());
+                child.addRuleId(inputString.ruleId());
             }
         }
     }
 
     /**
      * In the case of conflicting branches (possible input combinations that could
-     * result in more than one output),
-     * this method solves the conflict keeping in memory the highest outputs,
+     * result in more than one ruleId),
+     * this method solves the conflict keeping in memory the highest ruleIds,
      * depending on the hit policy.
      *
-     * @param outputs the outputs collection
+     * @param ruleIds the ruleIds collection
      */
-    public void addOutputs(Collection<Integer> outputs) {
-        if (outputs != null) {
-            for (var output : outputs) {
-                addOutput(output);
+    public void addRuleIds(Collection<Integer> ruleIds) {
+        if (ruleIds != null) {
+            for (var ruleId : ruleIds) {
+                addRuleId(ruleId);
             }
         }
     }
 
     /**
      * In the case of conflicting branches (possible input combinations that could
-     * result in more than one output),
-     * this method solves the conflict keeping in memory the highest output,
+     * result in more than one ruleId),
+     * this method solves the conflict keeping in memory the highest ruleId,
      * depending on the hit policy.
      *
-     * @param output the index of an output
+     * @param ruleId the index of an ruleId
      */
-    public void addOutput(Integer output) {
-        if (output != null) {
-            outputs.add(output);
+    public void addRuleId(Integer ruleId) {
+        if (ruleId != null) {
+            ruleIds.add(ruleId);
         }
     }
 
@@ -218,14 +216,14 @@ final class TrieTreeNode {
             var anyNode = children.get(ANY);
             children = anyNode.children;
             nodeLevel = anyNode.nodeLevel;
-            outputs = anyNode.outputs;
+            ruleIds = anyNode.ruleIds;
         }
         children.values().forEach(TrieTreeNode::compress);
 
         if (hitPolicy.isFindFirst()) {
-            var first = outputs.stream().findFirst();
+            var first = ruleIds.stream().findFirst();
             if (first.isPresent()) {
-                outputs = List.of(first.get());
+                ruleIds = List.of(first.get());
             }
         }
     }
