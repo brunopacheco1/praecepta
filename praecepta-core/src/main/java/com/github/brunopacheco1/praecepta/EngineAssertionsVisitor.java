@@ -13,8 +13,8 @@ public final class EngineAssertionsVisitor implements TrieTreeVisitor {
     private final List<Integer> pathLengths = new ArrayList<>();
     private final Deque<Integer> pathLengthsStack = new ArrayDeque<>();
     private int numberOfNodes;
-    private int shouldHaveOutputs;
-    private int shouldNotHaveOutputs;
+    private int shouldHaveRuleIds;
+    private int shouldNotHaveRuleIds;
 
     public Set<Integer> getFoundPraecepta() {
         return Set.copyOf(foundPraecepta);
@@ -28,12 +28,12 @@ public final class EngineAssertionsVisitor implements TrieTreeVisitor {
         return numberOfNodes;
     }
 
-    public int getShouldHaveOutputs() {
-        return shouldHaveOutputs;
+    public int getShouldHaveRuleIds() {
+        return shouldHaveRuleIds;
     }
 
-    public int getShouldNotHaveOutputs() {
-        return shouldNotHaveOutputs;
+    public int getShouldNotHaveRuleIds() {
+        return shouldNotHaveRuleIds;
     }
 
     @Override
@@ -46,14 +46,14 @@ public final class EngineAssertionsVisitor implements TrieTreeVisitor {
 
         if (node.getChildren().isEmpty()) {
             pathLengths.add(pathLength);
-            if (node.getOutputs().isEmpty()) {
-                shouldHaveOutputs++;
+            if (node.getRuleIds().isEmpty()) {
+                shouldHaveRuleIds++;
             } else {
-                foundPraecepta.addAll(node.getOutputs());
+                foundPraecepta.addAll(node.getRuleIds());
             }
         } else {
-            if (!node.getOutputs().isEmpty()) {
-                shouldNotHaveOutputs++;
+            if (!node.getRuleIds().isEmpty()) {
+                shouldNotHaveRuleIds++;
             }
         }
 

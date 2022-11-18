@@ -6,7 +6,7 @@ import java.util.List;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class PraeceptaEngineTest {
+class PraeceptaEngineRulesSortedByRuleIdTest {
 
     private static final Integer OUTPUT_1_INDEX = 1;
     private static final Integer OUTPUT_2_INDEX = 2;
@@ -52,12 +52,12 @@ class PraeceptaEngineTest {
     }
 
     @Test
-    void does_not_fail_when_there_are_overlapping_praecepta_if_hit_policy_is_collect() {
+    void does_not_fail_when_there_are_overlapping_praecepta_if_hit_policy_is_RULE_ORDER() {
         var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(null, null), praeceptumOutput(OUTPUT_1));
 
         var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
 
-        var engine = new PraeceptaEngine<>(HitPolicy.COLLECT, inputStrategy, outputStrategy);
+        var engine = new PraeceptaEngine<>(HitPolicy.RULE_ORDER, inputStrategy, outputStrategy);
         engine.register(List.of(praeceptum1, praeceptum2));
 
         var actual = engine.evaluate(new DummyInput(null, INPUT_2));
@@ -96,7 +96,7 @@ class PraeceptaEngineTest {
 
         var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
 
-        var engine = new PraeceptaEngine<>(HitPolicy.COLLECT, inputStrategy, outputStrategy);
+        var engine = new PraeceptaEngine<>(HitPolicy.RULE_ORDER, inputStrategy, outputStrategy);
         engine.register(List.of(praeceptum1, praeceptum2));
 
         var actual = engine.evaluate(new DummyInput(INPUT_1, INPUT_2));
