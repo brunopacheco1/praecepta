@@ -33,6 +33,7 @@
     <modules>
         <module>praecepta-engine</module>
         <module>praecepta-loader</module>
+        <module>praecepta-maven-plugin</module>
     </modules>
     <build>
         <pluginManagement>

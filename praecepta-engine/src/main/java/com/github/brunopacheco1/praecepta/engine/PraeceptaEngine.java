@@ -21,7 +21,7 @@ import com.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import com.github.brunopacheco1.praecepta.engine.exceptions.InvalidPraeceptaException;
 import com.github.brunopacheco1.praecepta.engine.exceptions.MissingOutputException;
 
-public final class PraeceptaEngine<I, O> {
+public class PraeceptaEngine<I, O> {
 
     private static Logger log = Logger.getLogger(PraeceptaEngine.class.getName());
 

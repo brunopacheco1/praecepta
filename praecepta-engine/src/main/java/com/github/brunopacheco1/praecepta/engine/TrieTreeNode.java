@@ -14,11 +14,11 @@ import java.util.stream.Stream;
 import com.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import com.github.brunopacheco1.praecepta.engine.beans.InputString;
 
-final class TrieTreeNode {
+public final class TrieTreeNode {
 
-    static final String ROOT = "ROOT";
-    static final String ANY = "_ANY_";
-    static final String NULL = "NULL";
+    public static final String ROOT = "ROOT";
+    public static final String ANY = "_ANY_";
+    public static final String NULL = "NULL";
 
     private final String value;
 
@@ -229,5 +229,13 @@ final class TrieTreeNode {
                 ruleIds = List.of(first.get());
             }
         }
+    }
+
+    public String getValue() {
+        return value;
+    }
+
+    public int getNodeLevel() {
+        return nodeLevel;
     }
 }
