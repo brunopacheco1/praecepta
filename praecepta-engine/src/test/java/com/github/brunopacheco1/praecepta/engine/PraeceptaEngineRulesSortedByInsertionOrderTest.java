@@ -6,6 +6,7 @@ import java.util.List;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import com.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import com.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import com.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import com.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
@@ -29,8 +30,26 @@ class PraeceptaEngineRulesSortedByInsertionOrderTest {
         return new PraeceptaInput(values);
     };
 
-    private final OutputStrategy<DummyOutput> outputStrategy = (PraeceptaOutput output) -> {
-        return new DummyOutput(output.values().get("output"));
+    private final OutputStrategy<DummyOutput> outputStrategy = new OutputStrategy<DummyOutput>() {
+        @Override
+        public DummyOutput transform(PraeceptaOutput output) {
+            return new DummyOutput(output.values().get("output"));
+        }
+
+        @Override
+        public DummyOutput max(DummyOutput obj1, DummyOutput obj2) {
+            return obj1.output().compareTo(obj2.output()) > 0 ? obj1 : obj2;
+        }
+
+        @Override
+        public DummyOutput min(DummyOutput obj1, DummyOutput obj2) {
+            return obj1.output().compareTo(obj2.output()) < 0 ? obj1 : obj2;
+        }
+
+        @Override
+        public DummyOutput sum(DummyOutput obj1, DummyOutput obj2) {
+            return new DummyOutput(obj1.output() + obj2.output());
+        }
     };
 
     @Test
@@ -149,6 +168,179 @@ class PraeceptaEngineRulesSortedByInsertionOrderTest {
 
         var expected = List.of(
                 new DummyOutput(OUTPUT_2));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveFieldByFieldElementComparator()
+                .containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    @Test
+    void should_return_praeceptum2_as_it_is_the_match_also_when_evaluating_all_praecepta_and_hit_policy_is_COLLECT() {
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
+
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
+
+        var engine = new PraeceptaEngine<>(HitPolicy.COLLECT, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
+
+        var actual = engine.evaluate(new DummyInput(null, INPUT_2));
+
+        var expected = List.of(
+                new DummyOutput(OUTPUT_2));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveFieldByFieldElementComparator()
+                .containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    @Test
+    void should_return_praeceptum1_as_it_is_the_match() {
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
+
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
+
+        var engine = new PraeceptaEngine<>(HitPolicy.FIRST, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
+
+        var actual = engine.evaluate(new DummyInput(INPUT_1, null));
+
+        var expected = List.of(
+                new DummyOutput(OUTPUT_1));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveFieldByFieldElementComparator()
+                .containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    @Test
+    void should_return_praeceptum1_as_it_is_the_match_also_when_evaluating_all_praecepta() {
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
+
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
+
+        var engine = new PraeceptaEngine<>(HitPolicy.FIRST, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
+
+        var actual = engine.evaluate(new DummyInput(INPUT_1, null));
+
+        var expected = List.of(
+                new DummyOutput(OUTPUT_1));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveFieldByFieldElementComparator()
+                .containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    @Test
+    void should_return_praeceptum1_as_it_is_the_match_also_when_evaluating_all_praecepta_and_hit_policy_is_COLLECT() {
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
+
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
+
+        var engine = new PraeceptaEngine<>(HitPolicy.COLLECT, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
+
+        var actual = engine.evaluate(new DummyInput(INPUT_1, null));
+
+        var expected = List.of(
+                new DummyOutput(OUTPUT_1));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveFieldByFieldElementComparator()
+                .containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    @Test
+    void should_return_praeceptum1_and_praeceptum2_as_they_are_the_matches_also_when_hit_policy_is_COLLECT() {
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
+
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
+
+        var engine = new PraeceptaEngine<>(HitPolicy.COLLECT, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
+
+        var actual = engine.evaluate(new DummyInput(INPUT_1, INPUT_2));
+
+        var expected = List.of(
+                new DummyOutput(OUTPUT_1),
+                new DummyOutput(OUTPUT_2));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveFieldByFieldElementComparator()
+                .containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    @Test
+    void should_return_praeceptum1_and_praeceptum2_as_they_are_the_matches_also_when_hit_policy_is_COLLECT_and_aggregation_operator_is_COLLECT() {
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
+
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
+
+        var engine = new PraeceptaEngine<>(HitPolicy.COLLECT, AggregationOperator.COLLECT, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
+
+        var actual = engine.evaluate(new DummyInput(INPUT_1, INPUT_2));
+
+        var expected = List.of(
+                new DummyOutput(OUTPUT_1),
+                new DummyOutput(OUTPUT_2));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveFieldByFieldElementComparator()
+                .containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    @Test
+    void should_return_praeceptum1_and_praeceptum2_as_they_are_the_matches_also_when_hit_policy_is_COLLECT_and_aggregation_operator_is_MAX() {
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
+
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
+
+        var engine = new PraeceptaEngine<>(HitPolicy.COLLECT, AggregationOperator.MAX, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
+
+        var actual = engine.evaluate(new DummyInput(INPUT_1, INPUT_2));
+
+        var expected = List.of(
+                new DummyOutput("OUTPUT_2"));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveFieldByFieldElementComparator()
+                .containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    @Test
+    void should_return_praeceptum1_and_praeceptum2_as_they_are_the_matches_also_when_hit_policy_is_COLLECT_and_aggregation_operator_is_MIN() {
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
+
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
+
+        var engine = new PraeceptaEngine<>(HitPolicy.COLLECT, AggregationOperator.MIN, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
+
+        var actual = engine.evaluate(new DummyInput(INPUT_1, INPUT_2));
+
+        var expected = List.of(
+                new DummyOutput("OUTPUT_1"));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveFieldByFieldElementComparator()
+                .containsExactlyInAnyOrderElementsOf(expected);
+    }
+
+    @Test
+    void should_return_praeceptum1_and_praeceptum2_as_they_are_the_matches_also_when_hit_policy_is_COLLECT_and_aggregation_operator_is_SUM() {
+        var praeceptum1 = new Praeceptum(OUTPUT_1_INDEX, praeceptumInput(INPUT_1, null), praeceptumOutput(OUTPUT_1));
+
+        var praeceptum2 = new Praeceptum(OUTPUT_2_INDEX, praeceptumInput(null, INPUT_2), praeceptumOutput(OUTPUT_2));
+
+        var engine = new PraeceptaEngine<>(HitPolicy.COLLECT, AggregationOperator.SUM, inputStrategy, outputStrategy);
+        engine.register(List.of(praeceptum1, praeceptum2));
+
+        var actual = engine.evaluate(new DummyInput(INPUT_1, INPUT_2));
+
+        var expected = List.of(
+                new DummyOutput("OUTPUT_1OUTPUT_2"));
 
         Assertions.assertThat(actual)
                 .usingRecursiveFieldByFieldElementComparator()
