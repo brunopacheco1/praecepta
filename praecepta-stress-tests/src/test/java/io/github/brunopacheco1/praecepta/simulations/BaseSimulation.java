@@ -1,7 +1,6 @@
 package io.github.brunopacheco1.praecepta.simulations;
 
 import io.gatling.javaapi.core.CheckBuilder;
-import io.gatling.javaapi.core.FeederBuilder;
 import io.gatling.javaapi.core.Simulation;
 import io.gatling.javaapi.http.HttpProtocolBuilder;
 
@@ -10,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 
 import static io.github.brunopacheco1.praecepta.simulations.SimulationProperties.baseUrl;
-import static io.gatling.javaapi.core.CoreDsl.csv;
 import static io.gatling.javaapi.core.CoreDsl.substring;
 import static io.gatling.javaapi.http.HttpDsl.http;
 import static io.gatling.javaapi.http.HttpDsl.status;

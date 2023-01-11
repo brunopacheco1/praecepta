@@ -11,7 +11,6 @@ import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.TrieTreeVisitor;
 import io.github.brunopacheco1.praecepta.engine.TrieTreeNode;
-import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.maven.plugin.templates.compilation.beans.NodeClassModel;
 
 import static io.github.brunopacheco1.praecepta.maven.plugin.templates.TemplateConfigurationConst.CONFIGURATION;
