@@ -1,0 +1,18 @@
+POST http://localhost:8080/api/v1/benchmark
+Content-Type: application/json
+
+{
+  "inputA": null,
+  "inputB": "B",
+  "inputC": null,
+  "inputD": null,
+  "inputE": null,
+  "inputF": "NO",
+  "inputG": null,
+  "inputH": null,
+  "inputI": "NO",
+  "inputJ": "YES",
+  "inputK": null,
+  "inputL": null,
+  "inputM": null
+}

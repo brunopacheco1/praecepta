@@ -1,6 +1,4 @@
 
-9
-	README.md,8/e/8ec9a00bfd09b3190ac6b22251dbb1aa95a0579d
 ¡
 qpraecepta-maven-plugin/src/main/java/com/github/brunopacheco1/praecepta/maven/plugin/rules/PluginRulesEngine.java,2/3/238ea46558ec95e212210d86e2cea6c17c6eed0f
 7

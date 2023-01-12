@@ -17,7 +17,7 @@ public class BenchmarkSimulation extends BaseSimulation {
                     .on(
                             exec(
                                     http("Benchmark")
-                                            .post("/benchmark")
+                                            .post("/api/v1/benchmark")
                                             .headers(COMMON_HEADERS)
                                             .body(StringBody(requestBody("request.json")))
                                             .check(errorChecks)
