@@ -2,13 +2,18 @@
 <project version="4">
   <component name="CompilerConfiguration">
     <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
       <profile name="Maven default annotation processors profile" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="praecepta-maven-plugin" />
+        <module name="praecepta-kogito-benchmark" />
         <module name="praecepta-loader" />
+        <module name="praecepta-stress-tests" />
+        <module name="praecepta-benchmark" />
         <module name="praecepta-engine" />
+        <module name="praecepta-camunda-benchmark" />
       </profile>
     </annotationProcessing>
   </component>
