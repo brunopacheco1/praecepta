@@ -1,1 +1,2 @@
-
+decision-table:
+  path: "decision_table.dmn"

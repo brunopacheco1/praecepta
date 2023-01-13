@@ -2,6 +2,7 @@ package io.com.github.brunopacheco1.praecepta.benchmark.service;
 
 import io.com.github.brunopacheco1.praecepta.benchmark.dto.BenchmarkInput;
 import io.com.github.brunopacheco1.praecepta.benchmark.dto.BenchmarkOutput;
+import io.com.github.brunopacheco1.praecepta.benchmark.dto.InputOutputConst;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;

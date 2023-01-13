@@ -1,7 +1,8 @@
-package io.com.github.brunopacheco1.praecepta.benchmark.service;
+package io.com.github.brunopacheco1.praecepta.camunda.benchmark.dto;
 
 import lombok.experimental.UtilityClass;
 
+import java.util.List;
 import java.util.Set;
 
 @UtilityClass
@@ -23,7 +24,7 @@ public class InputOutputConst {
     public static final String OUTPUT_B = "outputB";
     public static final String RULE_ID = "ruleId";
 
-    public static final Set<String> INPUTS = Set.of(
+    public static final List<String> INPUTS = List.of(
             INPUT_A,
             INPUT_B,
             INPUT_C,
@@ -39,7 +40,7 @@ public class InputOutputConst {
             INPUT_M
     );
 
-    public static final Set<String> OUTPUTS = Set.of(
+    public static final List<String> OUTPUTS = List.of(
             OUTPUT_A,
             OUTPUT_B,
             RULE_ID
