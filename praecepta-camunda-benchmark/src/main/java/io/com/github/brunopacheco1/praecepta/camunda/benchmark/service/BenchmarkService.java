@@ -8,8 +8,10 @@ import org.springframework.stereotype.Service;
 @Service
 @AllArgsConstructor
 public class BenchmarkService {
-    
+
+    private final BenchmarkEngine engine;
+
     public BenchmarkOutput benchmark(BenchmarkInput input) {
-        return BenchmarkOutput.builder().build();
+        return engine.evaluate(input);
     }
 }
