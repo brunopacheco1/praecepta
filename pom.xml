@@ -1,5 +1,6 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>io.github.brunopacheco1</groupId>
     <artifactId>praecepta</artifactId>
@@ -15,18 +16,23 @@
         <sonar.projectKey>brunopacheco1_praecepta</sonar.projectKey>
         <sonar.organization>brunopacheco1-github</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <native-buildtools.version>0.9.19</native-buildtools.version>
+        <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
+        <jacoco-maven-plugin.version>0.8.7</jacoco-maven-plugin.version>
+        <junit-jupiter-engine.version>5.9.1</junit-jupiter-engine.version>
+        <assertj-core.version>3.23.1</assertj-core.version>
     </properties>
     <dependencyManagement>
         <dependencies>
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
                 <artifactId>junit-jupiter-engine</artifactId>
-                <version>5.9.1</version>
+                <version>${junit-jupiter-engine.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
-                <version>3.23.1</version>
+                <version>${assertj-core.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -45,7 +51,12 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>2.22.2</version>
+                    <version>${maven-surefire-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.graalvm.buildtools</groupId>
+                    <artifactId>native-maven-plugin</artifactId>
+                    <version>${native-buildtools.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -53,7 +64,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.7</version>
+                <version>${jacoco-maven-plugin.version}</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
