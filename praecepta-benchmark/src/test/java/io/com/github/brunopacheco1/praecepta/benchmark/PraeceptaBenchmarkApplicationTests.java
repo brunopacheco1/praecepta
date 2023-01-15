@@ -9,5 +9,4 @@ class PraeceptaBenchmarkApplicationTests {
 	@Test
 	void contextLoads() {
 	}
-
 }

@@ -3,7 +3,6 @@ package io.com.github.brunopacheco1.praecepta.benchmark.dto;
 import lombok.experimental.UtilityClass;
 
 import java.util.List;
-import java.util.Set;
 
 @UtilityClass
 public class InputOutputConst {
