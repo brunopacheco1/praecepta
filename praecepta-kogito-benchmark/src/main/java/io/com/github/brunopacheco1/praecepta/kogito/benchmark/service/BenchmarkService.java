@@ -9,9 +9,7 @@ import org.springframework.stereotype.Service;
 @AllArgsConstructor
 public class BenchmarkService {
 
-    private final BenchmarkEngine engine;
-
     public BenchmarkOutput benchmark(BenchmarkInput input) {
-        return engine.evaluate(input);
+        return BenchmarkOutput.builder().build();
     }
 }
