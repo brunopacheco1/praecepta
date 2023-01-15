@@ -16,13 +16,14 @@
         <sonar.projectKey>brunopacheco1_praecepta</sonar.projectKey>
         <sonar.organization>brunopacheco1-github</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <native-buildtools.version>0.9.19</native-buildtools.version>
         <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
         <jacoco-maven-plugin.version>0.8.7</jacoco-maven-plugin.version>
         <junit-jupiter-engine.version>5.9.1</junit-jupiter-engine.version>
         <assertj-core.version>3.23.1</assertj-core.version>
         <jqwik.version>1.7.2</jqwik.version>
         <rest-assured.version>5.3.0</rest-assured.version>
+        <appengine-maven-plugin.version>2.4.4</appengine-maven-plugin.version>
+        <spring.boot.version>3.0.1</spring.boot.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -71,9 +72,14 @@
                     <version>${maven-surefire-plugin.version}</version>
                 </plugin>
                 <plugin>
-                    <groupId>org.graalvm.buildtools</groupId>
-                    <artifactId>native-maven-plugin</artifactId>
-                    <version>${native-buildtools.version}</version>
+                    <groupId>com.google.cloud.tools</groupId>
+                    <artifactId>appengine-maven-plugin</artifactId>
+                    <version>${appengine-maven-plugin.version}</version>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
                 </plugin>
             </plugins>
         </pluginManagement>

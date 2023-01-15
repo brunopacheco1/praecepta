@@ -13,7 +13,6 @@
 
     <properties>
         <sonar.projectKey>brunopacheco1_praecepta:${project.artifactId}</sonar.projectKey>
-        <spring.boot.version>3.0.1</spring.boot.version>
     </properties>
 
     <artifactId>praecepta-benchmark</artifactId>
@@ -36,23 +35,23 @@
             <artifactId>praecepta-loader</artifactId>
             <version>${project.version}</version>
         </dependency>
-        
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-		</dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
         </dependency>
-        
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
 
         <dependency>
             <groupId>net.jqwik</groupId>
@@ -71,18 +70,21 @@
             <artifactId>json-path</artifactId>
             <scope>test</scope>
         </dependency>
-	</dependencies>
+    </dependencies>
 
     <build>
         <plugins>
-			<plugin>
-				<groupId>org.graalvm.buildtools</groupId>
-				<artifactId>native-maven-plugin</artifactId>
-			</plugin>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-                <version>${spring.boot.version}</version>
+            <plugin>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>appengine-maven-plugin</artifactId>
+                <configuration>
+                    <deploy.projectId>praecepta-benchmark</deploy.projectId>
+                    <deploy.version>GCLOUD_CONFIG</deploy.version>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
                 <executions>
                     <execution>
                         <goals>
@@ -90,7 +92,7 @@
                         </goals>
                     </execution>
                 </executions>
-			</plugin>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
