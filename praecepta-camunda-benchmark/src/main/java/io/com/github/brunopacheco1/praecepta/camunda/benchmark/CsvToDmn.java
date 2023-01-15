@@ -93,6 +93,8 @@ public class CsvToDmn {
         }
 
         Dmn.writeModelToFile(new File("decision_table.dmn"), modelInstance);
+
+        csvParser.close();
     }
 
     private static String toDmnList(String value) {

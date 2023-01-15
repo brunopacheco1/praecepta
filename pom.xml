@@ -21,6 +21,8 @@
         <jacoco-maven-plugin.version>0.8.7</jacoco-maven-plugin.version>
         <junit-jupiter-engine.version>5.9.1</junit-jupiter-engine.version>
         <assertj-core.version>3.23.1</assertj-core.version>
+        <jqwik.version>1.7.2</jqwik.version>
+        <rest-assured.version>5.3.0</rest-assured.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -33,6 +35,21 @@
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
                 <version>${assertj-core.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.jqwik</groupId>
+                <artifactId>jqwik</artifactId>
+                <version>${jqwik.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.rest-assured</groupId>
+                <artifactId>rest-assured</artifactId>
+                <version>${rest-assured.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.rest-assured</groupId>
+                <artifactId>json-path</artifactId>
+                <version>${rest-assured.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
