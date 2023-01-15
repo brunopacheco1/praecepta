@@ -13,7 +13,6 @@
 
     <properties>
         <sonar.projectKey>brunopacheco1_praecepta:${project.artifactId}</sonar.projectKey>
-        <spring.boot.version>3.0.1</spring.boot.version>
         <version.org.kie.kogito>1.32.0.Final</version.org.kie.kogito>
         <kogito.bom.version>1.32.0.Final</kogito.bom.version>
     </properties>
@@ -44,6 +43,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+
         <dependency>
             <groupId>org.kie.kogito</groupId>
             <artifactId>kogito-decisions-spring-boot-starter</artifactId>
@@ -65,19 +65,16 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.graalvm.buildtools</groupId>
-                <artifactId>native-maven-plugin</artifactId>
-            </plugin>
-            <plugin>
-                <groupId>org.kie.kogito</groupId>
-                <artifactId>kogito-maven-plugin</artifactId>
-                <version>${version.org.kie.kogito}</version>
-                <extensions>true</extensions>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>appengine-maven-plugin</artifactId>
+                <configuration>
+                    <deploy.projectId>praecepta-kogito-benchmark</deploy.projectId>
+                    <deploy.version>GCLOUD_CONFIG</deploy.version>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <version>${spring.boot.version}</version>
                 <executions>
                     <execution>
                         <goals>

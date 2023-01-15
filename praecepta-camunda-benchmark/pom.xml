@@ -13,7 +13,6 @@
 
     <properties>
         <sonar.projectKey>brunopacheco1_praecepta:${project.artifactId}</sonar.projectKey>
-        <spring.boot.version>3.0.1</spring.boot.version>
         <camunda.version>7.18.0</camunda.version>
         <commons-csv.version>1.9.0</commons-csv.version>
     </properties>
@@ -87,13 +86,16 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.graalvm.buildtools</groupId>
-                <artifactId>native-maven-plugin</artifactId>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>appengine-maven-plugin</artifactId>
+                <configuration>
+                    <deploy.projectId>praecepta-camunda-benchmark</deploy.projectId>
+                    <deploy.version>GCLOUD_CONFIG</deploy.version>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <version>${spring.boot.version}</version>
                 <executions>
                     <execution>
                         <goals>
