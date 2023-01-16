@@ -37,18 +37,12 @@
     </properties>
     <dependencyManagement>
         <dependencies>
-            
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring.boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.springdoc</groupId>
-                <artifactId>springdoc-openapi-ui</artifactId>
-                <version>${springdoc-openapi-ui.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
