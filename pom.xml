@@ -34,6 +34,7 @@
         <appengine-maven-plugin.version>2.4.4</appengine-maven-plugin.version>
         <spring.boot.version>3.0.1</spring.boot.version>
         <springdoc-openapi-ui.version>1.6.14</springdoc-openapi-ui.version>
+        <native-maven-plugin.version>0.9.19</native-maven-plugin.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -98,6 +99,11 @@
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <version>${spring.boot.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.graalvm.buildtools</groupId>
+                    <artifactId>native-maven-plugin</artifactId>
+                    <version>${native-maven-plugin.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
