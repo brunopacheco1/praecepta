@@ -16,6 +16,15 @@
         <sonar.projectKey>brunopacheco1_praecepta</sonar.projectKey>
         <sonar.organization>brunopacheco1-github</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <sonar.exclusions>
+            **/dto/**/*,
+            **/beans/**/*,
+            **/exceptions/**/*,
+            **/simulations/**/*,
+            **/praecepta/maven/plugin/**/*,
+            **/*BenchmarkApplication.java,
+            **/CsvToDmn.java
+        </sonar.exclusions>
         <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
         <jacoco-maven-plugin.version>0.8.7</jacoco-maven-plugin.version>
         <junit-jupiter-engine.version>5.9.1</junit-jupiter-engine.version>
