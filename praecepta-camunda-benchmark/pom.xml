@@ -75,7 +75,7 @@
                 <groupId>com.google.cloud.tools</groupId>
                 <artifactId>appengine-maven-plugin</artifactId>
                 <configuration>
-                    <deploy.projectId>praecepta-camunda-benchmark</deploy.projectId>
+                    <deploy.projectId>praecepta-benchmark</deploy.projectId>
                     <deploy.version>GCLOUD_CONFIG</deploy.version>
                 </configuration>
             </plugin>
