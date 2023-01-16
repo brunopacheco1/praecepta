@@ -49,9 +49,9 @@
     <dmn:extensionElements/>
     <dmn:variable id="_5CD867D5-6565-4DB1-A354-9F306C1855C9" name="inputL" typeRef="string"/>
   </dmn:inputData>
-  <dmn:inputData id="_3E2C4805-ABD5-4033-9EFE-071E05715FD4" name="inputLM">
+  <dmn:inputData id="_3E2C4805-ABD5-4033-9EFE-071E05715FD4" name="inputM">
     <dmn:extensionElements/>
-    <dmn:variable id="_247B79F6-B00D-4D3E-A88C-B54D6FB61A58" name="inputLM" typeRef="string"/>
+    <dmn:variable id="_247B79F6-B00D-4D3E-A88C-B54D6FB61A58" name="inputM" typeRef="string"/>
   </dmn:inputData>
   <dmn:decision id="_C0674B9A-7FAC-4AD4-8DED-976A034F7CB2" name="result">
     <dmn:extensionElements/>
@@ -158,7 +158,7 @@
       </dmn:input>
       <dmn:input id="_8BE40F3D-0AE2-4ECE-9B3F-7B4E67B1268B">
         <dmn:inputExpression id="_E54FBD3B-E523-4E5F-93C0-981DF3A847DF" typeRef="string">
-          <dmn:text>inputLM</dmn:text>
+          <dmn:text>inputM</dmn:text>
         </dmn:inputExpression>
       </dmn:input>
       <dmn:output id="outputA" name="outputA" typeRef="string"/>

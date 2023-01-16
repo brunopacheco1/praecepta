@@ -15,12 +15,25 @@
         <sonar.projectKey>brunopacheco1_praecepta:${project.artifactId}</sonar.projectKey>
         <version.org.kie.kogito>1.32.0.Final</version.org.kie.kogito>
         <kogito.bom.version>1.32.0.Final</kogito.bom.version>
+        <springdoc.version>1.6.14</springdoc.version>
     </properties>
 
     <artifactId>praecepta-kogito-benchmark</artifactId>
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring.boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.kie.kogito</groupId>
                 <artifactId>kogito-spring-boot-bom</artifactId>
@@ -53,6 +66,18 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>json-path</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -63,6 +88,14 @@
                 <configuration>
                     <deploy.projectId>praecepta-kogito-benchmark</deploy.projectId>
                     <deploy.version>GCLOUD_CONFIG</deploy.version>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.kie.kogito</groupId>
+                <artifactId>kogito-maven-plugin</artifactId>
+                <version>${version.org.kie.kogito}</version>
+                <configuration>
+                    <onDemand>true</onDemand>
                 </configuration>
             </plugin>
             <plugin>
