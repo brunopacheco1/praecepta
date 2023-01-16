@@ -7,19 +7,30 @@ on:
     types: [opened, synchronize, reopened]
 jobs:
   build:
+    permissions:
+      contents: 'read'
+      id-token: 'write'
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: graalvm/setup-graalvm@v1
+      - name: 'checkout'
+        uses: actions/checkout@v3
+      - name: 'gcloud'
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+      - name: 'graalvm setup'
+        uses: graalvm/setup-graalvm@v1
         with:
           version: 'latest'
           java-version: '17'
           components: 'native-image'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           native-image-job-reports: 'true'
-      - name: Build with Maven
+      - name: 'test'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn -B package -Pnative org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+        run: mvn -B package org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
+      - name: 'deploy'
+        run: mvn package appengine:deploy -B -DskipTests -Pnative

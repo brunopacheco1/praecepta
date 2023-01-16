@@ -1,2 +1,3 @@
 runtime: java17
+entrypoint: ./praecepta-kogito-benchmark
 service: kogito
