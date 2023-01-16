@@ -22,13 +22,6 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-dependencies</artifactId>
-                <version>${spring.boot.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
                 <groupId>org.kie.kogito</groupId>
                 <artifactId>kogito-spring-boot-bom</artifactId>
                 <version>${kogito.bom.version}</version>
