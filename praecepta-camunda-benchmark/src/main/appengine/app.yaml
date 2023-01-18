@@ -1,3 +1,2 @@
 runtime: java17
-entrypoint: ./praecepta-camunda-benchmark
 service: camunda

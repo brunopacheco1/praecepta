@@ -89,7 +89,6 @@
                 <configuration>
                     <deploy.projectId>praecepta-benchmark</deploy.projectId>
                     <deploy.version>GCLOUD_CONFIG</deploy.version>
-                    <stage.artifact>${project.build.directory}/${project.build.finalName}</stage.artifact>
                 </configuration>
             </plugin>
             <plugin>

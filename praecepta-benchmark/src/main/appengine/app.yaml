@@ -1,3 +1,2 @@
 runtime: java17
-entrypoint: ./praecepta-benchmark
 service: default
