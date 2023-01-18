@@ -27,23 +27,8 @@ jobs:
           components: 'native-image'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           native-image-job-reports: 'true'
-      - name: 'build'
+      - name: 'build & deploy'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn -B install org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Pnative
-      - name: 'deploy praecepta'
-        run: |
-          cd praecepta-benchmark
-          mvn clean package native:compile appengine:deploy -B -DskipTests -Pnative
-          cd ..
-      - name: 'deploy kogito'
-        run: |
-          cd praecepta-kogito-benchmark
-          mvn clean package native:compile appengine:deploy -B -DskipTests -Pnative
-          cd ..
-      - name: 'deploy camunda'
-        run: |
-          cd praecepta-camunda-benchmark
-          mvn clean package native:compile appengine:deploy -B -DskipTests -Pnative
-          cd ..
+        run: mvn -B package org.sonarsource.scanner.maven:sonar-maven-plugin:sonar appengine:deploy
