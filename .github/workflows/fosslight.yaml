@@ -20,10 +20,10 @@ jobs:
 
       - name: Install FossLight
         run: |
-          pip install fosslight
+          pip install fosslight_source
 
       - name: Run FossLight
-        run: fosslight analyze --output-report fosslight-report.json
+        run: fosslight_source -p ./ -f yaml -j
 
       - name: Upload FossLight Report
         uses: actions/upload-artifact@v2
