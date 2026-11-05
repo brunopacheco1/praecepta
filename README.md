@@ -7,7 +7,6 @@ Praecepta is a rules engine implemented in Java that uses a trie tree to efficie
 - Fast rule matching using a trie tree data structure
 - Flexible rule definition syntax
 - Support for rule prioritization and conflict resolution
-- Asynchronous rule execution
 
 # Getting Started
 ## Praecepta Engine 
@@ -58,24 +57,38 @@ var result = engine.evaluate(inputToEvaluate);
 ```
 
 # Building and Testing
-To build Praecepta, you will need Maven installed on your system. To build the project, run the following command from the root directory of the repository:
+Praecepta requires **Java 25** (the current LTS) and Maven 3.9+. From the repository root:
 
 ```
-mvn clean install
+mvn clean verify
 ```
 
-To run the tests, use the following command:
+This runs the unit tests and the property-based tests in `praecepta-engine`, which check the
+engine against a naive reference implementation of DMN decision-table semantics on random tables.
+
+# Benchmarks
+`praecepta-benchmarks` compares Praecepta with Camunda DMN and Drools DMN in-process using
+[JMH](https://github.com/openjdk/jmh). Every engine evaluates the same rules (the bundled
+119-rule table, or generated tables of 100 and 1,000 rules), and each run first checks that all
+engines return the same answers.
 
 ```
-mvn test
+mvn -pl praecepta-benchmarks -am package -DskipTests
+java -jar praecepta-benchmarks/target/benchmarks.jar                      # latency, all engines and tables
+java -jar praecepta-benchmarks/target/benchmarks.jar -p table=real        # one table
+java -cp praecepta-benchmarks/target/benchmarks.jar \
+  io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta real   # retained heap
 ```
+
+The `Benchmarks` GitHub workflow runs the same on demand and uploads the results.
 
 # Dependencies
-Praecepta Engine has the following dependencies:
-* Java 17
+Praecepta Engine has no runtime dependencies.
 
-Praecepta Loader has the following dependencies:
-* Apache POI
+Praecepta Loader depends on Apache POI.
+
+# Roadmap
+See [docs/MODERNISATION.md](docs/MODERNISATION.md).
 
 # Contributing
 We welcome contributions to Praecepta! If you would like to contribute, please follow these steps:

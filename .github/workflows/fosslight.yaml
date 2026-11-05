@@ -11,10 +11,10 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
 
       - name: Set Up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v7
         with:
           python-version: '3.x'
 
@@ -26,7 +26,7 @@ jobs:
         run: fosslight_source -p ./ -f yaml -j
 
       - name: Upload FossLight Report
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v7
         with:
           name: fosslight-report
           path: fosslight-report.json

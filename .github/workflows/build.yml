@@ -5,30 +5,28 @@ on:
       - main
   pull_request:
     types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
 jobs:
   build:
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-    name: Build
+    name: Build & test (Java 25)
     runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
-      - name: 'checkout'
-        uses: actions/checkout@v3
-      - name: 'gcloud'
-        uses: 'google-github-actions/auth@v1'
+      - uses: actions/checkout@v7
         with:
-          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
-      - name: 'graalvm setup'
-        uses: graalvm/setup-graalvm@v1
+          fetch-depth: 0 # full history for SonarCloud blame data
+      - uses: actions/setup-java@v6
         with:
-          version: 'latest'
-          java-version: '17'
-          components: 'native-image'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          native-image-job-reports: 'true'
-      - name: 'build & deploy'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn -B package org.sonarsource.scanner.maven:sonar-maven-plugin:sonar appengine:deploy
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Build & test
+        run: mvn -B verify
+      - name: SonarCloud analysis
+        # Secrets are not exposed to pull requests from forks; skip instead of failing.
+        if: ${{ env.SONAR_TOKEN != '' }}
+        run: mvn -B -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar

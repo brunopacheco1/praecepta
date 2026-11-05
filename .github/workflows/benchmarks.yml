@@ -1,0 +1,46 @@
+name: Benchmarks
+# On demand only. Shared GitHub runners are noisy: use these results to spot large regressions or
+# compare engines within one run, not to publish absolute numbers.
+on:
+  workflow_dispatch:
+    inputs:
+      jmh-args:
+        description: 'Extra JMH arguments, e.g. "-p table=real -p engine=praecepta"'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  jmh:
+    name: JMH (Praecepta vs Camunda vs Drools)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Build benchmarks
+        run: mvn -B -pl praecepta-benchmarks -am package -DskipTests
+      - name: Footprint
+        run: |
+          for table in real synthetic-100 synthetic-1000; do
+            for engine in praecepta camunda camunda-legacy-feel drools; do
+              java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar \
+                io.github.brunopacheco1.praecepta.benchmarks.FootprintReport "$engine" "$table" | tail -n 1
+            done
+          done | tee footprint.txt
+      - name: Latency
+        env:
+          JMH_ARGS: ${{ inputs.jmh-args }}
+        run: java -jar praecepta-benchmarks/target/benchmarks.jar -rf json -rff jmh-results.json $JMH_ARGS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-results
+          path: |
+            jmh-results.json
+            footprint.txt
