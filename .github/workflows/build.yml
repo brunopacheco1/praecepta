@@ -29,4 +29,8 @@ jobs:
       - name: SonarCloud analysis
         # Secrets are not exposed to pull requests from forks; skip instead of failing.
         if: ${{ env.SONAR_TOKEN != '' }}
-        run: mvn -B -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar
+        # Advisory: an expired token or a SonarCloud outage must not block merging a green build.
+        continue-on-error: true
+        # `verify` in the same invocation lets the scanner resolve the reactor modules; tests and
+        # coverage data come from the previous step.
+        run: mvn -B verify -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar
