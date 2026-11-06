@@ -4,7 +4,8 @@ import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 
 /**
  * Converts rule outputs to the engine's output type. {@link #sum}, {@link #min} and {@link #max}
- * are only needed for COLLECT aggregations; they are applied when the engine is built.
+ * are only needed for COLLECT aggregations, and are applied to the matching outputs on every
+ * evaluation, so they should be cheap and side-effect free.
  */
 @FunctionalInterface
 public interface OutputStrategy<O> {
