@@ -16,12 +16,27 @@
 
     <properties>
         <jmh.version>1.37</jmh.version>
-        <camunda.version>7.24.0</camunda.version>
+        <!-- Camunda 8's DMN engine (dmn-scala, embedded by Zeebe); Camunda 7 community ended at 7.24.0 -->
+        <camunda-dmn.version>1.12.6</camunda-dmn.version>
         <kie.version>10.2.0</kie.version>
+        <!-- Camunda's feel-engine needs Jackson 2.22; Drools would otherwise resolve 2.19 first. -->
+        <jackson.version>2.22.1</jackson.version>
         <maven.install.skip>true</maven.install.skip>
         <maven.deploy.skip>true</maven.deploy.skip>
         <jacoco.skip>true</jacoco.skip>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -35,9 +50,9 @@
             <version>${jmh.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.camunda.bpm.dmn</groupId>
-            <artifactId>camunda-engine-dmn</artifactId>
-            <version>${camunda.version}</version>
+            <groupId>org.camunda.bpm.extension.dmn.scala</groupId>
+            <artifactId>dmn-engine</artifactId>
+            <version>${camunda-dmn.version}</version>
         </dependency>
         <dependency>
             <groupId>org.kie</groupId>
