@@ -14,6 +14,9 @@ import org.camunda.bpm.dmn.engine.DmnEngineConfiguration;
 import org.camunda.bpm.dmn.engine.impl.DefaultDmnEngineConfiguration;
 import org.kie.dmn.api.core.DMNModel;
 import org.kie.dmn.api.core.DMNRuntime;
+import org.kie.dmn.core.compiler.AlphaNetworkOption;
+import org.kie.dmn.core.compiler.DMNCompilerConfigurationImpl;
+import org.kie.dmn.core.compiler.DMNCompilerImpl;
 import org.kie.dmn.core.internal.utils.DMNRuntimeBuilder;
 import org.kie.internal.io.ResourceFactory;
 
@@ -29,7 +32,8 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
             case "praecepta" -> new Praecepta(table);
             case "camunda" -> new Camunda(table, false);
             case "camunda-legacy-feel" -> new Camunda(table, true);
-            case "drools" -> new Drools(table);
+            case "drools" -> new Drools(table, false);
+            case "drools-alphanetwork" -> new Drools(table, true);
             default -> throw new IllegalArgumentException("Unknown engine: " + engine);
         };
     }
@@ -83,14 +87,32 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
         }
     }
 
+    /**
+     * Drools (Apache KIE) DMN, with defaults ({@code drools}) or with its experimental alpha-network
+     * compilation forced on this compiler's configuration ({@code drools-alphanetwork}).
+     *
+     * <p>{@code drools-alphanetwork} is <b>not</b> in the default benchmark matrix. On Drools 10.2.0 it
+     * cannot compile tables with more than one output column, nor RULE_ORDER tables, and on the tables
+     * it does compile it disagrees with default Drools (and every other engine) on ~99% of inputs. The
+     * documented system property {@value AlphaNetworkOption#PROPERTY_NAME} is ignored by
+     * {@code DMNRuntimeBuilder}. Re-check on a newer Drools with
+     * {@code java -jar benchmarks.jar -p engine=drools-alphanetwork -p table=synthetic-100}: the
+     * pre-run cross-check aborts until it agrees.
+     */
     final class Drools implements Contender {
         private final DMNRuntime runtime;
         private final DMNModel model;
 
-        Drools(Table table) {
+        Drools(Table table, boolean alphaNetwork) {
             var resource = ResourceFactory.newReaderResource(new StringReader(DmnWriter.write(table)), "UTF-8");
             resource.setSourcePath(table.name() + ".dmn");
-            runtime = DMNRuntimeBuilder.fromDefaults().buildConfiguration().fromResources(List.of(resource))
+            runtime = DMNRuntimeBuilder.fromDefaults()
+                    .buildConfigurationUsingCustomCompiler(configuration -> {
+                        ((DMNCompilerConfigurationImpl) configuration)
+                                .setProperty(AlphaNetworkOption.PROPERTY_NAME, String.valueOf(alphaNetwork));
+                        return new DMNCompilerImpl(configuration);
+                    })
+                    .fromResources(List.of(resource))
                     .getOrElseThrow(cause -> new IllegalStateException("Drools could not compile the DMN model", cause));
             model = runtime.getModels().getFirst();
             if (model.hasErrors()) {
