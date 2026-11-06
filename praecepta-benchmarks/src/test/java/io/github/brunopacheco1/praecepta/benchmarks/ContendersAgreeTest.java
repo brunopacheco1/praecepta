@@ -7,6 +7,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 
@@ -31,6 +32,20 @@ class ContendersAgreeTest {
         Assertions.assertThatCode(() -> CrossCheck.assertAgreement(table, workload, other, praecepta))
                 .doesNotThrowAnyException();
         Assertions.assertThat(workload).allSatisfy(input -> Assertions.assertThat(praecepta.evaluate(input)).isNotEmpty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"strings", "enums"})
+    void generated_classes_agree_with_map_inputs(String variant) {
+        var workload = Workload.generate(Table.real(), 2_000, 11);
+        var generated = GeneratedInputs.variant(variant, workload);
+        var map = GeneratedInputs.variant("map", workload);
+        for (int i = 0; i < workload.size(); i++) {
+            Assertions.assertThat(generated.ruleIds().apply(generated.evaluate().apply(generated.inputs().get(i))))
+                    .as("input %s", workload.get(i))
+                    .isEqualTo(map.ruleIds().apply(map.evaluate().apply(map.inputs().get(i))))
+                    .isNotEmpty();
+        }
     }
 
     @Test
