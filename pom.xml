@@ -1,3 +1,10 @@
+<!--
+
+    SPDX-FileCopyrightText: Bruno Pacheco
+
+    SPDX-License-Identifier: Apache-2.0
+
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
@@ -7,10 +14,41 @@
     <packaging>pom</packaging>
     <version>0.0-SNAPSHOT</version>
     <name>praecepta</name>
+    <description>DMN decision tables for Java: strict hit policies, bitset matching, build-time validation.</description>
     <url>https://github.com/brunopacheco1/praecepta</url>
+    <inceptionYear>2022</inceptionYear>
+
+    <licenses>
+        <license>
+            <name>Apache-2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>brunopacheco1</id>
+            <name>Bruno Pacheco</name>
+            <url>https://github.com/brunopacheco1</url>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/brunopacheco1/praecepta.git</connection>
+        <developerConnection>scm:git:git@github.com:brunopacheco1/praecepta.git</developerConnection>
+        <url>https://github.com/brunopacheco1/praecepta</url>
+    </scm>
+
+    <issueManagement>
+        <system>GitHub</system>
+        <url>https://github.com/brunopacheco1/praecepta/issues</url>
+    </issueManagement>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- reproducible builds: fixed timestamps in every archive; the release process updates it -->
+        <project.build.outputTimestamp>2026-11-06T00:00:00Z</project.build.outputTimestamp>
         <java.version>25</java.version>
         <maven.compiler.release>${java.version}</maven.compiler.release>
 
@@ -38,6 +76,8 @@
         <maven-install-plugin.version>3.2.0</maven-install-plugin.version>
         <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
         <jacoco-maven-plugin.version>0.8.16</jacoco-maven-plugin.version>
+        <license-maven-plugin.version>5.1.2</license-maven-plugin.version>
+        <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
     </properties>
 
     <modules>
@@ -162,6 +202,60 @@
                                 <format>HTML</format>
                             </formats>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- SPDX headers on Java sources and POMs: `check` runs in verify, `mvn license:format` adds them -->
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>${license-maven-plugin.version}</version>
+                <configuration>
+                    <!-- REUSE-IgnoreStart: the header template is not this file's licence -->
+                    <licenseSets>
+                        <licenseSet>
+                            <inlineHeader>SPDX-FileCopyrightText: Bruno Pacheco
+
+SPDX-License-Identifier: Apache-2.0</inlineHeader>
+                            <includes>
+                                <include>src/**/*.java</include>
+                                <include>pom.xml</include>
+                            </includes>
+                        </licenseSet>
+                    </licenseSets>
+                    <!-- REUSE-IgnoreEnd -->
+                    <mapping>
+                        <java>SLASHSTAR_STYLE</java>
+                    </mapping>
+                    <strictCheck>true</strictCheck>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- CycloneDX SBOM per module (target/bom.json), attached to the build -->
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>${cyclonedx-maven-plugin.version}</version>
+                <configuration>
+                    <projectType>library</projectType>
+                    <outputFormat>json</outputFormat>
+                    <outputName>bom</outputName>
+                    <includeTestScope>false</includeTestScope>
+                    <includeProvidedScope>false</includeProvidedScope>
+                    <includeSystemScope>false</includeSystemScope>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>makeBom</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>

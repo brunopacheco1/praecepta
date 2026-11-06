@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: A minimal table (rules, hit policy, column types) and input, or a failing test.
+      render: java
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Praecepta version or commit
+    validations:
+      required: true
+  - type: input
+    id: java
+    attributes:
+      label: Java version

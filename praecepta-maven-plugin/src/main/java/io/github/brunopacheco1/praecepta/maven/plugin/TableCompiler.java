@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: Bruno Pacheco
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package io.github.brunopacheco1.praecepta.maven.plugin;
 
 import java.io.IOException;
@@ -47,6 +52,14 @@ final class TableCompiler {
      *                                  or if validation finds issues at least as severe as {@code failOn}
      */
     static Result compile(TableConfig config, String packageName, Severity failOn) {
+        return compile(config, packageName, failOn, null);
+    }
+
+    /**
+     * @param fileHeader text put first in every generated source as comments (e.g. the user's SPDX
+     *                   header), or null for none
+     */
+    static Result compile(TableConfig config, String packageName, Severity failOn, String fileHeader) {
         if (config.source == null) {
             throw new IllegalArgumentException("Every <table> needs a <source>");
         }
@@ -54,7 +67,7 @@ final class TableCompiler {
         var className = JavaNames.type(config.name != null ? config.name : table.name());
         var report = validate(table, failOn);
         var dmn = DmnWriter.write(table);
-        var sources = new SourceGenerator(packageName, className, table, config.source.getName()).generate();
+        var sources = new SourceGenerator(packageName, className, table, config.source.getName(), fileHeader).generate();
         return new Result(table, className, report, dmn, sources);
     }
 

@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/brunopacheco1/praecepta/security/advisories/new
+    about: Please report vulnerabilities privately, not as issues.

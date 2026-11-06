@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
 name: Benchmarks
 # On demand only. Shared GitHub runners are noisy: use these results to spot large regressions or
 # compare engines within one run, not to publish absolute numbers.
@@ -18,8 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
           java-version: '25'
@@ -38,7 +42,7 @@ jobs:
         env:
           JMH_ARGS: ${{ inputs.jmh-args }}
         run: java -jar praecepta-benchmarks/target/benchmarks.jar -rf json -rff jmh-results.json $JMH_ARGS
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: benchmark-results
           path: |
