@@ -28,8 +28,8 @@ jobs:
         run: mvn -B -pl praecepta-benchmarks -am package -DskipTests
       - name: Footprint
         run: |
-          for table in real synthetic-100 synthetic-1000; do
-            for engine in praecepta camunda camunda-legacy-feel drools; do
+          for table in real synthetic-100 synthetic-1000 mixed-100 mixed-1000; do
+            for engine in praecepta camunda drools; do
               java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar \
                 io.github.brunopacheco1.praecepta.benchmarks.FootprintReport "$engine" "$table" | tail -n 1
             done

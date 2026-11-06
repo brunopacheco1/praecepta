@@ -3,15 +3,13 @@ package io.github.brunopacheco1.praecepta.benchmarks;
 import java.io.ByteArrayInputStream;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.camunda.bpm.dmn.engine.DmnDecision;
-import org.camunda.bpm.dmn.engine.DmnEngine;
-import org.camunda.bpm.dmn.engine.DmnEngineConfiguration;
-import org.camunda.bpm.dmn.engine.impl.DefaultDmnEngineConfiguration;
+import org.camunda.dmn.DmnEngine;
+import org.camunda.dmn.parser.ParsedDmn;
 import org.kie.dmn.api.core.DMNModel;
 import org.kie.dmn.api.core.DMNRuntime;
 import org.kie.dmn.core.compiler.AlphaNetworkOption;
@@ -25,13 +23,12 @@ import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 /** A decision engine under test. Returns the ids of the matched rules, in hit-policy order. */
 public sealed interface Contender permits Contender.Praecepta, Contender.Camunda, Contender.Drools {
 
-    List<String> evaluate(Map<String, String> input);
+    List<String> evaluate(Map<String, Object> input);
 
     static Contender create(String engine, Table table) {
         return switch (engine) {
             case "praecepta" -> new Praecepta(table);
-            case "camunda" -> new Camunda(table, false);
-            case "camunda-legacy-feel" -> new Camunda(table, true);
+            case "camunda" -> new Camunda(table);
             case "drools" -> new Drools(table, false);
             case "drools-alphanetwork" -> new Drools(table, true);
             default -> throw new IllegalArgumentException("Unknown engine: " + engine);
@@ -40,50 +37,78 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
 
     /** Praecepta through its public API, exactly as an application would call it. */
     final class Praecepta implements Contender {
-        private final PraeceptaEngine<Map<String, String>, String> engine;
+        private final PraeceptaEngine<Map<String, Object>, String> engine;
 
         Praecepta(Table table) {
-            var builder = PraeceptaEngine.<Map<String, String>, String>builder()
+            var builder = PraeceptaEngine.<Map<String, Object>, String>builder()
                     .hitPolicy(table.hitPolicy())
                     .output(output -> output.values().get(Table.ID_OUTPUT))
                     .rules(table.rules());
-            for (var column : table.inputs()) {
-                builder.input(column, input -> input.get(column));
+            for (int c = 0; c < table.inputs().size(); c++) {
+                var column = table.inputs().get(c);
+                switch (table.types().get(c)) {
+                    case STRING -> builder.input(column, input -> (String) input.get(column));
+                    case NUMBER -> builder.numberInput(column, input -> (Number) input.get(column));
+                    case DATE -> builder.dateInput(column, input -> (LocalDate) input.get(column));
+                }
             }
             engine = builder.build();
         }
 
         @Override
-        public List<String> evaluate(Map<String, String> input) {
+        public List<String> evaluate(Map<String, Object> input) {
             return engine.evaluate(input);
         }
     }
 
     /**
-     * Camunda 7 DMN. With its default FEEL engine (feel-scala) evaluation is roughly 150x slower on
-     * these tables than with the legacy JUEL-based FEEL engine, which still supports the simple
-     * unary tests used here, so both configurations are benchmarked.
+     * Camunda 8's DMN engine (dmn-scala with feel-scala), the engine Zeebe embeds. It reads the
+     * standard DMN types, so it gets the same model as Drools. Camunda 7 (community edition ended at
+     * 7.24.0) and its legacy JUEL-based FEEL mode were benchmarked up to Phase 3.
      */
     final class Camunda implements Contender {
         private final DmnEngine engine;
-        private final DmnDecision decision;
+        private final ParsedDmn dmn;
 
-        Camunda(Table table, boolean legacyFeel) {
-            var configuration = (DefaultDmnEngineConfiguration) DmnEngineConfiguration.createDefaultDmnEngineConfiguration();
-            configuration.enableFeelLegacyBehavior(legacyFeel);
-            engine = configuration.buildEngine();
+        Camunda(Table table) {
+            engine = new DmnEngine.Builder().build();
             var xml = DmnWriter.write(table).getBytes(StandardCharsets.UTF_8);
-            decision = engine.parseDecision(DmnWriter.DECISION, new ByteArrayInputStream(xml));
+            var parsed = engine.parse(new ByteArrayInputStream(xml));
+            if (parsed.isLeft()) {
+                throw new IllegalStateException("Camunda could not parse the DMN model: " + parsed.left().get());
+            }
+            dmn = parsed.toOption().get();
         }
 
         @Override
-        public List<String> evaluate(Map<String, String> input) {
-            var result = engine.evaluateDecisionTable(decision, new HashMap<String, Object>(input));
-            var ids = new ArrayList<String>(result.size());
-            for (var row : result) {
-                ids.add(row.getEntry(Table.ID_OUTPUT));
+        public List<String> evaluate(Map<String, Object> input) {
+            var result = engine.eval(dmn, DmnWriter.DECISION, input);
+            if (result.isLeft()) {
+                throw new IllegalStateException("Camunda failed to evaluate " + input + ": " + result.left().get());
             }
+            var ids = new ArrayList<String>();
+            collectIds(result.toOption().get().value(), ids);
             return ids;
+        }
+
+        private static void collectIds(Object value, List<String> ids) {
+            switch (value) {
+                case null -> { }
+                case scala.None$ none -> { }
+                case java.util.Collection<?> rows -> rows.forEach(row -> collectIds(row, ids));
+                case scala.collection.Iterable<?> rows when !(value instanceof scala.collection.Map<?, ?>) ->
+                        rows.foreach(row -> {
+                            collectIds(row, ids);
+                            return null;
+                        });
+                case Map<?, ?> row -> ids.add(String.valueOf(row.get(Table.ID_OUTPUT)));
+                case scala.collection.Map<?, ?> row -> {
+                    @SuppressWarnings("unchecked")
+                    var columns = (scala.collection.Map<String, Object>) row;
+                    collectIds(columns.get(Table.ID_OUTPUT).getOrElse(() -> null), ids);
+                }
+                default -> ids.add(String.valueOf(value));
+            }
         }
     }
 
@@ -121,7 +146,7 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
         }
 
         @Override
-        public List<String> evaluate(Map<String, String> input) {
+        public List<String> evaluate(Map<String, Object> input) {
             var context = runtime.newContext();
             input.forEach(context::set);
             var result = runtime.evaluateByName(model, context, DmnWriter.DECISION)

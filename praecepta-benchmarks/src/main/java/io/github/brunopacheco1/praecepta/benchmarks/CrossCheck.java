@@ -11,7 +11,7 @@ public final class CrossCheck {
     private CrossCheck() {
     }
 
-    public static void assertAgreement(Table table, List<Map<String, String>> workload, Contender actual, Contender expected) {
+    public static void assertAgreement(Table table, List<Map<String, Object>> workload, Contender actual, Contender expected) {
         for (var input : workload) {
             var a = normalise(table, actual.evaluate(input));
             var e = normalise(table, expected.evaluate(input));

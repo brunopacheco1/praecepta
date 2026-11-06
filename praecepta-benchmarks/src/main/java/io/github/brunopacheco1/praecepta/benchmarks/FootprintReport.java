@@ -17,15 +17,21 @@ public final class FootprintReport {
     }
 
     public static void main(String[] args) {
-        var engines = args.length > 0 ? List.of(args[0]) : List.of("praecepta", "camunda", "camunda-legacy-feel", "drools");
-        var tables = args.length > 1 ? List.of(args[1]) : List.of("real", "synthetic-100", "synthetic-1000");
+        var engines = args.length > 0 ? List.of(args[0]) : List.of("praecepta", "camunda", "drools");
+        var tables = args.length > 1 ? List.of(args[1]) : List.of("real", "synthetic-100", "synthetic-1000", "mixed-100", "mixed-1000");
         System.out.printf("%-10s %-15s %14s %10s%n", "engine", "table", "retained heap", "build");
         for (var table : tables) {
             var decisionTable = Table.named(table);
             for (var engine : engines) {
                 long before = usedHeap();
                 long start = System.nanoTime();
-                var contender = Contender.create(engine, decisionTable);
+                Contender contender;
+                try {
+                    contender = Contender.create(engine, decisionTable);
+                } catch (UnsupportedOperationException e) {
+                    System.out.printf("%-10s %-15s %14s %10s%n", engine, table, "unsupported", "-");
+                    continue;
+                }
                 long buildMs = (System.nanoTime() - start) / 1_000_000;
                 long retained = usedHeap() - before;
                 System.out.printf("%-10s %-15s %11.1f MB %7d ms%n", engine, table, retained / 1048576.0, buildMs);

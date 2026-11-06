@@ -1,0 +1,143 @@
+package io.github.brunopacheco1.praecepta.engine;
+
+import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+import io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind;
+import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
+import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
+import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
+import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
+
+/** Readable examples of FEEL cells on typed columns, input value lists and gap reports. */
+class TypedColumnsTest {
+
+    record Applicant(String country, Integer age, LocalDate since) {
+    }
+
+    //   country        age          since                       → tier
+    // 1 "PT","ES"      [18..65)     < date("2020-01-01")         gold
+    // 2 not("FR")      >= 18        -                            silver
+    // 3 -              < 18         -                            junior
+    // 4 null           -            -                            unknown
+    private static final List<Praeceptum> RULES = List.of(
+            rule(1, "\"PT\",\"ES\"", "[18..65)", "< date(\"2020-01-01\")", "gold"),
+            rule(2, "not(\"FR\")", ">= 18", "-", "silver"),
+            rule(3, "-", "< 18", "", "junior"),
+            rule(4, "null", "", "", "unknown"));
+
+    @Test
+    void numbers_dates_lists_and_negation() {
+        var engine = engine(HitPolicy.FIRST).build();
+        Assertions.assertThat(engine.evaluate(new Applicant("PT", 30, LocalDate.of(2019, 5, 1)))).containsExactly("gold");
+        Assertions.assertThat(engine.evaluate(new Applicant("PT", 65, LocalDate.of(2019, 5, 1)))).containsExactly("silver"); // 65 excluded
+        Assertions.assertThat(engine.evaluate(new Applicant("PT", 30, LocalDate.of(2020, 1, 1)))).containsExactly("silver"); // not before 2020
+        Assertions.assertThat(engine.evaluate(new Applicant("FR", 30, null))).isEmpty();                                   // not("FR")
+        Assertions.assertThat(engine.evaluate(new Applicant("FR", 12, null))).containsExactly("junior");
+    }
+
+    @Test
+    void missing_values_follow_feel() {
+        var engine = engine(HitPolicy.COLLECT).build();
+        // null country: fails "PT","ES"; satisfies not("FR"); matches the null test
+        Assertions.assertThat(engine.evaluate(new Applicant(null, 30, LocalDate.of(2019, 1, 1)))).containsExactly("silver", "unknown");
+        // null age: comparisons are unknown, so rules 1-3 fail; only the null-country rule could match
+        Assertions.assertThat(engine.evaluate(new Applicant("PT", null, null))).isEmpty();
+    }
+
+    @Test
+    void numbers_compare_by_value_whatever_their_java_type() {
+        var engine = PraeceptaEngine.<Map<String, Number>, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .numberInput("x", input -> input.get("x"))
+                .output(output -> output.values().get("tier"))
+                .rules(List.of(new Praeceptum(1, new PraeceptaInput(Map.of("x", "[1..2]")), new PraeceptaOutput(Map.of("tier", "in")))))
+                .build();
+        for (Number x : List.<Number>of(1, 2L, 1.5d, new java.math.BigDecimal("2.000"))) {
+            Assertions.assertThat(engine.evaluate(Map.of("x", x))).as("%s", x).containsExactly("in");
+        }
+        Assertions.assertThat(engine.evaluate(Map.of("x", 2.0001))).isEmpty();
+    }
+
+    @Test
+    void map_based_inputs_parse_text_by_column_type() {
+        var engine = PraeceptaEngine.<Map<String, String>, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .inputs(PraeceptaInput::new)
+                .columnType("age", ColumnType.NUMBER)
+                .columnType("since", ColumnType.DATE)
+                .output(output -> output.values().get("tier"))
+                .rules(RULES)
+                .build();
+        Assertions.assertThat(engine.evaluate(Map.of("country", "ES", "age", "40", "since", "2018-07-01"))).containsExactly("gold");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("country", "ES", "age", "forty")))
+                .isInstanceOf(InvalidInputException.class)
+                .hasMessageContaining("age=forty");
+    }
+
+    @Test
+    void declared_input_values_reject_anything_else() {
+        var engine = engine(HitPolicy.FIRST)
+                .allowedValues("country", List.of("PT", "ES", "FR"))
+                .allowedValues("age", "[0..120]")
+                .build();
+        Assertions.assertThatThrownBy(() -> engine.evaluate(new Applicant("DE", 30, null)))
+                .isInstanceOfSatisfying(InvalidInputException.class, e -> Assertions.assertThat(e.getColumn()).isEqualTo("country"));
+        Assertions.assertThatThrownBy(() -> engine.evaluate(new Applicant("PT", 130, null)))
+                .isInstanceOf(InvalidInputException.class);
+        Assertions.assertThat(engine.evaluate(new Applicant(null, 30, null))).isNotEmpty(); // missing is always allowed
+    }
+
+    @Test
+    void declared_input_values_reveal_gaps() {
+        var engine = engine(HitPolicy.FIRST)
+                .allowedValues("country", List.of("PT", "ES", "FR"))
+                .allowedValues("age", "[0..120]")
+                .build();
+        var gaps = engine.validationReport().issues(Kind.GAP);
+        Assertions.assertThat(gaps).singleElement().satisfies(gap -> {
+            Assertions.assertThat(gap.detail()).isEqualTo("country = \"FR\", age in [18..120]");
+            Assertions.assertThat(gap.example()).containsEntry("country", "FR");
+        });
+    }
+
+    @Test
+    void without_string_value_lists_gaps_are_not_reported() {
+        Assertions.assertThat(engine(HitPolicy.FIRST).build().validationReport().issues(Kind.GAP)).isEmpty();
+    }
+
+    @Test
+    void invalid_cells_name_the_rule_and_column() {
+        var broken = List.of(rule(7, "\"PT\"", "[65..18]", "", "x"));
+        Assertions.assertThatThrownBy(() -> engine(HitPolicy.FIRST).rules(broken).build())
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessageContaining("Rule 7, column 'age'")
+                .hasMessageContaining("interval starts after it ends");
+    }
+
+    private static PraeceptaEngine.Builder<Applicant, String> engine(HitPolicy policy) {
+        return PraeceptaEngine.<Applicant, String>builder()
+                .hitPolicy(policy)
+                .input("country", Applicant::country)
+                .numberInput("age", Applicant::age)
+                .dateInput("since", Applicant::since)
+                .output(output -> output.values().get("tier"))
+                .rules(RULES);
+    }
+
+    private static Praeceptum rule(int id, String country, String age, String since, String tier) {
+        var cells = new HashMap<String, String>();
+        cells.put("country", country);
+        cells.put("age", age);
+        cells.put("since", since);
+        return new Praeceptum(id, new PraeceptaInput(cells), new PraeceptaOutput(Map.of("tier", tier)));
+    }
+}
