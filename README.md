@@ -7,8 +7,11 @@ lookups that cost a fraction of a microsecond.
 # Features
 - All DMN hit policies: UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER and COLLECT
   (with SUM / MIN / MAX aggregation)
-- Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY)
-  and rules that can never be selected (FIRST, PRIORITY)
+- DMN FEEL cells on STRING, NUMBER and DATE columns: lists, `not(...)`, comparisons, intervals,
+  `null`; unquoted `PT,ES` cells from earlier versions keep working
+- Optional DMN input value lists: values outside them are rejected
+- Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
+  rules that can never be selected (FIRST, PRIORITY), and gaps (declared inputs no rule matches)
 - Bitset matching: memory grows linearly with the table (10,000 rules fit in under 1 MB) and
   engines build in milliseconds
 - Immutable, thread-safe engines; no runtime dependencies
@@ -42,6 +45,42 @@ engine.evaluate(new Order("FR", "SMB"));   // [] - no rule matches
 engine.validationReport();                 // static findings, e.g. unreachable rules
 ```
 
+### Cells
+Cells are DMN FEEL simple unary tests, parsed according to the column's type:
+
+| Cell | Matches | Columns |
+|---|---|---|
+| blank or `-` | any value, including a missing one | all |
+| `"PT","ES"` or `PT,ES` | one of the values (unquoted words are string literals) | STRING |
+| `18`, `2.5` | that number (`1.0` equals `1`) | NUMBER |
+| `date("2025-01-31")` or `2025-01-31` | that date | DATE |
+| `< 18`, `<= 18`, `> 18`, `>= 18` | comparisons | NUMBER, DATE |
+| `[18..65)`, `(0..1]`, `]a..b[` | intervals: `[`/`]` closed, `(`/`)` or outward brackets open | NUMBER, DATE |
+| `null` | only a missing value | all |
+| `not(...)` | anything the list inside does not match | all |
+
+Missing values follow FEEL: they fail comparisons and intervals, equal only `null`, and so satisfy
+`not("FR")`. Blank text counts as missing.
+
+### Typed columns and input value lists
+```java
+var engine = PraeceptaEngine.<Applicant, String>builder()
+        .hitPolicy(HitPolicy.FIRST)
+        .input("country", Applicant::country)          // STRING
+        .numberInput("age", Applicant::age)            // any Number, compared as exact decimals
+        .dateInput("since", Applicant::since)          // LocalDate
+        .allowedValues("country", List.of("PT", "ES", "FR"))
+        .allowedValues("age", "[0..120]")
+        .output(output -> output.values().get("tier"))
+        .rules(rules)
+        .build();
+```
+With declared input values, other (non-missing) values throw `InvalidInputException`, and
+`validationReport()` lists **gaps**: declared inputs no rule matches, e.g.
+`country = "FR", age in [18..120]`. Gaps are only analysed when every string column the rules test
+declares its values. With map-based inputs, declare non-string columns with
+`.columnType("age", ColumnType.NUMBER)`; their text is parsed.
+
 Notes:
 - `PRIORITY` and `OUTPUT_ORDER` need DMN output value lists:
   `.outputPriority("grade", List.of("A", "B"))`, highest priority first.
@@ -52,7 +91,9 @@ Notes:
 
 ## Praecepta Loader
 Loads rules from the first sheet of an Excel file (or a CSV file) on the classpath. The header row
-names the columns; each following row is a rule, identified by its row number.
+names the columns; each following row is a rule, identified by its row number. Cells are read as
+text in the syntax above; numeric cells keep their exact value and date-formatted cells become ISO
+dates.
 
 ```java
 var rules = new ExcelLoader("rules/discounts.xlsx", Set.of("country", "segment"), Set.of("grade"))
@@ -78,10 +119,14 @@ This runs the unit tests and the property-based tests in `praecepta-engine`, whi
 engine against a naive reference implementation of DMN decision-table semantics on random tables.
 
 # Benchmarks
-`praecepta-benchmarks` compares Praecepta with Camunda DMN and Drools DMN in-process using
-[JMH](https://github.com/openjdk/jmh). Every engine evaluates the same rules (the bundled
-119-rule table, or generated tables of 100 and 1,000 rules), and each run first checks that all
-engines return the same answers.
+`praecepta-benchmarks` compares Praecepta in-process with Camunda 8's DMN engine (dmn-scala, as
+embedded by Zeebe) and Drools DMN, using [JMH](https://github.com/openjdk/jmh). Every engine
+evaluates the same rules, and each run first checks that all engines return the same answers.
+The tables are:
+- `real`: the bundled 119-rule table;
+- `synthetic-100` / `synthetic-1000`: generated string tables;
+- `mixed-100` / `mixed-1000`: generated tables mixing string, number and date columns, with
+  comparisons, intervals and `not(...)`.
 
 ```
 mvn -pl praecepta-benchmarks -am package -DskipTests

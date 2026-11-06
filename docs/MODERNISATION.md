@@ -162,10 +162,69 @@ engines that disagree. The `drools-alphanetwork` contender stays available on de
 - Single-column predicates: ranges, negation, sets, numbers, dates — compiled to per-interval
   bitmasks (binary search on sorted boundaries). Cross-column expressions out of scope.
 
+**Status: done** (branch `modernisation/phase-3`). Decisions: FEEL unary-test syntax with unquoted
+words still accepted (existing tables unchanged); optional input value lists, enforced at
+evaluation and used for gap reporting.
+- `CellParser` / `UnaryTests` (package `engine.feel`): lists, `not(...)`, `null`, `-`, comparisons and
+  intervals (every bracket style), `date("…")` or bare ISO dates; errors name the rule and column.
+- Typed columns: `input` (STRING), `numberInput` (any `Number`, compared as exact decimals),
+  `dateInput` (`LocalDate`); `columnType` for map-based inputs, whose text is parsed.
+- `ColumnIndex` splits each column into value classes no rule can tell apart: written values plus
+  "other" and "missing" for strings; boundary points and the open gaps between them for numbers and
+  dates (binary search). Gaps between consecutive days hold no date and are marked empty. FEEL's
+  three-valued logic is applied per class (missing fails comparisons, satisfies `not("A")`).
+- Input value lists (`allowedValues`): other values throw `InvalidInputException` (even after
+  early exit); analyses ignore them; GAP issues report uncovered declared regions with a readable
+  description (adjacent classes merged: `age in [18..120]`) and a concrete example.
+- Excel loader: numeric cells kept exact (they were rounded with `Math.round`), date-formatted
+  cells become ISO dates, formulas use cached results.
+- Tests: typed reference oracle (evaluates FEEL on concrete values, brute-forces every region);
+  12 properties over random STRING/NUMBER/DATE tables. It found four bugs during development:
+  `not(...)` around half-open intervals, validation skipped after early exit, gaps reported in an
+  empty domain, and rules matching nothing not reported as unreachable. Mutation-checked: planted
+  "date gaps not empty" and "not(unknown) matches" bugs were both caught.
+- Performance on string tables stays within ~3–10% of Phase 2 (real table 186–189 ns vs 175–184 ns,
+  interleaved runs). The first version was ~2× slower; restoring Phase 2's single-lookup path for
+  string columns, with blank and value-list checks only on a miss, fixed it.
+- Cross-engine benchmarks now include typed tables, and Camunda is now Camunda 8's DMN engine.
+  - `mixed-100` / `mixed-1000`: nine interleaved string, number (0..100) and date (2025) columns,
+    using every cell form (lists, `not(...)`, comparisons, intervals with open and closed ends).
+    The workload passes `BigDecimal` and `LocalDate` values.
+  - `DmnWriter` parses each cell with `CellParser` and writes standard FEEL with DMN types
+    (`string`, `number`, `date`), so every engine reads the same model.
+  - Camunda 7 community edition ended at 7.24.0. Camunda is now benchmarked through Camunda 8's
+    engine (dmn-scala 1.12.6 with feel-scala 1.22.1, as embedded by Zeebe). Camunda 8 has no legacy
+    FEEL mode, so `camunda-legacy-feel` is gone; that mode had no `date()` function anyway. The
+    Jackson family is pinned to 2.22.1 in the benchmark module, because feel-scala needs it and
+    Drools would otherwise resolve 2.19.
+  - Camunda 8 and Drools agree with Praecepta on every input of every table, missing values
+    included.
+
+  JMH, same settings as Phase 0 (3 × 2 s warm-up, 5 × 2 s measurement, one fork, JDK 27, Apple
+  Silicon). Footprint = retained heap · build time, each in a fresh JVM.
+
+  | Engine | real (119) | synthetic-100 | synthetic-1000 | mixed-100 | mixed-1000 |
+  |---|---:|---:|---:|---:|---:|
+  | **Praecepta** | **0.19 µs** · 0.2 MB · 41 ms | **0.16 µs** · 0.3 MB · 56 ms | **0.21 µs** · 0.4 MB · 79 ms | **0.43 µs** · 0.4 MB · 81 ms | **0.62 µs** · 0.9 MB · 161 ms |
+  | Camunda 8 (dmn-scala 1.12.6) | 16 µs · 4.6 MB · 427 ms | 19 µs · 4.8 MB · 471 ms | 155 µs · 16.1 MB · 677 ms | 33 µs · 4.9 MB · 528 ms | 278 µs · 16.3 MB · 796 ms |
+  | Drools DMN 10.2 | 39 µs · 6.4 MB · 334 ms | 16 µs · 7.0 MB · 403 ms | 135 µs · 13.5 MB · 640 ms | 31 µs · 7.4 MB · 491 ms | 247 µs · 15.6 MB · 1,055 ms |
+
+  - Camunda 8 is far faster than Camunda 7 with its default FEEL engine (16 µs vs 12,280 µs on the
+    real table) and about 5× faster than Camunda 7's legacy FEEL (84 µs).
+  - Praecepta stays 70–450× faster than both engines, with 10–40× less memory.
+  - Praecepta's mixed tables cost 2–3× its string tables. Each number or date column needs a binary
+    search over `BigDecimal` / `LocalDate` boundaries instead of one hash lookup. Range cells also
+    set many bits, so the AND rarely empties early and all nine columns are read.
+  - Possible follow-up (Phase 4, with the int-coded path): compare primitive boundary keys (epoch
+    days, scaled longs).
+- Not done: date-times; string ranges.
+
 ### Phase 4 — Build-time tooling & DMN import
 - Proper `maven-plugin` packaging (today it is packaged as a plain `jar` and its FreeMarker
   templates were never committed, so it cannot run).
 - Generate typed `Input`/`Output` records and enums; validate tables at build time.
+- Int-coded input path: generated enums whose ordinals are the index's value classes, so
+  evaluation needs no hashing (moved here from Phase 2; target ≤ 120 ns on the real table).
 - Optional pre-built serialised index.
 - DMN XML import (decision tables with simple unary tests).
 

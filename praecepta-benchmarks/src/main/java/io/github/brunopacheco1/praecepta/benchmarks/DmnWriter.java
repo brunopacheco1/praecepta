@@ -1,13 +1,24 @@
 package io.github.brunopacheco1.praecepta.benchmarks;
 
-import java.util.Arrays;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.stream.Collectors;
 
+import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
+import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
 
 /**
  * Renders a {@link Table} as a DMN 1.3 decision table understood by both Camunda and Drools.
- * Cell semantics mirror Praecepta: blank means "any" ({@code -}), {@code a,b} means "a or b".
+ * Every cell is parsed with Praecepta's own {@link CellParser} and re-rendered as standard FEEL
+ * (quoted strings, plain numbers, {@code date("...")}), so the engines evaluate the same tests.
  */
 public final class DmnWriter {
 
@@ -24,22 +35,27 @@ public final class DmnWriter {
                              id="praecepta_benchmark" name="praecepta_benchmark"
                              namespace="https://github.com/brunopacheco1/praecepta/benchmark">
                 """);
-        for (var input : table.inputs()) {
+        var inputs = table.inputs();
+        for (int c = 0; c < inputs.size(); c++) {
+            var input = inputs.get(c);
             xml.append("  <inputData id=\"data_").append(input).append("\" name=\"").append(input).append("\">\n")
-               .append("    <variable id=\"var_").append(input).append("\" name=\"").append(input).append("\" typeRef=\"string\"/>\n")
+               .append("    <variable id=\"var_").append(input).append("\" name=\"").append(input)
+               .append("\" typeRef=\"").append(typeRef(table.types().get(c))).append("\"/>\n")
                .append("  </inputData>\n");
         }
         xml.append("  <decision id=\"").append(DECISION).append("\" name=\"").append(DECISION).append("\">\n")
            .append("    <variable id=\"var_").append(DECISION).append("\" name=\"").append(DECISION).append("\"/>\n");
-        for (var input : table.inputs()) {
+        for (var input : inputs) {
             xml.append("    <informationRequirement id=\"req_").append(input).append("\">")
                .append("<requiredInput href=\"#data_").append(input).append("\"/></informationRequirement>\n");
         }
         xml.append("    <decisionTable id=\"table\" hitPolicy=\"").append(table.hitPolicy().name()).append("\">\n");
-        for (var input : table.inputs()) {
+        for (int c = 0; c < inputs.size(); c++) {
+            var input = inputs.get(c);
+            var type = table.types().get(c);
             xml.append("      <input id=\"in_").append(input).append("\" label=\"").append(input).append("\">")
-               .append("<inputExpression id=\"expr_").append(input).append("\" typeRef=\"string\"><text>")
-               .append(input).append("</text></inputExpression></input>\n");
+               .append("<inputExpression id=\"expr_").append(input).append("\" typeRef=\"").append(typeRef(type))
+               .append("\"><text>").append(input).append("</text></inputExpression></input>\n");
         }
         for (var output : table.outputs()) {
             xml.append("      <output id=\"out_").append(output).append("\" name=\"").append(output)
@@ -49,13 +65,15 @@ public final class DmnWriter {
         for (Praeceptum rule : table.rules()) {
             xml.append("      <rule id=\"rule_").append(ruleIndex).append("\">\n");
             int cell = 0;
-            for (var input : table.inputs()) {
+            for (int c = 0; c < inputs.size(); c++) {
+                var text = rule.input().values().get(inputs.get(c));
                 xml.append("        <inputEntry id=\"ie_").append(ruleIndex).append('_').append(cell++).append("\"><text>")
-                   .append(unaryTest(rule.input().values().get(input))).append("</text></inputEntry>\n");
+                   .append(xmlEscape(unaryTests(CellParser.parse(text, table.types().get(c)))))
+                   .append("</text></inputEntry>\n");
             }
             for (var output : table.outputs()) {
                 xml.append("        <outputEntry id=\"oe_").append(ruleIndex).append('_').append(cell++).append("\"><text>")
-                   .append(literal(rule.output().values().get(output))).append("</text></outputEntry>\n");
+                   .append(xmlEscape(literal(rule.output().values().get(output)))).append("</text></outputEntry>\n");
             }
             xml.append("      </rule>\n");
             ruleIndex++;
@@ -68,21 +86,47 @@ public final class DmnWriter {
         return xml.toString();
     }
 
-    private static String unaryTest(String cell) {
-        if (cell == null || cell.isBlank()) {
-            return "-";
-        }
-        return Arrays.stream(cell.split(","))
-                .map(DmnWriter::literal)
-                .collect(Collectors.joining(","));
+    private static String typeRef(ColumnType type) {
+        return switch (type) {
+            case STRING -> "string";
+            case NUMBER -> "number";
+            case DATE -> "date";
+        };
     }
 
-    private static String literal(String value) {
-        if (value == null) {
-            return "null";
-        }
-        var escaped = value.replace("\\", "\\\\").replace("\"", "\\\"")
-                .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-        return "\"" + escaped + "\"";
+    /** Standard FEEL text for a parsed cell. */
+    static String unaryTests(UnaryTests cell) {
+        return switch (cell) {
+            case UnaryTests.Any any -> "-";
+            case UnaryTests.Positive positive -> join(positive.tests());
+            case UnaryTests.Negated negated -> "not(" + join(negated.tests()) + ")";
+        };
+    }
+
+    private static String join(List<Test> tests) {
+        return tests.stream().map(DmnWriter::test).collect(Collectors.joining(", "));
+    }
+
+    private static String test(Test test) {
+        return switch (test) {
+            case NullTest n -> "null";
+            case Equals e -> literal(e.value());
+            case Compare c -> c.operator().symbol() + " " + literal(c.value());
+            case Range r -> (r.lowClosed() ? "[" : "(") + literal(r.low()) + ".." + literal(r.high())
+                    + (r.highClosed() ? "]" : ")");
+        };
+    }
+
+    private static String literal(Object value) {
+        return switch (value) {
+            case null -> "null";
+            case BigDecimal number -> number.toPlainString();
+            case LocalDate date -> "date(\"" + date + "\")";
+            default -> "\"" + value.toString().replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        };
+    }
+
+    private static String xmlEscape(String text) {
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 }
