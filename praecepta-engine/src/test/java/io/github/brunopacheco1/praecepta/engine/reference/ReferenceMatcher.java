@@ -92,6 +92,84 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     public enum Aggregator { COUNT, SUM, MIN, MAX }
 
+    /** An expected validation finding: the kind name and the rule ids involved, in rule order. */
+    public record Finding(String kind, List<Integer> ruleIds) {
+    }
+
+    /**
+     * Expected static-analysis findings, by brute force. Rules only distinguish the values written in
+     * their cells, so evaluating every combination of those values plus "missing" visits every input
+     * region there is.
+     */
+    public Set<Finding> expectedFindings(List<String> columns) {
+        var findings = new java.util.LinkedHashSet<Finding>();
+        var selected = new java.util.HashSet<Praeceptum>();
+        for (var input : representativeInputs(columns)) {
+            var matches = matches(input);
+            if (matches.isEmpty()) {
+                continue;
+            }
+            switch (hitPolicy) {
+                case UNIQUE -> {
+                    if (matches.size() > 1) {
+                        findings.add(new Finding("OVERLAPPING_RULES", ids(matches)));
+                    }
+                }
+                case ANY -> {
+                    if (matches.stream().map(Praeceptum::output).distinct().count() > 1) {
+                        findings.add(new Finding("CONFLICTING_OUTPUTS", ids(matches)));
+                    }
+                }
+                case FIRST -> selected.add(matches.getFirst());
+                case PRIORITY -> {
+                    var comparator = Comparator.comparing(Praeceptum::output, byPriority());
+                    selected.add(matches.stream().sorted(comparator).findFirst().orElseThrow());
+                }
+                default -> {
+                    // multi-hit policies have no static findings
+                }
+            }
+        }
+        if (hitPolicy == HitPolicy.FIRST || hitPolicy == HitPolicy.PRIORITY) {
+            for (var rule : rules) {
+                if (!selected.contains(rule)) {
+                    findings.add(new Finding("UNREACHABLE_RULE", List.of(rule.priority())));
+                }
+            }
+        }
+        return findings;
+    }
+
+    private List<Map<String, String>> representativeInputs(List<String> columns) {
+        List<Map<String, String>> inputs = new ArrayList<>();
+        inputs.add(new java.util.HashMap<>());
+        for (var column : columns) {
+            var values = new java.util.TreeSet<String>();
+            for (var rule : rules) {
+                var cell = rule.input().values().get(column);
+                if (cell != null && !cell.isBlank()) {
+                    values.addAll(List.of(cell.split(",")));
+                }
+            }
+            var options = new ArrayList<String>(values);
+            options.add(null);
+            var next = new ArrayList<Map<String, String>>();
+            for (var partial : inputs) {
+                for (var option : options) {
+                    var input = new java.util.HashMap<>(partial);
+                    input.put(column, option);
+                    next.add(input);
+                }
+            }
+            inputs = next;
+        }
+        return inputs;
+    }
+
+    private static List<Integer> ids(List<Praeceptum> rules) {
+        return rules.stream().map(Praeceptum::priority).toList();
+    }
+
     private static boolean accepts(Praeceptum rule, Map<String, String> input) {
         for (var cell : rule.input().values().entrySet()) {
             if (!accepts(cell.getValue(), input.get(cell.getKey()))) {

@@ -18,8 +18,6 @@ import org.kie.dmn.core.internal.utils.DMNRuntimeBuilder;
 import org.kie.internal.io.ResourceFactory;
 
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
-import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
-import io.github.brunopacheco1.praecepta.engine.exceptions.MissingOutputException;
 
 /** A decision engine under test. Returns the ids of the matched rules, in hit-policy order. */
 public sealed interface Contender permits Contender.Praecepta, Contender.Camunda, Contender.Drools {
@@ -41,18 +39,19 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
         private final PraeceptaEngine<Map<String, String>, String> engine;
 
         Praecepta(Table table) {
-            engine = new PraeceptaEngine<>(table.hitPolicy(), PraeceptaInput::new,
-                    output -> output.values().get(Table.ID_OUTPUT));
-            engine.register(table.rules());
+            var builder = PraeceptaEngine.<Map<String, String>, String>builder()
+                    .hitPolicy(table.hitPolicy())
+                    .output(output -> output.values().get(Table.ID_OUTPUT))
+                    .rules(table.rules());
+            for (var column : table.inputs()) {
+                builder.input(column, input -> input.get(column));
+            }
+            engine = builder.build();
         }
 
         @Override
         public List<String> evaluate(Map<String, String> input) {
-            try {
-                return engine.evaluate(input);
-            } catch (MissingOutputException e) {
-                return List.of();
-            }
+            return engine.evaluate(input);
         }
     }
 
