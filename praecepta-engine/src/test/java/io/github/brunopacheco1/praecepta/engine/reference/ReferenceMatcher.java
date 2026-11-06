@@ -110,14 +110,21 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                 continue;
             }
             switch (hitPolicy) {
+                // overlaps are reported per pair of rules that some input matches together
                 case UNIQUE -> {
-                    if (matches.size() > 1) {
-                        findings.add(new Finding("OVERLAPPING_RULES", ids(matches)));
+                    for (int a = 0; a < matches.size(); a++) {
+                        for (int b = a + 1; b < matches.size(); b++) {
+                            findings.add(new Finding("OVERLAPPING_RULES", ids(List.of(matches.get(a), matches.get(b)))));
+                        }
                     }
                 }
                 case ANY -> {
-                    if (matches.stream().map(Praeceptum::output).distinct().count() > 1) {
-                        findings.add(new Finding("CONFLICTING_OUTPUTS", ids(matches)));
+                    for (int a = 0; a < matches.size(); a++) {
+                        for (int b = a + 1; b < matches.size(); b++) {
+                            if (!matches.get(a).output().equals(matches.get(b).output())) {
+                                findings.add(new Finding("CONFLICTING_OUTPUTS", ids(List.of(matches.get(a), matches.get(b)))));
+                            }
+                        }
                     }
                 }
                 case FIRST -> selected.add(matches.getFirst());
