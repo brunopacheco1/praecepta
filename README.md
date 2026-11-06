@@ -93,6 +93,11 @@ java -cp praecepta-benchmarks/target/benchmarks.jar \
 
 The `Benchmarks` GitHub workflow runs the same on demand and uploads the results.
 
+Drools' experimental alpha-network compilation is not part of the default comparison: on Drools
+10.2.0 it disagrees with every other engine on these tables (see
+[docs/MODERNISATION.md](docs/MODERNISATION.md)). It can be checked on demand with
+`-p engine=drools-alphanetwork`.
+
 # Dependencies
 Praecepta Engine has no runtime dependencies.
 

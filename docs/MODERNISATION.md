@@ -143,6 +143,21 @@ mask. The target came from an experiment that fed pre-built arrays and skipped t
 Getting below it needs the int-coded input path, left for later along with partitioning by the most
 selective column, which 10,000 rules at 0.69 µs and 0.8 MB do not yet call for.
 
+**Drools' own index (checked after Phase 2).** Drools DMN ships an experimental alpha-network
+compilation for decision tables (`AlphaNetworkOption`, `org.kie.dmn.compiler.alphanetwork`), the
+closest equivalent of this bitset index, so default Drools alone is not a fair comparison. On
+Drools 10.2.0:
+- The documented system property is ignored by `DMNRuntimeBuilder`: the default evaluator runs.
+- Forcing the option on the compiler configuration installs `DMNAlphaNetworkEvaluatorImpl`, but it
+  cannot compile tables with more than one output column (the real table fails under every hit
+  policy) nor RULE_ORDER tables, and on the tables it does compile it disagrees with default Drools
+  on ~99% of inputs (for example returning rules whose cells do not match the input).
+
+We could not rule out that it needs set-up from Drools' build-time (Kogito) code generation that
+the runtime route skips. Either way it cannot be benchmarked, because the harness refuses to time
+engines that disagree. The `drools-alphanetwork` contender stays available on demand
+(`-p engine=drools-alphanetwork`) to re-check newer Drools releases.
+
 ### Phase 3 — Richer rule language
 - Single-column predicates: ranges, negation, sets, numbers, dates — compiled to per-interval
   bitmasks (binary search on sorted boundaries). Cross-column expressions out of scope.
