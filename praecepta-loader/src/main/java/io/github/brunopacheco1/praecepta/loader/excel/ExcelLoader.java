@@ -1,14 +1,17 @@
 package io.github.brunopacheco1.praecepta.loader.excel;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 
@@ -111,14 +114,24 @@ public class ExcelLoader extends BaseLoader {
     }
 
     private String getCellValue(Cell cell) {
-        switch (cell.getCellType()) {
-            case NUMERIC:
-                return String.valueOf(Math.round(cell.getNumericCellValue()));
-            case STRING:
-                return cell.getStringCellValue();
-            default:
-                return null;
-        }
+        return cellText(cell);
+    }
+
+    /**
+     * The text of a cell as the engine's cell parser expects it. Numbers keep their exact value
+     * ({@code 18.5}, not rounded; {@code 18}, not {@code 18.0}); date-formatted cells become ISO dates
+     * ({@code 2025-01-31}), which DATE columns accept; formulas use their cached result.
+     */
+    static String cellText(Cell cell) {
+        var type = cell.getCellType() == CellType.FORMULA ? cell.getCachedFormulaResultType() : cell.getCellType();
+        return switch (type) {
+            case NUMERIC -> DateUtil.isCellDateFormatted(cell)
+                    ? cell.getLocalDateTimeCellValue().toLocalDate().toString()
+                    : BigDecimal.valueOf(cell.getNumericCellValue()).stripTrailingZeros().toPlainString();
+            case STRING -> cell.getStringCellValue();
+            case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
+            default -> null;
+        };
     }
 
     /**

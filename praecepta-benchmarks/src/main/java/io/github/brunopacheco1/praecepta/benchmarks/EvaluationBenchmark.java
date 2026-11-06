@@ -33,14 +33,14 @@ public class EvaluationBenchmark {
 
     static final int WORKLOAD_SIZE = 4096;
 
-    @Param({"praecepta", "camunda", "camunda-legacy-feel", "drools"})
+    @Param({"praecepta", "camunda", "drools"})
     public String engine;
 
-    @Param({"real", "synthetic-100", "synthetic-1000"})
+    @Param({"real", "synthetic-100", "synthetic-1000", "mixed-100", "mixed-1000"})
     public String table;
 
     private Contender contender;
-    private Map<String, String>[] inputs;
+    private Map<String, Object>[] inputs;
     private int cursor;
 
     @Setup(Level.Trial)
