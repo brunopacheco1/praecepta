@@ -228,6 +228,80 @@ evaluation and used for gap reporting.
 - Optional pre-built serialised index.
 - DMN XML import (decision tables with simple unary tests).
 
+**Status: done** (branch `modernisation/phase-4`). Decisions:
+- The plugin converts every table to a DMN resource at build time, and the engine reads DMN with
+  the JDK's XML parser only, so applications need no Apache POI at runtime.
+- Excel/CSV column types and value lists are declared in the pom.
+- The pre-built serialised index is dropped: engines build in 40–160 ms for up to 1,000 rules,
+  and a binary format would need versioning.
+
+What was done:
+- `DecisionTable` (engine `beans`): a whole table, i.e. name, hit policy, aggregation, typed input
+  columns with value lists, output columns with output value lists, and rules.
+  `Builder.table(...)` applies it, then checks that every column is bound with the declared type.
+- `DmnReader` (engine `dmn` package) reads DMN 1.1–1.5.
+  - It handles Camunda Modeler output (diagram data, vendor attributes, annotations), `feel:`- and
+    `xsd:`-prefixed types, and several decisions per model (pick one by name).
+  - DTDs and external entities are refused.
+  - Supported: input expressions that name a variable; `string`, `number` / `integer` / `long` /
+    `double`, and `date` columns; cells in Praecepta's FEEL subset; input and output value lists;
+    literal outputs; every hit policy; SUM, MIN and MAX.
+  - Anything else fails with the decision, rule and column: boolean and date-time columns,
+    computed expressions, function calls, COUNT.
+- `DmnWriter` (moved from the benchmarks into the engine) writes DMN 1.3, adds value lists and
+  aggregation, and uses DMN's spelling of hit policies (`RULE ORDER`, `OUTPUT ORDER`). The
+  benchmarks feed Camunda and Drools through it.
+- Int-coded path: `Builder.enumInput(column, Enum.class, [value,] getter)`.
+  - Each constant's mask is computed once, so a lookup is an array access by ordinal.
+  - The enum is the column's input value list unless one is declared, in which case every
+    constant must be in it (checked at build).
+- Maven plugin rewritten as a real plugin (`maven-plugin` packaging, goal `praecepta:generate`;
+  FreeMarker and the never-committed templates are gone). Per table it:
+  1. loads `.xlsx`, `.csv` or `.dmn`;
+  2. validates with the engine (`failOn`: ERROR by default) and logs the rest;
+  3. writes `<Name>.dmn` next to the classes;
+  4. generates `<Name>Input` (a nested enum per string column with a value list; `BigDecimal`,
+     `LocalDate`), `<Name>Output`, and `<Name>` (static `evaluate` returning an `Optional` or a
+     `List`, plus `validationReport()` and `engine()`).
+
+  Generated code fully qualifies outside types. Column and value names become Java identifiers,
+  with reserved words and collisions handled.
+- Loaders take an `InputStream` as well as a classpath path.
+
+Tests:
+- DMN round-trip property: 500 random typed tables, every hit policy, written, read back and
+  evaluated against the reference; writing is stable.
+- Reader fixtures in Camunda Modeler and DMN 1.1 style, with rejection cases.
+- Enum bindings agree with string bindings.
+- Plugin tests generate sources, compile them with `-Xlint:all -Werror` against the engine jar
+  alone, and evaluate them.
+- Mutation-checked: planted "interval end brackets swapped" (writer) and "input value lists
+  dropped" (reader) bugs were both caught.
+- The benchmark module now uses the plugin itself: Maven orders it in the reactor automatically,
+  `-am` included.
+
+Performance, real table, `InputPathBenchmark`: the same engine, fed three ways, timed in one run.
+
+| Input | ns/op |
+|---|---:|
+| `Map` of strings (two hash lookups per column) | 233 |
+| generated record of `String`s (field read + one hash lookup) | 151 |
+| generated record of enums (field read + array index) | **104** |
+
+- The Phase 2 target (≤ 120 ns on the real table) is met by the enum path. All three variants pay
+  the same benchmark indirection, which is why the map variant reads higher here than in
+  `EvaluationBenchmark` (188 ns).
+- Existing paths are unchanged: interleaved against the Phase 3 jar, real 185/188 vs 183/179 ns,
+  synthetic-1000 218/218 vs 217/217, mixed-100 442/431 vs 435/437.
+- This run's cross-engine numbers were 10–17% noisier than Phase 3's; the Phase 3 table remains
+  the reference.
+
+Not done:
+- Boolean and date-time columns.
+- DMN models whose decisions require other decisions (DRG chaining).
+- A Maven-invoker integration test: the benchmark module's use of the plugin covers the Maven
+  wiring.
+
 ### Phase 5 — Release
 - Zero-dependency engine artifact, JPMS `module-info`, Maven Central, README rewrite.
 - Align package names (`io.com.github…` → `io.github…`).

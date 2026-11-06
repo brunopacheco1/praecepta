@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Random;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
@@ -18,7 +19,7 @@ import io.github.brunopacheco1.praecepta.loader.excel.ExcelLoader;
 
 /**
  * A decision table shared by every engine under test. Praecepta consumes {@link #rules()} directly;
- * the DMN engines consume the same rules rendered by {@link DmnWriter}, so all engines evaluate
+ * the DMN engines consume the same rules rendered by the engine's {@code DmnWriter}, so all engines evaluate
  * identical logic.
  *
  * @param name      identifier used as JMH parameter value
@@ -32,6 +33,9 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
                     List<Praeceptum> rules, HitPolicy hitPolicy) {
 
     public static final String ID_OUTPUT = "ruleId";
+
+    /** Name of the decision in the DMN given to Camunda and Drools. */
+    public static final String DECISION = "decision_table";
 
     /** First day of the date domain used by mixed tables. */
     static final LocalDate DAY0 = LocalDate.of(2025, 1, 1);
@@ -56,6 +60,16 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
             return mixed(Integer.parseInt(name.substring(MIXED_PREFIX.length())), 0.4, 42);
         }
         throw new IllegalArgumentException("Unknown table: " + name);
+    }
+
+    /** The table as a decision table, for {@code DmnWriter}; outputs are strings. */
+    public DecisionTable decisionTable() {
+        var columns = new ArrayList<DecisionTable.InputColumn>();
+        for (int c = 0; c < inputs.size(); c++) {
+            columns.add(new DecisionTable.InputColumn(inputs.get(c), types.get(c)));
+        }
+        var results = outputs.stream().map(output -> new DecisionTable.OutputColumn(output, ColumnType.STRING)).toList();
+        return new DecisionTable(DECISION, hitPolicy, null, columns, results, rules);
     }
 
     /** True when every column is a string column. */

@@ -1,7 +1,9 @@
 package io.github.brunopacheco1.praecepta.loader.csv;
 
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,9 +20,20 @@ public class CsvLoader extends BaseLoader {
 
     private final List<Praeceptum> praecepta = new ArrayList<>();
 
+    /** Reads a CSV file from the classpath. */
     public CsvLoader(String csvPath, Set<String> inputs, Set<String> outputs) {
         super(inputs, outputs);
-        readCsv(csvPath);
+        readCsv(csvPath, null);
+    }
+
+    /**
+     * Reads CSV (UTF-8) from a stream, which is closed afterwards.
+     *
+     * @param source names the data in error messages, e.g. its file name
+     */
+    public CsvLoader(InputStream csv, String source, Set<String> inputs, Set<String> outputs) {
+        super(inputs, outputs);
+        readCsv(source, csv);
     }
 
     /**
@@ -28,9 +41,9 @@ public class CsvLoader extends BaseLoader {
      *
      * @param csvPath the path to look after the CSV file
      */
-    private void readCsv(String csvPath) {
+    private void readCsv(String csvPath, InputStream stream) {
         try {
-            var lines = readLines(csvPath);
+            var lines = readLines(csvPath, stream);
             var headers = readHeadersPositioning(lines);
             var fileRows = readRows(headers, lines);
             praecepta.addAll(parseRowsToPraecepta(fileRows));
@@ -45,13 +58,12 @@ public class CsvLoader extends BaseLoader {
      * @param csvPath the file path
      * @return the list of lines
      */
-    private List<String> readLines(String csvPath) {
+    private List<String> readLines(String csvPath, InputStream stream) {
         try {
             var lines = new ArrayList<String>();
-            var classLoader = getClass().getClassLoader();
             try (
-                var inputStream = classLoader.getResourceAsStream(csvPath);
-                var br = new BufferedReader(new InputStreamReader(inputStream))
+                var inputStream = stream != null ? stream : getClass().getClassLoader().getResourceAsStream(csvPath);
+                var br = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))
             ) {
                 String line;
                 while ((line = br.readLine()) != null) {

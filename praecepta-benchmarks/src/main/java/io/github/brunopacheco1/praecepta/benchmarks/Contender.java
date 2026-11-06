@@ -19,6 +19,7 @@ import org.kie.dmn.core.internal.utils.DMNRuntimeBuilder;
 import org.kie.internal.io.ResourceFactory;
 
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
+import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 
 /** A decision engine under test. Returns the ids of the matched rules, in hit-policy order. */
 public sealed interface Contender permits Contender.Praecepta, Contender.Camunda, Contender.Drools {
@@ -72,7 +73,7 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
 
         Camunda(Table table) {
             engine = new DmnEngine.Builder().build();
-            var xml = DmnWriter.write(table).getBytes(StandardCharsets.UTF_8);
+            var xml = DmnWriter.write(table.decisionTable()).getBytes(StandardCharsets.UTF_8);
             var parsed = engine.parse(new ByteArrayInputStream(xml));
             if (parsed.isLeft()) {
                 throw new IllegalStateException("Camunda could not parse the DMN model: " + parsed.left().get());
@@ -82,7 +83,7 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
 
         @Override
         public List<String> evaluate(Map<String, Object> input) {
-            var result = engine.eval(dmn, DmnWriter.DECISION, input);
+            var result = engine.evalByName(dmn, Table.DECISION, input);
             if (result.isLeft()) {
                 throw new IllegalStateException("Camunda failed to evaluate " + input + ": " + result.left().get());
             }
@@ -129,7 +130,7 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
         private final DMNModel model;
 
         Drools(Table table, boolean alphaNetwork) {
-            var resource = ResourceFactory.newReaderResource(new StringReader(DmnWriter.write(table)), "UTF-8");
+            var resource = ResourceFactory.newReaderResource(new StringReader(DmnWriter.write(table.decisionTable())), "UTF-8");
             resource.setSourcePath(table.name() + ".dmn");
             runtime = DMNRuntimeBuilder.fromDefaults()
                     .buildConfigurationUsingCustomCompiler(configuration -> {
@@ -149,8 +150,8 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
         public List<String> evaluate(Map<String, Object> input) {
             var context = runtime.newContext();
             input.forEach(context::set);
-            var result = runtime.evaluateByName(model, context, DmnWriter.DECISION)
-                    .getDecisionResultByName(DmnWriter.DECISION)
+            var result = runtime.evaluateByName(model, context, Table.DECISION)
+                    .getDecisionResultByName(Table.DECISION)
                     .getResult();
             return ids(result);
         }
