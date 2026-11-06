@@ -74,6 +74,76 @@
     <build>
         <plugins>
             <plugin>
+                <!-- Dogfooding: the plugin compiles the real table into typed classes, twice -->
+                <groupId>io.github.brunopacheco1</groupId>
+                <artifactId>praecepta-maven-plugin</artifactId>
+                <version>${project.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <packageName>io.github.brunopacheco1.praecepta.benchmarks.generated</packageName>
+                            <tables>
+                                <!-- value lists: string columns become enums (the int-coded path) -->
+                                <table>
+                                    <source>src/main/resources/tables/decision_table.xlsx</source>
+                                    <name>RealEnums</name>
+                                    <hitPolicy>FIRST</hitPolicy>
+                                    <inputs>
+                                        <input><name>inputA</name><allowedValues>"A","B"</allowedValues></input>
+                                        <input><name>inputB</name><allowedValues>"A","B"</allowedValues></input>
+                                        <input><name>inputC</name><allowedValues>"A","B"</allowedValues></input>
+                                        <input><name>inputD</name><allowedValues>"A","AA","AB","AC","AD","AE","AF","AG","AH","AI","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"</allowedValues></input>
+                                        <input><name>inputE</name><allowedValues>"A","B","C","D","E","F","G","H","I","J"</allowedValues></input>
+                                        <input><name>inputF</name><allowedValues>"NO","YES"</allowedValues></input>
+                                        <input><name>inputG</name><allowedValues>"A","B"</allowedValues></input>
+                                        <input><name>inputH</name><allowedValues>"A","B"</allowedValues></input>
+                                        <input><name>inputI</name><allowedValues>"NO","YES"</allowedValues></input>
+                                        <input><name>inputJ</name><allowedValues>"NO","YES"</allowedValues></input>
+                                        <input><name>inputK</name><allowedValues>"A","B","C","D","E","F","G"</allowedValues></input>
+                                        <input><name>inputL</name><allowedValues>"NO","YES"</allowedValues></input>
+                                        <input><name>inputM</name><allowedValues>"A"</allowedValues></input>
+                                    </inputs>
+                                    <outputs>
+                                        <output><name>outputA</name></output>
+                                        <output><name>outputB</name></output>
+                                        <output><name>ruleId</name></output>
+                                    </outputs>
+                                </table>
+                                <!-- no value lists: columns stay String -->
+                                <table>
+                                    <source>src/main/resources/tables/decision_table.xlsx</source>
+                                    <name>RealStrings</name>
+                                    <hitPolicy>FIRST</hitPolicy>
+                                    <inputs>
+                                        <input><name>inputA</name></input>
+                                        <input><name>inputB</name></input>
+                                        <input><name>inputC</name></input>
+                                        <input><name>inputD</name></input>
+                                        <input><name>inputE</name></input>
+                                        <input><name>inputF</name></input>
+                                        <input><name>inputG</name></input>
+                                        <input><name>inputH</name></input>
+                                        <input><name>inputI</name></input>
+                                        <input><name>inputJ</name></input>
+                                        <input><name>inputK</name></input>
+                                        <input><name>inputL</name></input>
+                                        <input><name>inputM</name></input>
+                                    </inputs>
+                                    <outputs>
+                                        <output><name>outputA</name></output>
+                                        <output><name>outputB</name></output>
+                                        <output><name>ruleId</name></output>
+                                    </outputs>
+                                </table>
+                            </tables>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>

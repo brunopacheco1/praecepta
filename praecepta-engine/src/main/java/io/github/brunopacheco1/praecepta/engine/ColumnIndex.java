@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
@@ -36,6 +37,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *
  * Membership is decided per class with FEEL's three-valued logic: a missing value fails comparisons
  * and intervals (unknown), equals only {@code null}, and so satisfies {@code not("A")}.
+ *
+ * <p>A STRING column bound to an enum precomputes one mask per constant, so its lookup is an array
+ * access by ordinal instead of a hash lookup (the int-coded input path).
  */
 final class ColumnIndex {
 
@@ -60,8 +64,14 @@ final class ColumnIndex {
     /** Classes allowed by the declared input values (all, if none declared). Null is always allowed. */
     final boolean[] allowed;
     final boolean hasAllowedValues;
+    /** Enum-bound STRING column: mask per constant ordinal; null otherwise. */
+    private final long[][] ordinalMasks;
 
-    ColumnIndex(String name, ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues, int words) {
+    /**
+     * @param enumValues for a STRING column bound to an enum: each constant's value, by ordinal; else null
+     * @throws InvalidDecisionTableException if an enum value is outside the declared input values
+     */
+    ColumnIndex(String name, ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues, int words, String[] enumValues) {
         this.name = name;
         this.type = type;
         this.isString = type == ColumnType.STRING;
@@ -135,19 +145,37 @@ final class ColumnIndex {
             disallowedStrings = null;
         }
         nullMask = masks[nullClass];
+        if (enumValues == null) {
+            ordinalMasks = null;
+        } else {
+            ordinalMasks = new long[enumValues.length][];
+            for (int ordinal = 0; ordinal < enumValues.length; ordinal++) {
+                try {
+                    ordinalMasks[ordinal] = stringMaskSlow(enumValues[ordinal]);
+                } catch (InvalidInputException e) {
+                    throw new InvalidDecisionTableException("Column '%s': enum value '%s' is not one of the column's input values"
+                            .formatted(name, enumValues[ordinal]));
+                }
+            }
+        }
     }
 
     private final List<ValueClass> classes;
 
     /**
-     * The mask of rules accepting a raw input value: a String (typed getter or text map) for STRING
-     * columns; a Number, LocalDate or text for NUMBER and DATE columns. Blank text counts as missing.
+     * The mask of rules accepting a raw input value: a String (typed getter or text map) or, if the
+     * column is enum-bound, an enum constant for STRING columns; a Number, LocalDate or text for NUMBER
+     * and DATE columns. Blank text counts as missing.
      *
      * @throws InvalidInputException if the value is outside the declared input values, or text that
      *                               is not a valid number or date
      */
     long[] maskFor(Object raw) {
         if (isString) {
+            if (ordinalMasks != null) {
+                // int-coded path: enum constants were checked against the declared values when built
+                return raw == null ? nullMask : ordinalMasks[((Enum<?>) raw).ordinal()];
+            }
             // hot path, kept tiny so it inlines: a known value in a column without declared values
             if (raw != null && disallowedStrings == null) {
                 var mask = stringMasks.get(raw);

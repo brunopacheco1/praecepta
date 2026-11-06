@@ -21,6 +21,7 @@ import io.github.brunopacheco1.praecepta.engine.ValidationReport.Issue;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException;
@@ -47,6 +48,18 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * <p>Cells are DMN FEEL unary tests, parsed per column type: {@code "PT","ES"} (or unquoted
  * {@code PT,ES}), {@code not("FR")}, {@code >= 18}, {@code [18..65)}, {@code < date("2025-01-01")},
  * {@code null}, and {@code -} or blank for any value. See {@code CellParser}.
+ *
+ * <p>A whole DMN decision table (hit policy, column types, value lists and rules) can be loaded with
+ * {@code DmnReader} and passed to {@link Builder#table}; inputs are then bound as usual:
+ *
+ * <pre>{@code
+ * var engine = PraeceptaEngine.<Applicant, String>builder()
+ *         .table(DmnReader.read(stream))
+ *         .input("country", Applicant::country)
+ *         .numberInput("age", Applicant::age)
+ *         .output(output -> output.values().get("tier"))
+ *         .build();
+ * }</pre>
  *
  * <p>Instances are immutable and safe to share between threads. Outputs are converted once, when the
  * engine is built, and the same instances are returned by every evaluation, so output types should be
@@ -82,15 +95,25 @@ public final class PraeceptaEngine<I, O> {
 
         // columns and their types
         var types = new LinkedHashMap<String, ColumnType>();
+        var allowedValues = new LinkedHashMap<>(builder.allowedValues);
         if (builder.inputStrategy == null) {
             builder.extractors.forEach((column, binding) -> types.put(column, binding.type()));
             rejectUndeclaredColumns(rules, types.keySet());
+            // an enum is a closed set of values: it is the column's input value list unless one is declared
+            builder.extractors.forEach((column, binding) -> {
+                if (binding.enumValues() != null) {
+                    allowedValues.putIfAbsent(column, quotedList(List.of(binding.enumValues())));
+                }
+            });
         } else {
-            columnsUsedBy(rules).forEach(column -> types.put(column, ColumnType.STRING));
+            if (builder.tableTypes != null) {
+                types.putAll(builder.tableTypes);
+            }
+            columnsUsedBy(rules).forEach(column -> types.putIfAbsent(column, ColumnType.STRING));
             builder.allowedValues.keySet().forEach(column -> types.putIfAbsent(column, ColumnType.STRING));
             types.putAll(builder.columnTypes);
         }
-        for (var column : builder.allowedValues.keySet()) {
+        for (var column : allowedValues.keySet()) {
             if (!types.containsKey(column)) {
                 throw new InvalidDecisionTableException("Input values declared for unknown column '%s'".formatted(column));
             }
@@ -109,7 +132,8 @@ public final class PraeceptaEngine<I, O> {
         var columnIndexes = evaluationOrder.stream()
                 .map(column -> new ColumnIndex(column, types.get(column),
                         Arrays.stream(bitToRule).mapToObj(rule -> cells.get(column).get(rule)).toList(),
-                        allowedTests(column, types.get(column), builder.allowedValues.get(column)), words))
+                        allowedTests(column, types.get(column), allowedValues.get(column)), words,
+                        builder.inputStrategy == null ? builder.extractors.get(column).enumValues() : null))
                 .toList();
         index = new BitsetIndex(columnIndexes, bitToRule);
 
@@ -318,6 +342,12 @@ public final class PraeceptaEngine<I, O> {
         return cells;
     }
 
+    private static String quotedList(List<String> values) {
+        return values.stream()
+                .map(value -> "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+                .collect(java.util.stream.Collectors.joining(", "));
+    }
+
     private static UnaryTests allowedTests(String column, ColumnType type, String declared) {
         if (declared == null) {
             return null;
@@ -357,7 +387,8 @@ public final class PraeceptaEngine<I, O> {
      * {@link #input(String, Function)} (fastest) or all at once with {@link #inputs(InputStrategy)}.
      */
     public static final class Builder<I, O> {
-        private record Binding<I>(ColumnType type, Function<? super I, ?> extractor) {
+        /** @param enumValues for an enum-bound column, each constant's value by ordinal; else null */
+        private record Binding<I>(ColumnType type, Function<? super I, ?> extractor, String[] enumValues) {
         }
 
         private HitPolicy hitPolicy;
@@ -370,8 +401,42 @@ public final class PraeceptaEngine<I, O> {
         private final Map<String, List<String>> outputPriority = new LinkedHashMap<>();
         private List<Praeceptum> rules;
         private Severity failOn;
+        /** Column types of a {@link #table(DecisionTable)}, checked against the bindings. */
+        private Map<String, ColumnType> tableTypes;
 
         private Builder() {
+        }
+
+        /**
+         * Takes the hit policy, aggregation, rules, input value lists and (for PRIORITY and
+         * OUTPUT_ORDER) output value lists from a decision table, e.g. one read by {@code DmnReader}.
+         * Inputs are still bound with {@code input(...)} and its typed variants, which must cover every
+         * column of the table with its type, or with {@link #inputs(InputStrategy)}, in which case the
+         * table's column types apply.
+         */
+        public Builder<I, O> table(DecisionTable table) {
+            Objects.requireNonNull(table, "table");
+            hitPolicy(table.hitPolicy());
+            if (table.aggregation() != null) {
+                aggregation(table.aggregation());
+            }
+            rules(table.rules());
+            var types = new LinkedHashMap<String, ColumnType>();
+            for (var input : table.inputs()) {
+                types.put(input.name(), input.type());
+                if (input.allowedValues() != null) {
+                    allowedValues(input.name(), input.allowedValues());
+                }
+            }
+            tableTypes = types;
+            if (table.hitPolicy() == HitPolicy.PRIORITY || table.hitPolicy() == HitPolicy.OUTPUT_ORDER) {
+                for (var output : table.outputs()) {
+                    if (!output.values().isEmpty()) {
+                        outputPriority(output.name(), output.values());
+                    }
+                }
+            }
+            return this;
         }
 
         public Builder<I, O> hitPolicy(HitPolicy hitPolicy) {
@@ -400,10 +465,33 @@ public final class PraeceptaEngine<I, O> {
             return bind(column, ColumnType.DATE, extractor);
         }
 
+        /**
+         * Binds a STRING column to a getter returning an enum: the int-coded input path. Each constant
+         * stands for the value {@code name()}; lookups index an array by ordinal instead of hashing.
+         * The enum's values become the column's input value list unless one is declared, in which case
+         * every constant must be in it.
+         */
+        public <E extends Enum<E>> Builder<I, O> enumInput(String column, Class<E> type, Function<? super I, E> extractor) {
+            return enumInput(column, type, Enum::name, extractor);
+        }
+
+        /** {@link #enumInput(String, Class, Function)} where each constant stands for {@code value.apply(constant)}. */
+        public <E extends Enum<E>> Builder<I, O> enumInput(String column, Class<E> type, Function<? super E, String> value,
+                                                            Function<? super I, E> extractor) {
+            Objects.requireNonNull(type, "type");
+            Objects.requireNonNull(value, "value");
+            var values = Arrays.stream(type.getEnumConstants()).map(value).toArray(String[]::new);
+            return bind(column, ColumnType.STRING, extractor, values);
+        }
+
         private Builder<I, O> bind(String column, ColumnType type, Function<? super I, ?> extractor) {
+            return bind(column, type, extractor, null);
+        }
+
+        private Builder<I, O> bind(String column, ColumnType type, Function<? super I, ?> extractor, String[] enumValues) {
             Objects.requireNonNull(column, "column");
             Objects.requireNonNull(extractor, "extractor");
-            if (extractors.putIfAbsent(column, new Binding<>(type, extractor)) != null) {
+            if (extractors.putIfAbsent(column, new Binding<>(type, extractor, enumValues)) != null) {
                 throw new IllegalArgumentException("Input column '%s' is declared twice".formatted(column));
             }
             return this;
@@ -437,9 +525,7 @@ public final class PraeceptaEngine<I, O> {
 
         /** {@link #allowedValues(String, String)} for a string column, from plain values. */
         public Builder<I, O> allowedValues(String column, List<String> values) {
-            return allowedValues(column, values.stream()
-                    .map(value -> "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
-                    .collect(java.util.stream.Collectors.joining(", ")));
+            return allowedValues(column, quotedList(values));
         }
 
         public Builder<I, O> output(OutputStrategy<O> outputStrategy) {
@@ -483,6 +569,14 @@ public final class PraeceptaEngine<I, O> {
                     "bind inputs either per column with input(...) or with inputs(...), not both and not neither");
             require(columnTypes.isEmpty() || inputStrategy != null,
                     "columnType(...) only applies with inputs(...); per-column bindings carry their type");
+            if (tableTypes != null && inputStrategy == null) {
+                tableTypes.forEach((column, type) -> {
+                    var binding = extractors.get(column);
+                    require(binding != null, "column '%s' of the table has no input binding".formatted(column));
+                    require(binding.type() == type, "column '%s' is a %s column in the table but is bound as %s"
+                            .formatted(column, type, binding.type()));
+                });
+            }
             require(aggregation == null || hitPolicy == HitPolicy.COLLECT,
                     "aggregation is only allowed with the COLLECT hit policy");
             boolean needsPriority = hitPolicy == HitPolicy.PRIORITY || hitPolicy == HitPolicy.OUTPUT_ORDER;

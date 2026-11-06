@@ -14,8 +14,12 @@ lookups that cost a fraction of a microsecond.
   rules that can never be selected (FIRST, PRIORITY), and gaps (declared inputs no rule matches)
 - Bitset matching: memory grows linearly with the table (10,000 rules fit in under 1 MB) and
   engines build in milliseconds
+- Enum inputs: lookups by ordinal instead of hashing
 - Immutable, thread-safe engines; no runtime dependencies
-- Rules from code, Excel or CSV
+- Rules from code, Excel, CSV or DMN files (DMN 1.1 to 1.5, as written by Camunda Modeler and
+  other tools), and DMN export
+- A Maven plugin that validates tables at build time and generates typed input and output
+  records, so applications ship only the engine
 
 # Getting Started
 ## Praecepta Engine
@@ -88,9 +92,39 @@ Notes:
   throws `HitPolicyViolationException`.
 - `.failOn(Severity.ERROR)` makes `build()` reject tables whose validation report has errors.
 - `.inputs(order -> new PraeceptaInput(...))` binds all columns from a map instead of per column.
+- `.enumInput("country", Country.class, Order::country)` binds a column to an enum. Lookups then
+  index an array by ordinal instead of hashing, and the enum's constants become the column's
+  input value list. Each constant stands for its `name()`, or pass a function such as
+  `Country::code`.
+
+### DMN
+`DmnReader` loads a decision table from a DMN file (DMN 1.1 to 1.5), including its hit policy,
+column types and value lists. `Builder.table(...)` applies all of it; inputs are bound as usual,
+with the types the table declares.
+
+```java
+DecisionTable table;
+try (var dmn = Files.newInputStream(Path.of("discount.dmn"))) {
+    table = DmnReader.read(dmn);               // or read(dmn, "Decision name") if there are several
+}
+var engine = PraeceptaEngine.<Customer, String>builder()
+        .table(table)
+        .input("country", Customer::country)
+        .numberInput("age", Customer::age)
+        .output(output -> output.values().get("tier"))
+        .build();
+```
+
+Supported: input expressions that name a variable (`age`, `customer.age`); `string`, `number`
+(`integer`, `long`, `double`) and `date` columns; input entries in the cell syntax above; literal
+output entries; every hit policy, with SUM, MIN and MAX aggregation. Anything else (boolean or
+date-time columns, computed expressions, function calls, COUNT) is rejected with a message naming
+the decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
+evaluate identically, which is how the benchmarks feed them.
 
 ## Praecepta Loader
-Loads rules from the first sheet of an Excel file (or a CSV file) on the classpath. The header row
+Loads rules from the first sheet of an Excel file (or a semicolon-separated CSV file), from the
+classpath or from an `InputStream`. The header row
 names the columns; each following row is a rule, identified by its row number. Cells are read as
 text in the syntax above; numeric cells keep their exact value and date-formatted cells become ISO
 dates.
@@ -107,6 +141,54 @@ var engine = PraeceptaEngine.<Order, Discount>builder()
         .rules(rules)
         .build();
 ```
+
+## Praecepta Maven Plugin
+Compiles tables at build time. For each table the `generate` goal:
+1. loads it from Excel, CSV or DMN;
+2. validates it, failing the build on errors (`<failOn>`: `ERROR` by default, `WARNING` or
+   `NONE`) and logging the rest;
+3. writes it as a DMN resource next to the generated classes;
+4. generates `<Name>Input` and `<Name>Output` records and a `<Name>` class that evaluates the DMN.
+
+A string column with a value list becomes an enum in the input record, using the int-coded path.
+Numbers are `BigDecimal` and dates `LocalDate`. At runtime the generated code needs only
+`praecepta-engine`; Apache POI stays a build-time dependency.
+
+```xml
+<plugin>
+  <groupId>io.github.brunopacheco1</groupId>
+  <artifactId>praecepta-maven-plugin</artifactId>
+  <version>${praecepta.version}</version>
+  <executions><execution><goals><goal>generate</goal></goals></execution></executions>
+  <configuration>
+    <packageName>com.acme.pricing</packageName>
+    <tables>
+      <table>
+        <source>src/main/rules/discount.xlsx</source>
+        <hitPolicy>FIRST</hitPolicy>
+        <inputs>
+          <input><name>country</name><allowedValues>"PT","ES","FR"</allowedValues></input>
+          <input><name>age</name><type>NUMBER</type></input>
+        </inputs>
+        <outputs>
+          <output><name>discount</name><type>NUMBER</type></output>
+        </outputs>
+      </table>
+      <table>
+        <!-- DMN files carry their own hit policy, columns and value lists -->
+        <source>src/main/rules/shipping.dmn</source>
+      </table>
+    </tables>
+  </configuration>
+</plugin>
+```
+
+```java
+Optional<DiscountOutput> discount = Discount.evaluate(new DiscountInput(DiscountInput.Country.PT, new BigDecimal(30)));
+```
+
+Single-hit tables (and aggregations) return an `Optional`; multi-hit tables return a `List`.
+`Discount.validationReport()` gives the build-time findings, and `Discount.engine()` the engine.
 
 # Building and Testing
 Praecepta requires **Java 25** (the current LTS) and Maven 3.9+. From the repository root:
@@ -132,6 +214,7 @@ The tables are:
 mvn -pl praecepta-benchmarks -am package -DskipTests
 java -jar praecepta-benchmarks/target/benchmarks.jar                      # latency, all engines and tables
 java -jar praecepta-benchmarks/target/benchmarks.jar -p table=real        # one table
+java -jar praecepta-benchmarks/target/benchmarks.jar InputPathBenchmark  # real table: map vs generated records vs enums
 java -cp praecepta-benchmarks/target/benchmarks.jar \
   io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta real   # retained heap
 ```
@@ -144,9 +227,9 @@ Drools' experimental alpha-network compilation is not part of the default compar
 `-p engine=drools-alphanetwork`.
 
 # Dependencies
-Praecepta Engine has no runtime dependencies.
+Praecepta Engine has no runtime dependencies; it reads DMN with the JDK's XML parser.
 
-Praecepta Loader depends on Apache POI.
+Praecepta Loader depends on Apache POI. The Maven plugin uses the loader at build time only.
 
 # Roadmap
 See [docs/MODERNISATION.md](docs/MODERNISATION.md).

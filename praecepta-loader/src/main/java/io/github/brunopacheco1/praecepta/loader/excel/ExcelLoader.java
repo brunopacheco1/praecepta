@@ -1,5 +1,6 @@
 package io.github.brunopacheco1.praecepta.loader.excel;
 
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,9 +26,20 @@ public class ExcelLoader extends BaseLoader {
 
     private final List<Praeceptum> praecepta = new ArrayList<>();
 
+    /** Reads the first sheet of an Excel file from the classpath. */
     public ExcelLoader(String excelPath, Set<String> inputs, Set<String> outputs) {
         super(inputs, outputs);
-        readExcel(excelPath);
+        readExcel(excelPath, null);
+    }
+
+    /**
+     * Reads the first sheet of an Excel workbook from a stream, which is closed afterwards.
+     *
+     * @param source names the data in error messages, e.g. its file name
+     */
+    public ExcelLoader(InputStream excel, String source, Set<String> inputs, Set<String> outputs) {
+        super(inputs, outputs);
+        readExcel(source, excel);
     }
 
     /**
@@ -35,9 +47,9 @@ public class ExcelLoader extends BaseLoader {
      *
      * @param excelPath the path to look after the Excel file
      */
-    private void readExcel(String excelPath) {
+    private void readExcel(String excelPath, InputStream stream) {
         try (
-            var workbook = readFile(excelPath);
+            var workbook = readFile(excelPath, stream);
         ) {
             var sheet = workbook.getSheetAt(0);
             var headers = readHeadersPositioning(sheet);
@@ -54,10 +66,8 @@ public class ExcelLoader extends BaseLoader {
      * @param excelPath the file path
      * @return the Excel POI object
      */
-    private Workbook readFile(String excelPath) {
-        ClassLoader classLoader = getClass().getClassLoader();
-        try {
-            var inputStream = classLoader.getResourceAsStream(excelPath);
+    private Workbook readFile(String excelPath, InputStream stream) {
+        try (var inputStream = stream != null ? stream : getClass().getClassLoader().getResourceAsStream(excelPath)) {
             return WorkbookFactory.create(inputStream);
         } catch (Exception e) {
             throw new MissingFileException(excelPath, e);
