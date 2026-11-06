@@ -23,7 +23,7 @@ public final class CrossCheck {
         }
     }
 
-    /** COLLECT carries no ordering guarantee in the current engine, so compare as sorted lists. */
+    /** DMN leaves the order of COLLECT results unspecified, so compare them as sorted lists. */
     private static List<String> normalise(Table table, List<String> ids) {
         return table.hitPolicy() == HitPolicy.COLLECT ? ids.stream().sorted().toList() : ids;
     }

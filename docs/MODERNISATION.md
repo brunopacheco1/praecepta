@@ -80,6 +80,31 @@ Phase 2 targets exactly that.
 - Validation report (shadowed rules, overlaps, gaps) with configurable severity instead of
   throwing on any shadowed rule.
 
+**Status: done** (branch `modernisation/phase-1`). Notes:
+- API: `PraeceptaEngine.builder()` → immutable, thread-safe engine. Inputs bind per column
+  (`.input("country", Order::country)`, no maps) or via the map-based `InputStrategy`.
+  `register()`, `MissingOutputException`, `InvalidPraeceptaException`, the trie visitors and
+  `InputString` are gone.
+- The trie is now only a matcher (all matching rules per input region, frozen into immutable
+  nodes; regions with identical matches share a leaf). Hit policies are applied once per leaf at
+  build time, aggregations included, so `evaluate` is a walk plus an array lookup.
+- Strict DMN: rule order is list order (`Praeceptum.priority` is now just an identifier);
+  UNIQUE overlaps and ANY disagreements throw `HitPolicyViolationException`; PRIORITY and
+  OUTPUT_ORDER use output value lists (`outputPriority`); aggregation only with COLLECT.
+- `ValidationReport`, exact because every leaf is a reachable input region: UNREACHABLE_RULE
+  (FIRST, PRIORITY), OVERLAPPING_RULES (UNIQUE), CONFLICTING_OUTPUTS (ANY). `failOn(Severity)`
+  makes them build errors. "Gaps" (inputs no rule covers) are deferred to Phase 3: without typed
+  input domains every table has gaps.
+- Tests: all four Phase 1 properties enabled; PRIORITY, OUTPUT_ORDER and "validation report
+  matches the reference" added (11 properties × 1,000 tables). Mutation-checked: a planted
+  tie-breaking bug and a planted reachability bug were both caught.
+- Not done: DMN's COUNT aggregator (needs a way to build an output from a number).
+
+| Praecepta (JMH, same settings as Phase 0) | real (119 rules) | synthetic-100 | synthetic-1000 |
+|---|---:|---:|---:|
+| Phase 0 | 0.68 µs · 5.6 MB | 0.57 µs · 3.4 MB | 0.84 µs · 1,078 MB |
+| Phase 1 | **0.19 µs · 1.6 MB** | **0.14 µs · 0.7 MB** | **0.23 µs · 153 MB** |
+
 ### Phase 2 — Bitset-index core
 - Per column: value → bitmask of accepting rules (wildcards included); AND across columns.
 - Behind an internal `Matcher` interface; trie removed once differential tests are green.
