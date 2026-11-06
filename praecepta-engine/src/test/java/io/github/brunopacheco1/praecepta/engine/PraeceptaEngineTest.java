@@ -172,8 +172,9 @@ class PraeceptaEngineTest {
         @Test
         void reports_overlaps_under_unique() {
             var report = engine(HitPolicy.UNIQUE).build().validationReport();
-            Assertions.assertThat(report.issues()).containsExactlyInAnyOrder(
-                    new Issue(Kind.OVERLAPPING_RULES, List.of(10, 20, 30)),
+            Assertions.assertThat(report.issues()).containsExactly(
+                    new Issue(Kind.OVERLAPPING_RULES, List.of(10, 20)),
+                    new Issue(Kind.OVERLAPPING_RULES, List.of(10, 30)),
                     new Issue(Kind.OVERLAPPING_RULES, List.of(20, 30)));
         }
 
@@ -195,7 +196,7 @@ class PraeceptaEngineTest {
             var builder = engine(HitPolicy.UNIQUE).failOn(Severity.ERROR);
             Assertions.assertThatThrownBy(builder::build)
                     .isInstanceOfSatisfying(InvalidDecisionTableException.class,
-                            e -> Assertions.assertThat(e.getReport().issues(Kind.OVERLAPPING_RULES)).hasSize(2));
+                            e -> Assertions.assertThat(e.getReport().issues(Kind.OVERLAPPING_RULES)).hasSize(3));
         }
     }
 

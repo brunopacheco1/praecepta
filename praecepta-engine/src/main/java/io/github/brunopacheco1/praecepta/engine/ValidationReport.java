@@ -23,9 +23,9 @@ public record ValidationReport(List<Issue> issues) {
     public enum Kind {
         /** No input ever selects this rule: earlier or higher-priority rules always win (FIRST, PRIORITY). */
         UNREACHABLE_RULE(Severity.WARNING),
-        /** Some inputs match all these rules at once (UNIQUE): evaluating them raises a violation. */
+        /** Two rules that some inputs match together (UNIQUE): evaluating those inputs raises a violation. */
         OVERLAPPING_RULES(Severity.ERROR),
-        /** Some inputs match all these rules, which disagree on their outputs (ANY): a violation. */
+        /** Two rules with different outputs that some inputs match together (ANY): a violation. */
         CONFLICTING_OUTPUTS(Severity.ERROR);
 
         private final Severity severity;
@@ -57,8 +57,8 @@ public record ValidationReport(List<Issue> issues) {
         public String toString() {
             return switch (kind) {
                 case UNREACHABLE_RULE -> "WARNING rule %s can never be selected".formatted(ruleIds.getFirst());
-                case OVERLAPPING_RULES -> "ERROR rules %s overlap under UNIQUE".formatted(ruleIds);
-                case CONFLICTING_OUTPUTS -> "ERROR rules %s overlap with different outputs under ANY".formatted(ruleIds);
+                case OVERLAPPING_RULES -> "ERROR rules %s both match some inputs (UNIQUE)".formatted(ruleIds);
+                case CONFLICTING_OUTPUTS -> "ERROR rules %s both match some inputs but differ in outputs (ANY)".formatted(ruleIds);
             };
         }
     }

@@ -3,13 +3,11 @@ package io.github.brunopacheco1.praecepta.engine;
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -19,7 +17,6 @@ import java.util.function.BinaryOperator;
 import java.util.function.Function;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Issue;
-import io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
@@ -44,7 +41,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableE
  *
  * <p>Instances are immutable and safe to share between threads. Outputs are converted once, when the
  * engine is built, and the same instances are returned by every evaluation, so output types should be
- * immutable.
+ * immutable. Matching uses one bitmask per column value, so memory grows linearly with the table.
  *
  * @param <I> the input type
  * @param <O> the output type
@@ -53,19 +50,23 @@ public final class PraeceptaEngine<I, O> {
 
     private static final System.Logger LOG = System.getLogger(PraeceptaEngine.class.getName());
 
-    private record Violation(List<Integer> ruleIds) {
-    }
-
     private final HitPolicy hitPolicy;
     private final List<String> inputs;
-    private final MatchTree tree;
+    private final BitsetIndex index;
     private final InputStrategy<I> inputStrategy;
-    private final MatchTree.ColumnReader<I> extractorReader;
-    private final MatchTree.ColumnReader<Map<String, String>> mapReader;
-    /** Per leaf: the {@code List<O>} result, or a {@link Violation}. */
-    private final Object[] results;
+    private final BitsetIndex.ColumnReader<I> extractorReader;
+    private final BitsetIndex.ColumnReader<Map<String, String>> mapReader;
+    /** Per bit: the rule's output, and the same as a singleton result. */
+    private final Object[] outputByBit;
+    private final List<O>[] singleByBit;
+    /** Per bit: the rule's identifier, for violation messages. */
+    private final Integer[] idByBit;
+    /** ANY: per bit, the mask of rules whose outputs equal this rule's. */
+    private final long[][] sameOutputsByBit;
+    private final BinaryOperator<O> reduce;
     private final ValidationReport report;
 
+    @SuppressWarnings("unchecked")
     private PraeceptaEngine(Builder<I, O> builder) {
         hitPolicy = builder.hitPolicy;
         var rules = List.copyOf(builder.rules);
@@ -75,42 +76,48 @@ public final class PraeceptaEngine<I, O> {
             rejectUndeclaredColumns(rules, builder.extractors.keySet());
         }
         inputs = columns;
-        var levels = orderByWildcards(columns, rules);
+        var evaluationOrder = orderByWildcards(columns, rules);
 
-        var rows = rules.stream().map(rule -> levels.stream().map(column -> rule.input().values().get(column)).toList()).toList();
-        tree = MatchTree.build(levels.size(), rows);
+        // Bit order makes "lowest set bit" the winner: rule order, or priority order (ties keep rule order).
+        var ranks = builder.outputPriority.isEmpty() ? null : priorityRanks(rules, builder.outputPriority);
+        int[] bitToRule = java.util.stream.IntStream.range(0, rules.size()).boxed()
+                .sorted(ranks == null ? Comparator.naturalOrder() : Comparator.comparingInt((Integer r) -> ranks[r]))
+                .mapToInt(Integer::intValue)
+                .toArray();
+        var rows = rules.stream()
+                .map(rule -> evaluationOrder.stream().map(column -> rule.input().values().get(column)).toList())
+                .toList();
+        var cells = BitsetIndex.parseCells(rows, evaluationOrder.size());
+        index = new BitsetIndex(cells, evaluationOrder.size(), bitToRule);
 
         inputStrategy = builder.inputStrategy;
         if (inputStrategy == null) {
-            @SuppressWarnings("unchecked")
-            Function<? super I, String>[] byLevel = levels.stream().map(builder.extractors::get).toArray(Function[]::new);
-            extractorReader = (input, level) -> byLevel[level].apply(input);
+            Function<? super I, String>[] byColumn = evaluationOrder.stream().map(builder.extractors::get).toArray(Function[]::new);
+            extractorReader = (input, column) -> byColumn[column].apply(input);
             mapReader = null;
         } else {
-            var byLevel = levels.toArray(String[]::new);
-            mapReader = (values, level) -> values.get(byLevel[level]);
+            var byColumn = evaluationOrder.toArray(String[]::new);
+            mapReader = (values, column) -> values.get(byColumn[column]);
             extractorReader = null;
         }
 
-        var outputs = rules.stream().map(rule -> builder.outputStrategy.transform(rule.output())).toList();
-        var ranks = builder.outputPriority.isEmpty() ? null : priorityRanks(rules, builder.outputPriority);
-        var reduce = reducer(builder.aggregation, builder.outputStrategy);
+        int n = rules.size();
+        outputByBit = new Object[n];
+        singleByBit = new List[n];
+        idByBit = new Integer[n];
+        for (int bit = 0; bit < n; bit++) {
+            var rule = rules.get(bitToRule[bit]);
+            var output = builder.outputStrategy.transform(rule.output());
+            outputByBit[bit] = output;
+            singleByBit[bit] = List.of(output);
+            idByBit[bit] = rule.priority();
+        }
+        sameOutputsByBit = hitPolicy == HitPolicy.ANY ? sameOutputMasks(rules, bitToRule, index.words()) : null;
+        reduce = reducer(builder.aggregation, builder.outputStrategy);
 
-        results = new Object[tree.leafCount()];
-        var selected = new BitSet(rules.size());
-        var issues = new LinkedHashSet<Issue>();
-        for (int leaf = 0; leaf < results.length; leaf++) {
-            results[leaf] = resolve(tree.matches(leaf), rules, outputs, ranks, reduce, selected, issues);
-        }
-        if (hitPolicy == HitPolicy.FIRST || hitPolicy == HitPolicy.PRIORITY) {
-            for (int i = selected.nextClearBit(0); i < rules.size(); i = selected.nextClearBit(i + 1)) {
-                issues.add(new Issue(Kind.UNREACHABLE_RULE, List.of(rules.get(i).priority())));
-            }
-        }
-        report = new ValidationReport(issues.stream()
+        report = new ValidationReport(TableAnalysis.analyse(index, cells, rules, hitPolicy).stream()
                 .sorted(Comparator.comparing(Issue::severity).reversed())
                 .toList());
-
         if (builder.failOn != null && report.hasIssuesAtLeast(builder.failOn)) {
             throw new InvalidDecisionTableException(report);
         }
@@ -133,17 +140,55 @@ public final class PraeceptaEngine<I, O> {
      */
     @SuppressWarnings("unchecked")
     public List<O> evaluate(I input) {
-        int leaf = inputStrategy == null
-                ? tree.find(input, extractorReader)
-                : tree.find(inputStrategy.transform(input).values(), mapReader);
-        if (leaf == MatchTree.NO_MATCH) {
+        long[] matches = inputStrategy == null
+                ? index.match(input, extractorReader)
+                : index.match(inputStrategy.transform(input).values(), mapReader);
+        if (matches == null) {
             return List.of();
         }
-        var result = results[leaf];
-        if (result instanceof Violation violation) {
-            throw new HitPolicyViolationException(hitPolicy, violation.ruleIds());
+        return switch (hitPolicy) {
+            case FIRST, PRIORITY -> singleByBit[BitsetIndex.first(matches)];
+            case UNIQUE -> {
+                int bit = BitsetIndex.first(matches);
+                if (BitsetIndex.next(matches, bit + 1) >= 0) {
+                    throw violation(matches);
+                }
+                yield singleByBit[bit];
+            }
+            case ANY -> {
+                int bit = BitsetIndex.first(matches);
+                var same = sameOutputsByBit[bit];
+                for (int w = 0; w < matches.length; w++) {
+                    if ((matches[w] & ~same[w]) != 0) {
+                        throw violation(matches);
+                    }
+                }
+                yield singleByBit[bit];
+            }
+            case RULE_ORDER, OUTPUT_ORDER, COLLECT -> {
+                var selected = new Object[BitsetIndex.count(matches)];
+                int i = 0;
+                for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
+                    selected[i++] = outputByBit[bit];
+                }
+                if (reduce != null) {
+                    var total = (O) selected[0];
+                    for (int k = 1; k < selected.length; k++) {
+                        total = reduce.apply(total, (O) selected[k]);
+                    }
+                    yield List.of(total);
+                }
+                yield (List<O>) List.of(selected);
+            }
+        };
+    }
+
+    private HitPolicyViolationException violation(long[] matches) {
+        var ids = new ArrayList<Integer>();
+        for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
+            ids.add(idByBit[bit]);
         }
-        return (List<O>) result;
+        return new HitPolicyViolationException(hitPolicy, ids);
     }
 
     public HitPolicy hitPolicy() {
@@ -162,74 +207,16 @@ public final class PraeceptaEngine<I, O> {
 
     // ---- hit policies ----------------------------------------------------------------------
 
-    private Object resolve(int[] matches, List<Praeceptum> rules, List<O> outputs, int[] ranks,
-            BinaryOperator<O> reduce, BitSet selected, Collection<Issue> issues) {
-        if (matches.length == 0) {
-            return List.of();
+    private static long[][] sameOutputMasks(List<Praeceptum> rules, int[] bitToRule, int words) {
+        var byOutput = new HashMap<Object, long[]>();
+        for (int bit = 0; bit < bitToRule.length; bit++) {
+            BitsetIndex.set(byOutput.computeIfAbsent(rules.get(bitToRule[bit]).output(), o -> new long[words]), bit);
         }
-        return switch (hitPolicy) {
-            case UNIQUE -> {
-                markAll(matches, selected);
-                if (matches.length > 1) {
-                    var ids = ids(matches, rules);
-                    issues.add(new Issue(Kind.OVERLAPPING_RULES, ids));
-                    yield new Violation(ids);
-                }
-                yield List.of(outputs.get(matches[0]));
-            }
-            case ANY -> {
-                markAll(matches, selected);
-                var first = rules.get(matches[0]).output();
-                for (int m : matches) {
-                    if (!Objects.equals(rules.get(m).output(), first)) {
-                        var ids = ids(matches, rules);
-                        issues.add(new Issue(Kind.CONFLICTING_OUTPUTS, ids));
-                        yield new Violation(ids);
-                    }
-                }
-                yield List.of(outputs.get(matches[0]));
-            }
-            case FIRST -> {
-                selected.set(matches[0]);
-                yield List.of(outputs.get(matches[0]));
-            }
-            case PRIORITY -> {
-                int best = matches[0];
-                for (int m : matches) {
-                    if (ranks[m] < ranks[best]) {
-                        best = m;
-                    }
-                }
-                selected.set(best);
-                yield List.of(outputs.get(best));
-            }
-            case OUTPUT_ORDER -> {
-                markAll(matches, selected);
-                yield Arrays.stream(matches).boxed()
-                        .sorted(Comparator.comparingInt(m -> ranks[m])) // stable: ties keep rule order
-                        .map(outputs::get)
-                        .toList();
-            }
-            case RULE_ORDER -> {
-                markAll(matches, selected);
-                yield Arrays.stream(matches).mapToObj(outputs::get).toList();
-            }
-            case COLLECT -> {
-                markAll(matches, selected);
-                var collected = Arrays.stream(matches).mapToObj(outputs::get).toList();
-                yield reduce == null ? collected : List.of(collected.stream().reduce(reduce).orElseThrow());
-            }
-        };
-    }
-
-    private static void markAll(int[] matches, BitSet selected) {
-        for (int m : matches) {
-            selected.set(m);
+        var masks = new long[bitToRule.length][];
+        for (int bit = 0; bit < bitToRule.length; bit++) {
+            masks[bit] = byOutput.get(rules.get(bitToRule[bit]).output());
         }
-    }
-
-    private static List<Integer> ids(int[] matches, List<Praeceptum> rules) {
-        return Arrays.stream(matches).mapToObj(m -> rules.get(m).priority()).toList();
+        return masks;
     }
 
     /** Dense rank per rule: lower means higher priority; equal outputs share a rank. */

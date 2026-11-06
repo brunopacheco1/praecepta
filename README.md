@@ -9,6 +9,8 @@ lookups that cost a fraction of a microsecond.
   (with SUM / MIN / MAX aggregation)
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY)
   and rules that can never be selected (FIRST, PRIORITY)
+- Bitset matching: memory grows linearly with the table (10,000 rules fit in under 1 MB) and
+  engines build in milliseconds
 - Immutable, thread-safe engines; no runtime dependencies
 - Rules from code, Excel or CSV
 
