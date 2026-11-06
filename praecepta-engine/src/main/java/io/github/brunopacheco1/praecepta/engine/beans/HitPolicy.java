@@ -1,21 +1,33 @@
 package io.github.brunopacheco1.praecepta.engine.beans;
 
+/**
+ * DMN 1.3 decision-table hit policies (§8.2.12). "Rule order" is the order of the rules passed to
+ * the engine builder.
+ */
 public enum HitPolicy {
-    FIRST(true),
-    PRIORITY(true),
+    /** At most one rule may match; more than one is a {@code HitPolicyViolationException}. */
     UNIQUE(true),
+    /** Several rules may match if they all have the same outputs; otherwise a violation. */
     ANY(true),
-    COLLECT(false),
-    RULE_ORDER( false),
-    OUTPUT_ORDER(false);
+    /** The matching rule whose outputs have the highest priority (output value lists); ties go to rule order. */
+    PRIORITY(true),
+    /** The first matching rule in rule order. */
+    FIRST(true),
+    /** All matching rules, ordered by decreasing output priority; ties keep rule order. */
+    OUTPUT_ORDER(false),
+    /** All matching rules, in rule order. */
+    RULE_ORDER(false),
+    /** All matching rules (in rule order), optionally aggregated with an {@link AggregationOperator}. */
+    COLLECT(false);
 
-    private HitPolicy(boolean findFirst) {
-        this.findFirst = findFirst;
+    private final boolean singleHit;
+
+    HitPolicy(boolean singleHit) {
+        this.singleHit = singleHit;
     }
 
-    private final boolean findFirst;
-
-    public boolean isFindFirst() {
-        return findFirst;
+    /** Whether evaluation yields at most one output. */
+    public boolean isSingleHit() {
+        return singleHit;
     }
 }

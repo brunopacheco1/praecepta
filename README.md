@@ -1,59 +1,68 @@
 ![Workflow](https://github.com/brunopacheco1/praecepta/actions/workflows/build.yml/badge.svg) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=coverage)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta)
 
 # Praecepta
-Praecepta is a rules engine implemented in Java that uses a trie tree to efficiently search and match patterns in a large set of rules.
+Praecepta evaluates DMN-style decision tables in Java, with strict DMN 1.3 hit-policy semantics and
+lookups that cost a fraction of a microsecond.
 
 # Features
-- Fast rule matching using a trie tree data structure
-- Flexible rule definition syntax
-- Support for rule prioritization and conflict resolution
+- All DMN hit policies: UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER and COLLECT
+  (with SUM / MIN / MAX aggregation)
+- Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY)
+  and rules that can never be selected (FIRST, PRIORITY)
+- Immutable, thread-safe engines; no runtime dependencies
+- Rules from code, Excel or CSV
 
 # Getting Started
-## Praecepta Engine 
-To use Praecepta Engine in your project, you will need to:
-
-1. Add the Praecepta Engine library to your project's dependencies
-2. Define your rules using the provided syntax
-3. Create a `PraeceptaEngine` instance and add your rules to it
-4. Use the `PraeceptaEngine` to evaluate rules and execute their associated actions
-
-For example:
+## Praecepta Engine
+A rule (`Praeceptum`) maps input columns to cells and output columns to values. In a cell, blank
+means "any value" and `a,b` means "a or b". Rules are evaluated in the order given (DMN rule order).
 
 ```java
-var input1 = new PraeceptaInput(Map.of("input", "input1"));
-var output1 = new PraeceptaOutput(Map.of("output", "output1"));
-var praeceptum1 = new Praeceptum(1, input1, output1);
+record Order(String country, String segment) {}
+record Discount(String grade) {}
 
-var input2 = new PraeceptaInput(Map.of("input", "input2"));
-var output2 = new PraeceptaOutput(Map.of("output", "output2"));
-var praeceptum2 = new Praeceptum(2, input2, output2);
+var rules = List.of(
+        new Praeceptum(1, new PraeceptaInput(Map.of("country", "PT", "segment", "SMB")),
+                new PraeceptaOutput(Map.of("grade", "A"))),
+        new Praeceptum(2, new PraeceptaInput(Map.of("country", "PT,ES", "segment", "")),
+                new PraeceptaOutput(Map.of("grade", "B"))));
 
-var engine = new PraeceptaEngine<>(HitPolicy.UNIQUE, input -> input, output -> output);
-engine.register(List.of(praeceptum1, praeceptum2));
+var engine = PraeceptaEngine.<Order, Discount>builder()
+        .hitPolicy(HitPolicy.FIRST)
+        .input("country", Order::country)          // bind each column to a getter
+        .input("segment", Order::segment)
+        .output(output -> new Discount(output.values().get("grade")))
+        .rules(rules)
+        .build();
 
-var inputToEvaluate = new PraeceptaInput(Map.of("input", "input2"));
-var result = engine.evaluate(inputToEvaluate);
+engine.evaluate(new Order("PT", "SMB"));   // [Discount[grade=A]]
+engine.evaluate(new Order("FR", "SMB"));   // [] - no rule matches
+engine.validationReport();                 // static findings, e.g. unreachable rules
 ```
-## Praecepta Loader 
-To use Praecepta Loader in your project, you will need to:
 
-1. Add the Praecepta Loader library to your project's dependencies
-2. Define your rules using the provided syntax
-3. Create a `ExcelLoader` instance and add your rules to it
-4. Use the `ExcelLoader` to read the excel file and register the rules into the engine
+Notes:
+- `PRIORITY` and `OUTPUT_ORDER` need DMN output value lists:
+  `.outputPriority("grade", List.of("A", "B"))`, highest priority first.
+- An input matching several rules under `UNIQUE` (or rules with different outputs under `ANY`)
+  throws `HitPolicyViolationException`.
+- `.failOn(Severity.ERROR)` makes `build()` reject tables whose validation report has errors.
+- `.inputs(order -> new PraeceptaInput(...))` binds all columns from a map instead of per column.
 
-For example:
+## Praecepta Loader
+Loads rules from the first sheet of an Excel file (or a CSV file) on the classpath. The header row
+names the columns; each following row is a rule, identified by its row number.
 
 ```java
-var loader = new ExcelLoader("./yourmatrix.xlsx", Set.of("input"), Set.of("output"));
+var rules = new ExcelLoader("rules/discounts.xlsx", Set.of("country", "segment"), Set.of("grade"))
+        .getPraecepta();
 
-var engine = new PraeceptaEngine<>(HitPolicy.UNIQUE, input -> input, output -> output);
-
-var praecepta = loader.getPraecepta();
-engine.register(praecepta);
-
-var inputToEvaluate = new PraeceptaInput(Map.of("input", "input2"));
-var result = engine.evaluate(inputToEvaluate);
+var engine = PraeceptaEngine.<Order, Discount>builder()
+        .hitPolicy(HitPolicy.FIRST)
+        .input("country", Order::country)
+        .input("segment", Order::segment)
+        .output(output -> new Discount(output.values().get("grade")))
+        .rules(rules)
+        .build();
 ```
 
 # Building and Testing

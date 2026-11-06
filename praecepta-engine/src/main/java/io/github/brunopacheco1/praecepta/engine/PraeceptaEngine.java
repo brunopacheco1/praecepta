@@ -1,212 +1,414 @@
 package io.github.brunopacheco1.praecepta.engine;
 
-import java.util.HashMap;
+import java.lang.System.Logger.Level;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.BinaryOperator;
-import java.util.function.Predicate;
-import java.util.function.UnaryOperator;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.stream.Collectors;
+import java.util.function.Function;
 
+import io.github.brunopacheco1.praecepta.engine.ValidationReport.Issue;
+import io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind;
+import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
-import io.github.brunopacheco1.praecepta.engine.beans.InputString;
-import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
-import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
-import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidPraeceptaException;
-import io.github.brunopacheco1.praecepta.engine.exceptions.MissingOutputException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 
-public class PraeceptaEngine<I, O> {
+/**
+ * A decision table evaluated with strict DMN 1.3 hit-policy semantics.
+ *
+ * <pre>{@code
+ * var engine = PraeceptaEngine.<Order, Discount>builder()
+ *         .hitPolicy(HitPolicy.FIRST)
+ *         .input("country", Order::country)
+ *         .input("segment", Order::segment)
+ *         .output(output -> new Discount(output.values().get("discount")))
+ *         .rules(loader.getPraecepta())
+ *         .build();
+ *
+ * List<Discount> discounts = engine.evaluate(order); // empty if no rule matches
+ * }</pre>
+ *
+ * <p>Instances are immutable and safe to share between threads. Outputs are converted once, when the
+ * engine is built, and the same instances are returned by every evaluation, so output types should be
+ * immutable.
+ *
+ * @param <I> the input type
+ * @param <O> the output type
+ */
+public final class PraeceptaEngine<I, O> {
 
-    private static Logger log = Logger.getLogger(PraeceptaEngine.class.getName());
+    private static final System.Logger LOG = System.getLogger(PraeceptaEngine.class.getName());
 
+    private record Violation(List<Integer> ruleIds) {
+    }
+
+    private final HitPolicy hitPolicy;
+    private final List<String> inputs;
+    private final MatchTree tree;
     private final InputStrategy<I> inputStrategy;
-    private final OutputStrategy<O> outputStrategy;
-    private final AggregationOperator aggregationOperator;
-    private final TrieTreeNode root;
+    private final MatchTree.ColumnReader<I> extractorReader;
+    private final MatchTree.ColumnReader<Map<String, String>> mapReader;
+    /** Per leaf: the {@code List<O>} result, or a {@link Violation}. */
+    private final Object[] results;
+    private final ValidationReport report;
 
-    /**
-     * Important remark here, the ordering of input keys does not matter to the
-     * evaluation,
-     * but it matters to the tree distribution. That means, poorly created praecepta
-     * or poorly sorted input keys, will result on exponential memory consumption.
-     */
-    private List<String> inputKeys;
+    private PraeceptaEngine(Builder<I, O> builder) {
+        hitPolicy = builder.hitPolicy;
+        var rules = List.copyOf(builder.rules);
 
-    private final Map<Integer, PraeceptaOutput> outputs = new HashMap<>();
-
-    public PraeceptaEngine(
-            HitPolicy hitPolicy,
-            InputStrategy<I> inputStrategy,
-            OutputStrategy<O> outputStrategy) {
-        this(hitPolicy, AggregationOperator.COLLECT, inputStrategy, outputStrategy);
-    }
-
-    public PraeceptaEngine(
-            HitPolicy hitPolicy,
-            AggregationOperator aggregationOperator,
-            InputStrategy<I> inputStrategy,
-            OutputStrategy<O> outputStrategy) {
-        this.aggregationOperator = aggregationOperator;
-        this.inputStrategy = inputStrategy;
-        this.outputStrategy = outputStrategy;
-        root = new TrieTreeNode(hitPolicy, TrieTreeNode.ROOT, 0);
-    }
-
-    /**
-     * This method registers praecepta in the engine, for further evaluation.
-     *
-     * @param praecepta collection of praeceptum (combination of Input/Output
-     *                  values), for evaluation.
-     */
-    public void register(List<Praeceptum> praecepta) {
-        inputKeys = sortInputKeysByNumberOfNullValues(praecepta);
-        for (Praeceptum praeceptum : praecepta) {
-            var inputString = buildInputString(praeceptum.priority(), praeceptum.input(),
-                    this::sanitizeValueForAppending);
-            root.append(inputString);
-            outputs.put(praeceptum.priority(), praeceptum.output());
+        var columns = builder.inputStrategy == null ? List.copyOf(builder.extractors.keySet()) : columnsUsedBy(rules);
+        if (builder.inputStrategy == null) {
+            rejectUndeclaredColumns(rules, builder.extractors.keySet());
         }
-        root.compress();
-        validate(praecepta);
+        inputs = columns;
+        var levels = orderByWildcards(columns, rules);
+
+        var rows = rules.stream().map(rule -> levels.stream().map(column -> rule.input().values().get(column)).toList()).toList();
+        tree = MatchTree.build(levels.size(), rows);
+
+        inputStrategy = builder.inputStrategy;
+        if (inputStrategy == null) {
+            @SuppressWarnings("unchecked")
+            Function<? super I, String>[] byLevel = levels.stream().map(builder.extractors::get).toArray(Function[]::new);
+            extractorReader = (input, level) -> byLevel[level].apply(input);
+            mapReader = null;
+        } else {
+            var byLevel = levels.toArray(String[]::new);
+            mapReader = (values, level) -> values.get(byLevel[level]);
+            extractorReader = null;
+        }
+
+        var outputs = rules.stream().map(rule -> builder.outputStrategy.transform(rule.output())).toList();
+        var ranks = builder.outputPriority.isEmpty() ? null : priorityRanks(rules, builder.outputPriority);
+        var reduce = reducer(builder.aggregation, builder.outputStrategy);
+
+        results = new Object[tree.leafCount()];
+        var selected = new BitSet(rules.size());
+        var issues = new LinkedHashSet<Issue>();
+        for (int leaf = 0; leaf < results.length; leaf++) {
+            results[leaf] = resolve(tree.matches(leaf), rules, outputs, ranks, reduce, selected, issues);
+        }
+        if (hitPolicy == HitPolicy.FIRST || hitPolicy == HitPolicy.PRIORITY) {
+            for (int i = selected.nextClearBit(0); i < rules.size(); i = selected.nextClearBit(i + 1)) {
+                issues.add(new Issue(Kind.UNREACHABLE_RULE, List.of(rules.get(i).priority())));
+            }
+        }
+        report = new ValidationReport(issues.stream()
+                .sorted(Comparator.comparing(Issue::severity).reversed())
+                .toList());
+
+        if (builder.failOn != null && report.hasIssuesAtLeast(builder.failOn)) {
+            throw new InvalidDecisionTableException(report);
+        }
+        if (!report.isEmpty()) {
+            LOG.log(Level.WARNING, "Decision table has {0} validation issue(s):\n{1}", report.issues().size(), report);
+        }
     }
 
-    private List<String> sortInputKeysByNumberOfNullValues(List<Praeceptum> praecepta) {
-        var inputsByNumberOfAnyValues = praecepta.stream()
-                .map(Praeceptum::input)
-                .flatMap(it -> it.values().entrySet().stream())
-                .collect(
-                        Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue() == null ? 1 : 0, Math::addExact));
+    public static <I, O> Builder<I, O> builder() {
+        return new Builder<>();
+    }
 
-        return inputsByNumberOfAnyValues.entrySet().stream()
-                .sorted(Map.Entry.comparingByValue())
+    /**
+     * Evaluates the decision table.
+     *
+     * @return the outputs selected by the hit policy: at most one for single-hit policies (and for
+     *         aggregations), several for multi-hit ones; empty if no rule matches
+     * @throws HitPolicyViolationException if the input matches several rules under UNIQUE, or rules
+     *                                     with different outputs under ANY
+     */
+    @SuppressWarnings("unchecked")
+    public List<O> evaluate(I input) {
+        int leaf = inputStrategy == null
+                ? tree.find(input, extractorReader)
+                : tree.find(inputStrategy.transform(input).values(), mapReader);
+        if (leaf == MatchTree.NO_MATCH) {
+            return List.of();
+        }
+        var result = results[leaf];
+        if (result instanceof Violation violation) {
+            throw new HitPolicyViolationException(hitPolicy, violation.ruleIds());
+        }
+        return (List<O>) result;
+    }
+
+    public HitPolicy hitPolicy() {
+        return hitPolicy;
+    }
+
+    /** Input column names, as declared (or, with an {@link InputStrategy}, as used by the rules). */
+    public List<String> inputs() {
+        return inputs;
+    }
+
+    /** Findings of the static analysis performed at build time. */
+    public ValidationReport validationReport() {
+        return report;
+    }
+
+    // ---- hit policies ----------------------------------------------------------------------
+
+    private Object resolve(int[] matches, List<Praeceptum> rules, List<O> outputs, int[] ranks,
+            BinaryOperator<O> reduce, BitSet selected, Collection<Issue> issues) {
+        if (matches.length == 0) {
+            return List.of();
+        }
+        return switch (hitPolicy) {
+            case UNIQUE -> {
+                markAll(matches, selected);
+                if (matches.length > 1) {
+                    var ids = ids(matches, rules);
+                    issues.add(new Issue(Kind.OVERLAPPING_RULES, ids));
+                    yield new Violation(ids);
+                }
+                yield List.of(outputs.get(matches[0]));
+            }
+            case ANY -> {
+                markAll(matches, selected);
+                var first = rules.get(matches[0]).output();
+                for (int m : matches) {
+                    if (!Objects.equals(rules.get(m).output(), first)) {
+                        var ids = ids(matches, rules);
+                        issues.add(new Issue(Kind.CONFLICTING_OUTPUTS, ids));
+                        yield new Violation(ids);
+                    }
+                }
+                yield List.of(outputs.get(matches[0]));
+            }
+            case FIRST -> {
+                selected.set(matches[0]);
+                yield List.of(outputs.get(matches[0]));
+            }
+            case PRIORITY -> {
+                int best = matches[0];
+                for (int m : matches) {
+                    if (ranks[m] < ranks[best]) {
+                        best = m;
+                    }
+                }
+                selected.set(best);
+                yield List.of(outputs.get(best));
+            }
+            case OUTPUT_ORDER -> {
+                markAll(matches, selected);
+                yield Arrays.stream(matches).boxed()
+                        .sorted(Comparator.comparingInt(m -> ranks[m])) // stable: ties keep rule order
+                        .map(outputs::get)
+                        .toList();
+            }
+            case RULE_ORDER -> {
+                markAll(matches, selected);
+                yield Arrays.stream(matches).mapToObj(outputs::get).toList();
+            }
+            case COLLECT -> {
+                markAll(matches, selected);
+                var collected = Arrays.stream(matches).mapToObj(outputs::get).toList();
+                yield reduce == null ? collected : List.of(collected.stream().reduce(reduce).orElseThrow());
+            }
+        };
+    }
+
+    private static void markAll(int[] matches, BitSet selected) {
+        for (int m : matches) {
+            selected.set(m);
+        }
+    }
+
+    private static List<Integer> ids(int[] matches, List<Praeceptum> rules) {
+        return Arrays.stream(matches).mapToObj(m -> rules.get(m).priority()).toList();
+    }
+
+    /** Dense rank per rule: lower means higher priority; equal outputs share a rank. */
+    private static int[] priorityRanks(List<Praeceptum> rules, Map<String, List<String>> priority) {
+        var keys = new int[rules.size()][];
+        for (int r = 0; r < rules.size(); r++) {
+            var key = new int[priority.size()];
+            int c = 0;
+            for (var column : priority.entrySet()) {
+                var value = rules.get(r).output().values().get(column.getKey());
+                int index = column.getValue().indexOf(value);
+                if (index < 0) {
+                    throw new InvalidDecisionTableException("Rule %s: output %s=%s is not in its priority list %s"
+                            .formatted(rules.get(r).priority(), column.getKey(), value, column.getValue()));
+                }
+                key[c++] = index;
+            }
+            keys[r] = key;
+        }
+        Comparator<int[]> lexicographic = java.util.Arrays::compare;
+        var distinct = new TreeSet<>(lexicographic);
+        distinct.addAll(Arrays.asList(keys));
+        var ordered = new ArrayList<>(distinct);
+        var ranks = new int[rules.size()];
+        for (int r = 0; r < rules.size(); r++) {
+            ranks[r] = Collections.binarySearch(ordered, keys[r], lexicographic);
+        }
+        return ranks;
+    }
+
+    private static <O> BinaryOperator<O> reducer(AggregationOperator aggregation, OutputStrategy<O> strategy) {
+        if (aggregation == null) {
+            return null;
+        }
+        return switch (aggregation) {
+            case SUM -> strategy::sum;
+            case MIN -> strategy::min;
+            case MAX -> strategy::max;
+        };
+    }
+
+    // ---- columns -----------------------------------------------------------------------------
+
+    private static List<String> columnsUsedBy(List<Praeceptum> rules) {
+        var columns = new TreeSet<String>();
+        rules.forEach(rule -> columns.addAll(rule.input().values().keySet()));
+        return List.copyOf(columns);
+    }
+
+    private static void rejectUndeclaredColumns(List<Praeceptum> rules, Set<String> declared) {
+        for (var rule : rules) {
+            for (var cell : rule.input().values().entrySet()) {
+                if (!declared.contains(cell.getKey()) && cell.getValue() != null && !cell.getValue().isBlank()) {
+                    throw new InvalidDecisionTableException("Rule %s tests column '%s', which has no declared input"
+                            .formatted(rule.priority(), cell.getKey()));
+                }
+            }
+        }
+    }
+
+    /**
+     * Columns with fewer wildcards first. Evaluation does not depend on the order, but the trie's size
+     * does: testing selective columns first keeps wildcard copies small.
+     */
+    private static List<String> orderByWildcards(List<String> columns, List<Praeceptum> rules) {
+        var wildcards = new LinkedHashMap<String, Integer>();
+        for (var column : columns) {
+            int count = 0;
+            for (var rule : rules) {
+                var cell = rule.input().values().get(column);
+                if (cell == null || cell.isBlank()) {
+                    count++;
+                }
+            }
+            wildcards.put(column, count);
+        }
+        return wildcards.entrySet().stream()
+                .sorted(Map.Entry.comparingByValue()) // stable: ties keep declaration order
                 .map(Map.Entry::getKey)
                 .toList();
     }
 
-    private void validate(List<Praeceptum> praecepta) {
-        var visitor = new EngineAssertionsVisitor();
-        root.accept(visitor);
-
-        if (visitor.getShouldHaveRuleIds() > 0) {
-            throw new InvalidPraeceptaException();
-        }
-
-        if (visitor.getShouldNotHaveRuleIds() > 0) {
-            throw new InvalidPraeceptaException();
-        }
-
-        Set<Integer> actualPraecepta = praecepta.stream().map(Praeceptum::priority).collect(Collectors.toSet());
-        if (!visitor.getFoundPraecepta().containsAll(actualPraecepta)) {
-            throw new InvalidPraeceptaException();
-        }
-
-        var shortestPath = visitor.getPathLengths().stream()
-                .mapToInt(Integer::intValue)
-                .min()
-                .orElse(0);
-
-        var longestPath = visitor.getPathLengths().stream()
-                .mapToInt(Integer::intValue)
-                .max()
-                .orElse(0);
-
-        var averageLength = visitor.getPathLengths().stream()
-                .mapToInt(Integer::intValue)
-                .average()
-                .orElse(0D);
-
-        var numberOfNodes = visitor.getNumberOfNodes();
-
-        log.log(Level.INFO, "Number of branches: {0}", visitor.getPathLengths().size());
-        log.log(Level.INFO, "Shortest path: {0}", shortestPath);
-        log.log(Level.INFO, "Longest path: {0}", longestPath);
-        log.log(Level.INFO, "Average path length: {0}", averageLength);
-        log.log(Level.INFO, "Number of nodes: {0}", numberOfNodes);
-    }
-
-    private InputString buildInputString(Integer priority, PraeceptaInput input, UnaryOperator<String> sanitizeFunction) {
-        var sanitizedValues = getInputValues(input).stream()
-                .map(sanitizeFunction)
-                .toList();
-        return new InputString(priority, sanitizedValues);
-    }
-
-    private String sanitizeValueForAppending(String value) {
-        return Optional.ofNullable(value)
-                .filter(Predicate.not(String::isBlank))
-                .orElse(TrieTreeNode.ANY);
-    }
+    // ---- builder -------------------------------------------------------------------------------
 
     /**
-     * Given an input containing all dimensions for evaluation, the Engine returns
-     * all possible outputs
-     * or an exception, if no output was found.
-     *
-     * @param externalInput the input to be evaluated
-     * @return the output collection
-     * @throws MissingOutputException thrown if no output is found.
+     * Configures and builds a {@link PraeceptaEngine}. Inputs are bound either per column with
+     * {@link #input(String, Function)} (fastest) or all at once with {@link #inputs(InputStrategy)}.
      */
-    public List<O> evaluate(I externalInput) {
-        var input = inputStrategy.transform(externalInput);
-        var inputString = buildInputString(0, input, this::sanitizeValueForEvaluation);
+    public static final class Builder<I, O> {
+        private HitPolicy hitPolicy;
+        private AggregationOperator aggregation;
+        private final Map<String, Function<? super I, String>> extractors = new LinkedHashMap<>();
+        private InputStrategy<I> inputStrategy;
+        private OutputStrategy<O> outputStrategy;
+        private final Map<String, List<String>> outputPriority = new LinkedHashMap<>();
+        private List<Praeceptum> rules;
+        private Severity failOn;
 
-        var resultStream = root.evaluate(inputString)
-                .stream()
-                .map(outputs::get)
-                .map(outputStrategy::transform);
-
-        List<O> result;
-        if (AggregationOperator.COLLECT != aggregationOperator) {
-            BinaryOperator<O> reduceFunction = switch (aggregationOperator) {
-                case SUM -> outputStrategy::sum;
-                case MIN -> outputStrategy::min;
-                case MAX -> outputStrategy::max;
-                default -> throw new IllegalArgumentException("Not expected aggregation");
-            };
-            result = resultStream
-                    .reduce(reduceFunction)
-                    .map(List::of)
-                    .orElseGet(List::of);
-        } else {
-            result = resultStream.toList();
+        private Builder() {
         }
 
-        if (result.isEmpty()) {
-            throw new MissingOutputException();
+        public Builder<I, O> hitPolicy(HitPolicy hitPolicy) {
+            this.hitPolicy = Objects.requireNonNull(hitPolicy, "hitPolicy");
+            return this;
         }
 
-        return result;
-    }
+        /** Aggregates COLLECT results into a single output, using the output strategy's sum/min/max. */
+        public Builder<I, O> aggregation(AggregationOperator aggregation) {
+            this.aggregation = Objects.requireNonNull(aggregation, "aggregation");
+            return this;
+        }
 
-    private String sanitizeValueForEvaluation(String value) {
-        return Optional.ofNullable(value)
-                .filter(Predicate.not(String::isBlank))
-                .orElse(TrieTreeNode.NULL);
-    }
+        /** Binds an input column to a getter. Repeat for every column the rules test. */
+        public Builder<I, O> input(String column, Function<? super I, String> extractor) {
+            Objects.requireNonNull(column, "column");
+            Objects.requireNonNull(extractor, "extractor");
+            if (extractors.putIfAbsent(column, extractor) != null) {
+                throw new IllegalArgumentException("Input column '%s' is declared twice".formatted(column));
+            }
+            return this;
+        }
 
-    private List<String> getInputValues(PraeceptaInput input) {
-        return inputKeys.stream()
-                .map(it -> input.values().get(it))
-                .toList();
-    }
+        /** Converts each input to a map of column values. Simpler than per-column binding, but slower. */
+        public Builder<I, O> inputs(InputStrategy<I> inputStrategy) {
+            this.inputStrategy = Objects.requireNonNull(inputStrategy, "inputStrategy");
+            return this;
+        }
 
-    /**
-     * If for any reason, you need to infer the TrieTree content, this is the way to
-     * go.
-     *
-     * @param visitor the visitor
-     */
-    public void accept(TrieTreeVisitor visitor) {
-        root.accept(visitor);
-    }
+        public Builder<I, O> output(OutputStrategy<O> outputStrategy) {
+            this.outputStrategy = Objects.requireNonNull(outputStrategy, "outputStrategy");
+            return this;
+        }
 
-    public List<String> getInputs() {
-        return List.copyOf(inputKeys);
+        /**
+         * DMN output value list for PRIORITY and OUTPUT_ORDER: the allowed values of an output column,
+         * highest priority first. Columns are compared in the order they are declared.
+         */
+        public Builder<I, O> outputPriority(String outputColumn, List<String> valuesHighestFirst) {
+            Objects.requireNonNull(outputColumn, "outputColumn");
+            var values = List.copyOf(valuesHighestFirst);
+            if (new HashSet<>(values).size() != values.size()) {
+                throw new IllegalArgumentException("Priority list for '%s' has duplicates: %s".formatted(outputColumn, values));
+            }
+            if (outputPriority.putIfAbsent(outputColumn, values) != null) {
+                throw new IllegalArgumentException("Priority list for '%s' is declared twice".formatted(outputColumn));
+            }
+            return this;
+        }
+
+        /** The rules, in DMN rule order. */
+        public Builder<I, O> rules(List<Praeceptum> rules) {
+            this.rules = List.copyOf(rules);
+            return this;
+        }
+
+        /** Fail {@link #build()} with an {@link InvalidDecisionTableException} if validation finds issues this severe. */
+        public Builder<I, O> failOn(Severity severity) {
+            this.failOn = Objects.requireNonNull(severity, "severity");
+            return this;
+        }
+
+        public PraeceptaEngine<I, O> build() {
+            require(hitPolicy != null, "a hit policy is required");
+            require(outputStrategy != null, "an output strategy is required");
+            require(rules != null, "rules are required");
+            require(extractors.isEmpty() != (inputStrategy == null),
+                    "bind inputs either per column with input(...) or with inputs(...), not both and not neither");
+            require(aggregation == null || hitPolicy == HitPolicy.COLLECT,
+                    "aggregation is only allowed with the COLLECT hit policy");
+            boolean needsPriority = hitPolicy == HitPolicy.PRIORITY || hitPolicy == HitPolicy.OUTPUT_ORDER;
+            require(!needsPriority || !outputPriority.isEmpty(), hitPolicy + " requires outputPriority(...) lists");
+            require(needsPriority || outputPriority.isEmpty(), "outputPriority(...) only applies to PRIORITY and OUTPUT_ORDER");
+            return new PraeceptaEngine<>(this);
+        }
+
+        private static void require(boolean condition, String message) {
+            if (!condition) {
+                throw new IllegalStateException(message);
+            }
+        }
     }
 }

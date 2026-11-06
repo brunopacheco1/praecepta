@@ -58,8 +58,7 @@ public record Table(String name, List<String> inputs, List<String> outputs, List
 
     /**
      * Random table. Later columns are wildcards more often, as in typical hand-written tables.
-     * COLLECT hit policy, because random rules shadow each other and the current engine rejects
-     * shadowed rules under single-hit policies.
+     * COLLECT hit policy (all matches), so every overlapping rule contributes to the result.
      */
     public static Table synthetic(int ruleCount, int columns, int domain, double wildcardRatio, long seed) {
         var random = new Random(seed);
