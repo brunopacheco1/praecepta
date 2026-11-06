@@ -111,6 +111,53 @@ Phase 2 targets exactly that.
 - Optional int-coded fast path; partition by most selective column for very large tables.
 - Targets: real table ≤ 120 ns / < 200 KB; 1k-rule table ≤ 250 ns / < 1 MB; build in ms.
 
+**Status: done** (branch `modernisation/phase-2`). Notes:
+- `BitsetIndex` replaces the trie (deleted). Each rule owns a bit; each column maps every value
+  written in it to the mask of rules accepting it (wildcards included); missing, blank or unknown
+  values use the wildcard mask. Evaluation ANDs one mask per column, most selective column first,
+  and stops as soon as no rule is left.
+- Bit order does the hit-policy work: rule order for most policies, priority order (ties in rule
+  order) for PRIORITY and OUTPUT_ORDER, so FIRST and PRIORITY are "lowest set bit". ANY compares the
+  matches against a precomputed "same outputs" mask. Results are resolved at evaluation time;
+  COLLECT aggregations now call the `OutputStrategy` on every evaluation.
+- Validation no longer enumerates input regions (that was the blow-up). OVERLAPPING_RULES and
+  CONFLICTING_OUTPUTS are now reported **per pair of rules** — exact, because a UNIQUE/ANY violation
+  happens precisely when two such rules share an input. UNREACHABLE_RULE uses a search over the
+  rule's own region, branching only on values the rules distinguish and pruned as soon as one
+  candidate covers the rest. The reference oracle was updated to pairs; it still derives them by
+  brute force over every input region.
+- Mutation-checked: a planted "no region search" bug in the analysis and a planted "wildcards
+  missing from value masks" bug in the index were both caught.
+
+| Praecepta (JMH, same settings) | real (119 rules) | synthetic-100 | synthetic-1000 | synthetic-10000 |
+|---|---:|---:|---:|---:|
+| Phase 0 | 0.68 µs · 5.6 MB | 0.57 µs · 3.4 MB | 0.84 µs · 1,078 MB | — |
+| Phase 1 | 0.19 µs · 1.6 MB | 0.14 µs · 0.7 MB | 0.23 µs · 153 MB | not buildable in practice |
+| Phase 2 | **0.20 µs · 0.1 MB** | **0.14 µs · 0.2 MB** | **0.21 µs · 0.3 MB** | **0.69 µs · 0.8 MB** |
+
+Build time is now milliseconds (18 ms real, 59 ms for 1,000 rules, 110 ms for 10,000; Phase 1 took
+1.8 s for 1,000). Against the targets: memory and the 1,000-rule latency are met; the real-table
+latency (≤ 120 ns) is not. Allocation is 32 B per evaluation, so the remaining cost is two hash
+lookups per column for 13 columns: reading the benchmark's `Map` input, then finding the value's
+mask. The target came from an experiment that fed pre-built arrays and skipped the first lookup.
+Getting below it needs the int-coded input path, left for later along with partitioning by the most
+selective column, which 10,000 rules at 0.69 µs and 0.8 MB do not yet call for.
+
+**Drools' own index (checked after Phase 2).** Drools DMN ships an experimental alpha-network
+compilation for decision tables (`AlphaNetworkOption`, `org.kie.dmn.compiler.alphanetwork`), the
+closest equivalent of this bitset index, so default Drools alone is not a fair comparison. On
+Drools 10.2.0:
+- The documented system property is ignored by `DMNRuntimeBuilder`: the default evaluator runs.
+- Forcing the option on the compiler configuration installs `DMNAlphaNetworkEvaluatorImpl`, but it
+  cannot compile tables with more than one output column (the real table fails under every hit
+  policy) nor RULE_ORDER tables, and on the tables it does compile it disagrees with default Drools
+  on ~99% of inputs (for example returning rules whose cells do not match the input).
+
+We could not rule out that it needs set-up from Drools' build-time (Kogito) code generation that
+the runtime route skips. Either way it cannot be benchmarked, because the harness refuses to time
+engines that disagree. The `drools-alphanetwork` contender stays available on demand
+(`-p engine=drools-alphanetwork`) to re-check newer Drools releases.
+
 ### Phase 3 — Richer rule language
 - Single-column predicates: ranges, negation, sets, numbers, dates — compiled to per-interval
   bitmasks (binary search on sorted boundaries). Cross-column expressions out of scope.
