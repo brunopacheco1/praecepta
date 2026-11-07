@@ -100,7 +100,8 @@ class ContendersAgreeTest {
     @Test
     void no_input_misses_a_table_with_a_default_rule() {
         // the real table ends with a catch-all rule, as hand-written FIRST tables often do
-        Assertions.assertThatThrownBy(() -> Workload.generate(Table.real(), 10, 1, Workload.NO_MATCH))
+        var table = Table.real();
+        Assertions.assertThatThrownBy(() -> Workload.generate(table, 10, 1, Workload.NO_MATCH))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("matches any input");
     }
