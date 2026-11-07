@@ -38,11 +38,20 @@ Central and GitHub ([docs/RELEASING.md](docs/RELEASING.md)). Security fixes foll
 [SECURITY.md](SECURITY.md).
 
 ## Continuity
-If the maintainer can no longer continue, the project should go on with minimal interruption.
-- **The code** is Apache-2.0 and public: anyone may fork it and carry on.
-- **The repository:** the maintainer has named a successor in GitHub's account settings, who can
+If the maintainer can no longer continue, the project should go on with minimal interruption: within
+a week, someone should be able to triage issues, accept changes and publish a release.
+
+**Status: being arranged.** The maintainer is looking for a trusted person to take this role; this
+section will name the arrangement once it is in place. The plan:
+- **A successor for the repository:** a trusted person named in GitHub's account settings, who can
   take over the repository (and its issues, CI and website) if the maintainer's account becomes
-  inactive. A second maintainer, once there is one, gets admin access too.
+  inactive, and hand it to a new maintainer.
+- **Emergency access:** the same or another trusted person gets emergency access, through a password
+  manager, to what the repository does not hold, with a note on how to hand the project on.
+- **A second maintainer,** once there is one, gets admin access, which removes the need for either.
+
+What already holds today:
+- **The code** is Apache-2.0 and public: anyone may fork it and carry on.
 - **Releases** need no personal key: CI signs them with a dedicated release key stored as a
   repository secret, which a new maintainer can rotate (docs/RELEASING.md). The Maven Central
   namespace `io.github.brunopacheco1` is verified through this GitHub account; a successor can ask
