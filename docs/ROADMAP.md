@@ -42,5 +42,6 @@ A stable API, once the features above have settled and the project has a second 
 
 ## The project itself
 - **A second maintainer**, so every change can be reviewed by someone other than its author.
-- **The OpenSSF Best Practices silver badge**, and keeping the security work current: fuzzing,
-  dependency updates, and the [assurance case](SECURITY-ASSURANCE.md).
+- **Keeping the OpenSSF Best Practices silver badge** current, and working towards gold, which needs
+  a second maintainer and reviewer; and keeping the security work current: fuzzing, dependency
+  updates, and the [assurance case](SECURITY-ASSURANCE.md).
