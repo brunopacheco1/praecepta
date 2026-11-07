@@ -1,0 +1,78 @@
+<!--
+SPDX-FileCopyrightText: Bruno Pacheco
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
+# Releasing
+
+Pushing a signed tag `vX.Y.Z` runs [`.github/workflows/release.yml`](../.github/workflows/release.yml),
+which:
+1. checks the tag is annotated, signed by the maintainer (keys from `github.com/<owner>.gpg`) and
+   listed in `CHANGELOG.md`;
+2. sets the version from the tag, then builds and runs the tests;
+3. signs every artifact with the **release key**;
+4. publishes `praecepta` (parent POM), `praecepta-engine`, `praecepta-loader` and
+   `praecepta-maven-plugin` to Maven Central, waiting until they are live;
+5. records build provenance for the jars (GitHub artifact attestations);
+6. creates a GitHub release with the changelog section, jars, signatures, SBOMs and
+   `THIRD-PARTY-NOTICES.txt`.
+
+## One-time setup (owner)
+
+### 1. Maven Central namespace
+1. Sign in at <https://central.sonatype.com> with GitHub. The namespace `io.github.brunopacheco1`
+   is verified automatically for that GitHub account (check **Namespaces**).
+2. **View Account → Generate User Token**. Keep the username and password it shows; they are the
+   publishing credentials, not your login.
+
+### 2. Release signing key
+A dedicated key, so your personal key (`E7CEC6DF14F7B2C7`) never leaves your machine:
+
+```bash
+gpg --quick-gen-key "Praecepta Releases <4491850+brunopacheco1@users.noreply.github.com>" ed25519 sign 2y
+gpg --list-keys "Praecepta Releases"                                  # note the fingerprint
+gpg --keyserver keys.openpgp.org --send-keys <FINGERPRINT>            # Maven Central checks signatures against public keyservers
+gpg --keyserver keyserver.ubuntu.com --send-keys <FINGERPRINT>
+gpg --armor --export-secret-keys <FINGERPRINT> > release-key.asc      # for the secret below; delete the file afterwards
+```
+
+Optionally certify it with your personal key (`gpg --local-user E7CEC6DF14F7B2C7 --sign-key <FINGERPRINT>`),
+then upload again, so the release key is visibly vouched for.
+
+### 3. GitHub environment and secrets
+**Settings → Environments → New environment** `release`. Restrict it to tags matching `v*`
+(**Deployment branches and tags → Selected → Add rule → Tag `v*`**). Add these environment secrets:
+
+| Secret | Value |
+|---|---|
+| `MAVEN_CENTRAL_USERNAME` | user token username (step 1) |
+| `MAVEN_CENTRAL_PASSWORD` | user token password (step 1) |
+| `RELEASE_GPG_KEY` | contents of `release-key.asc` (step 2) |
+| `RELEASE_GPG_PASSPHRASE` | the release key's passphrase |
+
+Then delete `release-key.asc`. Optionally require yourself as a reviewer on the environment, so
+every release waits for a click.
+
+## Releasing a version
+1. In a pull request, rename `## [Unreleased]` in `CHANGELOG.md` to `## [X.Y.Z] - YYYY-MM-DD`,
+   add a fresh empty `## [Unreleased]` above it, and merge.
+2. Tag the merge commit with your personal key and push the tag:
+   ```bash
+   git switch main && git pull
+   git tag -s vX.Y.Z -m "Praecepta X.Y.Z"
+   git push origin vX.Y.Z
+   ```
+3. Watch **Actions → Release**. When it is green, the artifacts are on Maven Central (search can
+   take a few hours to show them) and the GitHub release is published.
+4. Set the development version for the next release (`mvn versions:set -DnewVersion=X.Y.(Z+1)-SNAPSHOT
+   -DgenerateBackupPoms=false -DprocessAllModules`) in a pull request.
+
+## Checking a release
+- Signatures: download a jar and its `.asc`, then `gpg --verify praecepta-engine-X.Y.Z.jar.asc`.
+- Provenance: `gh attestation verify praecepta-engine-X.Y.Z.jar --repo brunopacheco1/praecepta`.
+- SBOM: `praecepta-engine-X.Y.Z-cyclonedx.json` on the release (and on Maven Central).
+
+If publishing fails after the tag is pushed, fix the cause, delete the tag (locally and with
+`git push origin :refs/tags/vX.Y.Z`), and tag again. Maven Central never accepts the same version
+twice, so a version that did reach Central needs a new patch number.

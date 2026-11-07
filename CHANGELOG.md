@@ -29,6 +29,11 @@ Versions will follow [Semantic Versioning](https://semver.org/) from the first r
 - DMN 1.1–1.5 import (`DmnReader`) and DMN 1.3 export (`DmnWriter`).
 - Enum input bindings (int-coded lookups).
 - Excel and CSV loaders also read from an `InputStream`.
+- Published to Maven Central (`io.github.brunopacheco1`): `praecepta-engine`, `praecepta-loader`,
+  `praecepta-maven-plugin`. Each release is GPG-signed, with an SBOM, build provenance and
+  third-party notices.
+- The engine is a JPMS module (`io.github.brunopacheco1.praecepta.engine`, requires only
+  `java.xml`). The loader and plugin declare stable automatic module names.
 - REUSE-compliant licensing (SPDX headers), CycloneDX SBOMs per module, a dependency licence check,
   reproducible builds, CodeQL, OpenSSF Scorecard, Dependabot and pinned CI actions.
 

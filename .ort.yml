@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# ORT repository configuration (https://oss-review-toolkit.org/ort/docs/configuration/ort-yml):
+# the policy judges what is published, not tooling around it.
+excludes:
+  paths:
+    - pattern: "praecepta-benchmarks/**"
+      reason: "TEST_TOOL_OF"
+      comment: "JMH benchmarks comparing engines; never published."
+  scopes:
+    - pattern: "test"
+      reason: "TEST_DEPENDENCY_OF"
+      comment: "Test-only dependencies are not distributed."
+    - pattern: "provided"
+      reason: "PROVIDED_DEPENDENCY_OF"
+      comment: "Provided by Maven at build time (Maven plugin API); not distributed."

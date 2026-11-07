@@ -459,8 +459,91 @@ Not done here (owner actions or later phases):
 - Signed artifacts (GPG, required by Maven Central) and build provenance (GitHub artifact
   attestations) in the release workflow.
 - Give ORT a real job. Today it only analyses dependencies:
-  - an evaluator policy (`.ort/evaluator.rules.kts` or ORT's example rules) so that
-    `fail-on: violations` can actually fail, e.g. on copyleft licences in the published modules;
-  - attribution reports (a third-party `NOTICE`, listing Apache POI's dependencies and their
-    licences) attached to each release;
-  - optionally ScanCode on our own sources only, the source scanning FOSSLight used to do.
+  - an evaluator policy, so that `fail-on: violations` can actually fail;
+  - attribution reports for releases;
+  - optionally ScanCode on our own sources only.
+
+**Status: done** (branch `modernisation/phase-6`). Decisions:
+- the first release is **0.1.0** (semantic versioning; the API may change in 0.x);
+- releases are triggered by pushing a **signed `v*` tag**;
+- CI signs artifacts with a **dedicated release key**, so the maintainer's personal key never
+  enters CI;
+- the engine is a real **JPMS module**, and the loader and plugin get `Automatic-Module-Name`.
+
+What was done:
+- **Package names:** already `io.github.brunopacheco1.praecepta.*` everywhere; nothing to change.
+- **Engine module:** `module io.github.brunopacheco1.praecepta.engine` requires only `java.xml`
+  and exports `engine`, `beans`, `dmn`, `exceptions` and `feel`. Tests run on the module path (all
+  pass). The loader and plugin declare `io.github.brunopacheco1.praecepta.loader` and
+  `…maven.plugin`; POI's module layout makes a full module-info fragile there.
+- **POMs:** version `0.1.0-SNAPSHOT`; descriptions on every published module.
+- **`release` profile:**
+  - source and javadoc jars, with doclint on everything but missing comments; it passes;
+  - GPG signing with the BouncyCastle signer, reading `MAVEN_GPG_KEY` / `MAVEN_GPG_PASSPHRASE`,
+    so CI needs no gpg keyring;
+  - `central-publishing-maven-plugin` (autoPublish, waits until published).
+
+  Verified locally with a throwaway key: jars, sources, javadoc, POM and SBOM all signed, and the
+  signatures verify. `versions:set` from a tag version also works.
+- **`release.yml`** (on `v*` tags, in a `release` environment):
+  1. checks that the tag is annotated, signed by a key GitHub publishes for the owner, and has a
+     changelog section;
+  2. sets the version, builds, tests, signs and publishes the parent, engine, loader and plugin;
+  3. records build provenance (`actions/attest-build-provenance`);
+  4. creates the GitHub release with the changelog notes, jars, signatures, SBOMs and
+     `THIRD-PARTY-NOTICES.txt` (generated from the SBOMs by
+     `.github/scripts/third_party_notices.py`; 13 components today).
+- **ORT:**
+  - the evaluator now runs ORT's default policy (`ort-config`): copyleft and unclassified
+    licences, missing project files, …;
+  - `fail-on: violations` therefore enforces something;
+  - `.ort.yml` excludes the benchmarks and the test and provided scopes;
+  - the reporter adds the plain-text attribution notice.
+
+  The first real run is on this branch's pull request; ScanCode on our own sources remains
+  optional.
+- **`docs/RELEASING.md`:** owner setup (Central Portal token, release key on keyservers, `release`
+  environment and secrets) and the release steps.
+- **README:** Maven coordinates, a 0.x status note, and a "What Praecepta is not" section.
+
+Not done (owner actions): creating the Central token, the release key and the `release`
+environment, then tagging `v0.1.0`.
+
+### Phase 7 — Write-up
+A post on the maintainer's personal blog, written once 0.1.0 is on Maven Central, so readers can
+try it straight away. It covers:
+- **What changed**, from the 2022 trie engine to the 0.1.0 release: the bitset index, strict DMN,
+  FEEL cells, DMN import, the Maven plugin, and the open-source hygiene (Apache-2.0, REUSE, SBOMs,
+  signed releases).
+- **Real benchmark results with visuals:**
+  - charts for latency and memory per engine and table;
+  - JMH settings, hardware and versions stated;
+  - numbers re-measured on the released artifacts.
+- **A fair comparison:**
+  - every engine evaluates the same tables and is cross-checked before timing;
+  - Camunda 8 and Drools are measured with their default, supported setups;
+  - Praecepta's best case (generated enum inputs) is labelled as such;
+  - known biases are stated: in-process only; DMN engines also interpret full FEEL; warm JVM.
+- **The gaps:** what Camunda and Drools do that Praecepta does not:
+  - full FEEL and expressions across several columns;
+  - decision requirement graphs and BKMs;
+  - boolean and date-time types;
+  - modelling tools and decision services;
+  - mature ecosystems and support.
+- **How to use it:** the engine, DMN files and the Maven plugin, with copy-paste examples.
+- **How to contribute:** CONTRIBUTING, the issue templates, and good first issues.
+- **Nice-to-have features**, asking readers which they would use and inviting contributions:
+  - boolean, time and date-time columns;
+  - string ranges;
+  - DMN decision requirement graphs (chained decisions);
+  - a COUNT aggregation;
+  - primitive boundary keys for faster number/date columns;
+  - sparse (Roaring) bitmaps for very large tables;
+  - Gradle support;
+  - a GraalVM native-image check;
+  - a Spring Boot starter;
+  - an online playground.
+
+  Each links to a GitHub issue or discussion, so interest can be counted.
+
+Open before writing: where the blog lives (platform and repository or URL) and how it is published.

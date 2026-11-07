@@ -4,11 +4,16 @@ SPDX-FileCopyrightText: Bruno Pacheco
 SPDX-License-Identifier: Apache-2.0
 -->
 
-![Workflow](https://github.com/brunopacheco1/praecepta/actions/workflows/build.yml/badge.svg) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/brunopacheco1/praecepta/badge)](https://scorecard.dev/viewer/?uri=github.com/brunopacheco1/praecepta) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=coverage)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.brunopacheco1/praecepta-engine)](https://central.sonatype.com/artifact/io.github.brunopacheco1/praecepta-engine) [![Javadoc](https://javadoc.io/badge2/io.github.brunopacheco1/praecepta-engine/javadoc.svg)](https://javadoc.io/doc/io.github.brunopacheco1/praecepta-engine) ![Workflow](https://github.com/brunopacheco1/praecepta/actions/workflows/build.yml/badge.svg) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/brunopacheco1/praecepta/badge)](https://scorecard.dev/viewer/?uri=github.com/brunopacheco1/praecepta) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=coverage)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta)
 
 # Praecepta
-Praecepta evaluates DMN-style decision tables in Java, with strict DMN 1.3 hit-policy semantics and
-lookups that cost a fraction of a microsecond.
+Praecepta evaluates DMN decision tables in Java, with strict DMN 1.3 hit-policy semantics and
+lookups that cost a fraction of a microsecond. Write tables in Excel, CSV, DMN or code; validate
+them when you build; evaluate them with a dependency-free engine.
+
+> **Status: 0.x.** The API may still change between minor versions until 1.0. It covers the
+> decision-table part of DMN, not full FEEL or decision requirement graphs; see
+> [what Praecepta is not](#what-praecepta-is-not).
 
 # Features
 - All DMN hit policies: UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER and COLLECT
@@ -26,6 +31,38 @@ lookups that cost a fraction of a microsecond.
   other tools), and DMN export
 - A Maven plugin that validates tables at build time and generates typed input and output
   records, so applications ship only the engine
+
+# Installation
+Java 25 or later. Pick the modules you need:
+
+```xml
+<!-- the engine: no dependencies, a JPMS module (io.github.brunopacheco1.praecepta.engine) -->
+<dependency>
+  <groupId>io.github.brunopacheco1</groupId>
+  <artifactId>praecepta-engine</artifactId>
+  <version>0.1.0</version>
+</dependency>
+
+<!-- optional: load rules from Excel or CSV at runtime (brings Apache POI) -->
+<dependency>
+  <groupId>io.github.brunopacheco1</groupId>
+  <artifactId>praecepta-loader</artifactId>
+  <version>0.1.0</version>
+</dependency>
+```
+
+Or compile tables at build time with the [Maven plugin](#praecepta-maven-plugin), so that only
+`praecepta-engine` is needed at runtime. Every release is signed and has an SBOM, build provenance
+and third-party notices on its [GitHub release](https://github.com/brunopacheco1/praecepta/releases).
+
+# What Praecepta is not
+Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drools when you need:
+- **Full FEEL**: functions, arithmetic, contexts, lists and expressions spanning several columns
+  (e.g. `income > 2 * rent`). Praecepta cells are FEEL *simple unary tests* on one column.
+- **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
+  boxed expressions.
+- **Boolean, time and date-time columns** (planned), and string ranges.
+- **A process engine, a modeller or a decision service** around the tables.
 
 # Getting Started
 ## Praecepta Engine
@@ -164,7 +201,7 @@ Numbers are `BigDecimal` and dates `LocalDate`. At runtime the generated code ne
 <plugin>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-maven-plugin</artifactId>
-  <version>${praecepta.version}</version>
+  <version>0.1.0</version>
   <executions><execution><goals><goal>generate</goal></goals></execution></executions>
   <configuration>
     <packageName>com.acme.pricing</packageName>
