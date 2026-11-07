@@ -4,16 +4,18 @@
 
 name: Website
 # Publishes the project page (site/) with the API documentation of the latest release on GitHub
-# Pages: https://bruno.pacheco.lu/praecepta/. Runs when the page changes, on every release, and on
-# demand.
+# Pages: https://bruno.pacheco.lu/praecepta/. Runs when the page changes, after every successful
+# release, and on demand. It always runs on main (the only branch the github-pages environment
+# deploys from) and documents the latest release tag.
 on:
   push:
     branches: [main]
     paths:
       - 'site/**'
       - '.github/workflows/pages.yml'
-  release:
-    types: [published]
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -26,6 +28,7 @@ concurrency:
 jobs:
   build:
     name: Build the site
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
