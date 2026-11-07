@@ -271,6 +271,13 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
 
     <section class="wrap section" aria-labelledby="open-title">
       <h2 id="open-title">Open, and easy to check</h2>
+      <!-- the values are read from bestpractices.dev and Scorecard when the site is built (pages.yml),
+           so visitors' browsers never contact them; site/badges.json holds the last known values -->
+      <ul class="seals">
+        <li><a href="https://www.bestpractices.dev/projects/16426"><span>OpenSSF Best Practices</span><strong>@BEST_PRACTICES@</strong></a></li>
+        <li><a href="https://www.bestpractices.dev/projects/16426/baseline-1"><span>OpenSSF Baseline</span><strong>@BASELINE@</strong></a></li>
+        <li><a href="https://scorecard.dev/viewer/?uri=github.com/brunopacheco1/praecepta"><span>OpenSSF Scorecard</span><strong>@SCORECARD@</strong></a></li>
+      </ul>
       <ul class="plain two">
         <li><strong>Apache-2.0</strong>, and <a href="https://reuse.software">REUSE</a>-compliant: every file
           states its author and licence.</li>
@@ -279,11 +286,9 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
         <li><strong>Checked on every change:</strong> tests on Java 21, 25 and 27, an enforced code style,
           compiler warnings as errors, SonarCloud, CodeQL, dependency checks, and fuzzing of the parsers
           that read untrusted input.</li>
-        <li><strong>OpenSSF Best Practices:</strong> the
-          <a href="https://www.bestpractices.dev/projects/16426">silver badge</a> and
-          <a href="https://www.bestpractices.dev/projects/16426/baseline-1">Baseline level 1</a>, and the project's
-          <a href="https://scorecard.dev/viewer/?uri=github.com/brunopacheco1/praecepta">Scorecard</a>, with
-          what is left to improve, in the open.</li>
+        <li><strong>Assessed in the open:</strong> every answer behind the Best Practices and Baseline
+          badges links to its evidence, and Scorecard rechecks the repository every week, with what is
+          left to improve.</li>
       </ul>
     </section>
 

@@ -293,6 +293,19 @@ h3 { font-size: 1.02rem; letter-spacing: .03em; margin: 0 0 .45rem; }
 }
 .timeline .plain li { margin-bottom: 8px; }
 
+/* badge seals, in the theme instead of third-party images */
+.seals { list-style: none; display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 28px; padding: 0; }
+.seals a {
+  display: grid; gap: 2px; min-width: 200px; padding: 14px 20px;
+  color: var(--text); text-decoration: none; background: var(--card);
+  border: 1px solid var(--line); outline: 3px double var(--accent); outline-offset: -8px; border-radius: var(--radius);
+}
+.seals span { font: 500 .72rem var(--display); letter-spacing: .08em; color: var(--muted); }
+/* EB Garamond for the values: Cinzel draws 1 like a Roman I */
+.seals strong { font: 600 1.4rem/1.2 var(--serif); color: var(--accent); }
+.seals a:hover strong { color: var(--accent-strong); }
+@media (max-width: 480px) { .seals li, .seals a { width: 100%; } }
+
 .plain { margin: 0; padding-left: 1.2em; }
 .plain li { margin-bottom: 10px; }
 .plain li::marker { color: var(--accent); }
