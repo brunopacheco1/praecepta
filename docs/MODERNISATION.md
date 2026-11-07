@@ -575,15 +575,14 @@ contribute:
 | Fuzzing | 0 | Jazzer fuzz tests (`FuzzedDataProvider`) for `CellParser` and `DmnReader`, both of which parse untrusted input. They run as regression tests in every build, and fuzz longer on a schedule (issue #23). Scorecard only detects Java fuzzing through OSS-Fuzz or ClusterFuzzLite, so ClusterFuzzLite also fuzzes every pull request that touches the engine. | code |
 | Signed-Releases | 8 | Attach each artifact's provenance bundle (`*.intoto.jsonl`) to the GitHub release, beside the signatures. | code (`release.yml`) |
 | Branch-Protection | 3 | Ruleset on `main`: pull requests with 1 approval from a code owner (`.github/CODEOWNERS`), approval of the latest push, stale approvals dismissed, branches up to date, signed commits, and the required checks. Repository admins may bypass only when merging a pull request, since a sole maintainer cannot approve their own. Expected 8/10: 2 reviewers (Tier 4) needs a second maintainer. | owner (settings) |
-| CII-Best-Practices | 0 | Passing badge earned at bestpractices.dev ([project 16426](https://www.bestpractices.dev/projects/16426)): 55 criteria met, 11 not applicable, and the suggested `warnings_strict` still unmet. Silver is next. | owner |
+| OpenSSF Best Practices badge (Scorecard check `CII-Best-Practices`) | 0 | Silver badge earned at bestpractices.dev ([project 16426](https://www.bestpractices.dev/projects/16426)): passing and silver at 100%. Gold needs two-person review, a bus factor of 2 and unassociated contributors (see Code-Review and Contributors), and security headers on the website. | owner |
 | Code-Review | 0 | Counts merged changes approved by someone other than their author. Contributions already arrive through forks and PRs; each one the maintainer reviews counts, and a co-maintainer reviewing the maintainer's PRs completes it. | community |
 | Contributors | 3 | Contributors from several organisations; grows with contributions. | community |
 
-Also: enable **secret scanning and push protection** (free for public repositories; owner,
-in settings).
+Also: **secret scanning and push protection** are enabled.
 
 **Status:**
 - **Done:** fuzzing (Jazzer fuzz tests, the weekly `fuzz.yml` (issue #23) and ClusterFuzzLite on pull
   requests), provenance bundles on releases (from the next release on), and the ruleset on `main`.
-- **Done (owner):** the OpenSSF Best Practices passing badge.
-- **Owner actions still open:** secret scanning.
+- **Done (owner):** the OpenSSF Best Practices silver badge, a repository successor for continuity,
+  and secret scanning with push protection.
