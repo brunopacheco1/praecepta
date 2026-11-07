@@ -7,6 +7,9 @@ SPDX-License-Identifier: Apache-2.0
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.brunopacheco1/praecepta-engine)](https://central.sonatype.com/artifact/io.github.brunopacheco1/praecepta-engine) [![Javadoc](https://javadoc.io/badge2/io.github.brunopacheco1/praecepta-engine/javadoc.svg)](https://javadoc.io/doc/io.github.brunopacheco1/praecepta-engine) ![Workflow](https://github.com/brunopacheco1/praecepta/actions/workflows/build.yml/badge.svg) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/brunopacheco1/praecepta/badge)](https://scorecard.dev/viewer/?uri=github.com/brunopacheco1/praecepta) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=coverage)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta)
 
 # Praecepta
+**DMN decision tables for Java.** *Praecepta* is Latin for "rules" (classical pronunciation:
+*pry-KEP-ta*).
+
 Praecepta evaluates DMN decision tables in Java, with strict DMN 1.3 hit-policy semantics and
 lookups that cost a fraction of a microsecond. Write tables in Excel, CSV, DMN or code; validate
 them when you build; evaluate them with a dependency-free engine.
