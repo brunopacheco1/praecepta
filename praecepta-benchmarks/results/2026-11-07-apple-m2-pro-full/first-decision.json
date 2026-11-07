@@ -1,0 +1,715 @@
+[
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision",
+        "mode" : "ss",
+        "threads" : 1,
+        "forks" : 10,
+        "jvm" : "/opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java",
+        "jvmArgs" : [
+            "-Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures"
+        ],
+        "jdkVersion" : "27.0.1.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "27.0.1.0.2",
+        "warmupIterations" : 0,
+        "warmupTime" : "single-shot",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 1,
+        "measurementTime" : "single-shot",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "engine" : "praecepta",
+            "table" : "real"
+        },
+        "primaryMetric" : {
+            "score" : 75.75556249999998,
+            "scoreError" : 0.6640897638232691,
+            "scoreConfidence" : [
+                75.09147273617671,
+                76.41965226382325
+            ],
+            "scorePercentiles" : {
+                "0.0" : 75.183458,
+                "50.0" : 75.68481249999999,
+                "90.0" : 76.5545083,
+                "95.0" : 76.581875,
+                "99.0" : 76.581875,
+                "99.9" : 76.581875,
+                "99.99" : 76.581875,
+                "99.999" : 76.581875,
+                "99.9999" : 76.581875,
+                "100.0" : 76.581875
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    75.642042
+                ],
+                [
+                    75.469333
+                ],
+                [
+                    76.308208
+                ],
+                [
+                    75.626625
+                ],
+                [
+                    75.183458
+                ],
+                [
+                    75.727583
+                ],
+                [
+                    75.910792
+                ],
+                [
+                    75.871042
+                ],
+                [
+                    75.234667
+                ],
+                [
+                    76.581875
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision",
+        "mode" : "ss",
+        "threads" : 1,
+        "forks" : 10,
+        "jvm" : "/opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java",
+        "jvmArgs" : [
+            "-Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures"
+        ],
+        "jdkVersion" : "27.0.1.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "27.0.1.0.2",
+        "warmupIterations" : 0,
+        "warmupTime" : "single-shot",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 1,
+        "measurementTime" : "single-shot",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "engine" : "praecepta",
+            "table" : "mixed-100"
+        },
+        "primaryMetric" : {
+            "score" : 77.7060708,
+            "scoreError" : 3.2164886440894263,
+            "scoreConfidence" : [
+                74.48958215591058,
+                80.92255944408943
+            ],
+            "scorePercentiles" : {
+                "0.0" : 76.269416,
+                "50.0" : 76.8328955,
+                "90.0" : 82.23574970000001,
+                "95.0" : 82.380958,
+                "99.0" : 82.380958,
+                "99.9" : 82.380958,
+                "99.99" : 82.380958,
+                "99.999" : 82.380958,
+                "99.9999" : 82.380958,
+                "100.0" : 82.380958
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    76.978667
+                ],
+                [
+                    76.48225
+                ],
+                [
+                    82.380958
+                ],
+                [
+                    80.928875
+                ],
+                [
+                    77.230584
+                ],
+                [
+                    76.439292
+                ],
+                [
+                    76.269416
+                ],
+                [
+                    76.684875
+                ],
+                [
+                    76.888666
+                ],
+                [
+                    76.777125
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision",
+        "mode" : "ss",
+        "threads" : 1,
+        "forks" : 10,
+        "jvm" : "/opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java",
+        "jvmArgs" : [
+            "-Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures"
+        ],
+        "jdkVersion" : "27.0.1.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "27.0.1.0.2",
+        "warmupIterations" : 0,
+        "warmupTime" : "single-shot",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 1,
+        "measurementTime" : "single-shot",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "engine" : "praecepta",
+            "table" : "mixed-1000"
+        },
+        "primaryMetric" : {
+            "score" : 240.36320410000002,
+            "scoreError" : 24.444937653906024,
+            "scoreConfidence" : [
+                215.91826644609398,
+                264.80814175390606
+            ],
+            "scorePercentiles" : {
+                "0.0" : 209.744,
+                "50.0" : 241.48200050000003,
+                "90.0" : 268.3337038,
+                "95.0" : 270.349583,
+                "99.0" : 270.349583,
+                "99.9" : 270.349583,
+                "99.99" : 270.349583,
+                "99.999" : 270.349583,
+                "99.9999" : 270.349583,
+                "100.0" : 270.349583
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    270.349583
+                ],
+                [
+                    250.190791
+                ],
+                [
+                    247.9435
+                ],
+                [
+                    239.427208
+                ],
+                [
+                    241.110709
+                ],
+                [
+                    241.853292
+                ],
+                [
+                    224.00375
+                ],
+                [
+                    246.188625
+                ],
+                [
+                    232.820583
+                ],
+                [
+                    209.744
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision",
+        "mode" : "ss",
+        "threads" : 1,
+        "forks" : 10,
+        "jvm" : "/opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java",
+        "jvmArgs" : [
+            "-Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures"
+        ],
+        "jdkVersion" : "27.0.1.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "27.0.1.0.2",
+        "warmupIterations" : 0,
+        "warmupTime" : "single-shot",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 1,
+        "measurementTime" : "single-shot",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "engine" : "camunda",
+            "table" : "real"
+        },
+        "primaryMetric" : {
+            "score" : 468.54773750000004,
+            "scoreError" : 11.176713391432914,
+            "scoreConfidence" : [
+                457.3710241085671,
+                479.724450891433
+            ],
+            "scorePercentiles" : {
+                "0.0" : 463.760791,
+                "50.0" : 465.0326045,
+                "90.0" : 486.37745,
+                "95.0" : 488.095875,
+                "99.0" : 488.095875,
+                "99.9" : 488.095875,
+                "99.99" : 488.095875,
+                "99.999" : 488.095875,
+                "99.9999" : 488.095875,
+                "100.0" : 488.095875
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    488.095875
+                ],
+                [
+                    469.933375
+                ],
+                [
+                    464.655417
+                ],
+                [
+                    464.233625
+                ],
+                [
+                    465.195792
+                ],
+                [
+                    463.760791
+                ],
+                [
+                    464.869417
+                ],
+                [
+                    470.911625
+                ],
+                [
+                    469.68825
+                ],
+                [
+                    464.133208
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision",
+        "mode" : "ss",
+        "threads" : 1,
+        "forks" : 10,
+        "jvm" : "/opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java",
+        "jvmArgs" : [
+            "-Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures"
+        ],
+        "jdkVersion" : "27.0.1.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "27.0.1.0.2",
+        "warmupIterations" : 0,
+        "warmupTime" : "single-shot",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 1,
+        "measurementTime" : "single-shot",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "engine" : "camunda",
+            "table" : "mixed-100"
+        },
+        "primaryMetric" : {
+            "score" : 489.40004160000007,
+            "scoreError" : 4.9493886189703264,
+            "scoreConfidence" : [
+                484.45065298102975,
+                494.3494302189704
+            ],
+            "scorePercentiles" : {
+                "0.0" : 485.520666,
+                "50.0" : 488.710125,
+                "90.0" : 496.4088375,
+                "95.0" : 496.90025,
+                "99.0" : 496.90025,
+                "99.9" : 496.90025,
+                "99.99" : 496.90025,
+                "99.999" : 496.90025,
+                "99.9999" : 496.90025,
+                "100.0" : 496.90025
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    488.581458
+                ],
+                [
+                    486.599167
+                ],
+                [
+                    490.991708
+                ],
+                [
+                    487.205416
+                ],
+                [
+                    485.520666
+                ],
+                [
+                    496.90025
+                ],
+                [
+                    491.986125
+                ],
+                [
+                    489.485834
+                ],
+                [
+                    487.891
+                ],
+                [
+                    488.838792
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision",
+        "mode" : "ss",
+        "threads" : 1,
+        "forks" : 10,
+        "jvm" : "/opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java",
+        "jvmArgs" : [
+            "-Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures"
+        ],
+        "jdkVersion" : "27.0.1.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "27.0.1.0.2",
+        "warmupIterations" : 0,
+        "warmupTime" : "single-shot",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 1,
+        "measurementTime" : "single-shot",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "engine" : "camunda",
+            "table" : "mixed-1000"
+        },
+        "primaryMetric" : {
+            "score" : 774.3657001,
+            "scoreError" : 29.168329227041525,
+            "scoreConfidence" : [
+                745.1973708729585,
+                803.5340293270416
+            ],
+            "scorePercentiles" : {
+                "0.0" : 759.708167,
+                "50.0" : 766.0753125,
+                "90.0" : 815.5045455,
+                "95.0" : 817.557208,
+                "99.0" : 817.557208,
+                "99.9" : 817.557208,
+                "99.99" : 817.557208,
+                "99.999" : 817.557208,
+                "99.9999" : 817.557208,
+                "100.0" : 817.557208
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    767.663125
+                ],
+                [
+                    759.708167
+                ],
+                [
+                    768.354542
+                ],
+                [
+                    817.557208
+                ],
+                [
+                    761.013334
+                ],
+                [
+                    762.494834
+                ],
+                [
+                    764.4875
+                ],
+                [
+                    761.440375
+                ],
+                [
+                    797.030583
+                ],
+                [
+                    783.907333
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision",
+        "mode" : "ss",
+        "threads" : 1,
+        "forks" : 10,
+        "jvm" : "/opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java",
+        "jvmArgs" : [
+            "-Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures"
+        ],
+        "jdkVersion" : "27.0.1.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "27.0.1.0.2",
+        "warmupIterations" : 0,
+        "warmupTime" : "single-shot",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 1,
+        "measurementTime" : "single-shot",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "engine" : "drools",
+            "table" : "real"
+        },
+        "primaryMetric" : {
+            "score" : 379.2639749,
+            "scoreError" : 7.655475831302058,
+            "scoreConfidence" : [
+                371.60849906869794,
+                386.91945073130205
+            ],
+            "scorePercentiles" : {
+                "0.0" : 374.671334,
+                "50.0" : 376.96181249999995,
+                "90.0" : 390.72354590000003,
+                "95.0" : 391.507875,
+                "99.0" : 391.507875,
+                "99.9" : 391.507875,
+                "99.99" : 391.507875,
+                "99.999" : 391.507875,
+                "99.9999" : 391.507875,
+                "100.0" : 391.507875
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    383.664584
+                ],
+                [
+                    375.833916
+                ],
+                [
+                    379.356541
+                ],
+                [
+                    380.745208
+                ],
+                [
+                    376.3535
+                ],
+                [
+                    376.673458
+                ],
+                [
+                    391.507875
+                ],
+                [
+                    376.583166
+                ],
+                [
+                    377.250167
+                ],
+                [
+                    374.671334
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision",
+        "mode" : "ss",
+        "threads" : 1,
+        "forks" : 10,
+        "jvm" : "/opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java",
+        "jvmArgs" : [
+            "-Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures"
+        ],
+        "jdkVersion" : "27.0.1.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "27.0.1.0.2",
+        "warmupIterations" : 0,
+        "warmupTime" : "single-shot",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 1,
+        "measurementTime" : "single-shot",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "engine" : "drools",
+            "table" : "mixed-100"
+        },
+        "primaryMetric" : {
+            "score" : 436.8696040000001,
+            "scoreError" : 7.128315848794597,
+            "scoreConfidence" : [
+                429.7412881512055,
+                443.9979198487947
+            ],
+            "scorePercentiles" : {
+                "0.0" : 429.510333,
+                "50.0" : 437.05487500000004,
+                "90.0" : 443.3618583,
+                "95.0" : 443.556,
+                "99.0" : 443.556,
+                "99.9" : 443.556,
+                "99.99" : 443.556,
+                "99.999" : 443.556,
+                "99.9999" : 443.556,
+                "100.0" : 443.556
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    430.100625
+                ],
+                [
+                    437.643958
+                ],
+                [
+                    439.343583
+                ],
+                [
+                    435.2185
+                ],
+                [
+                    440.948166
+                ],
+                [
+                    443.556
+                ],
+                [
+                    434.2945
+                ],
+                [
+                    441.614583
+                ],
+                [
+                    429.510333
+                ],
+                [
+                    436.465792
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    },
+    {
+        "jmhVersion" : "1.37",
+        "benchmark" : "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision",
+        "mode" : "ss",
+        "threads" : 1,
+        "forks" : 10,
+        "jvm" : "/opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java",
+        "jvmArgs" : [
+            "-Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures"
+        ],
+        "jdkVersion" : "27.0.1.0.2",
+        "vmName" : "OpenJDK 64-Bit Server VM",
+        "vmVersion" : "27.0.1.0.2",
+        "warmupIterations" : 0,
+        "warmupTime" : "single-shot",
+        "warmupBatchSize" : 1,
+        "measurementIterations" : 1,
+        "measurementTime" : "single-shot",
+        "measurementBatchSize" : 1,
+        "params" : {
+            "engine" : "drools",
+            "table" : "mixed-1000"
+        },
+        "primaryMetric" : {
+            "score" : 1005.2058083,
+            "scoreError" : 14.591308908885654,
+            "scoreConfidence" : [
+                990.6144993911142,
+                1019.7971172088857
+            ],
+            "scorePercentiles" : {
+                "0.0" : 988.434208,
+                "50.0" : 1003.6666665,
+                "90.0" : 1024.2273334,
+                "95.0" : 1025.3,
+                "99.0" : 1025.3,
+                "99.9" : 1025.3,
+                "99.99" : 1025.3,
+                "99.999" : 1025.3,
+                "99.9999" : 1025.3,
+                "100.0" : 1025.3
+            },
+            "scoreUnit" : "ms/op",
+            "rawData" : [
+                [
+                    1002.355833
+                ],
+                [
+                    988.434208
+                ],
+                [
+                    1004.002458
+                ],
+                [
+                    999.875375
+                ],
+                [
+                    1014.573334
+                ],
+                [
+                    1006.943959
+                ],
+                [
+                    1000.795958
+                ],
+                [
+                    1025.3
+                ],
+                [
+                    1006.446083
+                ],
+                [
+                    1003.330875
+                ]
+            ]
+        },
+        "secondaryMetrics" : {
+        }
+    }
+]
+
+

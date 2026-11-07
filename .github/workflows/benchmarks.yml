@@ -4,14 +4,17 @@
 
 name: Benchmarks
 # On demand only. Shared GitHub runners are noisy: use these results to spot large regressions or
-# compare engines within one run, not to publish absolute numbers.
+# compare engines within one run, not to publish absolute numbers (run-benchmarks.sh full on a quiet
+# machine is for that).
 on:
   workflow_dispatch:
     inputs:
-      jmh-args:
-        description: 'Extra JMH arguments, e.g. "-p table=real -p engine=praecepta"'
-        required: false
-        default: ''
+      profile:
+        description: 'quick (about 15 minutes) or full (about 2.5 hours)'
+        required: true
+        default: quick
+        type: choice
+        options: [quick, full]
 
 permissions:
   contents: read
@@ -20,7 +23,7 @@ jobs:
   jmh:
     name: JMH (Praecepta vs Camunda vs Drools)
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
@@ -30,21 +33,15 @@ jobs:
           cache: maven
       - name: Build benchmarks
         run: mvn -B -pl praecepta-benchmarks -am package -DskipTests
-      - name: Footprint
-        run: |
-          for table in real synthetic-100 synthetic-1000 mixed-100 mixed-1000; do
-            for engine in praecepta camunda drools; do
-              java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar \
-                io.github.brunopacheco1.praecepta.benchmarks.FootprintReport "$engine" "$table" | tail -n 1
-            done
-          done | tee footprint.txt
-      - name: Latency
+      - name: Run
         env:
-          JMH_ARGS: ${{ inputs.jmh-args }}
-        run: java -jar praecepta-benchmarks/target/benchmarks.jar -rf json -rff jmh-results.json $JMH_ARGS
+          PROFILE: ${{ inputs.profile }}
+        run: praecepta-benchmarks/run-benchmarks.sh "$PROFILE" benchmark-results
+      - name: Summary
+        if: always()
+        run: '[ ! -f benchmark-results/summary.md ] || cat benchmark-results/summary.md >> "$GITHUB_STEP_SUMMARY"'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
         with:
           name: benchmark-results
-          path: |
-            jmh-results.json
-            footprint.txt
+          path: benchmark-results

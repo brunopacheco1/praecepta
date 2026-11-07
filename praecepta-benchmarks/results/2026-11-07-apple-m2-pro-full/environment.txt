@@ -1,0 +1,12 @@
+date: 2026-11-07T13:02:19Z
+profile: full (-f 3 -wi 5 -w 2s -i 5 -r 3s)
+commit: cb0ab86
+cpu: Apple M2 Pro
+cores: 12 (8 performance)
+memory: 16 GiB
+os: macOS 26.7.1
+java: 27.0.1.0.2 (OpenJDK 64-Bit Server VM)
+praecepta: 0.2.0-SNAPSHOT
+camunda dmn-scala: 1.12.6
+drools (kie-dmn-core): 10.2.0
+jmh: 1.37

@@ -249,24 +249,48 @@ engine against a naive reference implementation of DMN decision-table semantics 
 
 # Benchmarks
 `praecepta-benchmarks` compares Praecepta in-process with Camunda 8's DMN engine (dmn-scala, as
-embedded by Zeebe) and Drools DMN, using [JMH](https://github.com/openjdk/jmh). Every engine
-evaluates the same rules, and each run first checks that all engines return the same answers.
-The tables are:
-- `real`: the bundled 119-rule table;
-- `synthetic-100` / `synthetic-1000`: generated string tables;
-- `mixed-100` / `mixed-1000`: generated tables mixing string, number and date columns, with
-  comparisons, intervals and `not(...)`.
+embedded by Zeebe) and Drools DMN, using [JMH](https://github.com/openjdk/jmh). Every engine reads
+the same DMN document, and each run first checks that every engine returns the same answers as
+Praecepta built straight from the rules.
+
+The tables (`-p table=...`) are:
+- `real`: the bundled 119-rule, 13-column table (FIRST);
+- `synthetic-<rules>[x<columns>]`: generated string tables whose rules overlap (COLLECT);
+- `mixed-<rules>[x<columns>]`: generated tables mixing string, number and date columns, with
+  comparisons, intervals and `not(...)` (COLLECT);
+- `unique-<rules>[x<columns>]`: generated string tables whose rules never overlap (UNIQUE);
+- a suffix `-first`, `-priority`, `-ruleorder`, `-collect` or `-unique` changes only the hit
+  policy: `mixed-1000-first` has the rules of `mixed-1000`.
+
+The benchmarks are:
+- `EvaluationBenchmark`: latency of one decision, with `-p workload=match` (every input matches a
+  rule) or `nomatch` (none does); add `-bm sample` for percentiles and `-prof gc` for the memory
+  allocated per decision;
+- `ThroughputBenchmark`: decisions per millisecond with one engine shared by `-t <n>` threads;
+- `LifecycleBenchmark`: reading the DMN and building the engine, in a warm JVM;
+- `FirstDecisionBenchmark`: reading the DMN, building the engine and evaluating one input in a
+  fresh JVM (needs fixtures, see `run-benchmarks.sh`);
+- `InputPathBenchmark`: the real table fed as a map, generated records or enums;
+- `FootprintReport` (a `main`, not JMH): retained heap and build time.
+
+`run-benchmarks.sh` runs the whole matrix and writes the raw JMH results, the machine and versions,
+and a summary (`summary.md`, `results.csv`) into `praecepta-benchmarks/results/`. Published runs
+are kept there whole, so they can be audited: every suite's log and raw JSON, the footprint log, the
+SHA-256 of the `benchmarks.jar` that ran (in `environment.txt`) and each exact command line
+(`commands.txt`).
 
 ```
 mvn -pl praecepta-benchmarks -am package -DskipTests
-java -jar praecepta-benchmarks/target/benchmarks.jar                      # latency, all engines and tables
-java -jar praecepta-benchmarks/target/benchmarks.jar -p table=real        # one table
-java -jar praecepta-benchmarks/target/benchmarks.jar InputPathBenchmark  # real table: map vs generated records vs enums
+praecepta-benchmarks/run-benchmarks.sh               # everything, about 2.5 hours
+praecepta-benchmarks/run-benchmarks.sh quick         # a few tables, about 15 minutes
+java -jar praecepta-benchmarks/target/benchmarks.jar EvaluationBenchmark -p table=real   # one benchmark
 java -cp praecepta-benchmarks/target/benchmarks.jar \
-  io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta real   # retained heap
+  io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta real           # retained heap
 ```
 
-The `Benchmarks` GitHub workflow runs the same on demand and uploads the results.
+The `Benchmarks` GitHub workflow runs the quick profile on demand (or the full one, when asked) and
+uploads the results. Shared runners are noisy: use them to spot large regressions, not to publish
+numbers.
 
 Drools' experimental alpha-network compilation is not part of the default comparison: on Drools
 10.2.0 it disagrees with every other engine on these tables (see
