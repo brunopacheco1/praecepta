@@ -523,55 +523,50 @@ What was done:
 Not done (owner actions): creating the Central token, the release key and the `release`
 environment, then tagging `v0.1.0`.
 
-### Phase 7 — Write-up and OpenSSF improvements
-A post on the maintainer's personal blog, written once 0.1.0 is on Maven Central, so readers can
-try it straight away, and the project improvements its "how open is it" section points to.
+### Phase 7 — Benchmark refresh, roadmap and OpenSSF improvements
+After 0.1.0 reached Maven Central: measure the released artifacts, publish what could come next as
+issues, and raise the OpenSSF Scorecard.
 
-The post covers:
-- **What changed**, from the 2022 trie engine to the 0.1.0 release: the bitset index, strict DMN,
-  FEEL cells, DMN import, the Maven plugin, and the open-source hygiene (Apache-2.0, REUSE, SBOMs,
-  signed releases).
-- **Real benchmark results with visuals:**
-  - charts for latency and memory per engine and table;
-  - JMH settings, hardware and versions stated;
-  - numbers re-measured on the released artifacts.
-- **A fair comparison:**
-  - every engine evaluates the same tables and is cross-checked before timing;
-  - Camunda 8 and Drools are measured with their default, supported setups;
-  - Praecepta's best case (generated enum inputs) is labelled as such;
-  - known biases are stated: in-process only; DMN engines also interpret full FEEL; warm JVM.
-- **The gaps:** what Camunda and Drools do that Praecepta does not:
-  - full FEEL and expressions across several columns;
-  - decision requirement graphs and BKMs;
-  - boolean and date-time types;
-  - modelling tools and decision services;
-  - mature ecosystems and support.
-- **How to use it:** the engine, DMN files and the Maven plugin, with copy-paste examples.
-- **How open the project is:**
-  - the Apache-2.0 licence and REUSE compliance;
-  - everything public: code, CI, plan, benchmarks, issues;
-  - release integrity: signed artifacts, SBOMs, build provenance, reproducible builds;
-  - the OpenSSF Scorecard result, explained: anyone can fork and propose changes. The Code-Review
-    check measures something else: whether each merged change was approved by someone other than
-    its author. With a single maintainer nobody can approve the maintainer's own changes, so every reviewed
-    outside contribution, and any co-maintainer, raises it;
-  - an invitation to contributors, reviewers and co-maintainers.
-- **How to contribute:** CONTRIBUTING, the issue templates, and good first issues.
-- **Nice-to-have features**, asking readers which they would use and inviting contributions:
-  - boolean, time and date-time columns;
-  - string ranges;
-  - DMN decision requirement graphs (chained decisions);
-  - a COUNT aggregation;
-  - primitive boundary keys for faster number/date columns;
-  - sparse (Roaring) bitmaps for very large tables;
-  - Gradle support;
-  - a GraalVM native-image check;
-  - a Spring Boot starter;
-  - an online playground.
+**Benchmark of the released 0.1.0.** The benchmark module is built at tag `v0.1.0` against the
+artifacts downloaded from Maven Central, including the Maven plugin, which generates the
+real-table classes. Settings: Apple M2 Pro, JDK 27; JMH with 5 × 2 s warm-up and 5 × 3 s
+measurement, 2 forks. Cross-check: the same suite on a GitHub Actions runner (x86, Java 25).
+The absolute numbers differ there, but the ranking holds.
 
-  Each links to a GitHub issue or discussion, so interest can be counted. Done: issues #12–#23
-  (with the DMN TCK and fuzzing added), labelled `enhancement` / `help wanted`, four of them
-  `good first issue`.
+| µs per evaluation | real (119) | synthetic-100 | synthetic-1000 | mixed-100 | mixed-1000 |
+|---|---:|---:|---:|---:|---:|
+| Praecepta 0.1.0 | 0.19 | 0.15 | 0.23 | 0.49 | 0.68 |
+| Camunda 8 (dmn-scala 1.12.6) | 16.7 | 19.5 | 127 | 37.2 | 283 |
+| Drools 10.2.0 | 59.8 ± 6.1 | 16.4 | 144 ± 42 | 32.4 | 276 |
+
+- **Input paths** (real table): `Map` 231 ns, generated string record 142 ns, generated enum record
+  101 ns.
+- **Memory:** Praecepta 0.2–0.9 MB against 4.6–16.5 MB for the others.
+- **Build time:** Praecepta 39–167 ms against 0.3–1.1 s.
+- **Fairness:**
+  - same rules for every engine, cross-checked before timing;
+  - default, supported setups;
+  - `Map` inputs for every engine;
+  - Praecepta's enum path reported separately.
+- **Biases:** in-process, single-threaded, warm JVM. The DMN engines interpret full FEEL. Drools'
+  build-time (executable) model was not measured.
+
+**Roadmap as issues.** What could come next is published as issues #12–#25, labelled `enhancement`
+/ `help wanted`, with `good first issue` on the smaller ones. Each asks for a 👍 or an offer to
+contribute:
+- boolean, time and date-time columns;
+- string ranges;
+- inputs with several values;
+- decision requirement graphs;
+- a COUNT aggregation;
+- faster number and date columns;
+- compressed bitmaps;
+- Gradle;
+- GraalVM native image;
+- a Spring Boot starter;
+- an online playground;
+- the DMN TCK;
+- fuzzing.
 
 **OpenSSF Scorecard improvements.** The score was 7.8/10 after 0.1.0. The checks below 10:
 
@@ -587,7 +582,8 @@ The post covers:
 Also: enable **secret scanning and push protection** (free for public repositories; owner,
 in settings).
 
-**Blog:** the Hugo site `brunopacheco1.github.io` (Congo theme, English and Portuguese, deployed
-from `master` by GitHub Actions). The post comes as a pull request there, with charts drawn by the
-theme's Chart.js shortcode. The 2023 trie post gets an update note: its benchmark was not
-like-for-like.
+**Status:**
+- **Done:** fuzzing (Jazzer fuzz tests and the weekly `fuzz.yml`, issue #23) and provenance bundles on
+  releases (from the next release on).
+- **Owner actions still open:** the ruleset settings, the OpenSSF Best Practices badge, and secret
+  scanning.
