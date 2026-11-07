@@ -21,7 +21,6 @@
         resources and generates typed input/output records and a decision class.
     </description>
     <properties>
-        <sonar.projectKey>brunopacheco1_praecepta:${project.artifactId}</sonar.projectKey>
         <!-- the oldest Maven the build accepts (see the enforcer rule in the parent) -->
         <maven.api.version>3.9.16</maven.api.version>
         <maven-plugin-tools.version>3.16.0</maven-plugin-tools.version>

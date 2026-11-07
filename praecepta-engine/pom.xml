@@ -16,9 +16,6 @@
     <artifactId>praecepta-engine</artifactId>
     <packaging>jar</packaging>
     <name>praecepta-engine</name>
-    <properties>
-        <sonar.projectKey>brunopacheco1_praecepta:${project.artifactId}</sonar.projectKey>
-    </properties>
     <dependencies>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

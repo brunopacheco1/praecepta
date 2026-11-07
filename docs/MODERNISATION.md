@@ -416,6 +416,15 @@ What was done:
   - new `codeql.yml` (Java and Actions, build mode none) and `scorecard.yml` (published results,
     README badge);
   - `dependabot.yml` for Maven and Actions, weekly, with grouped tooling updates.
+  - SonarCloud is kept for code quality (bug patterns, smells, duplication, coverage on new
+    code), which the security tools do not cover. Its token had expired (every analysis since
+    Phase 0 failed with 403, hidden by the advisory step). The build now sends all modules to the
+    single project `brunopacheco1_praecepta`, with no per-module keys, and excludes only the
+    unpublished benchmarks; the Maven plugin, `beans` and `exceptions` packages are analysed.
+    The owner renews the token.
+  - ORT and FOSSLight had failed on every run: an action pinned to the retired
+    `upload-artifact@v3`, and Python 3.15 without wheels for a FOSSLight dependency. They are fixed
+    by pinning ORT action v1.2.0 and Python 3.12 with `fosslight_source` 2.3.18.
 - **Community files:**
   - `CONTRIBUTING.md`, replacing the README section;
   - `CODE_OF_CONDUCT.md`, adopting Contributor Covenant 2.1 by reference;
