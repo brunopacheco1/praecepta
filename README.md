@@ -314,7 +314,14 @@ Praecepta Engine has no runtime dependencies; it reads DMN with the JDK's XML pa
 Praecepta Loader depends on Apache POI. The Maven plugin uses the loader at build time only.
 
 # Roadmap
-See [docs/MODERNISATION.md](docs/MODERNISATION.md).
+[docs/ROADMAP.md](docs/ROADMAP.md) has the plans for the next year; past decisions and their reasons are in
+[docs/MODERNISATION.md](docs/MODERNISATION.md).
+
+# Project documents
+- [Architecture](docs/ARCHITECTURE.md): modules, the bitset index, DMN and the Maven plugin.
+- [Security assurance case](docs/SECURITY-ASSURANCE.md): what to expect, threats, and how they are countered.
+- [Governance](GOVERNANCE.md): roles, decisions and continuity.
+- [Contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md) and [security policy](SECURITY.md).
 
 # Contributing
 Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems

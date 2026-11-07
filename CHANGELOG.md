@@ -12,6 +12,8 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 ## [Unreleased]
 
 ### Added
+- **Project documents:** governance (roles, decisions, continuity), architecture, a security
+  assurance case and a one-year roadmap.
 - **A project website** at https://bruno.pacheco.lu/praecepta/, with the API documentation of the
   latest release, and a Classic Rome identity: a bronze *tabula ansata* logo, Cinzel and EB Garamond.
 - **Fuzz tests** (Jazzer) for the cell parser and the DMN reader: they replay saved inputs in every
