@@ -1,0 +1,99 @@
+<!--
+SPDX-FileCopyrightText: Bruno Pacheco
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
+# Security assurance case
+
+Why Praecepta's security requirements are met: what users can expect, the threats considered, the
+trust boundaries, the design principles applied, the common weaknesses countered, and the evidence.
+How to report a vulnerability is in [SECURITY.md](../SECURITY.md); the design itself is in
+[ARCHITECTURE.md](ARCHITECTURE.md).
+
+## What users can and cannot expect
+Praecepta is a library that runs inside the application that calls it, with that application's
+permissions. It opens no network connections, starts no processes, uses no cryptography, stores no
+data and needs no configuration.
+
+**Users can expect:**
+- **Reading untrusted DMN does not reach outside the document:** `DmnReader` resolves no DTDs and no
+  external entities, so a DMN file cannot read local files or make network requests (XXE).
+- **Bad input fails cleanly:** any malformed table, cell or DMN document is rejected with a
+  documented exception (`InvalidDecisionTableException`, `CellSyntaxException`) naming where the
+  problem is, never with an unexpected exception or a half-built engine.
+- **Input values are checked:** when a column declares its input values (a DMN value list), values
+  outside it are rejected rather than silently matched.
+- **No surprises at runtime:** an engine is immutable and thread-safe; evaluation has no side
+  effects and allocates little.
+- **Code the Maven plugin generates is safe to compile:** table, column and value names become
+  sanitised Java identifiers, and text copied into string literals or comments cannot break out of them.
+- **Releases are authentic:** signed, with build provenance, an SBOM and reproducible archives.
+
+**Users cannot expect (out of scope):**
+- **Protection from a malicious table's logic.** A table decides what the application does with
+  its answer; who may change tables is the application's responsibility.
+- **Bounded build time for huge FIRST or PRIORITY tables.** Validation of a large table with many
+  overlapping rules can take minutes ([#29](https://github.com/brunopacheco1/praecepta/issues/29)).
+  Applications that build engines from untrusted tables should limit the table size, or build
+  them off the request path.
+- **Limits on the size of input documents** beyond the JDK's XML processing limits
+  (`FEATURE_SECURE_PROCESSING`); applications should cap upload sizes.
+- **Spreadsheet safety beyond Apache POI's.** Excel files are parsed by Apache POI, kept up to date
+  by Dependabot.
+
+## Threat model
+| Asset | Threat | Countered by |
+|---|---|---|
+| The host application's files and network | A crafted DMN document using XXE or a DTD to read files or make requests | DTDs disallowed, external entities off, secure processing on (`DmnReader`) |
+| The host application's availability | Documents or cells crafted to crash the parser or exhaust memory | Fuzzing of the cell parser and DMN reader; JDK XML limits; a cell grammar without nesting (`not(...)` only wraps a whole cell), so parsing depth is bounded |
+| Correct decisions | Ambiguous or overlapping rules giving different answers than intended | Strict DMN hit policies; validation of overlaps, unreachable rules and gaps; the engine is tested against a reference implementation with property-based tests |
+| A build using the Maven plugin | Table content injected into generated Java code | `JavaNames` sanitises identifiers (reserved words included); string literals are escaped; comments escape unicode escapes and comment terminators |
+| Users' supply chain | A tampered release or dependency | Signed releases with provenance; pinned CI actions; Dependabot, dependency review and OSV scans; a signed-commit, pull-request-only `main` |
+
+## Trust boundaries
+1. **Table sources** (DMN, Excel and CSV files, and rule lists built in code) cross into the engine
+   through `DmnReader`, the loaders, `CellParser` and the builder. Everything is validated there;
+   nothing after that point trusts the table to be well formed.
+2. **Input values** cross through the getters the application binds; they are matched, never
+   evaluated as code.
+3. **The Maven plugin** turns tables into source code at build time; the output is the boundary
+   that matters, and names are sanitised before they are written.
+
+## Secure design principles applied
+- **Economy of mechanism:** cells are only *simple unary tests* on one column, not a general
+  expression language, so evaluating a table cannot run arbitrary code; the engine has no runtime
+  dependencies.
+- **Fail-safe defaults:** unsupported DMN features, unknown cell syntax and undeclared values are
+  rejected, not ignored; XML features are off unless needed.
+- **Complete mediation:** every table goes through the same parser and validation, whatever its
+  source.
+- **Least privilege and least common mechanism:** no network, file (except reading the table the
+  caller names), process or reflection access at runtime; no shared mutable state.
+- **Open design:** everything, including the threat model and the fuzzing, is public.
+- **Psychological acceptability:** validation errors name the decision, rule and column, so the safe
+  path is also the easy one.
+
+## Common weaknesses countered
+| Weakness | How |
+|---|---|
+| CWE-611, XML external entities | DTDs disallowed, external entities disabled |
+| CWE-776, entity expansion | DTDs disallowed; JDK secure-processing limits |
+| CWE-20, improper input validation | Cells parsed against a grammar; value lists enforced; DMN elements checked |
+| CWE-94, code injection (plugin) | Identifiers sanitised; string literals and comment text escaped |
+| CWE-400, resource exhaustion | Fuzzed parsers; JDK limits; a known gap for huge FIRST and PRIORITY tables (#29) |
+| CWE-362, race conditions | Immutable engines, no shared mutable state |
+| CWE-1104, unmaintained components | One runtime dependency (Apache POI, loader only), monitored by Dependabot and OSV |
+
+## Evidence
+- **Tests:** 91.9% line coverage; property-based tests compare the engine with a naive reference
+  implementation; tests run on Java 21, 25 and 27 on every pull request.
+- **Fuzzing:** Jazzer targets for the cell parser and the DMN reader run on every pull request that
+  touches the engine (ClusterFuzzLite), weekly for longer, and their saved inputs replay in every build.
+- **Static analysis:** CodeQL and SonarCloud on every pull request, with SonarCloud as a required
+  quality gate; compiler warnings fail the build; Checkstyle enforces the code style.
+- **Supply chain:** signed commits and releases, build provenance, CycloneDX SBOMs, reproducible
+  archives, pinned workflow actions, least-privilege workflow tokens, OpenSSF Scorecard.
+- **Process:** the OpenSSF Best Practices badge
+  ([project 16426](https://www.bestpractices.dev/projects/16426)), a private vulnerability
+  reporting channel, and a security policy with response times ([SECURITY.md](../SECURITY.md)).

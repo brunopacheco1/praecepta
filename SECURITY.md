@@ -28,7 +28,8 @@ Include what is affected, how to reproduce it, and the impact you see. What to e
 
 ## Scope
 Of particular interest: the DMN reader (`DmnReader`, which parses untrusted XML), the cell parser,
-the Excel and CSV loaders, and the Maven plugin's code generation.
+the Excel and CSV loaders, and the Maven plugin's code generation. What users can expect, the threat
+model and how each threat is countered are in the [security assurance case](docs/SECURITY-ASSURANCE.md).
 
 ## Verifying a release
 Every artifact on Maven Central is GPG-signed (`gpg --verify praecepta-engine-X.Y.Z.jar.asc`), and

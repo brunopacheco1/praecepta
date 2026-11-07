@@ -9,6 +9,9 @@ SPDX-License-Identifier: Apache-2.0
 Thanks for helping. Bug reports, questions and pull requests are all welcome.
 
 ## Before you start
+How the project is run, and how to become a maintainer, is in [GOVERNANCE.md](GOVERNANCE.md); the
+design is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 - For anything larger than a small fix, open an issue first so we can agree on the approach.
 - Security problems: do **not** open a public issue; see [SECURITY.md](SECURITY.md).
 - Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
