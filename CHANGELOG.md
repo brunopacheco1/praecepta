@@ -7,9 +7,11 @@ SPDX-License-Identifier: Apache-2.0
 # Changelog
 
 All notable changes are listed here, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Versions will follow [Semantic Versioning](https://semver.org/) from the first release.
+Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor versions may change the API.
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-11-07
 
 The first release since the 2022–2023 prototype: the engine, loader and Maven plugin are rewritten.
 Code written against the prototype needs the changes listed under *Changed*.
@@ -82,3 +84,6 @@ Code written against the prototype needs the changes listed under *Changed*.
   benchmarks against Camunda 8 and Drools).
 - **`MissingOutputException`** (no match now yields an empty result), **`InvalidPraeceptaException`**
   and the trie visitor API.
+
+[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/brunopacheco1/praecepta/releases/tag/v0.1.0

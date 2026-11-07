@@ -32,10 +32,25 @@ A dedicated key, so your personal key (`E7CEC6DF14F7B2C7`) never leaves your mac
 ```bash
 gpg --quick-gen-key "Praecepta Releases <4491850+brunopacheco1@users.noreply.github.com>" ed25519 sign 2y
 gpg --list-keys "Praecepta Releases"                                  # note the fingerprint
-gpg --keyserver keys.openpgp.org --send-keys <FINGERPRINT>            # Maven Central checks signatures against public keyservers
-gpg --keyserver keyserver.ubuntu.com --send-keys <FINGERPRINT>
+gpg --keyserver hkps://keys.openpgp.org --send-keys <FINGERPRINT>     # Maven Central checks signatures against public keyservers
+gpg --keyserver hkps://keyserver.ubuntu.com --send-keys <FINGERPRINT>
 gpg --armor --export-secret-keys <FINGERPRINT> > release-key.asc      # for the secret below; delete the file afterwards
 ```
+
+If `gpg` reports `keyserver send failed: No route to host` (its network helper, `dirmngr`, fails on
+some networks even over HTTPS), upload the public key over HTTPS directly; it sends only the
+public part:
+
+```bash
+gpg --armor --export <FINGERPRINT> | curl --proto '=https' -fsS --data-urlencode keytext@- https://keyserver.ubuntu.com/pks/add
+```
+
+For keys.openpgp.org, paste the output of `gpg --armor --export <FINGERPRINT>` into the form at
+<https://keys.openpgp.org/upload>.
+
+Check it is served: `curl -fsS "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x<FINGERPRINT>"`.
+keys.openpgp.org only publishes a key's name and email after the address is verified by email (the
+GitHub noreply address cannot receive it); Maven Central needs only the key itself.
 
 Optionally certify it with your personal key (`gpg --local-user E7CEC6DF14F7B2C7 --sign-key <FINGERPRINT>`),
 then upload again, so the release key is visibly vouched for.
@@ -56,7 +71,7 @@ every release waits for a click.
 
 ## Releasing a version
 1. In a pull request, rename `## [Unreleased]` in `CHANGELOG.md` to `## [X.Y.Z] - YYYY-MM-DD`,
-   add a fresh empty `## [Unreleased]` above it, and merge.
+   add a fresh empty `## [Unreleased]` above it, update the version links at the bottom, and merge.
 2. Tag the merge commit with your personal key and push the tag:
    ```bash
    git switch main && git pull
