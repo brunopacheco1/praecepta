@@ -416,6 +416,11 @@ What was done:
   - new `codeql.yml` (Java and Actions, build mode none) and `scorecard.yml` (published results,
     README badge);
   - `dependabot.yml` for Maven and Actions, weekly, with grouped tooling updates.
+  - `dependencies.yml` submits the resolved Maven tree of the published modules to GitHub on
+    every push to `main` and on same-repository pull requests. GitHub otherwise reads POMs
+    statically and saw only direct dependencies (2 of the loader's 13). Dependabot now alerts on,
+    and fixes, transitive ones such as `commons-compress` and `xmlbeans`. Dependency review fails a
+    pull request that adds a runtime dependency with a moderate-or-worse vulnerability.
   - SonarCloud is kept for code quality (bug patterns, smells, duplication, coverage on new
     code), which the security tools do not cover. Its token had expired (every analysis since
     Phase 0 failed with 403, hidden by the advisory step). The build now sends all modules to the

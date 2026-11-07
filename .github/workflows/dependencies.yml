@@ -1,0 +1,57 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: Dependencies
+# GitHub only reads pom.xml statically, so its dependency graph lists direct dependencies only.
+# Submitting the resolved Maven tree lets Dependabot alert on (and fix) transitive dependencies too,
+# and lets dependency review see what a pull request really adds.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    name: Submit dependency graph
+    # needs contents: write, which pull requests from forks never get
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # dependency submission API
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - uses: advanced-security/maven-dependency-submission-action@a64327a7329c9939cf675e458452febe1894a70c # v6.0.1
+        with:
+          # the published modules only: the benchmarks (Camunda, Drools, JMH) are never shipped
+          maven-args: -B -pl praecepta-engine,praecepta-loader,praecepta-maven-plugin -am
+
+  review:
+    name: Dependency review
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    needs: submit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # summary comment on failure
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # block pull requests that add a vulnerable runtime dependency
+          fail-on-severity: moderate
+          fail-on-scopes: runtime
+          # licences are checked against the SBOMs of the published modules in build.yml
+          license-check: false
+          # wait for this pull request's submitted snapshot (the submit job) to be processed
+          retry-on-snapshot-warnings: true
+          retry-on-snapshot-warnings-timeout: 300
+          show-patched-versions: true
+          comment-summary-in-pr: on-failure
