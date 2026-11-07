@@ -23,10 +23,13 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
 
 /**
- * Average latency of one decision evaluation, per engine and table.
+ * Latency of one decision evaluation, per engine, table ({@link Table#named}) and workload
+ * ({@link Workload}), on one thread. Average time by default; run with {@code -bm sample} for the
+ * latency distribution (percentiles) and with {@code -prof gc} for the memory allocated per decision.
  *
- * <p>Before timing, the selected engine is cross-checked against Praecepta on the whole workload;
- * a disagreement aborts the run, so results always compare engines computing the same answers.
+ * <p>Before timing, the selected engine is cross-checked against Praecepta built straight from the
+ * rules, on the whole workload; a disagreement aborts the run, so results always compare engines
+ * computing the same answers.
  */
 @State(Scope.Thread)
 @BenchmarkMode(Mode.AverageTime)
@@ -44,6 +47,9 @@ public class EvaluationBenchmark {
     @Param({"real", "synthetic-100", "synthetic-1000", "mixed-100", "mixed-1000"})
     public String table;
 
+    @Param({Workload.MATCH})
+    public String workload;
+
     private Contender contender;
     private Map<String, Object>[] inputs;
     private int cursor;
@@ -52,10 +58,10 @@ public class EvaluationBenchmark {
     @SuppressWarnings("unchecked")
     public void setUp() {
         var decisionTable = Table.named(table);
-        var workload = Workload.generate(decisionTable, WORKLOAD_SIZE, 7);
+        var requests = Workload.generate(decisionTable, WORKLOAD_SIZE, 7, workload);
         contender = Contender.create(engine, decisionTable);
-        CrossCheck.assertAgreement(decisionTable, workload, contender, Contender.create("praecepta", decisionTable));
-        inputs = workload.toArray(new Map[0]);
+        CrossCheck.assertAgreement(decisionTable, requests, contender);
+        inputs = requests.toArray(new Map[0]);
     }
 
     @Benchmark

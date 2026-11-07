@@ -24,35 +24,68 @@ import org.kie.dmn.core.internal.utils.DMNRuntimeBuilder;
 import org.kie.internal.io.ResourceFactory;
 
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
+import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
+import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 
-/** A decision engine under test. Returns the ids of the matched rules, in hit-policy order. */
+/**
+ * A decision engine under test. Returns the ids of the matched rules, in hit-policy order. Every
+ * engine, Praecepta included, is built from the same DMN document, as an application loading a
+ * {@code .dmn} file would do.
+ */
 public sealed interface Contender permits Contender.Praecepta, Contender.Camunda, Contender.Drools {
 
     List<String> evaluate(Map<String, Object> input);
 
     static Contender create(String engine, Table table) {
+        return create(engine, DmnWriter.write(table.decisionTable()), table.inputs(), table.types());
+    }
+
+    /**
+     * @param dmn    the DMN document, with one decision table named {@link Table#DECISION}
+     * @param inputs the table's input columns, which Praecepta binds to the input map by type
+     * @param types  their types
+     */
+    static Contender create(String engine, String dmn, List<String> inputs, List<ColumnType> types) {
         return switch (engine) {
-            case "praecepta" -> new Praecepta(table);
-            case "camunda" -> new Camunda(table);
-            case "drools" -> new Drools(table, false);
-            case "drools-alphanetwork" -> new Drools(table, true);
+            case "praecepta" -> new Praecepta(dmn, inputs, types);
+            case "camunda" -> new Camunda(dmn);
+            case "drools" -> new Drools(dmn, false);
+            case "drools-alphanetwork" -> new Drools(dmn, true);
             default -> throw new IllegalArgumentException("Unknown engine: " + engine);
         };
+    }
+
+    /**
+     * Praecepta built straight from the table's rules, without DMN. The benchmarks check every engine,
+     * including Praecepta read from DMN, against it.
+     */
+    static Contender reference(Table table) {
+        var builder = PraeceptaEngine.<Map<String, Object>, String>builder()
+                .hitPolicy(table.hitPolicy())
+                .rules(table.rules());
+        if (table.hitPolicy() == HitPolicy.PRIORITY) {
+            builder.outputPriority(Table.PRIORITY_OUTPUT, Table.PRIORITY_VALUES);
+        }
+        return new Praecepta(builder, table.inputs(), table.types());
     }
 
     /** Praecepta through its public API, exactly as an application would call it. */
     final class Praecepta implements Contender {
         private final PraeceptaEngine<Map<String, Object>, String> engine;
 
-        Praecepta(Table table) {
-            var builder = PraeceptaEngine.<Map<String, Object>, String>builder()
-                    .hitPolicy(table.hitPolicy())
-                    .output(output -> output.values().get(Table.ID_OUTPUT))
-                    .rules(table.rules());
-            for (int c = 0; c < table.inputs().size(); c++) {
-                var column = table.inputs().get(c);
-                switch (table.types().get(c)) {
+        Praecepta(String dmn, List<String> inputs, List<ColumnType> types) {
+            this(PraeceptaEngine.<Map<String, Object>, String>builder()
+                    .table(DmnReader.read(new ByteArrayInputStream(dmn.getBytes(StandardCharsets.UTF_8)))), inputs, types);
+        }
+
+        private Praecepta(PraeceptaEngine.Builder<Map<String, Object>, String> builder, List<String> inputs,
+                          List<ColumnType> types) {
+            builder.output(output -> output.values().get(Table.ID_OUTPUT));
+            for (int c = 0; c < inputs.size(); c++) {
+                var column = inputs.get(c);
+                switch (types.get(c)) {
                     case STRING -> builder.input(column, input -> (String) input.get(column));
                     case NUMBER -> builder.numberInput(column, input -> (Number) input.get(column));
                     case DATE -> builder.dateInput(column, input -> (LocalDate) input.get(column));
@@ -76,10 +109,9 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
         private final DmnEngine engine;
         private final ParsedDmn dmn;
 
-        Camunda(Table table) {
+        Camunda(String document) {
             engine = new DmnEngine.Builder().build();
-            var xml = DmnWriter.write(table.decisionTable()).getBytes(StandardCharsets.UTF_8);
-            var parsed = engine.parse(new ByteArrayInputStream(xml));
+            var parsed = engine.parse(new ByteArrayInputStream(document.getBytes(StandardCharsets.UTF_8)));
             if (parsed.isLeft()) {
                 throw new IllegalStateException("Camunda could not parse the DMN model: " + parsed.left().get());
             }
@@ -134,9 +166,9 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
         private final DMNRuntime runtime;
         private final DMNModel model;
 
-        Drools(Table table, boolean alphaNetwork) {
-            var resource = ResourceFactory.newReaderResource(new StringReader(DmnWriter.write(table.decisionTable())), "UTF-8");
-            resource.setSourcePath(table.name() + ".dmn");
+        Drools(String dmn, boolean alphaNetwork) {
+            var resource = ResourceFactory.newReaderResource(new StringReader(dmn), "UTF-8");
+            resource.setSourcePath(Table.DECISION + ".dmn");
             runtime = DMNRuntimeBuilder.fromDefaults()
                     .buildConfigurationUsingCustomCompiler(configuration -> {
                         ((DMNCompilerConfigurationImpl) configuration)

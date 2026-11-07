@@ -25,20 +25,67 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
 
 /**
- * Deterministic request mix: each input starts from a random rule, takes a value satisfying every
- * concrete cell, and a random known value (or null) for every wildcard cell. Every input therefore
- * matches at least one rule, so no engine pays for a no-match path.
+ * Deterministic request mixes.
+ * <ul>
+ *   <li>{@code match}: each input starts from a random rule, takes a value satisfying every concrete
+ *       cell, and a random known value (or null) for every wildcard cell, so it matches at least that
+ *       rule.</li>
+ *   <li>{@code nomatch}: the same inputs, with values no rule expects until none matches: an unknown
+ *       string first (an unknown code, say), then a missing number or date. This is the path of
+ *       requests the table does not cover. Tables with a catch-all rule, such as {@code real}, have
+ *       no such inputs.</li>
+ * </ul>
  *
  * <p>Values are {@code String}, {@code BigDecimal} or {@code LocalDate} by column type, created
  * fresh per input as if deserialised from a request.
  */
 public final class Workload {
 
+    public static final String MATCH = "match";
+    public static final String NO_MATCH = "nomatch";
+
     private Workload() {
     }
 
     public static List<Map<String, Object>> generate(Table table, int size, long seed) {
         return table.stringsOnly() ? strings(table, size, seed) : typed(table, size, seed);
+    }
+
+    public static List<Map<String, Object>> generate(Table table, int size, long seed, String shape) {
+        return switch (shape) {
+            case MATCH -> generate(table, size, seed);
+            case NO_MATCH -> noMatch(table, generate(table, size, seed), seed);
+            default -> throw new IllegalArgumentException("Unknown workload: " + shape);
+        };
+    }
+
+    private static List<Map<String, Object>> noMatch(Table table, List<Map<String, Object>> matching, long seed) {
+        var reference = Contender.reference(table);
+        var random = new Random(seed + 1);
+        var strings = new ArrayList<String>();
+        var others = new ArrayList<String>();
+        for (int c = 0; c < table.inputs().size(); c++) {
+            (table.types().get(c) == ColumnType.STRING ? strings : others).add(table.inputs().get(c));
+        }
+        var inputs = new ArrayList<Map<String, Object>>(matching.size());
+        for (var original : matching) {
+            var input = new HashMap<>(original);
+            var columns = new ArrayList<String>();
+            Collections.shuffle(strings, random);
+            Collections.shuffle(others, random);
+            columns.addAll(strings);
+            columns.addAll(others);
+            int next = 0;
+            while (!reference.evaluate(input).isEmpty()) {
+                if (next == columns.size()) {
+                    throw new IllegalStateException("A rule of " + table.name() + " matches any input");
+                }
+                var column = columns.get(next++);
+                input.put(column, strings.contains(column) ? new String("unknown") : null);
+            }
+            inputs.add(input);
+        }
+        return List.copyOf(inputs);
     }
 
     /** String tables, with Praecepta's legacy cells ({@code a,b}); unchanged since Phase 0. */

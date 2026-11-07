@@ -16,6 +16,14 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   build and fuzz weekly in CI.
 - **Releases attach their build provenance** (`praecepta-X.Y.Z.intoto.jsonl`) for offline
   verification.
+- **Broader benchmarks**, in which every engine, Praecepta included, reads the same DMN document:
+  - tables from 10 to 10,000 rules, and with 5 to 20 columns;
+  - every hit policy, including UNIQUE and PRIORITY;
+  - requests that match no rule;
+  - latency percentiles and memory allocated per decision;
+  - throughput with an engine shared by 1, 4 and 8 threads;
+  - time to build an engine from DMN, warm and in a fresh JVM;
+  - `run-benchmarks.sh` runs them all and records the machine and versions with the results.
 
 ## [0.1.0] - 2026-11-07
 
