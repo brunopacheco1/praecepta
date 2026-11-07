@@ -572,7 +572,7 @@ contribute:
 
 | Check | Score | Work | By |
 |---|---:|---|---|
-| Fuzzing | 0 | Jazzer fuzz tests (`FuzzedDataProvider`) for `CellParser` and `DmnReader`, both of which parse untrusted input. They run as regression tests in every build, and fuzz longer on a schedule (issue #23). | code |
+| Fuzzing | 0 | Jazzer fuzz tests (`FuzzedDataProvider`) for `CellParser` and `DmnReader`, both of which parse untrusted input. They run as regression tests in every build, and fuzz longer on a schedule (issue #23). Scorecard only detects Java fuzzing through OSS-Fuzz or ClusterFuzzLite, so ClusterFuzzLite also fuzzes every pull request that touches the engine. | code |
 | Signed-Releases | 8 | Attach each artifact's provenance bundle (`*.intoto.jsonl`) to the GitHub release, beside the signatures. | code (`release.yml`) |
 | Branch-Protection | 3 | Ruleset: require signed commits, and require a pull request (0 approvals, since there is a single maintainer). | owner (settings) |
 | CII-Best-Practices | 0 | Register at bestpractices.dev and answer the questionnaire; most criteria are already met. | owner |
@@ -583,7 +583,8 @@ Also: enable **secret scanning and push protection** (free for public repositori
 in settings).
 
 **Status:**
-- **Done:** fuzzing (Jazzer fuzz tests and the weekly `fuzz.yml`, issue #23) and provenance bundles on
+- **Done:** fuzzing (Jazzer fuzz tests, the weekly `fuzz.yml` (issue #23) and ClusterFuzzLite on pull
+  requests) and provenance bundles on
   releases (from the next release on).
 - **Owner actions still open:** the ruleset settings, the OpenSSF Best Practices badge, and secret
   scanning.

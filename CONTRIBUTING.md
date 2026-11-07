@@ -40,6 +40,10 @@ JAZZER_FUZZ=1 mvn -pl praecepta-engine test -Dtest=CellParserFuzzTest
 A crash saves its input under `src/test/resources/.../<Test>Inputs/<method>/crash-*`: fix the bug
 and commit that file, so it stays a regression test. The `Fuzzing` workflow does the same weekly.
 
+Each fuzz test calls a plain Jazzer target (`*Fuzzer`), which [ClusterFuzzLite](https://google.github.io/clusterfuzzlite/)
+also runs for 5 minutes on every pull request that touches the engine (`.clusterfuzzlite/`, the
+`ClusterFuzzLite` workflow). Its report names the crashing input; save it the same way.
+
 ## Pull requests
 1. Fork the repository and create a branch from `main`.
 2. Keep the change focused, and add or update tests. Engine changes should keep
