@@ -1,3 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: Bruno Pacheco
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 package io.github.brunopacheco1.praecepta.maven.plugin;
 
 import java.io.File;
@@ -81,6 +86,14 @@ public class GenerateMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project.build.directory}/generated-resources/praecepta")
     private File resourceDirectory;
 
+    /**
+     * Text put first in every generated source, as {@code //} comments: typically the project's own
+     * SPDX licence header. Generated code belongs to the project using the plugin, so there is none by
+     * default.
+     */
+    @Parameter
+    private String fileHeader;
+
     @Parameter(property = "praecepta.skip", defaultValue = "false")
     private boolean skip;
 
@@ -103,7 +116,7 @@ public class GenerateMojo extends AbstractMojo {
                 }
                 TableCompiler.Result result;
                 try {
-                    result = TableCompiler.compile(table, packageName, severity);
+                    result = TableCompiler.compile(table, packageName, severity, fileHeader);
                 } catch (IllegalArgumentException e) {
                     throw new MojoFailureException(e.getMessage(), e);
                 }

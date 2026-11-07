@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Licensing for files that cannot carry a comment header (https://reuse.software/spec-3.3/).
+version = 1
+
+[[annotations]]
+path = [
+    "NOTICE",
+    ".vscode/settings.json",
+    "**/*.csv",
+    "**/*.xlsx",
+    "**/*.dmn",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "Bruno Pacheco"
+SPDX-License-Identifier = "Apache-2.0"

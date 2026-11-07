@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: Bruno Pacheco
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Modernisation plan
 
 Goal: make Praecepta a fast, small, correct, publishable decision-table library — strict DMN
@@ -12,6 +18,7 @@ tables and generates typed classes rather than per-rule code.
 | 2 | Java baseline | Latest LTS: **Java 25**. |
 | 3 | Benchmarks | Retire the GCP App Engine deployments; benchmark in-process with JMH instead. |
 | 4 | DMN import | In scope (Phase 4). |
+| 5 | Licence | Relicense from MIT to **Apache-2.0** (Phase 5). |
 
 ## Why not generate Java code from the rules
 
@@ -302,6 +309,158 @@ Not done:
 - A Maven-invoker integration test: the benchmark module's use of the plugin covers the Maven
   wiring.
 
-### Phase 5 — Release
+<!-- REUSE-IgnoreStart: this section quotes SPDX tags as examples -->
+### Phase 5 — Open-source compliance
+Relicense to Apache-2.0, and make licensing, provenance and project health machine-checkable
+before the first public release. The repository already runs FOSSLight and ORT on pushes to
+`main`; this phase builds on them rather than adding parallel tools.
+
+- **Relicensing, MIT → Apache-2.0** (decision 5), done first so the rest of the phase applies the
+  right identifier:
+  - check ownership first. Every human commit is by the maintainer, but nine early commits
+    (2022–2023) use a work email address. Their surviving code is the loader module, the small
+    bean and strategy types, and the POMs, all since renamed or reworked. Confirm that this code
+    is the maintainer's to relicense.
+  - if it is: relicense the whole tree.
+  - if not, or in doubt: keep those files under MIT, which Apache-2.0 projects may include.
+    REUSE records the split per file (`SPDX-License-Identifier: MIT`, plus
+    `LICENSES/MIT.txt`), or the code is rewritten. No artifacts were ever released, so there are
+    no published MIT versions to consider.
+  - replace `LICENSE` with the Apache-2.0 text and add `LICENSES/Apache-2.0.txt`;
+  - add a `NOTICE` file (the Apache convention) with the copyright line, and any notices that
+    bundled third-party code requires (none today: the published modules bundle nothing);
+  - update the README licence section and the POM `<licenses>` block;
+  - record the change in `CHANGELOG.md`.
+
+- **REUSE compliance** ([reuse.software](https://reuse.software), spec 3.3):
+  - an SPDX header on every source, POM, workflow and doc file:
+    `SPDX-FileCopyrightText: <year> <holder>` and `SPDX-License-Identifier: Apache-2.0`
+    (or `MIT` for any files kept under MIT);
+  - `LICENSES/Apache-2.0.txt` (and `LICENSES/MIT.txt` only if MIT files remain);
+  - `REUSE.toml` for files that cannot carry a header (`.xlsx`, `.csv` and `.dmn` fixtures,
+    `.jqwik-database`);
+  - `reuse lint` in CI, failing the build on any unlicensed file.
+- **Header enforcement in the build:** a Maven check (e.g. Spotless or `license-maven-plugin`)
+  that verifies headers on `verify` and can add them, so new files cannot slip through between
+  CI runs. Generated sources from `praecepta-maven-plugin` get a header too, with the license the
+  user configures (default: none, since generated code belongs to the user).
+- **Copyright:** one holder string, used consistently in headers, `NOTICE`, POM `<licenses>` /
+  `<developers>` / `<scm>` metadata (Maven Central requires these), and the generated code
+  banner.
+- **SBOM:** CycloneDX (`cyclonedx-maven-plugin`) per published module, attached to the release
+  artifacts (`-cyclonedx.json` / `.xml`). Optionally SPDX as well, if a consumer needs it.
+- **Dependency licences:**
+  - fail the build on dependency licences incompatible with distributing the published modules
+    (engine, loader, plugin) under Apache-2.0, via ORT's `fail-on: violations` with an explicit
+    policy. Permissive licences are fine. GPL-2.0-only is not (it is incompatible with Apache-2.0),
+    and strong copyleft generally needs review;
+  - list third-party licences for the loader's Apache POI dependency;
+  - exclude the benchmark module, which is not published.
+- **Supply chain:**
+  - Dependabot (or Renovate) for Maven and GitHub Actions;
+  - Actions pinned by commit SHA;
+  - CodeQL;
+  - the OpenSSF Scorecard workflow and badge;
+  - vulnerability scanning of the SBOM (e.g. `osv-scanner`).
+- **Release integrity:**
+  - reproducible builds (`project.build.outputTimestamp`, checked with
+    `artifact:compare`);
+  - GPG-signed artifacts (required by Maven Central);
+  - build provenance via GitHub artifact attestations (SLSA level 2/3).
+- **Community health files:** `CONTRIBUTING.md` (moved out of the README), `CODE_OF_CONDUCT.md`
+  (Contributor Covenant), `SECURITY.md` (private vulnerability reporting), issue and PR templates,
+  `CHANGELOG.md` (Keep a Changelog) with semantic versioning.
+- **OpenSSF Best Practices badge**, once the above is in place.
+- **Cleanup:** make the ORT workflow also run on pull requests, not only after merge; decide
+  whether FOSSLight is still needed.
+
+**Status: done** (branch `modernisation/phase-5`). Decisions:
+- the maintainer owns all the code, including the early work-email commits, so everything is
+  Apache-2.0;
+- copyright holder "Bruno Pacheco";
+- no contributor sign-off (Apache-2.0 section 5 covers contributions);
+- CycloneDX SBOMs only;
+- FOSSLight is removed. Its one unique job was scanning our sources for foreign licence texts.
+  REUSE now enforces per-file licensing, the repository holds no vendored third-party code, and its
+  `pip install` of about a hundred ScanCode dependencies was SonarCloud's last security finding.
+  ORT stays and runs on pull requests; it gets policy rules and attribution reports in Phase 6.
+
+The history was rewritten before this phase. The work email and then the personal Yahoo address
+were replaced by the GitHub noreply address in every commit, and the commits were re-signed; trees,
+messages and dates are unchanged.
+
+What was done:
+- **Relicensing:** `LICENSE` now holds the Apache-2.0 text, plus `LICENSES/Apache-2.0.txt` and a
+  `NOTICE` file. The POM gained `<licenses>`, `<developers>` (no email), `<scm>`,
+  `<issueManagement>` and `<inceptionYear>`. The README and the changelog record the change.
+- **REUSE 3.3:**
+  - an SPDX header on all Java sources and POMs (`license-maven-plugin`, slash-star style),
+    workflows, Markdown and `.gitignore`;
+  - `REUSE.toml` for files that cannot hold a comment (CSV, XLSX, DMN fixtures, `NOTICE`, VS Code
+    settings);
+  - `reuse lint` passes. Text that quotes SPDX tags is wrapped in `REUSE-IgnoreStart/End`.
+- **Header enforcement:** `license:check` runs in `verify` on every module, and `mvn license:format`
+  adds missing headers. Checked: removing a header fails the build.
+- **Generated code:** the plugin's new `<fileHeader>` option prepends the user's own header to
+  generated sources (none by default, since generated code belongs to the user's project).
+- **SBOMs:** `cyclonedx-maven-plugin` writes `target/bom.json` per published module and attaches
+  it as `-cyclonedx.json`. The benchmark module is skipped.
+- **Licence policy:** `.github/scripts/check_sbom_licenses.py` checks the SBOMs against an
+  allowlist of permissive licences in CI. A component passes if any of its licences is allowed,
+  and unlicensed components fail. Today the engine has no dependencies, and the loader and plugin
+  carry Apache-2.0 components plus one BSD-3-Clause (`curvesapi`). Tested against a fake SBOM with
+  GPL-only and unlicensed components: both fail.
+- **Reproducible builds:** `project.build.outputTimestamp` is set. Two clean builds produced
+  byte-identical jars and SBOMs for engine, loader and plugin.
+- **CI:**
+  - every action is pinned to a commit SHA with a version comment;
+  - `build.yml` adds the licence check, an SBOM artifact, a `reuse lint` job, and OSV-Scanner on
+    the SBOMs (advisory: results go to code scanning);
+  - new `codeql.yml` (Java and Actions, build mode none) and `scorecard.yml` (published results,
+    README badge);
+  - `dependabot.yml` for Maven and Actions, weekly, with grouped tooling updates.
+  - `dependencies.yml` submits the resolved Maven tree of the published modules to GitHub on
+    every push to `main` and on same-repository pull requests. GitHub otherwise reads POMs
+    statically and saw only direct dependencies (2 of the loader's 13). Dependabot now alerts on,
+    and fixes, transitive ones such as `commons-compress` and `xmlbeans`. Dependency review fails a
+    pull request that adds a runtime dependency with a moderate-or-worse vulnerability.
+  - SonarCloud is kept for code quality (bug patterns, smells, duplication, coverage on new
+    code), which the security tools do not cover. Its token had expired (every analysis since
+    Phase 0 failed with 403, hidden by the advisory step). The build now sends all modules to the
+    single project `brunopacheco1_praecepta`, with no per-module keys, and excludes only the
+    unpublished benchmarks; the Maven plugin, `beans` and `exceptions` packages are analysed.
+    The owner renews the token.
+  - ORT had failed on every run, because its action was pinned to the retired
+    `upload-artifact@v3`; it now pins ORT action v1.2.0. FOSSLight had failed on every run too
+    (Python 3.15 without wheels for a dependency) before it was removed.
+- **Community files:**
+  - `CONTRIBUTING.md`, replacing the README section;
+  - `CODE_OF_CONDUCT.md`, adopting Contributor Covenant 2.1 by reference;
+  - `SECURITY.md`, pointing to GitHub private vulnerability reporting;
+  - `CHANGELOG.md` (Keep a Changelog);
+  - issue forms and a PR template.
+
+Not done here (owner actions or later phases):
+- **Repository settings:** turn on private vulnerability reporting (Settings → Code security),
+  which `SECURITY.md` links to.
+- **OpenSSF Best Practices badge:** register the project at bestpractices.dev.
+- **GPG-signed artifacts and build provenance (attestations):** Phase 6, with the release
+  workflow.
+- **GitHub's old PR references:** `refs/pull/1–5` still hold the pre-rewrite commits until GitHub
+  Support removes them.
+- **OSV-Scanner's SBOM input is untested:** it couldn't be run locally, so it is advisory until its
+  first CI run confirms it.
+
+<!-- REUSE-IgnoreEnd -->
+
+### Phase 6 — Release
 - Zero-dependency engine artifact, JPMS `module-info`, Maven Central, README rewrite.
 - Align package names (`io.com.github…` → `io.github…`).
+- Signed artifacts (GPG, required by Maven Central) and build provenance (GitHub artifact
+  attestations) in the release workflow.
+- Give ORT a real job. Today it only analyses dependencies:
+  - an evaluator policy (`.ort/evaluator.rules.kts` or ORT's example rules) so that
+    `fail-on: violations` can actually fail, e.g. on copyleft licences in the published modules;
+  - attribution reports (a third-party `NOTICE`, listing Apache POI's dependencies and their
+    licences) attached to each release;
+  - optionally ScanCode on our own sources only, the source scanning FOSSLight used to do.

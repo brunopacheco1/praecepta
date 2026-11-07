@@ -1,4 +1,10 @@
-![Workflow](https://github.com/brunopacheco1/praecepta/actions/workflows/build.yml/badge.svg) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=coverage)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta)
+<!--
+SPDX-FileCopyrightText: Bruno Pacheco
+
+SPDX-License-Identifier: Apache-2.0
+-->
+
+![Workflow](https://github.com/brunopacheco1/praecepta/actions/workflows/build.yml/badge.svg) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/brunopacheco1/praecepta/badge)](https://scorecard.dev/viewer/?uri=github.com/brunopacheco1/praecepta) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=coverage)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta)
 
 # Praecepta
 Praecepta evaluates DMN-style decision tables in Java, with strict DMN 1.3 hit-policy semantics and
@@ -188,6 +194,8 @@ Optional<DiscountOutput> discount = Discount.evaluate(new DiscountInput(Discount
 ```
 
 Single-hit tables (and aggregations) return an `Optional`; multi-hit tables return a `List`.
+Generated code belongs to your project, so it carries no Praecepta licence header. Set
+`<fileHeader>` to prepend your own, such as your project's SPDX lines.
 `Discount.validationReport()` gives the build-time findings, and `Discount.engine()` the engine.
 
 # Building and Testing
@@ -235,13 +243,11 @@ Praecepta Loader depends on Apache POI. The Maven plugin uses the loader at buil
 See [docs/MODERNISATION.md](docs/MODERNISATION.md).
 
 # Contributing
-We welcome contributions to Praecepta! If you would like to contribute, please follow these steps:
-
-1. Fork the repository
-2. Create a new branch for your changes
-3. Make your changes
-4. Run the tests to ensure they pass
-5. Submit a pull request
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems
+privately as described in [SECURITY.md](SECURITY.md). Changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
 
 # License
-Praecepta is licensed under the MIT License. See LICENSE for more information.
+Praecepta is licensed under the [Apache License 2.0](LICENSE); see also [NOTICE](NOTICE). Every
+file carries an SPDX header or is covered by [REUSE.toml](REUSE.toml), and the repository is
+[REUSE](https://reuse.software)-compliant. Each published module ships a CycloneDX SBOM.
