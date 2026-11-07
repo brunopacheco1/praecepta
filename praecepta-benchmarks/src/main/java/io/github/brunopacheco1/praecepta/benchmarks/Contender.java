@@ -113,7 +113,7 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
             engine = new DmnEngine.Builder().build();
             var parsed = engine.parse(new ByteArrayInputStream(document.getBytes(StandardCharsets.UTF_8)));
             if (parsed.isLeft()) {
-                throw new IllegalStateException("Camunda could not parse the DMN model: " + parsed.left().get());
+                throw new IllegalStateException("Camunda could not parse the DMN model: " + parsed.swap().toOption().get());
             }
             dmn = parsed.toOption().get();
         }
@@ -122,7 +122,7 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
         public List<String> evaluate(Map<String, Object> input) {
             var result = engine.evalByName(dmn, Table.DECISION, input);
             if (result.isLeft()) {
-                throw new IllegalStateException("Camunda failed to evaluate " + input + ": " + result.left().get());
+                throw new IllegalStateException("Camunda failed to evaluate " + input + ": " + result.swap().toOption().get());
             }
             var ids = new ArrayList<String>();
             collectIds(result.toOption().get().value(), ids);

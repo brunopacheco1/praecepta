@@ -40,7 +40,7 @@ public class FileRow {
                 .filter(it -> keys.contains(it.getKey()))
                 .collect(Collectors.toSet());
 
-        if(filteredEntries.size() != keys.size()) {
+        if (filteredEntries.size() != keys.size()) {
             throw new ParsingInputOutputException();
         }
 

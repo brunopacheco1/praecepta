@@ -9,6 +9,9 @@ package io.github.brunopacheco1.praecepta.loader.exceptions;
  * Exception raised if a matrix file cannot be loaded.
  */
 public class InvalidMatrixException extends RuntimeException {
+
+    @java.io.Serial
+    private static final long serialVersionUID = 1L;
     /**
      * Exception raised if a matrix file cannot be loaded.
      *

@@ -11,6 +11,9 @@ package io.github.brunopacheco1.praecepta.engine.exceptions;
  */
 public class InvalidInputException extends IllegalArgumentException {
 
+    @java.io.Serial
+    private static final long serialVersionUID = 1L;
+
     private final String column;
     private final transient Object value;
 
