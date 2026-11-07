@@ -11,6 +11,12 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+### Added
+- **Fuzz tests** (Jazzer) for the cell parser and the DMN reader: they replay saved inputs in every
+  build and fuzz weekly in CI.
+- **Releases attach their build provenance** (`praecepta-X.Y.Z.intoto.jsonl`) for offline
+  verification.
+
 ## [0.1.0] - 2026-11-07
 
 The first release since the 2022–2023 prototype: the engine, loader and Maven plugin are rewritten.

@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: Fuzzing
+# Every build replays the fuzz tests' saved inputs (regression mode). This workflow lets Jazzer
+# generate new inputs for each target for 5 minutes. A crash fails the job and uploads the input:
+# add it under the test's ...FuzzTestInputs directory, fix the bug, and it stays a regression test.
+on:
+  schedule:
+    - cron: '23 2 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: Fuzz ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [CellParserFuzzTest, DmnReaderFuzzTest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Fuzz for 5 minutes
+        env:
+          JAZZER_FUZZ: 1
+        run: >
+          mvn -B -pl praecepta-engine -Dlicense.skip -Djacoco.skip test
+          -Dtest=${{ matrix.target }} -Dsurefire.failIfNoSpecifiedTests=false
+      - name: Upload crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: crashes-${{ matrix.target }}
+          path: praecepta-engine/src/test/resources/**/crash-*
