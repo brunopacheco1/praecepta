@@ -10,13 +10,16 @@ on:
   schedule:
     - cron: '41 4 * * 1'
 
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   analysis:
     name: Scorecard analysis
     runs-on: ubuntu-latest
     permissions:
+      contents: read
+      actions: read
       security-events: write # upload results to code scanning
       id-token: write # publish results for the badge
     steps:

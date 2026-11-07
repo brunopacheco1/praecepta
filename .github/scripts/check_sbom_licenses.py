@@ -12,6 +12,7 @@ Usage: check_sbom_licenses.py praecepta-engine/target/bom.json praecepta-loader/
 """
 import json
 import sys
+from pathlib import Path
 
 # Licences compatible with distributing the project under Apache-2.0 (permissive).
 ALLOWED = {
@@ -38,8 +39,14 @@ def main(paths):
         print(__doc__)
         return 2
     problems = 0
+    root = Path.cwd().resolve()
     for path in paths:
-        with open(path, encoding="utf-8") as file:
+        # SBOMs come from this repository's build; refuse anything outside it
+        resolved = (root / path).resolve()
+        if not resolved.is_relative_to(root) or resolved.suffix != ".json":
+            print(f"Refusing {path}: expected a .json file inside {root}")
+            return 2
+        with resolved.open(encoding="utf-8") as file:
             bom = json.load(file)
         module = bom.get("metadata", {}).get("component", {}).get("name", path)
         for component in bom.get("components", []):

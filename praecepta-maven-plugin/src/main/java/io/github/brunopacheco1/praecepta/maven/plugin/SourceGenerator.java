@@ -40,10 +40,6 @@ final class SourceGenerator {
     /** Lines put first in every generated file as {@code //} comments, e.g. an SPDX header; empty for none. */
     private final java.util.List<String> fileHeader;
 
-    SourceGenerator(String packageName, String className, DecisionTable table, String sourceFile) {
-        this(packageName, className, table, sourceFile, null);
-    }
-
     /**
      * @param fileHeader text put first in every generated file as {@code //} comments (each line
      *                   stripped, surrounding blank lines dropped), or null for none

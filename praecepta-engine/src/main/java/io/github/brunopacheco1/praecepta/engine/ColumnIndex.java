@@ -98,7 +98,7 @@ final class ColumnIndex {
             classes.add(new ValueClass.OtherString());
             boundaries = null;
         } else {
-            var points = new TreeSet<Comparable<?>>((a, b) -> compare(a, b));
+            var points = new TreeSet<Comparable<?>>(ColumnIndex::compare);
             cellsByBit.forEach(cell -> collectBoundaries(cell, points));
             if (allowedValues != null) {
                 collectBoundaries(allowedValues, points);
@@ -265,7 +265,7 @@ final class ColumnIndex {
         if (type == ColumnType.STRING) {
             return stringClasses.getOrDefault(value, otherClass);
         }
-        int found = Arrays.binarySearch(boundaries, value, (a, b) -> compare(a, b));
+        int found = Arrays.binarySearch(boundaries, value, ColumnIndex::compare);
         return found >= 0 ? 2 * found + 1 : 2 * (-found - 1);
     }
 

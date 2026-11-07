@@ -45,14 +45,21 @@ jobs:
             praecepta-engine/target/bom.json
             praecepta-loader/target/bom.json
             praecepta-maven-plugin/target/bom.json
-      - name: SonarCloud analysis
-        # Secrets are not exposed to pull requests from forks; skip instead of failing.
-        if: ${{ env.SONAR_TOKEN != '' }}
-        # Advisory: an expired token or a SonarCloud outage must not block merging a green build.
-        continue-on-error: true
+      - name: SonarCloud analysis and quality gate
+        # Mandatory: the scanner waits for the quality gate and fails this job if the gate fails,
+        # the token is missing or expired, or the analysis errors.
+        # GitHub never gives secrets to pull requests from forks, so those cannot be analysed here.
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         # `verify` in the same invocation lets the scanner resolve the reactor modules; tests and
         # coverage data come from the previous step.
-        run: mvn -B verify -DskipTests org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar
+        run: >
+          mvn -B verify -DskipTests
+          org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar
+          -Dsonar.qualitygate.wait=true
+          -Dsonar.qualitygate.timeout=600
+      - name: SonarCloud skipped (pull request from a fork)
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        run: echo "::warning title=SonarCloud not run::Pull requests from forks get no secrets; a maintainer must analyse this change before merging."
 
   reuse:
     name: REUSE compliance
