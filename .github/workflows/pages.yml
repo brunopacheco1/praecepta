@@ -55,38 +55,48 @@ jobs:
           mvn -B -q -Prelease -DskipTests -Dlicense.skip -pl praecepta-engine,praecepta-loader -am package
       - name: Read the OpenSSF badge values
         # read at build time, so visitors' browsers never contact these services; if a lookup fails,
-        # the last known values in site/badges.json stay
+        # the last known values in site/badges.json stay. Each phalera's metal follows its level:
+        # Best Practices passing/silver/gold, Baseline I/II/III, Scorecard below 6/6 to 8/8 and above.
         run: |
-          clean() { tr -cd 'A-Za-z0-9. /'; }
           best_practices=$(jq -r .best_practices site/badges.json)
           baseline=$(jq -r .baseline site/badges.json)
           scorecard=$(jq -r .scorecard site/badges.json)
           if project=$(curl -fsS --max-time 20 https://www.bestpractices.dev/projects/16426.json); then
             level=$(jq -r '.badge_level // empty' <<< "$project")
-            case "$level" in passing|silver|gold) best_practices="${level^}" ;; esac
-            baseline="In progress"
+            case "$level" in passing|silver|gold) best_practices="$level" ;; esac
             for n in 3 2 1; do
               if [ "$(jq -r ".badge_percentage_baseline_$n // 0" <<< "$project")" = "100" ]; then
-                baseline="Level $n"
+                baseline=$n
                 break
               fi
             done
           fi
           if card=$(curl -fsS --max-time 20 https://api.scorecard.dev/projects/github.com/brunopacheco1/praecepta); then
             score=$(jq -r '.score // empty' <<< "$card")
-            [ -n "$score" ] && scorecard="$score / 10"
+            [[ "$score" =~ ^[0-9]+(\.[0-9]+)?$ ]] && scorecard="$score"
           fi
+          case "$best_practices" in gold) bp_metal=gold ;; silver) bp_metal=silver ;; *) bp_metal=bronze ;; esac
+          case "$baseline" in 3) baseline_value=III baseline_metal=gold ;; 2) baseline_value=II baseline_metal=silver ;; *) baseline_value=I baseline_metal=bronze ;; esac
+          [[ "$scorecard" =~ ^[0-9]+(\.[0-9]+)?$ ]] || scorecard=0
+          scorecard_metal=$(awk -v s="$scorecard" 'BEGIN { print (s >= 8 ? "gold" : (s >= 6 ? "silver" : "bronze")) }')
           {
-            echo "BEST_PRACTICES=$(clean <<< "$best_practices")"
-            echo "BASELINE=$(clean <<< "$baseline")"
-            echo "SCORECARD=$(clean <<< "$scorecard")"
-          } >> "$GITHUB_ENV"
+            echo "BP_METAL=$bp_metal"
+            echo "BP_VALUE=${best_practices^^}"
+            echo "BP_NAME=${best_practices^}"
+            echo "BASELINE_METAL=$baseline_metal"
+            echo "BASELINE_VALUE=$baseline_value"
+            echo "BASELINE_LEVEL=$baseline"
+            echo "SCORECARD_METAL=$scorecard_metal"
+            echo "SCORECARD_VALUE=$scorecard"
+          } | tr -cd 'A-Za-z0-9._=\n' >> "$GITHUB_ENV"
       - name: Assemble the site
         run: |
           mkdir -p _site/api
           cp -R site/. _site/
-          sed -i -e "s/@VERSION@/${VERSION}/g" -e "s|@BEST_PRACTICES@|${BEST_PRACTICES}|" \
-            -e "s|@BASELINE@|${BASELINE}|" -e "s|@SCORECARD@|${SCORECARD}|" _site/index.html
+          sed -i -e "s/@VERSION@/${VERSION}/g" \
+            -e "s/@BP_METAL@/${BP_METAL}/g" -e "s/@BP_VALUE@/${BP_VALUE}/g" -e "s/@BP_NAME@/${BP_NAME}/g" \
+            -e "s/@BASELINE_METAL@/${BASELINE_METAL}/g" -e "s/@BASELINE_VALUE@/${BASELINE_VALUE}/g" -e "s/@BASELINE_LEVEL@/${BASELINE_LEVEL}/g" \
+            -e "s/@SCORECARD_METAL@/${SCORECARD_METAL}/g" -e "s/@SCORECARD_VALUE@/${SCORECARD_VALUE}/g" _site/index.html
           cp -R ../release/praecepta-engine/target/reports/apidocs _site/api/engine
           cp -R ../release/praecepta-loader/target/reports/apidocs _site/api/loader
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

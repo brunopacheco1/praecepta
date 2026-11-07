@@ -271,12 +271,60 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
 
     <section class="wrap section" aria-labelledby="open-title">
       <h2 id="open-title">Open, and easy to check</h2>
-      <!-- the values are read from bestpractices.dev and Scorecard when the site is built (pages.yml),
-           so visitors' browsers never contact them; site/badges.json holds the last known values -->
-      <ul class="seals">
-        <li><a href="https://www.bestpractices.dev/projects/16426"><span>OpenSSF Best Practices</span><strong>@BEST_PRACTICES@</strong></a></li>
-        <li><a href="https://www.bestpractices.dev/projects/16426/baseline-1"><span>OpenSSF Baseline</span><strong>@BASELINE@</strong></a></li>
-        <li><a href="https://scorecard.dev/viewer/?uri=github.com/brunopacheco1/praecepta"><span>OpenSSF Scorecard</span><strong>@SCORECARD@</strong></a></li>
+      <!-- phalerae: the discs Roman soldiers wore on a harness for merit. The values and each disc's
+           metal are read from bestpractices.dev and Scorecard when the site is built (pages.yml), so
+           visitors' browsers never contact them; site/badges.json holds the last known values. -->
+      <svg class="ph-defs" aria-hidden="true" focusable="false">
+        <defs>
+          <radialGradient id="ph-gold" cx="38%" cy="32%"><stop offset="0" stop-color="#fbe7a6"/><stop offset=".55" stop-color="#d9ad48"/><stop offset="1" stop-color="#946c1c"/></radialGradient>
+          <radialGradient id="ph-silver" cx="38%" cy="32%"><stop offset="0" stop-color="#f4f6f8"/><stop offset=".55" stop-color="#c3cad1"/><stop offset="1" stop-color="#858e96"/></radialGradient>
+          <radialGradient id="ph-bronze" cx="38%" cy="32%"><stop offset="0" stop-color="#e9b98a"/><stop offset=".55" stop-color="#b17843"/><stop offset="1" stop-color="#744822"/></radialGradient>
+          <path id="ph-arc" d="M34 92 A46 46 0 0 1 126 92"/>
+        </defs>
+      </svg>
+      <ul class="phalerae">
+        <li>
+          <a href="https://www.bestpractices.dev/projects/16426" aria-label="OpenSSF Best Practices: @BP_NAME@">
+            <svg class="phalera @BP_METAL@" viewBox="0 0 160 172" aria-hidden="true">
+              <rect class="ph-loop" x="68" y="0" width="24" height="20" rx="3"/>
+              <circle class="ph-rim" cx="80" cy="92" r="76"/>
+              <circle class="ph-beads" cx="80" cy="92" r="67"/>
+              <circle class="ph-field" cx="80" cy="92" r="59"/>
+              <text class="ph-label"><textPath href="#ph-arc" startOffset="50%">BEST PRACTICES</textPath></text>
+              <text class="ph-value ph-word" x="80" y="104">@BP_VALUE@</text>
+              <text class="ph-sub" x="80" y="126">OPENSSF</text>
+              <g class="ph-laurel"><ellipse cx="70" cy="140" rx="3" ry="7" transform="rotate(-55 70 140)"/><ellipse cx="90" cy="140" rx="3" ry="7" transform="rotate(55 90 140)"/><ellipse cx="62" cy="134" rx="3" ry="7" transform="rotate(-35 62 134)"/><ellipse cx="98" cy="134" rx="3" ry="7" transform="rotate(35 98 134)"/></g>
+            </svg>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.bestpractices.dev/projects/16426/baseline-1" aria-label="OpenSSF Baseline: level @BASELINE_LEVEL@">
+            <svg class="phalera @BASELINE_METAL@" viewBox="0 0 160 172" aria-hidden="true">
+              <rect class="ph-loop" x="68" y="0" width="24" height="20" rx="3"/>
+              <circle class="ph-rim" cx="80" cy="92" r="76"/>
+              <circle class="ph-beads" cx="80" cy="92" r="67"/>
+              <circle class="ph-field" cx="80" cy="92" r="59"/>
+              <text class="ph-label"><textPath href="#ph-arc" startOffset="50%">BASELINE</textPath></text>
+              <text class="ph-value ph-numeral" x="80" y="104">@BASELINE_VALUE@</text>
+              <text class="ph-sub" x="80" y="126">LEVEL</text>
+              <g class="ph-laurel"><ellipse cx="70" cy="140" rx="3" ry="7" transform="rotate(-55 70 140)"/><ellipse cx="90" cy="140" rx="3" ry="7" transform="rotate(55 90 140)"/><ellipse cx="62" cy="134" rx="3" ry="7" transform="rotate(-35 62 134)"/><ellipse cx="98" cy="134" rx="3" ry="7" transform="rotate(35 98 134)"/></g>
+            </svg>
+          </a>
+        </li>
+        <li>
+          <a href="https://scorecard.dev/viewer/?uri=github.com/brunopacheco1/praecepta" aria-label="OpenSSF Scorecard: @SCORECARD_VALUE@ out of 10">
+            <svg class="phalera @SCORECARD_METAL@" viewBox="0 0 160 172" aria-hidden="true">
+              <rect class="ph-loop" x="68" y="0" width="24" height="20" rx="3"/>
+              <circle class="ph-rim" cx="80" cy="92" r="76"/>
+              <circle class="ph-beads" cx="80" cy="92" r="67"/>
+              <circle class="ph-field" cx="80" cy="92" r="59"/>
+              <text class="ph-label"><textPath href="#ph-arc" startOffset="50%">SCORECARD</textPath></text>
+              <text class="ph-value ph-number" x="80" y="104">@SCORECARD_VALUE@</text>
+              <text class="ph-sub" x="80" y="126">OUT OF 10</text>
+              <g class="ph-laurel"><ellipse cx="70" cy="140" rx="3" ry="7" transform="rotate(-55 70 140)"/><ellipse cx="90" cy="140" rx="3" ry="7" transform="rotate(55 90 140)"/><ellipse cx="62" cy="134" rx="3" ry="7" transform="rotate(-35 62 134)"/><ellipse cx="98" cy="134" rx="3" ry="7" transform="rotate(35 98 134)"/></g>
+            </svg>
+          </a>
+        </li>
       </ul>
       <ul class="plain two">
         <li><strong>Apache-2.0</strong>, and <a href="https://reuse.software">REUSE</a>-compliant: every file
