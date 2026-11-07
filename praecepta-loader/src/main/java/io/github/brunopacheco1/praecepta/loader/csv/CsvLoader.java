@@ -21,7 +21,7 @@ import io.github.brunopacheco1.praecepta.loader.beans.FileRow;
 import io.github.brunopacheco1.praecepta.loader.exceptions.InvalidMatrixException;
 import io.github.brunopacheco1.praecepta.loader.exceptions.MissingFileException;
 
-public class CsvLoader extends BaseLoader {
+public final class CsvLoader extends BaseLoader {
 
     private final List<Praeceptum> praecepta = new ArrayList<>();
 
@@ -125,7 +125,7 @@ public class CsvLoader extends BaseLoader {
         for (String cell : rowStr.split(";")) {
             row.set(headers.get(colIndex++), cell.trim());
         }
-        
+
         return row;
     }
 

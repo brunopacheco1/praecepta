@@ -15,6 +15,9 @@ import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
  */
 public class HitPolicyViolationException extends RuntimeException {
 
+    @java.io.Serial
+    private static final long serialVersionUID = 1L;
+
     private final transient HitPolicy hitPolicy;
     private final transient List<Integer> ruleIds;
 

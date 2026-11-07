@@ -144,7 +144,9 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                     options.add(" ");
                     yield Arbitraries.of(options).injectNull(0.15);
                 }
-                case NUMBER -> Arbitraries.integers().between(-2, 12).<Object>map(half -> BigDecimal.valueOf(half).divide(BigDecimal.TWO)).injectNull(0.15);
+                case NUMBER -> Arbitraries.integers().between(-2, 12)
+                        .<Object>map(half -> BigDecimal.valueOf(half).divide(BigDecimal.TWO))
+                        .injectNull(0.15);
                 case DATE -> Arbitraries.integers().between(-1, 6).<Object>map(DAY0::plusDays).injectNull(0.15);
             });
         }

@@ -228,7 +228,7 @@ public final class CellParser {
                 }
             } else if (c == '"') {
                 quoted = true;
-            } else if (c == '(' ) {
+            } else if (c == '(') {
                 depth++;
             } else if (c == ')' && depth > 0) {
                 depth--;

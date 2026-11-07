@@ -66,7 +66,9 @@ public class ThroughputBenchmark {
         var requests = Workload.generate(decisionTable, EvaluationBenchmark.WORKLOAD_SIZE, 7);
         contender = Contender.create(engine, decisionTable);
         CrossCheck.assertAgreement(decisionTable, requests, contender);
-        inputs = requests.toArray(new Map[0]);
+        @SuppressWarnings("unchecked") // a generic array cannot be created otherwise
+        Map<String, Object>[] array = requests.toArray(Map[]::new);
+        inputs = array;
     }
 
     @Benchmark

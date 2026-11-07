@@ -18,6 +18,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableE
  * <p>A plain Jazzer fuzz target, so that both {@link DmnReaderFuzzTest} (JUnit, in every build) and
  * ClusterFuzzLite (see {@code .clusterfuzzlite/build.sh}) run it.
  */
+@SuppressWarnings("exports") // Jazzer's API is on the class path, not a module
 public final class DmnReaderFuzzer {
 
     private DmnReaderFuzzer() {

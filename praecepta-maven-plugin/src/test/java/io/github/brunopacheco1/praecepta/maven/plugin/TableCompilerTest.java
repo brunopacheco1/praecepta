@@ -98,7 +98,8 @@ class TableCompilerTest {
             var input = loader.loadClass(PACKAGE + ".DiscountInput");
             var evaluate = loader.loadClass(PACKAGE + ".Discount").getMethod("evaluate", input);
             var es = enumConstant(loader, PACKAGE + ".DiscountInput$Country", "ES");
-            var outputs = (List<?>) evaluate.invoke(null, input.getDeclaredConstructors()[0].newInstance(es, new BigDecimal(40), LocalDate.of(2010, 1, 1)));
+            var request = input.getDeclaredConstructors()[0].newInstance(es, new BigDecimal(40), LocalDate.of(2010, 1, 1));
+            var outputs = (List<?>) evaluate.invoke(null, request);
             Assertions.assertThat(outputs).map(Object::toString)
                     .containsExactly("DiscountOutput[discount=0.15, tier=gold]", "DiscountOutput[discount=0.05, tier=silver]");
         }

@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CsvLoaderTest {
-    
+
     @Test
     void fails_if_matrix_does_not_exist() {
         var inputs = Set.of("inputOne", "inputTwo");
