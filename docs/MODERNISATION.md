@@ -591,3 +591,45 @@ in settings).
 from `master` by GitHub Actions). The post comes as a pull request there, with charts drawn by the
 theme's Chart.js shortcode. The 2023 trie post gets an update note: its benchmark was not
 like-for-like.
+
+### Phase 8 — Blog platform (`brunopacheco1.github.io`)
+The Phase 7 post lives on a Hugo site that can no longer be built locally with a current Hugo:
+- the theme, Congo v2.9.0, fails on recent Hugo (`no such template "_internal/shortcodes/figure.html"`:
+  its `figure` shortcode wraps an internal template that newer Hugo removed);
+- CI still builds with Hugo 0.135.0, so posts can only be checked after they are published;
+- pull requests have no checks.
+
+| Component | In use | Latest (Nov 2026) |
+|---|---|---|
+| Hugo (extended) | 0.135.0, CI pin | 0.169.0 |
+| Congo theme (Hugo module) | v2.9.0 | v2.14.0 |
+| Go (`go.mod` directive; Hugo modules need Go) | 1.21.13 | 1.27 |
+| `actions/checkout`, `configure-pages`, `upload-pages-artifact`, `deploy-pages` | v4, v5, v3, v4 | v7, v6, v5, v5 |
+
+**Checked:** in a scratch copy, Congo v2.14.0 with Hugo 0.169.0 builds the site: 37 English and 35
+Portuguese pages, with no errors. The Praecepta post renders its three charts (Chart.js bundle
+loaded) and tables in both languages.
+
+Work, in the blog repository:
+1. **Theme:** `hugo mod get github.com/jpanther/congo/v2@v2.14.0`, then check the layout, the
+   shortcodes used (`alert`, `chart`, `figure`) and the dark mode against the live site.
+2. **Hugo:** pin 0.169.0 in CI, and use the same version locally (`brew install hugo go`). Verify the
+   downloaded `.deb` against Hugo's published checksums instead of a bare `wget`.
+3. **Config deprecations:**
+   - Hugo 0.158 renamed `languageCode` → `locale`, `languageName` → `label`, `languageDirection` →
+     `direction`;
+   - `paginate` → `[pagination] pagerSize`;
+   - bump the `go` directive.
+4. **Workflow:**
+   - a build-only job on pull requests, so a post is checked before it goes live;
+   - actions pinned by commit SHA at their latest versions;
+   - drop the unused Dart Sass step (Congo uses Tailwind; nothing uses Sass);
+   - least-privilege permissions per job.
+5. **Repository hygiene:**
+   - ignore `.hugo_build.lock`;
+   - move the Google site-verification file from `public/` (build output) to `static/`;
+   - Dependabot for `github-actions` and `gomod` (theme updates);
+   - a README with local preview (`hugo server -D`).
+6. **Order:** this upgrade lands first, then the Praecepta post (blog PR #3) is rebased onto it and
+   previewed locally before merging.
+
