@@ -39,8 +39,8 @@ jobs:
           if [ "$(git cat-file -t "$TAG")" != tag ]; then
             echo "::error::$TAG is a lightweight tag; create it with git tag -s"; exit 1
           fi
-          # the maintainer's public keys, as published by GitHub
-          curl -fsSL "https://github.com/${GITHUB_REPOSITORY_OWNER}.gpg" | gpg --import
+          # the maintainer's public keys, as published by GitHub (HTTPS only, redirects included)
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL "https://github.com/${GITHUB_REPOSITORY_OWNER}.gpg" | gpg --import
           git verify-tag "$TAG"
           if ! grep -q "^## \[${VERSION}\]" CHANGELOG.md; then
             echo "::error::CHANGELOG.md has no '## [${VERSION}]' section"; exit 1
