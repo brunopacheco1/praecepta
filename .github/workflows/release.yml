@@ -82,7 +82,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # release notes: this version's section of the changelog
-          awk -v v="## [${VERSION}]" 'index($0, v) == 1 {on = 1; next} /^## \[/ {on = 0} on' CHANGELOG.md > notes.md
+          # (until the next version heading or the link references at the bottom)
+          awk -v v="## [${VERSION}]" 'index($0, v) == 1 {on = 1; next} /^## \[/ || /^\[[^]]*\]: / {on = 0} on' CHANGELOG.md > notes.md
           files=()
           for module in praecepta-engine praecepta-loader praecepta-maven-plugin; do
             for suffix in .jar -sources.jar -javadoc.jar; do
