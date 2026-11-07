@@ -584,5 +584,5 @@ Also: **secret scanning and push protection** are enabled.
 **Status:**
 - **Done:** fuzzing (Jazzer fuzz tests, the weekly `fuzz.yml` (issue #23) and ClusterFuzzLite on pull
   requests), provenance bundles on releases (from the next release on), and the ruleset on `main`.
-- **Done (owner):** the OpenSSF Best Practices silver badge, a repository successor for continuity,
-  and secret scanning with push protection.
+- **Done (owner):** the OpenSSF Best Practices silver badge and OpenSSF Baseline level 1, a
+  repository successor for continuity, and secret scanning with push protection.
