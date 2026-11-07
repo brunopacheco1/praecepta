@@ -1,0 +1,95 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: Release
+# Pushing a signed tag vX.Y.Z publishes engine, loader and Maven plugin to Maven Central.
+# Owner setup and the release steps: docs/RELEASING.md.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish to Maven Central
+    runs-on: ubuntu-latest
+    # the secrets live in this environment, so only this job can read them
+    environment: release
+    permissions:
+      contents: write # create the GitHub release
+      id-token: write # sign the build provenance
+      attestations: write # store the build provenance
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check the tag
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$ ]]; then
+            echo "::error::Tag $TAG is not vMAJOR.MINOR.PATCH"; exit 1
+          fi
+          VERSION="${BASH_REMATCH[1]}"
+          git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
+          if [ "$(git cat-file -t "$TAG")" != tag ]; then
+            echo "::error::$TAG is a lightweight tag; create it with git tag -s"; exit 1
+          fi
+          # the maintainer's public keys, as published by GitHub (HTTPS only, redirects included)
+          curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL "https://github.com/${GITHUB_REPOSITORY_OWNER}.gpg" | gpg --import
+          git verify-tag "$TAG"
+          if ! grep -q "^## \[${VERSION}\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [${VERSION}]' section"; exit 1
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          # writes ~/.m2/settings.xml with the Central Portal credentials read from these variables
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_PASSWORD
+      - name: Set the version from the tag
+        run: mvn -B versions:set -DnewVersion="${VERSION}" -DgenerateBackupPoms=false -DprocessAllModules
+      - name: Build, test, sign and publish
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_KEY: ${{ secrets.RELEASE_GPG_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+        # the benchmarks are not published
+        run: mvn -B -P release -pl praecepta-engine,praecepta-loader,praecepta-maven-plugin -am deploy
+      - name: Third-party notices
+        run: >
+          python3 .github/scripts/third_party_notices.py "${VERSION}"
+          praecepta-loader/target/bom.json praecepta-maven-plugin/target/bom.json
+          > THIRD-PARTY-NOTICES.txt
+      - name: Build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            praecepta-engine/target/praecepta-engine-${{ env.VERSION }}.jar
+            praecepta-loader/target/praecepta-loader-${{ env.VERSION }}.jar
+            praecepta-maven-plugin/target/praecepta-maven-plugin-${{ env.VERSION }}.jar
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # release notes: this version's section of the changelog
+          awk -v v="## [${VERSION}]" 'index($0, v) == 1 {on = 1; next} /^## \[/ {on = 0} on' CHANGELOG.md > notes.md
+          files=()
+          for module in praecepta-engine praecepta-loader praecepta-maven-plugin; do
+            for suffix in .jar -sources.jar -javadoc.jar; do
+              files+=("${module}/target/${module}-${VERSION}${suffix}" "${module}/target/${module}-${VERSION}${suffix}.asc")
+            done
+            cp "${module}/target/bom.json" "${module}-${VERSION}-cyclonedx.json"
+            files+=("${module}-${VERSION}-cyclonedx.json")
+          done
+          gh release create "${GITHUB_REF_NAME}" --verify-tag --title "Praecepta ${VERSION}" \
+            --notes-file notes.md "${files[@]}" THIRD-PARTY-NOTICES.txt

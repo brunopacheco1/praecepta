@@ -11,7 +11,7 @@
     <parent>
         <groupId>io.github.brunopacheco1</groupId>
         <artifactId>praecepta</artifactId>
-        <version>0.0-SNAPSHOT</version>
+        <version>0.1.0-SNAPSHOT</version>
     </parent>
     <artifactId>praecepta-benchmarks</artifactId>
     <packaging>jar</packaging>
@@ -175,7 +175,7 @@
                         <configuration>
                             <rules combine.self="override">
                                 <requireJavaVersion>
-                                    <version>[25,)</version>
+                                    <version>[21,)</version>
                                 </requireJavaVersion>
                             </rules>
                         </configuration>

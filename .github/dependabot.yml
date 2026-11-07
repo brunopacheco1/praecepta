@@ -8,6 +8,13 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # maven.api.version is the oldest Maven the plugin runs on (it becomes requiredMavenVersion in
+      # the plugin descriptor); raise it on purpose, not through a bump. Patch updates are fine.
+      - dependency-name: "org.apache.maven:maven-plugin-api"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "org.apache.maven:maven-core"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
       # one PR per week for build and test tooling; runtime dependencies stay separate
       build-and-test:

@@ -22,10 +22,15 @@ jobs:
         uses: oss-review-toolkit/ort-ci-github-action@086d928d24ef1653dc0777296b312fda5faaaf52 # v1.2.0 (older pins used the retired upload-artifact@v3)
         with:
           allow-dynamic-versions: 'true'
+          # the evaluator applies ORT's policy rules (ort-config: copyleft and unclassified licences,
+          # missing project files...); excludes in .ort.yml keep it to what is published
           fail-on: 'violations'
+          # PlainTextTemplate is the attribution (NOTICE) report
+          report-formats: 'CycloneDx,SpdxDocument,WebApp,PlainTextTemplate'
           run: >
             cache-dependencies,
-            metadata-labels,
+            labels,
             analyzer,
+            evaluator,
             reporter,
             upload-results

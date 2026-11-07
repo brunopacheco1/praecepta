@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# ORT repository configuration (https://oss-review-toolkit.org/ort/docs/configuration/ort-yml):
+# the policy judges what is published, not tooling around it.
+analyzer:
+  # do not resolve excluded projects at all (the integration-test POMs hold @placeholders@)
+  skip_excluded: true
+excludes:
+  paths:
+    - pattern: "praecepta-benchmarks/**"
+      reason: "TEST_TOOL_OF"
+      comment: "JMH benchmarks comparing engines; never published."
+    - pattern: ".github/**"
+      reason: "BUILD_TOOL_OF"
+      comment: "CI workflows and their GitHub Actions; not distributed."
+    - pattern: "praecepta-maven-plugin/src/it/**"
+      reason: "TEST_OF"
+      comment: "Maven plugin integration tests; their POMs are filled in by maven-invoker-plugin."
+  scopes:
+    - pattern: "test"
+      reason: "TEST_DEPENDENCY_OF"
+      comment: "Test-only dependencies are not distributed."
+    - pattern: "provided"
+      reason: "PROVIDED_DEPENDENCY_OF"
+      comment: "Provided by Maven at build time (Maven plugin API); not distributed."
