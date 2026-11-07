@@ -81,8 +81,8 @@ jobs:
           case "$baseline" in 3) baseline_value=III baseline_metal=gold ;; 2) baseline_value=II baseline_metal=silver ;; *) baseline_value=I baseline_metal=bronze ;; esac
           [[ "$scorecard" =~ ^[0-9]+(\.[0-9]+)?$ ]] || scorecard=0
           scorecard_metal=$(awk -v s="$scorecard" 'BEGIN { print (s >= 8 ? "gold" : (s >= 6 ? "silver" : "bronze")) }')
-          # the live checks (armillae): SonarCloud's gate and coverage, and the latest CodeQL and REUSE
-          # results on main; a lookup that fails or has not finished keeps the last known value
+          # the live checks (armillae): SonarCloud's gate and coverage, the latest CodeQL run on main and
+          # the FSFE's REUSE check; a lookup that fails or has not finished keeps the last known value
           gate=$(jq -r .quality_gate site/badges.json)
           coverage=$(jq -r .coverage site/badges.json)
           codeql=$(jq -r .codeql site/badges.json)
@@ -100,8 +100,9 @@ jobs:
           if runs=$(curl -fsS --max-time 20 "${auth[@]}" "$github/actions/workflows/codeql.yml/runs?branch=main&status=completed&per_page=1"); then
             case "$(jq -r '.workflow_runs[0].conclusion // empty' <<< "$runs")" in success) codeql=passing ;; failure) codeql=failing ;; esac
           fi
-          if checks=$(curl -fsS --max-time 20 "${auth[@]}" "$github/commits/main/check-runs?check_name=REUSE%20compliance"); then
-            case "$(jq -r '.check_runs[0].conclusion // empty' <<< "$checks")" in success) reuse=compliant ;; failure) reuse=failing ;; esac
+          # REUSE: the FSFE's own check of the repository (api.reuse.software), not our CI
+          if lint=$(curl -fsS --max-time 20 https://api.reuse.software/status/github.com/brunopacheco1/praecepta); then
+            case "$(jq -r '.status // empty' <<< "$lint")" in compliant) reuse=compliant ;; non-compliant) reuse=failing ;; esac
           fi
           [[ "$coverage" =~ ^[0-9]+(\.[0-9]+)?$ ]] || coverage=0
           state() { [ "$1" = failing ] && echo failing || echo ok; }
