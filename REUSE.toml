@@ -18,6 +18,8 @@ path = [
     "praecepta-benchmarks/results/**",
     # the social image, rendered from site/brand/social.svg
     "site/brand/social.png",
+    # last known badge values for the website (JSON has no comments)
+    "site/badges.json",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "Bruno Pacheco"

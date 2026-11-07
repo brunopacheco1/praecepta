@@ -293,6 +293,74 @@ h3 { font-size: 1.02rem; letter-spacing: .03em; margin: 0 0 .45rem; }
 }
 .timeline .plain li { margin-bottom: 8px; }
 
+/* phalerae on a harness: the OpenSSF badges as Roman decorations, metal by level */
+.ph-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.phalerae {
+  position: relative; list-style: none; margin: 0 0 32px; padding: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 18px;
+}
+/* the harness: a leather strap with rivets, down on phones, across on wider screens */
+.phalerae::before {
+  content: ""; position: absolute; z-index: 0; left: 50%; top: 0; bottom: 0; width: 22px; transform: translateX(-50%);
+  background:
+    radial-gradient(circle, #c9a26e 2.4px, transparent 3px) center / 22px 26px repeat-y,
+    linear-gradient(90deg, #4a2f1c, #6b4428 45%, #4a2f1c);
+  border-radius: 4px;
+}
+@media (min-width: 640px) {
+  .phalerae { flex-direction: row; justify-content: center; gap: 44px; }
+  .phalerae::before {
+    left: 6%; right: 6%; top: 46px; bottom: auto; width: auto; height: 22px; transform: none;
+    background:
+      radial-gradient(circle, #c9a26e 2.4px, transparent 3px) center / 26px 22px repeat-x,
+      linear-gradient(#4a2f1c, #6b4428 45%, #4a2f1c);
+  }
+}
+.phalerae li { position: relative; z-index: 1; }
+.phalerae a { display: block; border-radius: 50%; }
+.phalerae a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.phalera { display: block; width: 170px; height: auto; transition: transform .15s ease; }
+.phalerae a:hover .phalera { transform: translateY(-2px) rotate(-2deg); }
+.ph-loop { fill: #6b4428; stroke: #3a2414; stroke-width: 1.5; }
+.ph-rim { stroke-width: 2; }
+.ph-beads { fill: none; stroke-width: 2.4; stroke-dasharray: .1 6.2; stroke-linecap: round; }
+.ph-field { stroke-width: 1; opacity: .9; }
+.ph-label { font: 700 11px var(--display); letter-spacing: 1.6px; text-anchor: middle; }
+.ph-value { text-anchor: middle; }
+.ph-word { font: 700 19px var(--display); letter-spacing: 1px; }
+.ph-numeral { font: 700 40px var(--display); }
+/* EB Garamond for numbers: Cinzel draws 1 like a Roman I */
+.ph-number { font: 600 34px var(--serif); }
+.ph-sub { font: 600 9px var(--display); letter-spacing: 1.4px; text-anchor: middle; }
+.ph-issuer { font: 700 9.5px var(--display); letter-spacing: 2px; text-anchor: middle; }
+.gold .ph-rim, .gold .ph-field { fill: url(#ph-gold); stroke: #7a5a14; }
+.gold .ph-beads { stroke: #7a5a14; }
+.gold text { fill: #4a360a; }
+.silver .ph-rim, .silver .ph-field { fill: url(#ph-silver); stroke: #5f676e; }
+.silver .ph-beads { stroke: #5f676e; }
+.silver text { fill: #2d3237; }
+.bronze .ph-rim, .bronze .ph-field { fill: url(#ph-bronze); stroke: #5a3618; }
+.bronze .ph-beads { stroke: #5a3618; }
+.bronze text { fill: #3a220e; }
+
+/* armillae: the live checks as open bronze bracelets; a failing one turns verdigris */
+.armillae { list-style: none; margin: -8px 0 30px; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 24px; }
+.armillae a { display: block; border-radius: 12px; }
+.armillae a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.armilla { display: block; width: 132px; height: auto; transition: transform .15s ease; }
+.armillae a:hover .armilla { transform: translateY(-2px); }
+.arm-band { fill: none; stroke: url(#arm-bronze); stroke-width: 9; stroke-linecap: round; }
+.arm-knob { fill: url(#arm-bronze); stroke: #5a3618; }
+.arm-label { font: 600 8.5px var(--display); letter-spacing: 1px; text-anchor: middle; fill: var(--muted); }
+.arm-value { text-anchor: middle; fill: var(--text); }
+.arm-word { font: 700 11.5px var(--display); letter-spacing: .3px; }
+/* EB Garamond for numbers: Cinzel draws 1 like a Roman I */
+.arm-num { font: 600 19px var(--serif); }
+.failing .arm-band { stroke: url(#arm-verdigris); }
+.failing .arm-knob { fill: url(#arm-verdigris); stroke: #264c41; }
+.failing .arm-value { fill: var(--second); }
+@media (max-width: 480px) { .armilla { width: 120px; } }
+
 .plain { margin: 0; padding-left: 1.2em; }
 .plain li { margin-bottom: 10px; }
 .plain li::marker { color: var(--accent); }
