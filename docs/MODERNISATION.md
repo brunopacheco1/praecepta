@@ -371,8 +371,8 @@ before the first public release. The repository already runs FOSSLight and ORT o
   (Contributor Covenant), `SECURITY.md` (private vulnerability reporting), issue and PR templates,
   `CHANGELOG.md` (Keep a Changelog) with semantic versioning.
 - **OpenSSF Best Practices badge**, once the above is in place.
-- **Cleanup:** make the FOSSLight and ORT workflows also run on pull requests, not only after
-  merge.
+- **Cleanup:** make the ORT workflow also run on pull requests, not only after merge; decide
+  whether FOSSLight is still needed.
 
 **Status: done** (branch `modernisation/phase-5`). Decisions:
 - the maintainer owns all the code, including the early work-email commits, so everything is
@@ -380,7 +380,10 @@ before the first public release. The repository already runs FOSSLight and ORT o
 - copyright holder "Bruno Pacheco";
 - no contributor sign-off (Apache-2.0 section 5 covers contributions);
 - CycloneDX SBOMs only;
-- FOSSLight and ORT are kept and now also run on pull requests.
+- FOSSLight is removed. Its one unique job was scanning our sources for foreign licence texts.
+  REUSE now enforces per-file licensing, the repository holds no vendored third-party code, and its
+  `pip install` of about a hundred ScanCode dependencies was SonarCloud's last security finding.
+  ORT stays and runs on pull requests; it gets policy rules and attribution reports in Phase 6.
 
 The history was rewritten before this phase. The work email and then the personal Yahoo address
 were replaced by the GitHub noreply address in every commit, and the commits were re-signed; trees,
@@ -427,9 +430,9 @@ What was done:
     single project `brunopacheco1_praecepta`, with no per-module keys, and excludes only the
     unpublished benchmarks; the Maven plugin, `beans` and `exceptions` packages are analysed.
     The owner renews the token.
-  - ORT and FOSSLight had failed on every run: an action pinned to the retired
-    `upload-artifact@v3`, and Python 3.15 without wheels for a FOSSLight dependency. They are fixed
-    by pinning ORT action v1.2.0 and Python 3.12 with `fosslight_source` 2.3.18.
+  - ORT had failed on every run, because its action was pinned to the retired
+    `upload-artifact@v3`; it now pins ORT action v1.2.0. FOSSLight had failed on every run too
+    (Python 3.15 without wheels for a dependency) before it was removed.
 - **Community files:**
   - `CONTRIBUTING.md`, replacing the README section;
   - `CODE_OF_CONDUCT.md`, adopting Contributor Covenant 2.1 by reference;
@@ -453,3 +456,11 @@ Not done here (owner actions or later phases):
 ### Phase 6 — Release
 - Zero-dependency engine artifact, JPMS `module-info`, Maven Central, README rewrite.
 - Align package names (`io.com.github…` → `io.github…`).
+- Signed artifacts (GPG, required by Maven Central) and build provenance (GitHub artifact
+  attestations) in the release workflow.
+- Give ORT a real job. Today it only analyses dependencies:
+  - an evaluator policy (`.ort/evaluator.rules.kts` or ORT's example rules) so that
+    `fail-on: violations` can actually fail, e.g. on copyleft licences in the published modules;
+  - attribution reports (a third-party `NOTICE`, listing Apache POI's dependencies and their
+    licences) attached to each release;
+  - optionally ScanCode on our own sources only, the source scanning FOSSLight used to do.
