@@ -278,8 +278,11 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
         <defs>
           <radialGradient id="ph-gold" cx="38%" cy="32%"><stop offset="0" stop-color="#fbe7a6"/><stop offset=".55" stop-color="#d9ad48"/><stop offset="1" stop-color="#946c1c"/></radialGradient>
           <radialGradient id="ph-silver" cx="38%" cy="32%"><stop offset="0" stop-color="#f4f6f8"/><stop offset=".55" stop-color="#c3cad1"/><stop offset="1" stop-color="#858e96"/></radialGradient>
+          <linearGradient id="arm-bronze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e3b17f"/><stop offset=".5" stop-color="#a86f3c"/><stop offset="1" stop-color="#6e4420"/></linearGradient>
+          <linearGradient id="arm-verdigris" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fd0bf"/><stop offset=".5" stop-color="#4f8f7c"/><stop offset="1" stop-color="#2f5c4f"/></linearGradient>
           <radialGradient id="ph-bronze" cx="38%" cy="32%"><stop offset="0" stop-color="#e9b98a"/><stop offset=".55" stop-color="#b17843"/><stop offset="1" stop-color="#744822"/></radialGradient>
           <path id="ph-arc" d="M34 92 A46 46 0 0 1 126 92"/>
+          <path id="ph-arc-low" d="M26 92 A54 54 0 0 0 134 92"/>
         </defs>
       </svg>
       <ul class="phalerae">
@@ -291,9 +294,8 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
               <circle class="ph-beads" cx="80" cy="92" r="67"/>
               <circle class="ph-field" cx="80" cy="92" r="59"/>
               <text class="ph-label"><textPath href="#ph-arc" startOffset="50%">BEST PRACTICES</textPath></text>
-              <text class="ph-value ph-word" x="80" y="104">@BP_VALUE@</text>
-              <text class="ph-sub" x="80" y="126">OPENSSF</text>
-              <g class="ph-laurel"><ellipse cx="70" cy="140" rx="3" ry="7" transform="rotate(-55 70 140)"/><ellipse cx="90" cy="140" rx="3" ry="7" transform="rotate(55 90 140)"/><ellipse cx="62" cy="134" rx="3" ry="7" transform="rotate(-35 62 134)"/><ellipse cx="98" cy="134" rx="3" ry="7" transform="rotate(35 98 134)"/></g>
+              <text class="ph-value ph-word" x="80" y="100">@BP_VALUE@</text>
+              <text class="ph-issuer"><textPath href="#ph-arc-low" startOffset="50%">· OPENSSF ·</textPath></text>
             </svg>
           </a>
         </li>
@@ -305,9 +307,9 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
               <circle class="ph-beads" cx="80" cy="92" r="67"/>
               <circle class="ph-field" cx="80" cy="92" r="59"/>
               <text class="ph-label"><textPath href="#ph-arc" startOffset="50%">BASELINE</textPath></text>
-              <text class="ph-value ph-numeral" x="80" y="104">@BASELINE_VALUE@</text>
-              <text class="ph-sub" x="80" y="126">LEVEL</text>
-              <g class="ph-laurel"><ellipse cx="70" cy="140" rx="3" ry="7" transform="rotate(-55 70 140)"/><ellipse cx="90" cy="140" rx="3" ry="7" transform="rotate(55 90 140)"/><ellipse cx="62" cy="134" rx="3" ry="7" transform="rotate(-35 62 134)"/><ellipse cx="98" cy="134" rx="3" ry="7" transform="rotate(35 98 134)"/></g>
+              <text class="ph-value ph-numeral" x="80" y="100">@BASELINE_VALUE@</text>
+              <text class="ph-sub" x="80" y="119">LEVEL</text>
+              <text class="ph-issuer"><textPath href="#ph-arc-low" startOffset="50%">· OPENSSF ·</textPath></text>
             </svg>
           </a>
         </li>
@@ -319,9 +321,57 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
               <circle class="ph-beads" cx="80" cy="92" r="67"/>
               <circle class="ph-field" cx="80" cy="92" r="59"/>
               <text class="ph-label"><textPath href="#ph-arc" startOffset="50%">SCORECARD</textPath></text>
-              <text class="ph-value ph-number" x="80" y="104">@SCORECARD_VALUE@</text>
-              <text class="ph-sub" x="80" y="126">OUT OF 10</text>
-              <g class="ph-laurel"><ellipse cx="70" cy="140" rx="3" ry="7" transform="rotate(-55 70 140)"/><ellipse cx="90" cy="140" rx="3" ry="7" transform="rotate(55 90 140)"/><ellipse cx="62" cy="134" rx="3" ry="7" transform="rotate(-35 62 134)"/><ellipse cx="98" cy="134" rx="3" ry="7" transform="rotate(35 98 134)"/></g>
+              <text class="ph-value ph-number" x="80" y="100">@SCORECARD_VALUE@</text>
+              <text class="ph-sub" x="80" y="119">OUT OF 10</text>
+              <text class="ph-issuer"><textPath href="#ph-arc-low" startOffset="50%">· OPENSSF ·</textPath></text>
+            </svg>
+          </a>
+        </li>
+      </ul>
+      <!-- armillae, the bronze armbands Rome gave its soldiers: the live checks, read when the site
+           is built (pages.yml); a failing check turns verdigris -->
+      <ul class="armillae">
+        <li>
+          <a href="https://sonarcloud.io/summary/overall?id=brunopacheco1_praecepta" aria-label="SonarCloud quality gate: @GATE_NAME@">
+            <svg class="armilla @GATE_STATE@" viewBox="0 0 128 112" aria-hidden="true">
+              <path class="arm-band" d="M40 98 A52 44 0 1 1 88 98"/>
+              <circle class="arm-knob" cx="40" cy="98" r="7"/>
+              <circle class="arm-knob" cx="88" cy="98" r="7"/>
+              <text class="arm-label" x="64" y="50">QUALITY GATE</text>
+              <text class="arm-value arm-word" x="64" y="72">@GATE@</text>
+            </svg>
+          </a>
+        </li>
+        <li>
+          <a href="https://sonarcloud.io/summary/overall?id=brunopacheco1_praecepta" aria-label="Test coverage: @COVERAGE@">
+            <svg class="armilla @COVERAGE_STATE@" viewBox="0 0 128 112" aria-hidden="true">
+              <path class="arm-band" d="M40 98 A52 44 0 1 1 88 98"/>
+              <circle class="arm-knob" cx="40" cy="98" r="7"/>
+              <circle class="arm-knob" cx="88" cy="98" r="7"/>
+              <text class="arm-label" x="64" y="50">COVERAGE</text>
+              <text class="arm-value arm-num" x="64" y="72">@COVERAGE@</text>
+            </svg>
+          </a>
+        </li>
+        <li>
+          <a href="https://github.com/brunopacheco1/praecepta/actions/workflows/codeql.yml" aria-label="CodeQL: @CODEQL_NAME@">
+            <svg class="armilla @CODEQL_STATE@" viewBox="0 0 128 112" aria-hidden="true">
+              <path class="arm-band" d="M40 98 A52 44 0 1 1 88 98"/>
+              <circle class="arm-knob" cx="40" cy="98" r="7"/>
+              <circle class="arm-knob" cx="88" cy="98" r="7"/>
+              <text class="arm-label" x="64" y="50">CODEQL</text>
+              <text class="arm-value arm-word" x="64" y="72">@CODEQL@</text>
+            </svg>
+          </a>
+        </li>
+        <li>
+          <a href="https://github.com/brunopacheco1/praecepta/actions/workflows/build.yml" aria-label="REUSE: @REUSE_NAME@">
+            <svg class="armilla @REUSE_STATE@" viewBox="0 0 128 112" aria-hidden="true">
+              <path class="arm-band" d="M40 98 A52 44 0 1 1 88 98"/>
+              <circle class="arm-knob" cx="40" cy="98" r="7"/>
+              <circle class="arm-knob" cx="88" cy="98" r="7"/>
+              <text class="arm-label" x="64" y="50">REUSE</text>
+              <text class="arm-value arm-word" x="64" y="72">@REUSE@</text>
             </svg>
           </a>
         </li>

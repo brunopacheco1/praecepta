@@ -1,5 +1,9 @@
 {
   "best_practices": "silver",
   "baseline": 1,
-  "scorecard": 8.8
+  "scorecard": 8.8,
+  "quality_gate": "passed",
+  "coverage": 91.9,
+  "codeql": "passing",
+  "reuse": "compliant"
 }

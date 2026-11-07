@@ -332,19 +332,34 @@ h3 { font-size: 1.02rem; letter-spacing: .03em; margin: 0 0 .45rem; }
 /* EB Garamond for numbers: Cinzel draws 1 like a Roman I */
 .ph-number { font: 600 34px var(--serif); }
 .ph-sub { font: 600 9px var(--display); letter-spacing: 1.4px; text-anchor: middle; }
-.ph-laurel ellipse { stroke: none; }
+.ph-issuer { font: 700 9.5px var(--display); letter-spacing: 2px; text-anchor: middle; }
 .gold .ph-rim, .gold .ph-field { fill: url(#ph-gold); stroke: #7a5a14; }
 .gold .ph-beads { stroke: #7a5a14; }
-.gold .ph-laurel ellipse { fill: #8a6618; }
 .gold text { fill: #4a360a; }
 .silver .ph-rim, .silver .ph-field { fill: url(#ph-silver); stroke: #5f676e; }
 .silver .ph-beads { stroke: #5f676e; }
-.silver .ph-laurel ellipse { fill: #6c747b; }
 .silver text { fill: #2d3237; }
 .bronze .ph-rim, .bronze .ph-field { fill: url(#ph-bronze); stroke: #5a3618; }
 .bronze .ph-beads { stroke: #5a3618; }
-.bronze .ph-laurel ellipse { fill: #66401d; }
 .bronze text { fill: #3a220e; }
+
+/* armillae: the live checks as open bronze bracelets; a failing one turns verdigris */
+.armillae { list-style: none; margin: -8px 0 30px; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 24px; }
+.armillae a { display: block; border-radius: 12px; }
+.armillae a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.armilla { display: block; width: 132px; height: auto; transition: transform .15s ease; }
+.armillae a:hover .armilla { transform: translateY(-2px); }
+.arm-band { fill: none; stroke: url(#arm-bronze); stroke-width: 9; stroke-linecap: round; }
+.arm-knob { fill: url(#arm-bronze); stroke: #5a3618; }
+.arm-label { font: 600 8.5px var(--display); letter-spacing: 1px; text-anchor: middle; fill: var(--muted); }
+.arm-value { text-anchor: middle; fill: var(--text); }
+.arm-word { font: 700 11.5px var(--display); letter-spacing: .3px; }
+/* EB Garamond for numbers: Cinzel draws 1 like a Roman I */
+.arm-num { font: 600 19px var(--serif); }
+.failing .arm-band { stroke: url(#arm-verdigris); }
+.failing .arm-knob { fill: url(#arm-verdigris); stroke: #264c41; }
+.failing .arm-value { fill: var(--second); }
+@media (max-width: 480px) { .armilla { width: 120px; } }
 
 .plain { margin: 0; padding-left: 1.2em; }
 .plain li { margin-bottom: 10px; }

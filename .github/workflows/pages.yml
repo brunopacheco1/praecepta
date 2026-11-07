@@ -57,6 +57,8 @@ jobs:
         # read at build time, so visitors' browsers never contact these services; if a lookup fails,
         # the last known values in site/badges.json stay. Each phalera's metal follows its level:
         # Best Practices passing/silver/gold, Baseline I/II/III, Scorecard below 6/6 to 8/8 and above.
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           best_practices=$(jq -r .best_practices site/badges.json)
           baseline=$(jq -r .baseline site/badges.json)
@@ -79,6 +81,44 @@ jobs:
           case "$baseline" in 3) baseline_value=III baseline_metal=gold ;; 2) baseline_value=II baseline_metal=silver ;; *) baseline_value=I baseline_metal=bronze ;; esac
           [[ "$scorecard" =~ ^[0-9]+(\.[0-9]+)?$ ]] || scorecard=0
           scorecard_metal=$(awk -v s="$scorecard" 'BEGIN { print (s >= 8 ? "gold" : (s >= 6 ? "silver" : "bronze")) }')
+          # the live checks (armillae): SonarCloud's gate and coverage, and the latest CodeQL and REUSE
+          # results on main; a lookup that fails or has not finished keeps the last known value
+          gate=$(jq -r .quality_gate site/badges.json)
+          coverage=$(jq -r .coverage site/badges.json)
+          codeql=$(jq -r .codeql site/badges.json)
+          reuse=$(jq -r .reuse site/badges.json)
+          sonar=https://sonarcloud.io/api
+          if status=$(curl -fsS --max-time 20 "$sonar/qualitygates/project_status?projectKey=brunopacheco1_praecepta"); then
+            case "$(jq -r '.projectStatus.status // empty' <<< "$status")" in OK) gate=passed ;; ERROR) gate=failing ;; esac
+          fi
+          if measures=$(curl -fsS --max-time 20 "$sonar/measures/component?component=brunopacheco1_praecepta&metricKeys=coverage"); then
+            value=$(jq -r '.component.measures[0].value // empty' <<< "$measures")
+            [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]] && coverage="$value"
+          fi
+          github="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+          if runs=$(curl -fsS --max-time 20 "${auth[@]}" "$github/actions/workflows/codeql.yml/runs?branch=main&status=completed&per_page=1"); then
+            case "$(jq -r '.workflow_runs[0].conclusion // empty' <<< "$runs")" in success) codeql=passing ;; failure) codeql=failing ;; esac
+          fi
+          if checks=$(curl -fsS --max-time 20 "${auth[@]}" "$github/commits/main/check-runs?check_name=REUSE%20compliance"); then
+            case "$(jq -r '.check_runs[0].conclusion // empty' <<< "$checks")" in success) reuse=compliant ;; failure) reuse=failing ;; esac
+          fi
+          [[ "$coverage" =~ ^[0-9]+(\.[0-9]+)?$ ]] || coverage=0
+          state() { [ "$1" = failing ] && echo failing || echo ok; }
+          coverage_state=$(awk -v c="$coverage" 'BEGIN { print (c >= 80 ? "ok" : "failing") }')
+          {
+            echo "GATE=${gate^^}"
+            echo "GATE_NAME=${gate^}"
+            echo "GATE_STATE=$(state "$gate")"
+            echo "COVERAGE=${coverage}%"
+            echo "COVERAGE_STATE=$coverage_state"
+            echo "CODEQL=${codeql^^}"
+            echo "CODEQL_NAME=${codeql^}"
+            echo "CODEQL_STATE=$(state "$codeql")"
+            echo "REUSE=${reuse^^}"
+            echo "REUSE_NAME=${reuse^}"
+            echo "REUSE_STATE=$(state "$reuse")"
+          } | tr -cd 'A-Za-z0-9._%=\n' >> "$GITHUB_ENV"
           {
             echo "BP_METAL=$bp_metal"
             echo "BP_VALUE=${best_practices^^}"
@@ -96,7 +136,11 @@ jobs:
           sed -i -e "s/@VERSION@/${VERSION}/g" \
             -e "s/@BP_METAL@/${BP_METAL}/g" -e "s/@BP_VALUE@/${BP_VALUE}/g" -e "s/@BP_NAME@/${BP_NAME}/g" \
             -e "s/@BASELINE_METAL@/${BASELINE_METAL}/g" -e "s/@BASELINE_VALUE@/${BASELINE_VALUE}/g" -e "s/@BASELINE_LEVEL@/${BASELINE_LEVEL}/g" \
-            -e "s/@SCORECARD_METAL@/${SCORECARD_METAL}/g" -e "s/@SCORECARD_VALUE@/${SCORECARD_VALUE}/g" _site/index.html
+            -e "s/@SCORECARD_METAL@/${SCORECARD_METAL}/g" -e "s/@SCORECARD_VALUE@/${SCORECARD_VALUE}/g" \
+            -e "s/@GATE_STATE@/${GATE_STATE}/g" -e "s/@GATE_NAME@/${GATE_NAME}/g" -e "s/@GATE@/${GATE}/g" \
+            -e "s/@COVERAGE_STATE@/${COVERAGE_STATE}/g" -e "s/@COVERAGE@/${COVERAGE}/g" \
+            -e "s/@CODEQL_STATE@/${CODEQL_STATE}/g" -e "s/@CODEQL_NAME@/${CODEQL_NAME}/g" -e "s/@CODEQL@/${CODEQL}/g" \
+            -e "s/@REUSE_STATE@/${REUSE_STATE}/g" -e "s/@REUSE_NAME@/${REUSE_NAME}/g" -e "s/@REUSE@/${REUSE}/g" _site/index.html
           cp -R ../release/praecepta-engine/target/reports/apidocs _site/api/engine
           cp -R ../release/praecepta-loader/target/reports/apidocs _site/api/loader
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
