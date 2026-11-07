@@ -1,0 +1,1340 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: <none>
+# Measurement: 1 iterations, single-shot each
+# Timeout: 10 min per iteration
+# Threads: 1 thread
+# Benchmark mode: Single shot invocation time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision
+# Parameters: (engine = praecepta, table = real)
+
+# Run progress: 0.00% complete, ETA 00:00:00
+# Fork: 1 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 75.642 ms/op
+
+# Run progress: 1.11% complete, ETA 00:00:21
+# Fork: 2 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 75.469 ms/op
+
+# Run progress: 2.22% complete, ETA 00:00:20
+# Fork: 3 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 76.308 ms/op
+
+# Run progress: 3.33% complete, ETA 00:00:19
+# Fork: 4 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 75.627 ms/op
+
+# Run progress: 4.44% complete, ETA 00:00:19
+# Fork: 5 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 75.183 ms/op
+
+# Run progress: 5.56% complete, ETA 00:00:18
+# Fork: 6 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 75.728 ms/op
+
+# Run progress: 6.67% complete, ETA 00:00:18
+# Fork: 7 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 75.911 ms/op
+
+# Run progress: 7.78% complete, ETA 00:00:18
+# Fork: 8 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 75.871 ms/op
+
+# Run progress: 8.89% complete, ETA 00:00:17
+# Fork: 9 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 75.235 ms/op
+
+# Run progress: 10.00% complete, ETA 00:00:17
+# Fork: 10 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 76.582 ms/op
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision":
+  N = 10
+  mean =     75.756 ±(99.9%) 0.664 ms/op
+
+  Histogram, ms/op:
+    [75.000, 75.125) = 0 
+    [75.125, 75.250) = 2 
+    [75.250, 75.375) = 0 
+    [75.375, 75.500) = 1 
+    [75.500, 75.625) = 0 
+    [75.625, 75.750) = 3 
+    [75.750, 75.875) = 1 
+    [75.875, 76.000) = 1 
+    [76.000, 76.125) = 0 
+    [76.125, 76.250) = 0 
+    [76.250, 76.375) = 1 
+    [76.375, 76.500) = 0 
+    [76.500, 76.625) = 1 
+    [76.625, 76.750) = 0 
+    [76.750, 76.875) = 0 
+
+  Percentiles, ms/op:
+      p(0.0000) =     75.183 ms/op
+     p(50.0000) =     75.685 ms/op
+     p(90.0000) =     76.555 ms/op
+     p(95.0000) =     76.582 ms/op
+     p(99.0000) =     76.582 ms/op
+     p(99.9000) =     76.582 ms/op
+     p(99.9900) =     76.582 ms/op
+     p(99.9990) =     76.582 ms/op
+     p(99.9999) =     76.582 ms/op
+    p(100.0000) =     76.582 ms/op
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: <none>
+# Measurement: 1 iterations, single-shot each
+# Timeout: 10 min per iteration
+# Threads: 1 thread
+# Benchmark mode: Single shot invocation time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision
+# Parameters: (engine = praecepta, table = mixed-100)
+
+# Run progress: 11.11% complete, ETA 00:00:17
+# Fork: 1 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 76.979 ms/op
+
+# Run progress: 12.22% complete, ETA 00:00:17
+# Fork: 2 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 76.482 ms/op
+
+# Run progress: 13.33% complete, ETA 00:00:17
+# Fork: 3 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 82.381 ms/op
+
+# Run progress: 14.44% complete, ETA 00:00:17
+# Fork: 4 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 80.929 ms/op
+
+# Run progress: 15.56% complete, ETA 00:00:16
+# Fork: 5 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 77.231 ms/op
+
+# Run progress: 16.67% complete, ETA 00:00:16
+# Fork: 6 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 76.439 ms/op
+
+# Run progress: 17.78% complete, ETA 00:00:16
+# Fork: 7 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 76.269 ms/op
+
+# Run progress: 18.89% complete, ETA 00:00:16
+# Fork: 8 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 76.685 ms/op
+
+# Run progress: 20.00% complete, ETA 00:00:16
+# Fork: 9 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 76.889 ms/op
+
+# Run progress: 21.11% complete, ETA 00:00:15
+# Fork: 10 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 76.777 ms/op
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision":
+  N = 10
+  mean =     77.706 ±(99.9%) 3.216 ms/op
+
+  Histogram, ms/op:
+    [76.000, 76.500) = 3 
+    [76.500, 77.000) = 4 
+    [77.000, 77.500) = 1 
+    [77.500, 78.000) = 0 
+    [78.000, 78.500) = 0 
+    [78.500, 79.000) = 0 
+    [79.000, 79.500) = 0 
+    [79.500, 80.000) = 0 
+    [80.000, 80.500) = 0 
+    [80.500, 81.000) = 1 
+    [81.000, 81.500) = 0 
+    [81.500, 82.000) = 0 
+    [82.000, 82.500) = 1 
+
+  Percentiles, ms/op:
+      p(0.0000) =     76.269 ms/op
+     p(50.0000) =     76.833 ms/op
+     p(90.0000) =     82.236 ms/op
+     p(95.0000) =     82.381 ms/op
+     p(99.0000) =     82.381 ms/op
+     p(99.9000) =     82.381 ms/op
+     p(99.9900) =     82.381 ms/op
+     p(99.9990) =     82.381 ms/op
+     p(99.9999) =     82.381 ms/op
+    p(100.0000) =     82.381 ms/op
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: <none>
+# Measurement: 1 iterations, single-shot each
+# Timeout: 10 min per iteration
+# Threads: 1 thread
+# Benchmark mode: Single shot invocation time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision
+# Parameters: (engine = praecepta, table = mixed-1000)
+
+# Run progress: 22.22% complete, ETA 00:00:15
+# Fork: 1 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 270.350 ms/op
+
+# Run progress: 23.33% complete, ETA 00:00:16
+# Fork: 2 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 250.191 ms/op
+
+# Run progress: 24.44% complete, ETA 00:00:16
+# Fork: 3 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 247.944 ms/op
+
+# Run progress: 25.56% complete, ETA 00:00:16
+# Fork: 4 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 239.427 ms/op
+
+# Run progress: 26.67% complete, ETA 00:00:16
+# Fork: 5 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 241.111 ms/op
+
+# Run progress: 27.78% complete, ETA 00:00:16
+# Fork: 6 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 241.853 ms/op
+
+# Run progress: 28.89% complete, ETA 00:00:16
+# Fork: 7 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 224.004 ms/op
+
+# Run progress: 30.00% complete, ETA 00:00:16
+# Fork: 8 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 246.189 ms/op
+
+# Run progress: 31.11% complete, ETA 00:00:16
+# Fork: 9 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 232.821 ms/op
+
+# Run progress: 32.22% complete, ETA 00:00:16
+# Fork: 10 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: 209.744 ms/op
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision":
+  N = 10
+  mean =    240.363 ±(99.9%) 24.445 ms/op
+
+  Histogram, ms/op:
+    [200.000, 205.000) = 0 
+    [205.000, 210.000) = 1 
+    [210.000, 215.000) = 0 
+    [215.000, 220.000) = 0 
+    [220.000, 225.000) = 1 
+    [225.000, 230.000) = 0 
+    [230.000, 235.000) = 1 
+    [235.000, 240.000) = 1 
+    [240.000, 245.000) = 2 
+    [245.000, 250.000) = 2 
+    [250.000, 255.000) = 1 
+    [255.000, 260.000) = 0 
+    [260.000, 265.000) = 0 
+    [265.000, 270.000) = 0 
+    [270.000, 275.000) = 1 
+
+  Percentiles, ms/op:
+      p(0.0000) =    209.744 ms/op
+     p(50.0000) =    241.482 ms/op
+     p(90.0000) =    268.334 ms/op
+     p(95.0000) =    270.350 ms/op
+     p(99.0000) =    270.350 ms/op
+     p(99.9000) =    270.350 ms/op
+     p(99.9900) =    270.350 ms/op
+     p(99.9990) =    270.350 ms/op
+     p(99.9999) =    270.350 ms/op
+    p(100.0000) =    270.350 ms/op
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: <none>
+# Measurement: 1 iterations, single-shot each
+# Timeout: 10 min per iteration
+# Threads: 1 thread
+# Benchmark mode: Single shot invocation time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision
+# Parameters: (engine = camunda, table = real)
+
+# Run progress: 33.33% complete, ETA 00:00:16
+# Fork: 1 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+488.096 ms/op
+
+# Run progress: 34.44% complete, ETA 00:00:17
+# Fork: 2 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+469.933 ms/op
+
+# Run progress: 35.56% complete, ETA 00:00:17
+# Fork: 3 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+464.655 ms/op
+
+# Run progress: 36.67% complete, ETA 00:00:17
+# Fork: 4 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+464.234 ms/op
+
+# Run progress: 37.78% complete, ETA 00:00:17
+# Fork: 5 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+465.196 ms/op
+
+# Run progress: 38.89% complete, ETA 00:00:18
+# Fork: 6 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+463.761 ms/op
+
+# Run progress: 40.00% complete, ETA 00:00:18
+# Fork: 7 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+464.869 ms/op
+
+# Run progress: 41.11% complete, ETA 00:00:18
+# Fork: 8 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+470.912 ms/op
+
+# Run progress: 42.22% complete, ETA 00:00:18
+# Fork: 9 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+469.688 ms/op
+
+# Run progress: 43.33% complete, ETA 00:00:18
+# Fork: 10 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+464.133 ms/op
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision":
+  N = 10
+  mean =    468.548 ±(99.9%) 11.177 ms/op
+
+  Histogram, ms/op:
+    [460.000, 462.500) = 0 
+    [462.500, 465.000) = 5 
+    [465.000, 467.500) = 1 
+    [467.500, 470.000) = 2 
+    [470.000, 472.500) = 1 
+    [472.500, 475.000) = 0 
+    [475.000, 477.500) = 0 
+    [477.500, 480.000) = 0 
+    [480.000, 482.500) = 0 
+    [482.500, 485.000) = 0 
+    [485.000, 487.500) = 0 
+
+  Percentiles, ms/op:
+      p(0.0000) =    463.761 ms/op
+     p(50.0000) =    465.033 ms/op
+     p(90.0000) =    486.377 ms/op
+     p(95.0000) =    488.096 ms/op
+     p(99.0000) =    488.096 ms/op
+     p(99.9000) =    488.096 ms/op
+     p(99.9900) =    488.096 ms/op
+     p(99.9990) =    488.096 ms/op
+     p(99.9999) =    488.096 ms/op
+    p(100.0000) =    488.096 ms/op
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: <none>
+# Measurement: 1 iterations, single-shot each
+# Timeout: 10 min per iteration
+# Threads: 1 thread
+# Benchmark mode: Single shot invocation time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision
+# Parameters: (engine = camunda, table = mixed-100)
+
+# Run progress: 44.44% complete, ETA 00:00:18
+# Fork: 1 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+488.581 ms/op
+
+# Run progress: 45.56% complete, ETA 00:00:18
+# Fork: 2 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+486.599 ms/op
+
+# Run progress: 46.67% complete, ETA 00:00:18
+# Fork: 3 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+490.992 ms/op
+
+# Run progress: 47.78% complete, ETA 00:00:17
+# Fork: 4 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+487.205 ms/op
+
+# Run progress: 48.89% complete, ETA 00:00:17
+# Fork: 5 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+485.521 ms/op
+
+# Run progress: 50.00% complete, ETA 00:00:17
+# Fork: 6 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+496.900 ms/op
+
+# Run progress: 51.11% complete, ETA 00:00:17
+# Fork: 7 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+491.986 ms/op
+
+# Run progress: 52.22% complete, ETA 00:00:17
+# Fork: 8 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+489.486 ms/op
+
+# Run progress: 53.33% complete, ETA 00:00:17
+# Fork: 9 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+487.891 ms/op
+
+# Run progress: 54.44% complete, ETA 00:00:17
+# Fork: 10 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+488.839 ms/op
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision":
+  N = 10
+  mean =    489.400 ±(99.9%) 4.949 ms/op
+
+  Histogram, ms/op:
+    [480.000, 481.250) = 0 
+    [481.250, 482.500) = 0 
+    [482.500, 483.750) = 0 
+    [483.750, 485.000) = 0 
+    [485.000, 486.250) = 1 
+    [486.250, 487.500) = 2 
+    [487.500, 488.750) = 2 
+    [488.750, 490.000) = 2 
+    [490.000, 491.250) = 1 
+    [491.250, 492.500) = 1 
+    [492.500, 493.750) = 0 
+    [493.750, 495.000) = 0 
+    [495.000, 496.250) = 0 
+    [496.250, 497.500) = 1 
+    [497.500, 498.750) = 0 
+
+  Percentiles, ms/op:
+      p(0.0000) =    485.521 ms/op
+     p(50.0000) =    488.710 ms/op
+     p(90.0000) =    496.409 ms/op
+     p(95.0000) =    496.900 ms/op
+     p(99.0000) =    496.900 ms/op
+     p(99.9000) =    496.900 ms/op
+     p(99.9900) =    496.900 ms/op
+     p(99.9990) =    496.900 ms/op
+     p(99.9999) =    496.900 ms/op
+    p(100.0000) =    496.900 ms/op
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: <none>
+# Measurement: 1 iterations, single-shot each
+# Timeout: 10 min per iteration
+# Threads: 1 thread
+# Benchmark mode: Single shot invocation time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision
+# Parameters: (engine = camunda, table = mixed-1000)
+
+# Run progress: 55.56% complete, ETA 00:00:16
+# Fork: 1 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+767.663 ms/op
+
+# Run progress: 56.67% complete, ETA 00:00:16
+# Fork: 2 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+759.708 ms/op
+
+# Run progress: 57.78% complete, ETA 00:00:16
+# Fork: 3 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+768.355 ms/op
+
+# Run progress: 58.89% complete, ETA 00:00:16
+# Fork: 4 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+817.557 ms/op
+
+# Run progress: 60.00% complete, ETA 00:00:16
+# Fork: 5 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+761.013 ms/op
+
+# Run progress: 61.11% complete, ETA 00:00:16
+# Fork: 6 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+762.495 ms/op
+
+# Run progress: 62.22% complete, ETA 00:00:16
+# Fork: 7 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+764.488 ms/op
+
+# Run progress: 63.33% complete, ETA 00:00:15
+# Fork: 8 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+761.440 ms/op
+
+# Run progress: 64.44% complete, ETA 00:00:15
+# Fork: 9 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+797.031 ms/op
+
+# Run progress: 65.56% complete, ETA 00:00:15
+# Fork: 10 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+783.907 ms/op
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision":
+  N = 10
+  mean =    774.366 ±(99.9%) 29.168 ms/op
+
+  Histogram, ms/op:
+    [750.000, 755.000) = 0 
+    [755.000, 760.000) = 1 
+    [760.000, 765.000) = 4 
+    [765.000, 770.000) = 2 
+    [770.000, 775.000) = 0 
+    [775.000, 780.000) = 0 
+    [780.000, 785.000) = 1 
+    [785.000, 790.000) = 0 
+    [790.000, 795.000) = 0 
+    [795.000, 800.000) = 1 
+    [800.000, 805.000) = 0 
+    [805.000, 810.000) = 0 
+    [810.000, 815.000) = 0 
+
+  Percentiles, ms/op:
+      p(0.0000) =    759.708 ms/op
+     p(50.0000) =    766.075 ms/op
+     p(90.0000) =    815.505 ms/op
+     p(95.0000) =    817.557 ms/op
+     p(99.0000) =    817.557 ms/op
+     p(99.9000) =    817.557 ms/op
+     p(99.9900) =    817.557 ms/op
+     p(99.9990) =    817.557 ms/op
+     p(99.9999) =    817.557 ms/op
+    p(100.0000) =    817.557 ms/op
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: <none>
+# Measurement: 1 iterations, single-shot each
+# Timeout: 10 min per iteration
+# Threads: 1 thread
+# Benchmark mode: Single shot invocation time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision
+# Parameters: (engine = drools, table = real)
+
+# Run progress: 66.67% complete, ETA 00:00:15
+# Fork: 1 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+383.665 ms/op
+
+# Run progress: 67.78% complete, ETA 00:00:14
+# Fork: 2 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+375.834 ms/op
+
+# Run progress: 68.89% complete, ETA 00:00:14
+# Fork: 3 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+379.357 ms/op
+
+# Run progress: 70.00% complete, ETA 00:00:13
+# Fork: 4 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+380.745 ms/op
+
+# Run progress: 71.11% complete, ETA 00:00:13
+# Fork: 5 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+376.354 ms/op
+
+# Run progress: 72.22% complete, ETA 00:00:12
+# Fork: 6 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+376.673 ms/op
+
+# Run progress: 73.33% complete, ETA 00:00:12
+# Fork: 7 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+391.508 ms/op
+
+# Run progress: 74.44% complete, ETA 00:00:11
+# Fork: 8 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+376.583 ms/op
+
+# Run progress: 75.56% complete, ETA 00:00:11
+# Fork: 9 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+377.250 ms/op
+
+# Run progress: 76.67% complete, ETA 00:00:10
+# Fork: 10 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+374.671 ms/op
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision":
+  N = 10
+  mean =    379.264 ±(99.9%) 7.655 ms/op
+
+  Histogram, ms/op:
+    [370.000, 372.500) = 0 
+    [372.500, 375.000) = 1 
+    [375.000, 377.500) = 5 
+    [377.500, 380.000) = 1 
+    [380.000, 382.500) = 1 
+    [382.500, 385.000) = 1 
+    [385.000, 387.500) = 0 
+    [387.500, 390.000) = 0 
+    [390.000, 392.500) = 1 
+    [392.500, 395.000) = 0 
+    [395.000, 397.500) = 0 
+
+  Percentiles, ms/op:
+      p(0.0000) =    374.671 ms/op
+     p(50.0000) =    376.962 ms/op
+     p(90.0000) =    390.724 ms/op
+     p(95.0000) =    391.508 ms/op
+     p(99.0000) =    391.508 ms/op
+     p(99.9000) =    391.508 ms/op
+     p(99.9900) =    391.508 ms/op
+     p(99.9990) =    391.508 ms/op
+     p(99.9999) =    391.508 ms/op
+    p(100.0000) =    391.508 ms/op
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: <none>
+# Measurement: 1 iterations, single-shot each
+# Timeout: 10 min per iteration
+# Threads: 1 thread
+# Benchmark mode: Single shot invocation time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision
+# Parameters: (engine = drools, table = mixed-100)
+
+# Run progress: 77.78% complete, ETA 00:00:10
+# Fork: 1 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+430.101 ms/op
+
+# Run progress: 78.89% complete, ETA 00:00:09
+# Fork: 2 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+437.644 ms/op
+
+# Run progress: 80.00% complete, ETA 00:00:09
+# Fork: 3 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+439.344 ms/op
+
+# Run progress: 81.11% complete, ETA 00:00:08
+# Fork: 4 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+435.219 ms/op
+
+# Run progress: 82.22% complete, ETA 00:00:08
+# Fork: 5 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+440.948 ms/op
+
+# Run progress: 83.33% complete, ETA 00:00:07
+# Fork: 6 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+443.556 ms/op
+
+# Run progress: 84.44% complete, ETA 00:00:07
+# Fork: 7 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+434.295 ms/op
+
+# Run progress: 85.56% complete, ETA 00:00:06
+# Fork: 8 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+441.615 ms/op
+
+# Run progress: 86.67% complete, ETA 00:00:06
+# Fork: 9 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+429.510 ms/op
+
+# Run progress: 87.78% complete, ETA 00:00:05
+# Fork: 10 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+436.466 ms/op
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision":
+  N = 10
+  mean =    436.870 ±(99.9%) 7.128 ms/op
+
+  Histogram, ms/op:
+    [420.000, 422.500) = 0 
+    [422.500, 425.000) = 0 
+    [425.000, 427.500) = 0 
+    [427.500, 430.000) = 1 
+    [430.000, 432.500) = 1 
+    [432.500, 435.000) = 1 
+    [435.000, 437.500) = 2 
+    [437.500, 440.000) = 2 
+    [440.000, 442.500) = 2 
+    [442.500, 445.000) = 1 
+    [445.000, 447.500) = 0 
+
+  Percentiles, ms/op:
+      p(0.0000) =    429.510 ms/op
+     p(50.0000) =    437.055 ms/op
+     p(90.0000) =    443.362 ms/op
+     p(95.0000) =    443.556 ms/op
+     p(99.0000) =    443.556 ms/op
+     p(99.9000) =    443.556 ms/op
+     p(99.9900) =    443.556 ms/op
+     p(99.9990) =    443.556 ms/op
+     p(99.9999) =    443.556 ms/op
+    p(100.0000) =    443.556 ms/op
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Dpraecepta.fixtures=/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/fixtures
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: <none>
+# Measurement: 1 iterations, single-shot each
+# Timeout: 10 min per iteration
+# Threads: 1 thread
+# Benchmark mode: Single shot invocation time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision
+# Parameters: (engine = drools, table = mixed-1000)
+
+# Run progress: 88.89% complete, ETA 00:00:05
+# Fork: 1 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+1002.356 ms/op
+
+# Run progress: 90.00% complete, ETA 00:00:04
+# Fork: 2 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+988.434 ms/op
+
+# Run progress: 91.11% complete, ETA 00:00:04
+# Fork: 3 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+1004.002 ms/op
+
+# Run progress: 92.22% complete, ETA 00:00:03
+# Fork: 4 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+999.875 ms/op
+
+# Run progress: 93.33% complete, ETA 00:00:03
+# Fork: 5 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+1014.573 ms/op
+
+# Run progress: 94.44% complete, ETA 00:00:02
+# Fork: 6 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+1006.944 ms/op
+
+# Run progress: 95.56% complete, ETA 00:00:02
+# Fork: 7 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+1000.796 ms/op
+
+# Run progress: 96.67% complete, ETA 00:00:01
+# Fork: 8 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+1025.300 ms/op
+
+# Run progress: 97.78% complete, ETA 00:00:01
+# Fork: 9 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+1006.446 ms/op
+
+# Run progress: 98.89% complete, ETA 00:00:00
+# Fork: 10 of 10
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+1003.331 ms/op
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionBenchmark.firstDecision":
+  N = 10
+  mean =   1005.206 ±(99.9%) 14.591 ms/op
+
+  Histogram, ms/op:
+    [ 980.000,  985.000) = 0 
+    [ 985.000,  990.000) = 1 
+    [ 990.000,  995.000) = 0 
+    [ 995.000, 1000.000) = 1 
+    [1000.000, 1005.000) = 4 
+    [1005.000, 1010.000) = 2 
+    [1010.000, 1015.000) = 1 
+    [1015.000, 1020.000) = 0 
+    [1020.000, 1025.000) = 0 
+
+  Percentiles, ms/op:
+      p(0.0000) =    988.434 ms/op
+     p(50.0000) =   1003.667 ms/op
+     p(90.0000) =   1024.227 ms/op
+     p(95.0000) =   1025.300 ms/op
+     p(99.0000) =   1025.300 ms/op
+     p(99.9000) =   1025.300 ms/op
+     p(99.9900) =   1025.300 ms/op
+     p(99.9990) =   1025.300 ms/op
+     p(99.9999) =   1025.300 ms/op
+    p(100.0000) =   1025.300 ms/op
+
+
+# Run complete. Total time: 00:00:52
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                              (engine)     (table)  Mode  Cnt     Score    Error  Units
+FirstDecisionBenchmark.firstDecision  praecepta        real    ss   10    75.756 ±  0.664  ms/op
+FirstDecisionBenchmark.firstDecision  praecepta   mixed-100    ss   10    77.706 ±  3.216  ms/op
+FirstDecisionBenchmark.firstDecision  praecepta  mixed-1000    ss   10   240.363 ± 24.445  ms/op
+FirstDecisionBenchmark.firstDecision    camunda        real    ss   10   468.548 ± 11.177  ms/op
+FirstDecisionBenchmark.firstDecision    camunda   mixed-100    ss   10   489.400 ±  4.949  ms/op
+FirstDecisionBenchmark.firstDecision    camunda  mixed-1000    ss   10   774.366 ± 29.168  ms/op
+FirstDecisionBenchmark.firstDecision     drools        real    ss   10   379.264 ±  7.655  ms/op
+FirstDecisionBenchmark.firstDecision     drools   mixed-100    ss   10   436.870 ±  7.128  ms/op
+FirstDecisionBenchmark.firstDecision     drools  mixed-1000    ss   10  1005.206 ± 14.591  ms/op
+
+Benchmark result is saved to /Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/first-decision.json

@@ -4,7 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Runs the benchmark matrix (Praecepta, Camunda and Drools) and writes every raw result, the machine
-# and versions it ran on, and a summary into one directory.
+# and versions it ran on, and a summary into one directory. To audit a run, it also keeps every log,
+# the SHA-256 of the jar it ran, and each command line (commands.txt).
 #
 #   praecepta-benchmarks/run-benchmarks.sh [full|quick] [output directory]
 #
@@ -59,12 +60,22 @@ case "$profile" in
 esac
 engines=praecepta,camunda,drools
 
+# appends a command line to commands.txt, exactly as run, with the repository root left out
+record() {
+  { printf '%q ' "$@"; echo; } | sed "s:$root/::g" >> "$out/commands.txt"
+}
+
 jmh() {
   local suite=$1
   shift
+  local command=("$java" -jar "$jar" -foe true -rf json -rff "$out/$suite.json" "$@")
   echo "== $suite: $*"
-  "$java" -jar "$jar" -foe true -rf json -rff "$out/$suite.json" "$@" > "$out/$suite.log" 2>&1 \
-    || { echo "$suite failed: see $out/$suite.log" >&2; exit 1; }
+  record "${command[@]}"
+  "${command[@]}" > "$out/$suite.log" 2>&1 || { echo "$suite failed: see $out/$suite.log" >&2; exit 1; }
+}
+
+sha256() {
+  { sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"; } | cut -d ' ' -f 1
 }
 
 property() {
@@ -90,18 +101,33 @@ property() {
   echo "camunda dmn-scala: $(property camunda-dmn.version)"
   echo "drools (kie-dmn-core): $(property kie.version)"
   echo "jmh: $(property jmh.version)"
+  echo "benchmarks.jar sha256: $(sha256 "$jar")"
 } > "$out/environment.txt"
 cat "$out/environment.txt"
+: > "$out/commands.txt"
 
+# one fresh JVM per engine and table; the whole output goes to footprint.log, the measured row to
+# footprint.txt, and a failure is reported in both
 echo "== footprint"
-{
-  printf '%-10s %-20s %14s %10s\n' engine table "retained heap" build
-  for table in ${scale//,/ } ${columns//,/ } ${policies//,/ }; do
-    for engine in ${engines//,/ }; do
-      "$java" -Xmx6g -cp "$jar" io.github.brunopacheco1.praecepta.benchmarks.FootprintReport "$engine" "$table" 2>/dev/null | tail -n 1
-    done
+printf '%-10s %-20s %14s %10s\n' engine table "retained heap" build > "$out/footprint.txt"
+: > "$out/footprint.log"
+for table in ${scale//,/ } ${columns//,/ } ${policies//,/ }; do
+  for engine in ${engines//,/ }; do
+    command=("$java" -Xmx6g -cp "$jar" io.github.brunopacheco1.praecepta.benchmarks.FootprintReport "$engine" "$table")
+    record "${command[@]}"
+    echo "== $engine $table" >> "$out/footprint.log"
+    status=0
+    "${command[@]}" > "$out/footprint.row" 2>&1 || status=$?
+    cat "$out/footprint.row" >> "$out/footprint.log"
+    row=$(awk -v engine="$engine" -v table="$table" '$1 == engine && $2 == table' "$out/footprint.row")
+    if [ "$status" -ne 0 ] || [ -z "$row" ]; then
+      echo "footprint of $engine on $table failed (exit $status): see $out/footprint.log" >&2
+      row=$(printf '%-10s %-20s %14s %10s' "$engine" "$table" "failed" "-")
+    fi
+    echo "$row" >> "$out/footprint.txt"
   done
-} > "$out/footprint.txt"
+done
+rm -f "$out/footprint.row"
 
 # latency on one thread, with the memory allocated per decision
 jmh scale EvaluationBenchmark "${runs[@]}" -prof gc -p engine=$engines -p table=$scale
@@ -116,7 +142,9 @@ for t in "${threads[@]}"; do
 done
 # reading the DMN and building the engine, warm and in a fresh JVM
 jmh build LifecycleBenchmark -p engine=$engines -p table=$lifecycle
-"$java" -cp "$jar" io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionFixtures "$out/fixtures" ${lifecycle//,/ }
+fixtures=("$java" -cp "$jar" io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionFixtures "$out/fixtures" ${lifecycle//,/ })
+record "${fixtures[@]}"
+"${fixtures[@]}"
 jmh first-decision FirstDecisionBenchmark -f "$first_forks" -jvmArgsAppend "-Dpraecepta.fixtures=$out/fixtures" \
   -p engine=$engines -p table=$lifecycle
 rm -rf "$out/fixtures"

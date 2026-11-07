@@ -275,7 +275,9 @@ The benchmarks are:
 
 `run-benchmarks.sh` runs the whole matrix and writes the raw JMH results, the machine and versions,
 and a summary (`summary.md`, `results.csv`) into `praecepta-benchmarks/results/`. Published runs
-are kept there.
+are kept there whole, so they can be audited: every suite's log and raw JSON, the footprint log, the
+SHA-256 of the `benchmarks.jar` that ran (in `environment.txt`) and each exact command line
+(`commands.txt`).
 
 ```
 mvn -pl praecepta-benchmarks -am package -DskipTests

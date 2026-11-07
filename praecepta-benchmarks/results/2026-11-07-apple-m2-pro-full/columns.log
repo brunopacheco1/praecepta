@@ -1,0 +1,2136 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = praecepta, table = synthetic-1000x5, workload = match)
+
+# Run progress: 0.00% complete, ETA 00:15:00
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 261.191 ns/op
+# Warmup Iteration   2: 248.973 ns/op
+# Warmup Iteration   3: 248.282 ns/op
+# Warmup Iteration   4: 246.143 ns/op
+# Warmup Iteration   5: 247.451 ns/op
+Iteration   1: 246.993 ns/op
+                 gc.alloc.rate:      1146.409 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   2: 247.391 ns/op
+                 gc.alloc.rate:      1144.550 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            5.000 ms
+
+Iteration   3: 247.022 ns/op
+                 gc.alloc.rate:      1146.276 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   4: 247.388 ns/op
+                 gc.alloc.rate:      1144.575 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 254.505 ns/op
+                 gc.alloc.rate:      1112.557 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+
+# Run progress: 2.78% complete, ETA 00:14:49
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 259.645 ns/op
+# Warmup Iteration   2: 247.817 ns/op
+# Warmup Iteration   3: 247.949 ns/op
+# Warmup Iteration   4: 246.349 ns/op
+# Warmup Iteration   5: 246.941 ns/op
+Iteration   1: 246.508 ns/op
+                 gc.alloc.rate:      1148.666 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   2: 248.668 ns/op
+                 gc.alloc.rate:      1138.686 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            5.000 ms
+
+Iteration   3: 245.240 ns/op
+                 gc.alloc.rate:      1154.604 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   4: 245.851 ns/op
+                 gc.alloc.rate:      1151.737 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 244.522 ns/op
+                 gc.alloc.rate:      1157.974 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+
+# Run progress: 5.56% complete, ETA 00:14:24
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 268.967 ns/op
+# Warmup Iteration   2: 253.033 ns/op
+# Warmup Iteration   3: 248.497 ns/op
+# Warmup Iteration   4: 243.289 ns/op
+# Warmup Iteration   5: 245.177 ns/op
+Iteration   1: 244.361 ns/op
+                 gc.alloc.rate:      1158.757 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   2: 247.601 ns/op
+                 gc.alloc.rate:      1143.595 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   3: 247.291 ns/op
+                 gc.alloc.rate:      1145.022 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   4: 247.287 ns/op
+                 gc.alloc.rate:      1145.044 MB/sec
+                 gc.alloc.rate.norm: 296.923 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   5: 244.688 ns/op
+                 gc.alloc.rate:      1157.204 MB/sec
+                 gc.alloc.rate.norm: 296.922 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  247.021 ±(99.9%) 2.604 ns/op [Average]
+  (min, avg, max) = (244.361, 247.021, 254.505), stdev = 2.435
+  CI (99.9%): [244.417, 249.625] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate":
+  1146.377 ±(99.9%) 11.875 MB/sec [Average]
+  (min, avg, max) = (1112.557, 1146.377, 1158.757), stdev = 11.108
+  CI (99.9%): [1134.502, 1158.252] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate.norm":
+  296.922 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (296.922, 296.922, 296.923), stdev = 0.001
+  CI (99.9%): [296.922, 296.922] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.count":
+  42.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (2.000, 2.800, 3.000), stdev = 0.414
+  CI (99.9%): [42.000, 42.000] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.time":
+  51.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (1.000, 3.400, 6.000), stdev = 1.957
+  CI (99.9%): [51.000, 51.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = praecepta, table = synthetic-1000x20, workload = match)
+
+# Run progress: 8.33% complete, ETA 00:13:58
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 407.541 ns/op
+# Warmup Iteration   2: 408.492 ns/op
+# Warmup Iteration   3: 398.539 ns/op
+# Warmup Iteration   4: 402.179 ns/op
+# Warmup Iteration   5: 394.744 ns/op
+Iteration   1: 395.184 ns/op
+                 gc.alloc.rate:      424.715 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            5.000 ms
+
+Iteration   2: 395.496 ns/op
+                 gc.alloc.rate:      424.380 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 395.085 ns/op
+                 gc.alloc.rate:      424.822 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   4: 395.948 ns/op
+                 gc.alloc.rate:      423.895 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 396.167 ns/op
+                 gc.alloc.rate:      423.658 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            2.000 ms
+
+
+# Run progress: 11.11% complete, ETA 00:13:34
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 409.927 ns/op
+# Warmup Iteration   2: 407.305 ns/op
+# Warmup Iteration   3: 398.604 ns/op
+# Warmup Iteration   4: 401.581 ns/op
+# Warmup Iteration   5: 396.304 ns/op
+Iteration   1: 395.364 ns/op
+                 gc.alloc.rate:      424.522 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   2: 394.329 ns/op
+                 gc.alloc.rate:      425.637 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   3: 393.393 ns/op
+                 gc.alloc.rate:      426.648 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   4: 393.548 ns/op
+                 gc.alloc.rate:      426.480 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   5: 395.938 ns/op
+                 gc.alloc.rate:      423.903 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            2.000 ms
+
+
+# Run progress: 13.89% complete, ETA 00:13:09
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 408.842 ns/op
+# Warmup Iteration   2: 405.539 ns/op
+# Warmup Iteration   3: 398.098 ns/op
+# Warmup Iteration   4: 400.455 ns/op
+# Warmup Iteration   5: 398.005 ns/op
+Iteration   1: 395.587 ns/op
+                 gc.alloc.rate:      424.280 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   2: 393.347 ns/op
+                 gc.alloc.rate:      426.698 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 395.093 ns/op
+                 gc.alloc.rate:      424.807 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   4: 394.551 ns/op
+                 gc.alloc.rate:      425.395 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 393.534 ns/op
+                 gc.alloc.rate:      426.493 MB/sec
+                 gc.alloc.rate.norm: 176.001 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            2.000 ms
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  394.838 ±(99.9%) 1.059 ns/op [Average]
+  (min, avg, max) = (393.347, 394.838, 396.167), stdev = 0.991
+  CI (99.9%): [393.778, 395.897] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate":
+  425.089 ±(99.9%) 1.142 MB/sec [Average]
+  (min, avg, max) = (423.658, 425.089, 426.698), stdev = 1.068
+  CI (99.9%): [423.947, 426.231] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate.norm":
+  176.001 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (176.001, 176.001, 176.001), stdev = 0.001
+  CI (99.9%): [176.001, 176.001] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.count":
+  18.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (1.000, 1.200, 2.000), stdev = 0.414
+  CI (99.9%): [18.000, 18.000] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.time":
+  42.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (2.000, 2.800, 5.000), stdev = 0.941
+  CI (99.9%): [42.000, 42.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = praecepta, table = mixed-1000x6, workload = match)
+
+# Run progress: 16.67% complete, ETA 00:12:44
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 670.591 ns/op
+# Warmup Iteration   2: 648.298 ns/op
+# Warmup Iteration   3: 645.399 ns/op
+# Warmup Iteration   4: 645.725 ns/op
+# Warmup Iteration   5: 640.245 ns/op
+Iteration   1: 633.623 ns/op
+                 gc.alloc.rate:      700.756 MB/sec
+                 gc.alloc.rate.norm: 465.603 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   2: 631.082 ns/op
+                 gc.alloc.rate:      703.562 MB/sec
+                 gc.alloc.rate.norm: 465.603 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   3: 634.128 ns/op
+                 gc.alloc.rate:      700.193 MB/sec
+                 gc.alloc.rate.norm: 465.603 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   4: 630.735 ns/op
+                 gc.alloc.rate:      703.950 MB/sec
+                 gc.alloc.rate.norm: 465.602 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 626.261 ns/op
+                 gc.alloc.rate:      708.990 MB/sec
+                 gc.alloc.rate.norm: 465.604 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            4.000 ms
+
+
+# Run progress: 19.44% complete, ETA 00:12:18
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 640.875 ns/op
+# Warmup Iteration   2: 623.193 ns/op
+# Warmup Iteration   3: 611.829 ns/op
+# Warmup Iteration   4: 625.505 ns/op
+# Warmup Iteration   5: 619.014 ns/op
+Iteration   1: 614.849 ns/op
+                 gc.alloc.rate:      722.152 MB/sec
+                 gc.alloc.rate.norm: 465.602 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   2: 613.480 ns/op
+                 gc.alloc.rate:      723.744 MB/sec
+                 gc.alloc.rate.norm: 465.603 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   3: 617.438 ns/op
+                 gc.alloc.rate:      719.115 MB/sec
+                 gc.alloc.rate.norm: 465.603 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   4: 616.572 ns/op
+                 gc.alloc.rate:      720.135 MB/sec
+                 gc.alloc.rate.norm: 465.603 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   5: 614.665 ns/op
+                 gc.alloc.rate:      722.365 MB/sec
+                 gc.alloc.rate.norm: 465.602 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            3.000 ms
+
+
+# Run progress: 22.22% complete, ETA 00:11:53
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 634.632 ns/op
+# Warmup Iteration   2: 614.740 ns/op
+# Warmup Iteration   3: 615.276 ns/op
+# Warmup Iteration   4: 621.306 ns/op
+# Warmup Iteration   5: 616.844 ns/op
+Iteration   1: 615.279 ns/op
+                 gc.alloc.rate:      721.644 MB/sec
+                 gc.alloc.rate.norm: 465.602 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   2: 625.190 ns/op
+                 gc.alloc.rate:      710.175 MB/sec
+                 gc.alloc.rate.norm: 465.603 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 610.142 ns/op
+                 gc.alloc.rate:      727.722 MB/sec
+                 gc.alloc.rate.norm: 465.603 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            5.000 ms
+
+Iteration   4: 617.608 ns/op
+                 gc.alloc.rate:      718.927 MB/sec
+                 gc.alloc.rate.norm: 465.603 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   5: 615.375 ns/op
+                 gc.alloc.rate:      721.532 MB/sec
+                 gc.alloc.rate.norm: 465.603 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            5.000 ms
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  621.095 ±(99.9%) 8.731 ns/op [Average]
+  (min, avg, max) = (610.142, 621.095, 634.128), stdev = 8.167
+  CI (99.9%): [612.364, 629.826] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate":
+  714.997 ±(99.9%) 9.995 MB/sec [Average]
+  (min, avg, max) = (700.193, 714.997, 727.722), stdev = 9.349
+  CI (99.9%): [705.003, 724.992] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate.norm":
+  465.603 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (465.602, 465.603, 465.604), stdev = 0.001
+  CI (99.9%): [465.602, 465.603] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.count":
+  26.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (1.000, 1.733, 2.000), stdev = 0.458
+  CI (99.9%): [26.000, 26.000] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.time":
+  53.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (1.000, 3.533, 5.000), stdev = 1.125
+  CI (99.9%): [53.000, 53.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = praecepta, table = mixed-1000x18, workload = match)
+
+# Run progress: 25.00% complete, ETA 00:11:28
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1205.563 ns/op
+# Warmup Iteration   2: 1198.976 ns/op
+# Warmup Iteration   3: 1191.112 ns/op
+# Warmup Iteration   4: 1187.903 ns/op
+# Warmup Iteration   5: 1197.799 ns/op
+Iteration   1: 1204.829 ns/op
+                 gc.alloc.rate:      139.562 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   2: 1181.318 ns/op
+                 gc.alloc.rate:      142.339 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 1182.982 ns/op
+                 gc.alloc.rate:      142.138 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 1187.504 ns/op
+                 gc.alloc.rate:      141.597 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 1186.878 ns/op
+                 gc.alloc.rate:      141.671 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           ≈ 0 counts
+
+
+# Run progress: 27.78% complete, ETA 00:11:03
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1102.281 ns/op
+# Warmup Iteration   2: 1094.968 ns/op
+# Warmup Iteration   3: 1091.857 ns/op
+# Warmup Iteration   4: 1076.583 ns/op
+# Warmup Iteration   5: 1088.244 ns/op
+Iteration   1: 1091.294 ns/op
+                 gc.alloc.rate:      154.081 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   2: 1078.899 ns/op
+                 gc.alloc.rate:      155.850 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 1094.204 ns/op
+                 gc.alloc.rate:      153.671 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 1082.881 ns/op
+                 gc.alloc.rate:      155.276 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   5: 1084.642 ns/op
+                 gc.alloc.rate:      155.023 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           ≈ 0 counts
+
+
+# Run progress: 30.56% complete, ETA 00:10:38
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1106.295 ns/op
+# Warmup Iteration   2: 1093.162 ns/op
+# Warmup Iteration   3: 1084.399 ns/op
+# Warmup Iteration   4: 1097.164 ns/op
+# Warmup Iteration   5: 1096.149 ns/op
+Iteration   1: 1084.620 ns/op
+                 gc.alloc.rate:      155.028 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   2: 1076.116 ns/op
+                 gc.alloc.rate:      156.253 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 1089.128 ns/op
+                 gc.alloc.rate:      154.387 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   4: 1077.160 ns/op
+                 gc.alloc.rate:      156.100 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 1078.270 ns/op
+                 gc.alloc.rate:      155.941 MB/sec
+                 gc.alloc.rate.norm: 176.323 B/op
+                 gc.count:           ≈ 0 counts
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  1118.715 ±(99.9%) 55.286 ns/op [Average]
+  (min, avg, max) = (1076.116, 1118.715, 1204.829), stdev = 51.714
+  CI (99.9%): [1063.429, 1174.001] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate":
+  150.594 ±(99.9%) 7.215 MB/sec [Average]
+  (min, avg, max) = (139.562, 150.594, 156.253), stdev = 6.749
+  CI (99.9%): [143.379, 157.810] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate.norm":
+  176.323 ±(99.9%) 0.001 B/op [Average]
+  (min, avg, max) = (176.323, 176.323, 176.323), stdev = 0.001
+  CI (99.9%): [176.323, 176.323] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.count":
+  6.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (≈ 0, 0.400, 1.000), stdev = 0.507
+  CI (99.9%): [6.000, 6.000] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.time":
+  16.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (≈ 0, 1.067, 3.000), stdev = 1.387
+  CI (99.9%): [16.000, 16.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = camunda, table = synthetic-1000x5, workload = match)
+
+# Run progress: 33.33% complete, ETA 00:10:13
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+85586.523 ns/op
+# Warmup Iteration   2: 80737.589 ns/op
+# Warmup Iteration   3: 88179.405 ns/op
+# Warmup Iteration   4: 81023.518 ns/op
+# Warmup Iteration   5: 81211.143 ns/op
+Iteration   1: 80083.300 ns/op
+                 gc.alloc.rate:      4621.143 MB/sec
+                 gc.alloc.rate.norm: 388071.167 B/op
+                 gc.count:           11.000 counts
+                 gc.time:            7.000 ms
+
+Iteration   2: 79845.951 ns/op
+                 gc.alloc.rate:      4634.885 MB/sec
+                 gc.alloc.rate.norm: 388070.585 B/op
+                 gc.count:           12.000 counts
+                 gc.time:            8.000 ms
+
+Iteration   3: 80593.544 ns/op
+                 gc.alloc.rate:      4591.925 MB/sec
+                 gc.alloc.rate.norm: 388072.113 B/op
+                 gc.count:           11.000 counts
+                 gc.time:            8.000 ms
+
+Iteration   4: 80140.058 ns/op
+                 gc.alloc.rate:      4617.846 MB/sec
+                 gc.alloc.rate.norm: 388069.245 B/op
+                 gc.count:           11.000 counts
+                 gc.time:            7.000 ms
+
+Iteration   5: 80005.141 ns/op
+                 gc.alloc.rate:      4625.639 MB/sec
+                 gc.alloc.rate.norm: 388072.012 B/op
+                 gc.count:           12.000 counts
+                 gc.time:            8.000 ms
+
+
+# Run progress: 36.11% complete, ETA 00:09:49
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+109062.357 ns/op
+# Warmup Iteration   2: 106735.646 ns/op
+# Warmup Iteration   3: 108227.503 ns/op
+# Warmup Iteration   4: 104967.634 ns/op
+# Warmup Iteration   5: 105200.525 ns/op
+Iteration   1: 104840.639 ns/op
+                 gc.alloc.rate:      4707.828 MB/sec
+                 gc.alloc.rate.norm: 517576.110 B/op
+                 gc.count:           11.000 counts
+                 gc.time:            11.000 ms
+
+Iteration   2: 105127.387 ns/op
+                 gc.alloc.rate:      4695.018 MB/sec
+                 gc.alloc.rate.norm: 517574.248 B/op
+                 gc.count:           12.000 counts
+                 gc.time:            10.000 ms
+
+Iteration   3: 104604.369 ns/op
+                 gc.alloc.rate:      4718.541 MB/sec
+                 gc.alloc.rate.norm: 517575.552 B/op
+                 gc.count:           12.000 counts
+                 gc.time:            13.000 ms
+
+Iteration   4: 105152.326 ns/op
+                 gc.alloc.rate:      4693.922 MB/sec
+                 gc.alloc.rate.norm: 517574.787 B/op
+                 gc.count:           11.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   5: 104745.825 ns/op
+                 gc.alloc.rate:      4712.141 MB/sec
+                 gc.alloc.rate.norm: 517575.532 B/op
+                 gc.count:           12.000 counts
+                 gc.time:            11.000 ms
+
+
+# Run progress: 38.89% complete, ETA 00:09:25
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+117949.736 ns/op
+# Warmup Iteration   2: 116450.558 ns/op
+# Warmup Iteration   3: 114125.674 ns/op
+# Warmup Iteration   4: 113523.198 ns/op
+# Warmup Iteration   5: 114578.115 ns/op
+Iteration   1: 113653.843 ns/op
+                 gc.alloc.rate:      4340.206 MB/sec
+                 gc.alloc.rate.norm: 517263.312 B/op
+                 gc.count:           11.000 counts
+                 gc.time:            11.000 ms
+
+Iteration   2: 114279.375 ns/op
+                 gc.alloc.rate:      4316.325 MB/sec
+                 gc.alloc.rate.norm: 517268.472 B/op
+                 gc.count:           10.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   3: 113885.486 ns/op
+                 gc.alloc.rate:      4331.417 MB/sec
+                 gc.alloc.rate.norm: 517267.181 B/op
+                 gc.count:           11.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   4: 113932.093 ns/op
+                 gc.alloc.rate:      4329.611 MB/sec
+                 gc.alloc.rate.norm: 517267.988 B/op
+                 gc.count:           11.000 counts
+                 gc.time:            10.000 ms
+
+Iteration   5: 114057.020 ns/op
+                 gc.alloc.rate:      4324.858 MB/sec
+                 gc.alloc.rate.norm: 517270.281 B/op
+                 gc.count:           10.000 counts
+                 gc.time:            9.000 ms
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  99663.091 ±(99.9%) 15822.741 ns/op [Average]
+  (min, avg, max) = (79845.951, 99663.091, 114279.375), stdev = 14800.602
+  CI (99.9%): [83840.350, 115485.832] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate":
+  4550.754 ±(99.9%) 178.739 MB/sec [Average]
+  (min, avg, max) = (4316.325, 4550.754, 4718.541), stdev = 167.192
+  CI (99.9%): [4372.015, 4729.493] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate.norm":
+  474304.572 ±(99.9%) 67475.504 B/op [Average]
+  (min, avg, max) = (388069.245, 474304.572, 517576.110), stdev = 63116.628
+  CI (99.9%): [406829.068, 541780.076] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.count":
+  168.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (10.000, 11.200, 12.000), stdev = 0.676
+  CI (99.9%): [168.000, 168.000] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.time":
+  140.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (7.000, 9.333, 13.000), stdev = 1.676
+  CI (99.9%): [140.000, 140.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = camunda, table = synthetic-1000x20, workload = match)
+
+# Run progress: 41.67% complete, ETA 00:09:00
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+234225.737 ns/op
+# Warmup Iteration   2: 208657.196 ns/op
+# Warmup Iteration   3: 203672.760 ns/op
+# Warmup Iteration   4: 203684.006 ns/op
+# Warmup Iteration   5: 203482.826 ns/op
+Iteration   1: 204376.645 ns/op
+                 gc.alloc.rate:      5111.073 MB/sec
+                 gc.alloc.rate.norm: 1095365.935 B/op
+                 gc.count:           13.000 counts
+                 gc.time:            12.000 ms
+
+Iteration   2: 203636.168 ns/op
+                 gc.alloc.rate:      5129.560 MB/sec
+                 gc.alloc.rate.norm: 1095349.315 B/op
+                 gc.count:           13.000 counts
+                 gc.time:            12.000 ms
+
+Iteration   3: 203483.096 ns/op
+                 gc.alloc.rate:      5133.450 MB/sec
+                 gc.alloc.rate.norm: 1095354.698 B/op
+                 gc.count:           12.000 counts
+                 gc.time:            12.000 ms
+
+Iteration   4: 203629.318 ns/op
+                 gc.alloc.rate:      5129.769 MB/sec
+                 gc.alloc.rate.norm: 1095361.928 B/op
+                 gc.count:           13.000 counts
+                 gc.time:            13.000 ms
+
+Iteration   5: 203218.520 ns/op
+                 gc.alloc.rate:      5140.140 MB/sec
+                 gc.alloc.rate.norm: 1095353.059 B/op
+                 gc.count:           13.000 counts
+                 gc.time:            12.000 ms
+
+
+# Run progress: 44.44% complete, ETA 00:08:36
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+234657.816 ns/op
+# Warmup Iteration   2: 203575.193 ns/op
+# Warmup Iteration   3: 198164.126 ns/op
+# Warmup Iteration   4: 198407.252 ns/op
+# Warmup Iteration   5: 199391.012 ns/op
+Iteration   1: 198926.563 ns/op
+                 gc.alloc.rate:      5249.988 MB/sec
+                 gc.alloc.rate.norm: 1095144.586 B/op
+                 gc.count:           13.000 counts
+                 gc.time:            12.000 ms
+
+Iteration   2: 198081.355 ns/op
+                 gc.alloc.rate:      5272.484 MB/sec
+                 gc.alloc.rate.norm: 1095158.339 B/op
+                 gc.count:           13.000 counts
+                 gc.time:            12.000 ms
+
+Iteration   3: 198425.264 ns/op
+                 gc.alloc.rate:      5263.280 MB/sec
+                 gc.alloc.rate.norm: 1095143.396 B/op
+                 gc.count:           12.000 counts
+                 gc.time:            10.000 ms
+
+Iteration   4: 199762.943 ns/op
+                 gc.alloc.rate:      5227.947 MB/sec
+                 gc.alloc.rate.norm: 1095143.434 B/op
+                 gc.count:           13.000 counts
+                 gc.time:            12.000 ms
+
+Iteration   5: 198589.993 ns/op
+                 gc.alloc.rate:      5258.962 MB/sec
+                 gc.alloc.rate.norm: 1095157.220 B/op
+                 gc.count:           13.000 counts
+                 gc.time:            11.000 ms
+
+
+# Run progress: 47.22% complete, ETA 00:08:12
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+238162.012 ns/op
+# Warmup Iteration   2: 202169.126 ns/op
+# Warmup Iteration   3: 196820.982 ns/op
+# Warmup Iteration   4: 196088.632 ns/op
+# Warmup Iteration   5: 197788.009 ns/op
+Iteration   1: 197590.182 ns/op
+                 gc.alloc.rate:      5286.267 MB/sec
+                 gc.alloc.rate.norm: 1095302.817 B/op
+                 gc.count:           13.000 counts
+                 gc.time:            11.000 ms
+
+Iteration   2: 196324.515 ns/op
+                 gc.alloc.rate:      5320.416 MB/sec
+                 gc.alloc.rate.norm: 1095315.830 B/op
+                 gc.count:           13.000 counts
+                 gc.time:            12.000 ms
+
+Iteration   3: 196201.920 ns/op
+                 gc.alloc.rate:      5323.685 MB/sec
+                 gc.alloc.rate.norm: 1095302.185 B/op
+                 gc.count:           13.000 counts
+                 gc.time:            12.000 ms
+
+Iteration   4: 196851.377 ns/op
+                 gc.alloc.rate:      5306.103 MB/sec
+                 gc.alloc.rate.norm: 1095311.638 B/op
+                 gc.count:           13.000 counts
+                 gc.time:            12.000 ms
+
+Iteration   5: 196000.562 ns/op
+                 gc.alloc.rate:      5329.127 MB/sec
+                 gc.alloc.rate.norm: 1095305.199 B/op
+                 gc.count:           13.000 counts
+                 gc.time:            13.000 ms
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  199673.228 ±(99.9%) 3325.235 ns/op [Average]
+  (min, avg, max) = (196000.562, 199673.228, 204376.645), stdev = 3110.427
+  CI (99.9%): [196347.993, 202998.463] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate":
+  5232.150 ±(99.9%) 86.425 MB/sec [Average]
+  (min, avg, max) = (5111.073, 5232.150, 5329.127), stdev = 80.842
+  CI (99.9%): [5145.725, 5318.575] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate.norm":
+  1095271.305 ±(99.9%) 98.207 B/op [Average]
+  (min, avg, max) = (1095143.396, 1095271.305, 1095365.935), stdev = 91.863
+  CI (99.9%): [1095173.099, 1095369.512] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.count":
+  193.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (12.000, 12.867, 13.000), stdev = 0.352
+  CI (99.9%): [193.000, 193.000] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.time":
+  178.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (10.000, 11.867, 13.000), stdev = 0.743
+  CI (99.9%): [178.000, 178.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = camunda, table = mixed-1000x6, workload = match)
+
+# Run progress: 50.00% complete, ETA 00:07:47
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+232550.313 ns/op
+# Warmup Iteration   2: 231558.556 ns/op
+# Warmup Iteration   3: 228355.206 ns/op
+# Warmup Iteration   4: 226873.838 ns/op
+# Warmup Iteration   5: 228593.116 ns/op
+Iteration   1: 228011.445 ns/op
+                 gc.alloc.rate:      3629.125 MB/sec
+                 gc.alloc.rate.norm: 867713.960 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            8.000 ms
+
+Iteration   2: 228297.905 ns/op
+                 gc.alloc.rate:      3624.339 MB/sec
+                 gc.alloc.rate.norm: 867657.325 B/op
+                 gc.count:           8.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   3: 230221.307 ns/op
+                 gc.alloc.rate:      3595.073 MB/sec
+                 gc.alloc.rate.norm: 867901.993 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   4: 228886.471 ns/op
+                 gc.alloc.rate:      3614.681 MB/sec
+                 gc.alloc.rate.norm: 867579.873 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            7.000 ms
+
+Iteration   5: 228166.727 ns/op
+                 gc.alloc.rate:      3626.964 MB/sec
+                 gc.alloc.rate.norm: 867783.699 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            9.000 ms
+
+
+# Run progress: 52.78% complete, ETA 00:07:23
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+272029.167 ns/op
+# Warmup Iteration   2: 261204.340 ns/op
+# Warmup Iteration   3: 258559.207 ns/op
+# Warmup Iteration   4: 259955.760 ns/op
+# Warmup Iteration   5: 257330.385 ns/op
+Iteration   1: 258518.697 ns/op
+                 gc.alloc.rate:      3439.192 MB/sec
+                 gc.alloc.rate.norm: 932328.150 B/op
+                 gc.count:           8.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   2: 257867.343 ns/op
+                 gc.alloc.rate:      3447.975 MB/sec
+                 gc.alloc.rate.norm: 932395.953 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   3: 259901.309 ns/op
+                 gc.alloc.rate:      3420.455 MB/sec
+                 gc.alloc.rate.norm: 932218.976 B/op
+                 gc.count:           8.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   4: 257556.789 ns/op
+                 gc.alloc.rate:      3452.344 MB/sec
+                 gc.alloc.rate.norm: 932418.268 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            10.000 ms
+
+Iteration   5: 257483.702 ns/op
+                 gc.alloc.rate:      3452.631 MB/sec
+                 gc.alloc.rate.norm: 932231.453 B/op
+                 gc.count:           8.000 counts
+                 gc.time:            7.000 ms
+
+
+# Run progress: 55.56% complete, ETA 00:06:58
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+232239.965 ns/op
+# Warmup Iteration   2: 226979.549 ns/op
+# Warmup Iteration   3: 225830.932 ns/op
+# Warmup Iteration   4: 223603.045 ns/op
+# Warmup Iteration   5: 224188.513 ns/op
+Iteration   1: 225372.939 ns/op
+                 gc.alloc.rate:      3628.872 MB/sec
+                 gc.alloc.rate.norm: 857614.690 B/op
+                 gc.count:           8.000 counts
+                 gc.time:            8.000 ms
+
+Iteration   2: 226029.478 ns/op
+                 gc.alloc.rate:      3619.023 MB/sec
+                 gc.alloc.rate.norm: 857777.401 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   3: 225722.521 ns/op
+                 gc.alloc.rate:      3622.878 MB/sec
+                 gc.alloc.rate.norm: 857521.309 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   4: 224930.017 ns/op
+                 gc.alloc.rate:      3636.518 MB/sec
+                 gc.alloc.rate.norm: 857731.127 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            10.000 ms
+
+Iteration   5: 223960.128 ns/op
+                 gc.alloc.rate:      3651.793 MB/sec
+                 gc.alloc.rate.norm: 857619.940 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            10.000 ms
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  237395.118 ±(99.9%) 16432.078 ns/op [Average]
+  (min, avg, max) = (223960.128, 237395.118, 259901.309), stdev = 15370.576
+  CI (99.9%): [220963.040, 253827.197] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate":
+  3564.124 ±(99.9%) 96.285 MB/sec [Average]
+  (min, avg, max) = (3420.455, 3564.124, 3651.793), stdev = 90.065
+  CI (99.9%): [3467.839, 3660.409] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate.norm":
+  885899.608 ±(99.9%) 36605.730 B/op [Average]
+  (min, avg, max) = (857521.309, 885899.608, 932418.268), stdev = 34241.022
+  CI (99.9%): [849293.878, 922505.338] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.count":
+  130.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (8.000, 8.667, 9.000), stdev = 0.488
+  CI (99.9%): [130.000, 130.000] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.time":
+  126.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (6.000, 8.400, 10.000), stdev = 1.352
+  CI (99.9%): [126.000, 126.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = camunda, table = mixed-1000x18, workload = match)
+
+# Run progress: 58.33% complete, ETA 00:06:33
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+341677.071 ns/op
+# Warmup Iteration   2: 339195.726 ns/op
+# Warmup Iteration   3: 329547.176 ns/op
+# Warmup Iteration   4: 328418.308 ns/op
+# Warmup Iteration   5: 329736.417 ns/op
+Iteration   1: 336847.815 ns/op
+                 gc.alloc.rate:      3982.667 MB/sec
+                 gc.alloc.rate.norm: 1406805.621 B/op
+                 gc.count:           10.000 counts
+                 gc.time:            11.000 ms
+
+Iteration   2: 329329.117 ns/op
+                 gc.alloc.rate:      4074.755 MB/sec
+                 gc.alloc.rate.norm: 1407183.543 B/op
+                 gc.count:           10.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   3: 329672.421 ns/op
+                 gc.alloc.rate:      4069.611 MB/sec
+                 gc.alloc.rate.norm: 1406863.466 B/op
+                 gc.count:           10.000 counts
+                 gc.time:            10.000 ms
+
+Iteration   4: 330148.524 ns/op
+                 gc.alloc.rate:      4063.346 MB/sec
+                 gc.alloc.rate.norm: 1406748.914 B/op
+                 gc.count:           10.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   5: 329081.516 ns/op
+                 gc.alloc.rate:      4077.403 MB/sec
+                 gc.alloc.rate.norm: 1407033.313 B/op
+                 gc.count:           10.000 counts
+                 gc.time:            10.000 ms
+
+
+# Run progress: 61.11% complete, ETA 00:06:08
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+425748.645 ns/op
+# Warmup Iteration   2: 417080.780 ns/op
+# Warmup Iteration   3: 409015.811 ns/op
+# Warmup Iteration   4: 408218.835 ns/op
+# Warmup Iteration   5: 406861.429 ns/op
+Iteration   1: 408333.661 ns/op
+                 gc.alloc.rate:      3463.060 MB/sec
+                 gc.alloc.rate.norm: 1482842.680 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            8.000 ms
+
+Iteration   2: 407497.772 ns/op
+                 gc.alloc.rate:      3469.658 MB/sec
+                 gc.alloc.rate.norm: 1482618.165 B/op
+                 gc.count:           8.000 counts
+                 gc.time:            8.000 ms
+
+Iteration   3: 408042.706 ns/op
+                 gc.alloc.rate:      3465.825 MB/sec
+                 gc.alloc.rate.norm: 1482961.656 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            8.000 ms
+
+Iteration   4: 407648.954 ns/op
+                 gc.alloc.rate:      3469.268 MB/sec
+                 gc.alloc.rate.norm: 1483000.596 B/op
+                 gc.count:           8.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   5: 411125.257 ns/op
+                 gc.alloc.rate:      3440.663 MB/sec
+                 gc.alloc.rate.norm: 1483318.313 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            8.000 ms
+
+
+# Run progress: 63.89% complete, ETA 00:05:43
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+436578.368 ns/op
+# Warmup Iteration   2: 434863.157 ns/op
+# Warmup Iteration   3: 432475.763 ns/op
+# Warmup Iteration   4: 421738.366 ns/op
+# Warmup Iteration   5: 434555.892 ns/op
+Iteration   1: 433563.263 ns/op
+                 gc.alloc.rate:      3318.975 MB/sec
+                 gc.alloc.rate.norm: 1508957.609 B/op
+                 gc.count:           8.000 counts
+                 gc.time:            8.000 ms
+
+Iteration   2: 423934.970 ns/op
+                 gc.alloc.rate:      3393.172 MB/sec
+                 gc.alloc.rate.norm: 1508434.332 B/op
+                 gc.count:           8.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   3: 422718.732 ns/op
+                 gc.alloc.rate:      3404.769 MB/sec
+                 gc.alloc.rate.norm: 1509231.971 B/op
+                 gc.count:           8.000 counts
+                 gc.time:            7.000 ms
+
+Iteration   4: 420697.583 ns/op
+                 gc.alloc.rate:      3418.206 MB/sec
+                 gc.alloc.rate.norm: 1507951.519 B/op
+                 gc.count:           9.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   5: 422775.228 ns/op
+                 gc.alloc.rate:      3403.052 MB/sec
+                 gc.alloc.rate.norm: 1508679.162 B/op
+                 gc.count:           8.000 counts
+                 gc.time:            6.000 ms
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  388094.501 ±(99.9%) 45398.080 ns/op [Average]
+  (min, avg, max) = (329081.516, 388094.501, 433563.263), stdev = 42465.393
+  CI (99.9%): [342696.421, 433492.582] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate":
+  3634.295 ±(99.9%) 331.390 MB/sec [Average]
+  (min, avg, max) = (3318.975, 3634.295, 4077.403), stdev = 309.983
+  CI (99.9%): [3302.905, 3965.686] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate.norm":
+  1466175.391 ±(99.9%) 47793.395 B/op [Average]
+  (min, avg, max) = (1406748.914, 1466175.391, 1509231.971), stdev = 44705.971
+  CI (99.9%): [1418381.996, 1513968.785] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.count":
+  134.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (8.000, 8.933, 10.000), stdev = 0.884
+  CI (99.9%): [134.000, 134.000] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.time":
+  126.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (6.000, 8.400, 11.000), stdev = 1.404
+  CI (99.9%): [126.000, 126.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = drools, table = synthetic-1000x5, workload = match)
+
+# Run progress: 66.67% complete, ETA 00:05:17
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+177038.574 ns/op
+# Warmup Iteration   2: 184080.319 ns/op
+# Warmup Iteration   3: 183027.292 ns/op
+# Warmup Iteration   4: 183485.444 ns/op
+# Warmup Iteration   5: 182821.669 ns/op
+Iteration   1: 182621.019 ns/op
+                 gc.alloc.rate:      1028.343 MB/sec
+                 gc.alloc.rate.norm: 196929.361 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            10.000 ms
+
+Iteration   2: 182692.584 ns/op
+                 gc.alloc.rate:      1027.968 MB/sec
+                 gc.alloc.rate.norm: 196932.653 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   3: 183147.544 ns/op
+                 gc.alloc.rate:      1025.386 MB/sec
+                 gc.alloc.rate.norm: 196926.771 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   4: 182432.652 ns/op
+                 gc.alloc.rate:      1029.363 MB/sec
+                 gc.alloc.rate.norm: 196920.069 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 182875.475 ns/op
+                 gc.alloc.rate:      1026.917 MB/sec
+                 gc.alloc.rate.norm: 196928.302 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+
+# Run progress: 69.44% complete, ETA 00:04:51
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+176740.189 ns/op
+# Warmup Iteration   2: 183733.419 ns/op
+# Warmup Iteration   3: 184249.183 ns/op
+# Warmup Iteration   4: 184492.340 ns/op
+# Warmup Iteration   5: 182904.819 ns/op
+Iteration   1: 183619.548 ns/op
+                 gc.alloc.rate:      1022.652 MB/sec
+                 gc.alloc.rate.norm: 196909.748 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   2: 182953.307 ns/op
+                 gc.alloc.rate:      1026.352 MB/sec
+                 gc.alloc.rate.norm: 196909.456 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            5.000 ms
+
+Iteration   3: 183225.102 ns/op
+                 gc.alloc.rate:      1024.873 MB/sec
+                 gc.alloc.rate.norm: 196911.952 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   4: 182599.407 ns/op
+                 gc.alloc.rate:      1028.416 MB/sec
+                 gc.alloc.rate.norm: 196919.057 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   5: 182272.195 ns/op
+                 gc.alloc.rate:      1030.214 MB/sec
+                 gc.alloc.rate.norm: 196911.584 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+
+# Run progress: 72.22% complete, ETA 00:04:24
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+175530.366 ns/op
+# Warmup Iteration   2: 183166.458 ns/op
+# Warmup Iteration   3: 184372.259 ns/op
+# Warmup Iteration   4: 183123.734 ns/op
+# Warmup Iteration   5: 184322.479 ns/op
+Iteration   1: 183541.878 ns/op
+                 gc.alloc.rate:      1023.163 MB/sec
+                 gc.alloc.rate.norm: 196926.205 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   2: 186853.410 ns/op
+                 gc.alloc.rate:      1004.887 MB/sec
+                 gc.alloc.rate.norm: 196931.544 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            9.000 ms
+
+Iteration   3: 184529.782 ns/op
+                 gc.alloc.rate:      1017.672 MB/sec
+                 gc.alloc.rate.norm: 196927.736 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            5.000 ms
+
+Iteration   4: 182657.416 ns/op
+                 gc.alloc.rate:      1028.094 MB/sec
+                 gc.alloc.rate.norm: 196920.122 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 181262.404 ns/op
+                 gc.alloc.rate:      1036.045 MB/sec
+                 gc.alloc.rate.norm: 196927.677 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  183152.248 ±(99.9%) 1340.008 ns/op [Average]
+  (min, avg, max) = (181262.404, 183152.248, 186853.410), stdev = 1253.444
+  CI (99.9%): [181812.241, 184492.256] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate":
+  1025.356 ±(99.9%) 7.452 MB/sec [Average]
+  (min, avg, max) = (1004.887, 1025.356, 1036.045), stdev = 6.971
+  CI (99.9%): [1017.904, 1032.809] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate.norm":
+  196922.149 ±(99.9%) 8.744 B/op [Average]
+  (min, avg, max) = (196909.456, 196922.149, 196932.653), stdev = 8.179
+  CI (99.9%): [196913.405, 196930.893] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.count":
+  39.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (2.000, 2.600, 3.000), stdev = 0.507
+  CI (99.9%): [39.000, 39.000] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.time":
+  78.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (1.000, 5.200, 10.000), stdev = 3.005
+  CI (99.9%): [78.000, 78.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = drools, table = synthetic-1000x20, workload = match)
+
+# Run progress: 75.00% complete, ETA 00:03:58
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+145171.773 ns/op
+# Warmup Iteration   2: 146604.612 ns/op
+# Warmup Iteration   3: 146452.675 ns/op
+# Warmup Iteration   4: 145608.723 ns/op
+# Warmup Iteration   5: 146627.482 ns/op
+Iteration   1: 146336.329 ns/op
+                 gc.alloc.rate:      1314.500 MB/sec
+                 gc.alloc.rate.norm: 201713.325 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            11.000 ms
+
+Iteration   2: 145869.734 ns/op
+                 gc.alloc.rate:      1318.707 MB/sec
+                 gc.alloc.rate.norm: 201710.946 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            5.000 ms
+
+Iteration   3: 146500.276 ns/op
+                 gc.alloc.rate:      1313.052 MB/sec
+                 gc.alloc.rate.norm: 201714.797 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   4: 147389.191 ns/op
+                 gc.alloc.rate:      1305.084 MB/sec
+                 gc.alloc.rate.norm: 201706.974 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 145451.480 ns/op
+                 gc.alloc.rate:      1322.523 MB/sec
+                 gc.alloc.rate.norm: 201715.838 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+
+# Run progress: 77.78% complete, ETA 00:03:32
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+142742.044 ns/op
+# Warmup Iteration   2: 142757.345 ns/op
+# Warmup Iteration   3: 141887.091 ns/op
+# Warmup Iteration   4: 141220.635 ns/op
+# Warmup Iteration   5: 142494.902 ns/op
+Iteration   1: 141937.743 ns/op
+                 gc.alloc.rate:      1356.775 MB/sec
+                 gc.alloc.rate.norm: 201943.187 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            14.000 ms
+
+Iteration   2: 141721.054 ns/op
+                 gc.alloc.rate:      1358.877 MB/sec
+                 gc.alloc.rate.norm: 201944.191 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 141082.050 ns/op
+                 gc.alloc.rate:      1364.960 MB/sec
+                 gc.alloc.rate.norm: 201932.938 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   4: 141653.130 ns/op
+                 gc.alloc.rate:      1359.533 MB/sec
+                 gc.alloc.rate.norm: 201945.024 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   5: 141952.203 ns/op
+                 gc.alloc.rate:      1356.687 MB/sec
+                 gc.alloc.rate.norm: 201948.010 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+
+# Run progress: 80.56% complete, ETA 00:03:05
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+145385.820 ns/op
+# Warmup Iteration   2: 144893.150 ns/op
+# Warmup Iteration   3: 143428.314 ns/op
+# Warmup Iteration   4: 143455.265 ns/op
+# Warmup Iteration   5: 142988.447 ns/op
+Iteration   1: 143391.585 ns/op
+                 gc.alloc.rate:      1344.008 MB/sec
+                 gc.alloc.rate.norm: 202092.086 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            14.000 ms
+
+Iteration   2: 142123.218 ns/op
+                 gc.alloc.rate:      1356.008 MB/sec
+                 gc.alloc.rate.norm: 202091.382 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 142333.237 ns/op
+                 gc.alloc.rate:      1353.994 MB/sec
+                 gc.alloc.rate.norm: 202087.557 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   4: 142078.558 ns/op
+                 gc.alloc.rate:      1356.393 MB/sec
+                 gc.alloc.rate.norm: 202083.101 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   5: 142300.086 ns/op
+                 gc.alloc.rate:      1354.238 MB/sec
+                 gc.alloc.rate.norm: 202080.280 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  143474.658 ±(99.9%) 2313.681 ns/op [Average]
+  (min, avg, max) = (141082.050, 143474.658, 147389.191), stdev = 2164.219
+  CI (99.9%): [141160.977, 145788.339] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate":
+  1342.356 ±(99.9%) 22.373 MB/sec [Average]
+  (min, avg, max) = (1305.084, 1342.356, 1364.960), stdev = 20.928
+  CI (99.9%): [1319.983, 1364.729] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate.norm":
+  201913.976 ±(99.9%) 170.739 B/op [Average]
+  (min, avg, max) = (201706.974, 201913.976, 202092.086), stdev = 159.709
+  CI (99.9%): [201743.237, 202084.714] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.count":
+  50.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (3.000, 3.333, 4.000), stdev = 0.488
+  CI (99.9%): [50.000, 50.000] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.time":
+  76.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (2.000, 5.067, 14.000), stdev = 4.234
+  CI (99.9%): [76.000, 76.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = drools, table = mixed-1000x6, workload = match)
+
+# Run progress: 83.33% complete, ETA 00:02:39
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+253709.416 ns/op
+# Warmup Iteration   2: 245897.730 ns/op
+# Warmup Iteration   3: 244756.336 ns/op
+# Warmup Iteration   4: 247414.356 ns/op
+# Warmup Iteration   5: 245053.253 ns/op
+Iteration   1: 244576.746 ns/op
+                 gc.alloc.rate:      1445.529 MB/sec
+                 gc.alloc.rate.norm: 370735.004 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   2: 248348.148 ns/op
+                 gc.alloc.rate:      1423.277 MB/sec
+                 gc.alloc.rate.norm: 370661.286 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 249403.574 ns/op
+                 gc.alloc.rate:      1417.564 MB/sec
+                 gc.alloc.rate.norm: 370738.473 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   4: 247500.476 ns/op
+                 gc.alloc.rate:      1428.411 MB/sec
+                 gc.alloc.rate.norm: 370723.690 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   5: 242737.192 ns/op
+                 gc.alloc.rate:      1456.383 MB/sec
+                 gc.alloc.rate.norm: 370711.335 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+
+# Run progress: 86.11% complete, ETA 00:02:12
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+246498.278 ns/op
+# Warmup Iteration   2: 244332.352 ns/op
+# Warmup Iteration   3: 245205.950 ns/op
+# Warmup Iteration   4: 243384.569 ns/op
+# Warmup Iteration   5: 246572.855 ns/op
+Iteration   1: 243641.845 ns/op
+                 gc.alloc.rate:      1451.155 MB/sec
+                 gc.alloc.rate.norm: 370751.600 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            6.000 ms
+
+Iteration   2: 244316.247 ns/op
+                 gc.alloc.rate:      1447.273 MB/sec
+                 gc.alloc.rate.norm: 370785.418 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   3: 245379.687 ns/op
+                 gc.alloc.rate:      1440.853 MB/sec
+                 gc.alloc.rate.norm: 370746.284 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   4: 243522.289 ns/op
+                 gc.alloc.rate:      1451.894 MB/sec
+                 gc.alloc.rate.norm: 370759.394 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   5: 242607.528 ns/op
+                 gc.alloc.rate:      1457.249 MB/sec
+                 gc.alloc.rate.norm: 370729.049 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+
+# Run progress: 88.89% complete, ETA 00:01:46
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+261311.355 ns/op
+# Warmup Iteration   2: 260011.838 ns/op
+# Warmup Iteration   3: 252811.187 ns/op
+# Warmup Iteration   4: 253256.985 ns/op
+# Warmup Iteration   5: 253997.800 ns/op
+Iteration   1: 254921.717 ns/op
+                 gc.alloc.rate:      1387.876 MB/sec
+                 gc.alloc.rate.norm: 371003.701 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            11.000 ms
+
+Iteration   2: 253387.877 ns/op
+                 gc.alloc.rate:      1396.409 MB/sec
+                 gc.alloc.rate.norm: 371036.447 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 253415.078 ns/op
+                 gc.alloc.rate:      1396.394 MB/sec
+                 gc.alloc.rate.norm: 371072.601 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   4: 253798.605 ns/op
+                 gc.alloc.rate:      1394.510 MB/sec
+                 gc.alloc.rate.norm: 371137.282 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   5: 252374.591 ns/op
+                 gc.alloc.rate:      1402.167 MB/sec
+                 gc.alloc.rate.norm: 371083.112 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  247995.440 ±(99.9%) 4860.052 ns/op [Average]
+  (min, avg, max) = (242607.528, 247995.440, 254921.717), stdev = 4546.096
+  CI (99.9%): [243135.388, 252855.492] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate":
+  1426.463 ±(99.9%) 27.262 MB/sec [Average]
+  (min, avg, max) = (1387.876, 1426.463, 1457.249), stdev = 25.501
+  CI (99.9%): [1399.201, 1453.725] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate.norm":
+  370844.978 ±(99.9%) 178.050 B/op [Average]
+  (min, avg, max) = (370661.286, 370844.978, 371137.282), stdev = 166.549
+  CI (99.9%): [370666.928, 371023.029] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.count":
+  51.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (3.000, 3.400, 4.000), stdev = 0.507
+  CI (99.9%): [51.000, 51.000] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.time":
+  63.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (3.000, 4.200, 11.000), stdev = 2.145
+  CI (99.9%): [63.000, 63.000] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 27.0.1.0.2, OpenJDK 64-Bit Server VM, 27.0.1.0.2
+# VM invoker: /opt/homebrew/Cellar/openjdk/27.0.1.0.2/libexec/openjdk.jdk/Contents/Home/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = drools, table = mixed-1000x18, workload = match)
+
+# Run progress: 91.67% complete, ETA 00:01:19
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+268802.720 ns/op
+# Warmup Iteration   2: 265363.152 ns/op
+# Warmup Iteration   3: 267495.920 ns/op
+# Warmup Iteration   4: 262555.893 ns/op
+# Warmup Iteration   5: 262455.548 ns/op
+Iteration   1: 261548.347 ns/op
+                 gc.alloc.rate:      1367.809 MB/sec
+                 gc.alloc.rate.norm: 375143.848 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            12.000 ms
+
+Iteration   2: 261502.331 ns/op
+                 gc.alloc.rate:      1367.515 MB/sec
+                 gc.alloc.rate.norm: 374995.091 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   3: 260930.244 ns/op
+                 gc.alloc.rate:      1371.677 MB/sec
+                 gc.alloc.rate.norm: 375313.238 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            5.000 ms
+
+Iteration   4: 261423.708 ns/op
+                 gc.alloc.rate:      1368.574 MB/sec
+                 gc.alloc.rate.norm: 375171.388 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 262745.698 ns/op
+                 gc.alloc.rate:      1361.883 MB/sec
+                 gc.alloc.rate.norm: 375230.494 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+
+# Run progress: 94.44% complete, ETA 00:00:53
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+266456.853 ns/op
+# Warmup Iteration   2: 270766.651 ns/op
+# Warmup Iteration   3: 266631.732 ns/op
+# Warmup Iteration   4: 273174.735 ns/op
+# Warmup Iteration   5: 266029.728 ns/op
+Iteration   1: 263476.014 ns/op
+                 gc.alloc.rate:      1357.493 MB/sec
+                 gc.alloc.rate.norm: 375059.214 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            11.000 ms
+
+Iteration   2: 264056.034 ns/op
+                 gc.alloc.rate:      1355.289 MB/sec
+                 gc.alloc.rate.norm: 375273.409 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 262972.997 ns/op
+                 gc.alloc.rate:      1360.703 MB/sec
+                 gc.alloc.rate.norm: 375225.640 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   4: 264452.561 ns/op
+                 gc.alloc.rate:      1353.271 MB/sec
+                 gc.alloc.rate.norm: 375274.355 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            4.000 ms
+
+Iteration   5: 265474.384 ns/op
+                 gc.alloc.rate:      1347.512 MB/sec
+                 gc.alloc.rate.norm: 375121.844 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+
+# Run progress: 97.22% complete, ETA 00:00:26
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+265994.162 ns/op
+# Warmup Iteration   2: 262585.111 ns/op
+# Warmup Iteration   3: 262518.768 ns/op
+# Warmup Iteration   4: 262271.005 ns/op
+# Warmup Iteration   5: 262014.930 ns/op
+Iteration   1: 261385.660 ns/op
+                 gc.alloc.rate:      1369.072 MB/sec
+                 gc.alloc.rate.norm: 375256.487 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            7.000 ms
+
+Iteration   2: 268230.500 ns/op
+                 gc.alloc.rate:      1333.744 MB/sec
+                 gc.alloc.rate.norm: 375145.272 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 260947.970 ns/op
+                 gc.alloc.rate:      1371.853 MB/sec
+                 gc.alloc.rate.norm: 375387.374 B/op
+                 gc.count:           4.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   4: 261055.597 ns/op
+                 gc.alloc.rate:      1371.188 MB/sec
+                 gc.alloc.rate.norm: 375363.825 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   5: 260072.174 ns/op
+                 gc.alloc.rate:      1376.463 MB/sec
+                 gc.alloc.rate.norm: 375386.282 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  262684.948 ±(99.9%) 2317.627 ns/op [Average]
+  (min, avg, max) = (260072.174, 262684.948, 268230.500), stdev = 2167.910
+  CI (99.9%): [260367.321, 265002.575] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate":
+  1362.270 ±(99.9%) 12.096 MB/sec [Average]
+  (min, avg, max) = (1333.744, 1362.270, 1376.463), stdev = 11.314
+  CI (99.9%): [1350.174, 1374.366] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.alloc.rate.norm":
+  375223.184 ±(99.9%) 125.192 B/op [Average]
+  (min, avg, max) = (374995.091, 375223.184, 375387.374), stdev = 117.104
+  CI (99.9%): [375097.992, 375348.376] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.count":
+  50.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (3.000, 3.333, 4.000), stdev = 0.488
+  CI (99.9%): [50.000, 50.000] (assumes normal distribution)
+
+Secondary result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate:gc.time":
+  66.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (2.000, 4.400, 12.000), stdev = 3.158
+  CI (99.9%): [66.000, 66.000] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:16:03
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                         (engine)            (table)  (workload)  Mode  Cnt        Score       Error   Units
+EvaluationBenchmark.evaluate                     praecepta   synthetic-1000x5       match  avgt   15      247.021 ±     2.604   ns/op
+EvaluationBenchmark.evaluate:gc.alloc.rate       praecepta   synthetic-1000x5       match  avgt   15     1146.377 ±    11.875  MB/sec
+EvaluationBenchmark.evaluate:gc.alloc.rate.norm  praecepta   synthetic-1000x5       match  avgt   15      296.922 ±     0.001    B/op
+EvaluationBenchmark.evaluate:gc.count            praecepta   synthetic-1000x5       match  avgt   15       42.000              counts
+EvaluationBenchmark.evaluate:gc.time             praecepta   synthetic-1000x5       match  avgt   15       51.000                  ms
+EvaluationBenchmark.evaluate                     praecepta  synthetic-1000x20       match  avgt   15      394.838 ±     1.059   ns/op
+EvaluationBenchmark.evaluate:gc.alloc.rate       praecepta  synthetic-1000x20       match  avgt   15      425.089 ±     1.142  MB/sec
+EvaluationBenchmark.evaluate:gc.alloc.rate.norm  praecepta  synthetic-1000x20       match  avgt   15      176.001 ±     0.001    B/op
+EvaluationBenchmark.evaluate:gc.count            praecepta  synthetic-1000x20       match  avgt   15       18.000              counts
+EvaluationBenchmark.evaluate:gc.time             praecepta  synthetic-1000x20       match  avgt   15       42.000                  ms
+EvaluationBenchmark.evaluate                     praecepta       mixed-1000x6       match  avgt   15      621.095 ±     8.731   ns/op
+EvaluationBenchmark.evaluate:gc.alloc.rate       praecepta       mixed-1000x6       match  avgt   15      714.997 ±     9.995  MB/sec
+EvaluationBenchmark.evaluate:gc.alloc.rate.norm  praecepta       mixed-1000x6       match  avgt   15      465.603 ±     0.001    B/op
+EvaluationBenchmark.evaluate:gc.count            praecepta       mixed-1000x6       match  avgt   15       26.000              counts
+EvaluationBenchmark.evaluate:gc.time             praecepta       mixed-1000x6       match  avgt   15       53.000                  ms
+EvaluationBenchmark.evaluate                     praecepta      mixed-1000x18       match  avgt   15     1118.715 ±    55.286   ns/op
+EvaluationBenchmark.evaluate:gc.alloc.rate       praecepta      mixed-1000x18       match  avgt   15      150.594 ±     7.215  MB/sec
+EvaluationBenchmark.evaluate:gc.alloc.rate.norm  praecepta      mixed-1000x18       match  avgt   15      176.323 ±     0.001    B/op
+EvaluationBenchmark.evaluate:gc.count            praecepta      mixed-1000x18       match  avgt   15        6.000              counts
+EvaluationBenchmark.evaluate:gc.time             praecepta      mixed-1000x18       match  avgt   15       16.000                  ms
+EvaluationBenchmark.evaluate                       camunda   synthetic-1000x5       match  avgt   15    99663.091 ± 15822.741   ns/op
+EvaluationBenchmark.evaluate:gc.alloc.rate         camunda   synthetic-1000x5       match  avgt   15     4550.754 ±   178.739  MB/sec
+EvaluationBenchmark.evaluate:gc.alloc.rate.norm    camunda   synthetic-1000x5       match  avgt   15   474304.572 ± 67475.504    B/op
+EvaluationBenchmark.evaluate:gc.count              camunda   synthetic-1000x5       match  avgt   15      168.000              counts
+EvaluationBenchmark.evaluate:gc.time               camunda   synthetic-1000x5       match  avgt   15      140.000                  ms
+EvaluationBenchmark.evaluate                       camunda  synthetic-1000x20       match  avgt   15   199673.228 ±  3325.235   ns/op
+EvaluationBenchmark.evaluate:gc.alloc.rate         camunda  synthetic-1000x20       match  avgt   15     5232.150 ±    86.425  MB/sec
+EvaluationBenchmark.evaluate:gc.alloc.rate.norm    camunda  synthetic-1000x20       match  avgt   15  1095271.305 ±    98.207    B/op
+EvaluationBenchmark.evaluate:gc.count              camunda  synthetic-1000x20       match  avgt   15      193.000              counts
+EvaluationBenchmark.evaluate:gc.time               camunda  synthetic-1000x20       match  avgt   15      178.000                  ms
+EvaluationBenchmark.evaluate                       camunda       mixed-1000x6       match  avgt   15   237395.118 ± 16432.078   ns/op
+EvaluationBenchmark.evaluate:gc.alloc.rate         camunda       mixed-1000x6       match  avgt   15     3564.124 ±    96.285  MB/sec
+EvaluationBenchmark.evaluate:gc.alloc.rate.norm    camunda       mixed-1000x6       match  avgt   15   885899.608 ± 36605.730    B/op
+EvaluationBenchmark.evaluate:gc.count              camunda       mixed-1000x6       match  avgt   15      130.000              counts
+EvaluationBenchmark.evaluate:gc.time               camunda       mixed-1000x6       match  avgt   15      126.000                  ms
+EvaluationBenchmark.evaluate                       camunda      mixed-1000x18       match  avgt   15   388094.501 ± 45398.080   ns/op
+EvaluationBenchmark.evaluate:gc.alloc.rate         camunda      mixed-1000x18       match  avgt   15     3634.295 ±   331.390  MB/sec
+EvaluationBenchmark.evaluate:gc.alloc.rate.norm    camunda      mixed-1000x18       match  avgt   15  1466175.391 ± 47793.395    B/op
+EvaluationBenchmark.evaluate:gc.count              camunda      mixed-1000x18       match  avgt   15      134.000              counts
+EvaluationBenchmark.evaluate:gc.time               camunda      mixed-1000x18       match  avgt   15      126.000                  ms
+EvaluationBenchmark.evaluate                        drools   synthetic-1000x5       match  avgt   15   183152.248 ±  1340.008   ns/op
+EvaluationBenchmark.evaluate:gc.alloc.rate          drools   synthetic-1000x5       match  avgt   15     1025.356 ±     7.452  MB/sec
+EvaluationBenchmark.evaluate:gc.alloc.rate.norm     drools   synthetic-1000x5       match  avgt   15   196922.149 ±     8.744    B/op
+EvaluationBenchmark.evaluate:gc.count               drools   synthetic-1000x5       match  avgt   15       39.000              counts
+EvaluationBenchmark.evaluate:gc.time                drools   synthetic-1000x5       match  avgt   15       78.000                  ms
+EvaluationBenchmark.evaluate                        drools  synthetic-1000x20       match  avgt   15   143474.658 ±  2313.681   ns/op
+EvaluationBenchmark.evaluate:gc.alloc.rate          drools  synthetic-1000x20       match  avgt   15     1342.356 ±    22.373  MB/sec
+EvaluationBenchmark.evaluate:gc.alloc.rate.norm     drools  synthetic-1000x20       match  avgt   15   201913.976 ±   170.739    B/op
+EvaluationBenchmark.evaluate:gc.count               drools  synthetic-1000x20       match  avgt   15       50.000              counts
+EvaluationBenchmark.evaluate:gc.time                drools  synthetic-1000x20       match  avgt   15       76.000                  ms
+EvaluationBenchmark.evaluate                        drools       mixed-1000x6       match  avgt   15   247995.440 ±  4860.052   ns/op
+EvaluationBenchmark.evaluate:gc.alloc.rate          drools       mixed-1000x6       match  avgt   15     1426.463 ±    27.262  MB/sec
+EvaluationBenchmark.evaluate:gc.alloc.rate.norm     drools       mixed-1000x6       match  avgt   15   370844.978 ±   178.050    B/op
+EvaluationBenchmark.evaluate:gc.count               drools       mixed-1000x6       match  avgt   15       51.000              counts
+EvaluationBenchmark.evaluate:gc.time                drools       mixed-1000x6       match  avgt   15       63.000                  ms
+EvaluationBenchmark.evaluate                        drools      mixed-1000x18       match  avgt   15   262684.948 ±  2317.627   ns/op
+EvaluationBenchmark.evaluate:gc.alloc.rate          drools      mixed-1000x18       match  avgt   15     1362.270 ±    12.096  MB/sec
+EvaluationBenchmark.evaluate:gc.alloc.rate.norm     drools      mixed-1000x18       match  avgt   15   375223.184 ±   125.192    B/op
+EvaluationBenchmark.evaluate:gc.count               drools      mixed-1000x18       match  avgt   15       50.000              counts
+EvaluationBenchmark.evaluate:gc.time                drools      mixed-1000x18       match  avgt   15       66.000                  ms
+
+Benchmark result is saved to /Users/bruno.pacheco/dev/personal_git/praecepta/praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/columns.json
