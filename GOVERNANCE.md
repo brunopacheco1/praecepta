@@ -41,16 +41,19 @@ Central and GitHub ([docs/RELEASING.md](docs/RELEASING.md)). Security fixes foll
 If the maintainer can no longer continue, the project should go on with minimal interruption: within
 a week, someone should be able to triage issues, accept changes and publish a release.
 
-**Status: being arranged.** The maintainer is looking for a trusted person to take this role; this
-section will name the arrangement once it is in place. The plan:
-- **A successor for the repository:** a trusted person named in GitHub's account settings, who can
-  take over the repository (and its issues, CI and website) if the maintainer's account becomes
-  inactive, and hand it to a new maintainer.
-- **Emergency access:** the same or another trusted person gets emergency access, through a password
-  manager, to what the repository does not hold, with a note on how to hand the project on.
-- **A second maintainer,** once there is one, gets admin access, which removes the need for either.
+**In place:**
+- **A successor for the repository:** the maintainer has named a trusted person as successor in
+  GitHub's account settings. If the maintainer's account becomes inactive, the successor can take
+  over the repository, with its issues, pull requests, CI, secrets and website, and either carry on
+  or hand it to a new maintainer.
+- **Releases after a takeover:** the release workflow runs in a protected `release` environment
+  whose required reviewer is the maintainer; as the repository's new owner, the successor can name
+  a new reviewer and release with the existing signing key and Maven Central credentials, held as
+  secrets in the repository.
+- **A second maintainer,** once there is one, gets admin access, so the project would not depend on
+  the successor process at all.
 
-What already holds today:
+Also:
 - **The code** is Apache-2.0 and public: anyone may fork it and carry on.
 - **Releases** need no personal key: CI signs them with a dedicated release key stored as a
   repository secret, which a new maintainer can rotate (docs/RELEASING.md). The Maven Central
