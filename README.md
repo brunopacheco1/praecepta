@@ -33,7 +33,7 @@ them when you build; evaluate them with a dependency-free engine.
   records, so applications ship only the engine
 
 # Installation
-Java 25 or later. Pick the modules you need:
+Java 21 or later (tested on 21, 25 and 27). Pick the modules you need:
 
 ```xml
 <!-- the engine: no dependencies, a JPMS module (io.github.brunopacheco1.praecepta.engine) -->
@@ -186,6 +186,8 @@ var engine = PraeceptaEngine.<Order, Discount>builder()
 ```
 
 ## Praecepta Maven Plugin
+Runs on Maven 3.9 and later (CI tests 3.9, 3.10 and the 4.0 release candidate) with Java 21+.
+
 Compiles tables at build time. For each table the `generate` goal:
 1. loads it from Excel, CSV or DMN;
 2. validates it, failing the build on errors (`<failOn>`: `ERROR` by default, `WARNING` or
@@ -236,7 +238,7 @@ Generated code belongs to your project, so it carries no Praecepta licence heade
 `Discount.validationReport()` gives the build-time findings, and `Discount.engine()` the engine.
 
 # Building and Testing
-Praecepta requires **Java 25** (the current LTS) and Maven 3.9+. From the repository root:
+Building Praecepta needs **Java 21** or later and Maven 3.9+; CI builds on Java 21, 25 and 27. From the repository root:
 
 ```
 mvn clean verify

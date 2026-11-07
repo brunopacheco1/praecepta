@@ -175,7 +175,7 @@
                         <configuration>
                             <rules combine.self="override">
                                 <requireJavaVersion>
-                                    <version>[25,)</version>
+                                    <version>[21,)</version>
                                 </requireJavaVersion>
                             </rules>
                         </configuration>

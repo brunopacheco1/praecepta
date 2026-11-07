@@ -17,7 +17,7 @@ Code written against the prototype needs the changes listed under *Changed*.
 ### Changed
 - **Licence: Praecepta is now licensed under the Apache License 2.0** (previously MIT). No version
   was ever released under MIT.
-- **Java 25** baseline. The engine is a JPMS module (`io.github.brunopacheco1.praecepta.engine`,
+- **Java 21** baseline (tested on 21, 25 and 27). The engine is a JPMS module (`io.github.brunopacheco1.praecepta.engine`,
   requires only `java.xml`). The loader and plugin declare stable automatic module names.
 - **Engine API:**
   - engines are built once with `PraeceptaEngine.builder()`, and are immutable and thread-safe;
@@ -38,6 +38,7 @@ Code written against the prototype needs the changes listed under *Changed*.
   - writes them as DMN resources;
   - generates typed input/output records (enums for string value lists) and a decision class
     that needs only the engine at runtime;
+  - it runs on Maven 3.9 and later (tested on 3.9, 3.10 and 4.0);
   - the old `COMPILATION` and in-memory generation modes are gone.
 
 ### Added

@@ -49,7 +49,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- reproducible builds: fixed timestamps in every archive; the release process updates it -->
         <project.build.outputTimestamp>2026-11-06T00:00:00Z</project.build.outputTimestamp>
-        <java.version>25</java.version>
+        <java.version>21</java.version>
         <maven.compiler.release>${java.version}</maven.compiler.release>
 
         <sonar.projectKey>brunopacheco1_praecepta</sonar.projectKey>
@@ -82,6 +82,7 @@
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.12.0</central-publishing-maven-plugin.version>
         <versions-maven-plugin.version>2.24.0</versions-maven-plugin.version>
+        <maven-invoker-plugin.version>3.10.1</maven-invoker-plugin.version>
     </properties>
 
     <modules>
@@ -179,7 +180,7 @@
                         <configuration>
                             <rules>
                                 <requireJavaVersion>
-                                    <version>[25,)</version>
+                                    <version>[21,)</version>
                                 </requireJavaVersion>
                                 <requireMavenVersion>
                                     <version>[3.9,)</version>

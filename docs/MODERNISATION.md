@@ -15,7 +15,7 @@ tables and generates typed classes rather than per-rule code.
 | # | Topic | Decision |
 |---|-------|----------|
 | 1 | Hit policies | Strict DMN semantics (`UNIQUE` fails on overlap, `ANY` requires equal outputs, `PRIORITY`/`OUTPUT_ORDER` order by output values). |
-| 2 | Java baseline | Latest LTS: **Java 25**. |
+| 2 | Java baseline | Latest LTS: **Java 25** (Phase 0). **Revised in Phase 6 to Java 21**: the code compiled and passed unchanged with `--release 21`, and 21 is the LTS most users run. CI builds on 21, 25 and 27. |
 | 3 | Benchmarks | Retire the GCP App Engine deployments; benchmark in-process with JMH instead. |
 | 4 | DMN import | In scope (Phase 4). |
 | 5 | Licence | Relicense from MIT to **Apache-2.0** (Phase 5). |
@@ -505,6 +505,19 @@ What was done:
 - **`docs/RELEASING.md`:** owner setup (Central Portal token, release key on keyservers, `release`
   environment and secrets) and the release steps.
 - **README:** Maven coordinates, a 0.x status note, and a "What Praecepta is not" section.
+
+- **Java and Maven support** (decided during the phase):
+  - **Java 21** baseline instead of 25. The whole build, benchmarks included, passed unchanged on
+    JDK 21 with `--release 21`. Java 17 would have needed rewriting the pattern-matching switches.
+  - **CI:** the required "Build & test (Java 25)" job is unchanged; new jobs build on **Java 21 and
+    27**.
+  - **Plugin integration test:** a user project (`praecepta-maven-plugin/src/it/csv-table`)
+    compiles a CSV table with the plugin and runs JUnit tests on the generated classes. CI runs it
+    under Maven **3.9.16** and **3.10.0** (required) and **4.0.0-rc-7** (preview), installed
+    through the Maven wrapper. All three passed locally.
+  - **Plugin's Maven floor:** it stays 3.9 (its descriptor's `requiredMavenVersion` follows
+    `maven.api.version`). Dependabot ignores minor and major Maven API bumps, and PR #8 (3.10.0)
+    was closed for that reason.
 
 Not done (owner actions): creating the Central token, the release key and the `release`
 environment, then tagging `v0.1.0`.

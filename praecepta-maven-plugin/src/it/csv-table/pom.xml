@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    SPDX-FileCopyrightText: Bruno Pacheco
+
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>it.praecepta</groupId>
+    <artifactId>csv-table</artifactId>
+    <version>1.0</version>
+    <description>Integration test: a project using praecepta-maven-plugin on a CSV table.</description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>21</maven.compiler.release>
+    </properties>
+
+    <dependencies>
+        <!-- all the generated code needs at runtime -->
+        <dependency>
+            <groupId>io.github.brunopacheco1</groupId>
+            <artifactId>praecepta-engine</artifactId>
+            <version>@project.version@</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>@junit.version@</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>@maven-compiler-plugin.version@</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>@maven-surefire-plugin.version@</version>
+            </plugin>
+            <plugin>
+                <groupId>io.github.brunopacheco1</groupId>
+                <artifactId>praecepta-maven-plugin</artifactId>
+                <version>@project.version@</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <packageName>it.rules</packageName>
+                    <tables>
+                        <table>
+                            <source>rules/fees.csv</source>
+                            <name>Fees</name>
+                            <hitPolicy>COLLECT</hitPolicy>
+                            <aggregation>SUM</aggregation>
+                            <inputs>
+                                <input><name>zone</name><allowedValues>"mainland","islands"</allowedValues></input>
+                            </inputs>
+                            <outputs>
+                                <output><name>fee</name><type>NUMBER</type></output>
+                            </outputs>
+                        </table>
+                    </tables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -14,14 +14,18 @@ Thanks for helping. Bug reports, questions and pull requests are all welcome.
 - Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
 
 ## Building
-Praecepta needs **Java 25** and Maven 3.9+:
+Praecepta needs **Java 21** or later and Maven 3.9+:
 
 ```
 mvn verify
 ```
 
-This runs the unit tests and the property-based tests, checks the SPDX header of every Java source
-and POM, and writes a CycloneDX SBOM per module (`target/bom.json`).
+This runs the unit tests and the property-based tests, runs the Maven plugin's integration tests
+(`praecepta-maven-plugin/src/it`, skip with `-Dinvoker.skip`), checks the SPDX header of every Java
+source and POM, and writes a CycloneDX SBOM per module (`target/bom.json`).
+
+The code targets **Java 21** (`--release 21`): newer language features or APIs fail to compile.
+CI also builds on Java 25 and 27, and runs the plugin's integration tests on Maven 3.9, 3.10 and 4.0.
 
 ## Pull requests
 1. Fork the repository and create a branch from `main`.
