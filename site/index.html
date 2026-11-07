@@ -38,6 +38,7 @@ SPDX-License-Identifier: Apache-2.0
           <li><a href="#start">Get started</a></li>
           <li><a href="#how">How it works</a></li>
           <li><a href="#numbers">Benchmarks</a></li>
+          <li><a href="#roadmap">Roadmap</a></li>
           <li><a href="api/engine/">API</a></li>
           <li><a href="https://github.com/brunopacheco1/praecepta">GitHub</a></li>
         </ul>
@@ -189,6 +190,13 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
 
     <section id="how" class="wrap section" aria-labelledby="how-title">
       <h2 id="how-title">How it works</h2>
+      <figure class="context">
+        <svg class="c4 c4-wide" viewBox="0 0 960 420" role="img" aria-labelledby="c4-wide-title c4-wide-desc"><title id="c4-wide-title">System context: who and what Praecepta works with</title><desc id="c4-wide-desc">A rule author writes decision tables in a DMN modeller, Excel or CSV. Praecepta, a Java library, reads those files. A Java developer configures the Maven build, which runs the Praecepta plugin to validate tables and generate classes. The developer's Java application evaluates decisions with Praecepta, in-process.</desc><defs><marker id="c4-arrow-wide" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="c4-arrowhead" d="M0 0 L10 5 L0 10z"/></marker></defs><g class="c4-person"><circle cx="170" cy="27" r="16"/><rect x="90" y="46" width="160" height="54" rx="18"/><text class="c4-name" x="170" y="68">Rule author</text><text class="c4-kind" x="170" y="86">[Person]</text></g><g class="c4-person"><circle cx="790" cy="27" r="16"/><rect x="710" y="46" width="160" height="54" rx="18"/><text class="c4-name" x="790" y="68">Java developer</text><text class="c4-kind" x="790" y="86">[Person]</text></g><g class="c4-ext"><rect x="50" y="170" width="240" height="112" rx="5"/><text class="c4-name" x="170.0" y="196">Table editors</text><text class="c4-kind" x="170.0" y="213">[External system]</text><text class="c4-desc" x="170.0" y="234">DMN modeller, Excel or CSV</text></g><g class="c4-focus"><rect x="380" y="160" width="200" height="132" rx="5"/><text class="c4-name" x="480.0" y="186">Praecepta</text><text class="c4-kind" x="480.0" y="203">[Java library]</text><text class="c4-desc" x="480.0" y="224">Validates and evaluates</text><text class="c4-desc" x="480.0" y="241">DMN decision tables</text></g><g class="c4-ext"><rect x="670" y="140" width="240" height="100" rx="5"/><text class="c4-name" x="790.0" y="166">Maven build</text><text class="c4-kind" x="790.0" y="183">[External system]</text><text class="c4-desc" x="790.0" y="204">with the Praecepta plugin</text></g><g class="c4-ext"><rect x="670" y="300" width="240" height="100" rx="5"/><text class="c4-name" x="790.0" y="326">Your Java application</text><text class="c4-kind" x="790.0" y="343">[External system]</text><text class="c4-desc" x="790.0" y="364">embeds the engine</text></g><path class="c4-edge" d="M170 102 L170 166" marker-end="url(#c4-arrow-wide)"/><text class="c4-label" text-anchor="start" x="182" y="128">Writes decision</text><text class="c4-label" text-anchor="start" x="182" y="144">tables in</text><path class="c4-edge" d="M290 226 L376 226" marker-end="url(#c4-arrow-wide)"/><text class="c4-label" text-anchor="middle" x="333" y="196">DMN, Excel</text><text class="c4-label" text-anchor="middle" x="333" y="212">or CSV files</text><path class="c4-edge" d="M790 102 L790 136" marker-end="url(#c4-arrow-wide)"/><text class="c4-label" text-anchor="start" x="802" y="124">Configures</text><path class="c4-edge" d="M670 190 L584 210" marker-end="url(#c4-arrow-wide)"/><text class="c4-label" text-anchor="middle" x="627" y="160">Validates tables,</text><text class="c4-label" text-anchor="middle" x="627" y="176">generates classes</text><path class="c4-edge" d="M670 350 L584 262" marker-end="url(#c4-arrow-wide)"/><text class="c4-label" text-anchor="end" x="610" y="336">Evaluates decisions,</text><text class="c4-label" text-anchor="end" x="610" y="352">in-process</text></svg>
+        <svg class="c4 c4-tall" viewBox="0 0 360 640" role="img" aria-labelledby="c4-tall-title c4-tall-desc"><title id="c4-tall-title">System context: who and what Praecepta works with</title><desc id="c4-tall-desc">A rule author writes decision tables in a DMN modeller, Excel or CSV. Praecepta, a Java library, reads those files. A Java developer configures the Maven build, which runs the Praecepta plugin to validate tables and generate classes. The developer's Java application evaluates decisions with Praecepta, in-process.</desc><defs><marker id="c4-arrow-tall" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="c4-arrowhead" d="M0 0 L10 5 L0 10z"/></marker></defs><g class="c4-person"><circle cx="92" cy="23" r="16"/><rect x="12" y="42" width="160" height="54" rx="18"/><text class="c4-name" x="92" y="64">Rule author</text><text class="c4-kind" x="92" y="82">[Person]</text></g><g class="c4-person"><circle cx="268" cy="23" r="16"/><rect x="188" y="42" width="160" height="54" rx="18"/><text class="c4-name" x="268" y="64">Java developer</text><text class="c4-kind" x="268" y="82">[Person]</text></g><g class="c4-ext"><rect x="8" y="150" width="168" height="96" rx="5"/><text class="c4-name" x="92.0" y="176">Table editors</text><text class="c4-kind" x="92.0" y="193">[External system]</text><text class="c4-desc" x="92.0" y="214">DMN modeller,</text><text class="c4-desc" x="92" y="231">Excel or CSV</text></g><g class="c4-ext"><rect x="184" y="150" width="168" height="96" rx="5"/><text class="c4-name" x="268.0" y="176">Maven build</text><text class="c4-kind" x="268.0" y="193">[External system]</text><text class="c4-desc" x="268.0" y="214">with the plugin</text></g><g class="c4-focus"><rect x="50" y="330" width="260" height="116" rx="5"/><text class="c4-name" x="180.0" y="356">Praecepta</text><text class="c4-kind" x="180.0" y="373">[Java library]</text><text class="c4-desc" x="180.0" y="394">Validates and evaluates</text><text class="c4-desc" x="180.0" y="411">DMN decision tables</text></g><g class="c4-ext"><rect x="50" y="540" width="260" height="84" rx="5"/><text class="c4-name" x="180.0" y="566">Your Java application</text><text class="c4-kind" x="180.0" y="583">[External system]</text><text class="c4-desc" x="180.0" y="604">embeds the engine</text></g><path class="c4-edge" d="M92 98 L92 146" marker-end="url(#c4-arrow-tall)"/><text class="c4-label" text-anchor="start" x="100" y="126">Writes tables in</text><path class="c4-edge" d="M268 98 L268 146" marker-end="url(#c4-arrow-tall)"/><text class="c4-label" text-anchor="start" x="276" y="126">Configures</text><path class="c4-edge" d="M92 246 L120 326" marker-end="url(#c4-arrow-tall)"/><text class="c4-label" text-anchor="end" x="88" y="292">Files</text><path class="c4-edge" d="M268 246 L240 326" marker-end="url(#c4-arrow-tall)"/><text class="c4-label" text-anchor="start" x="272" y="284">Validates,</text><text class="c4-label" text-anchor="start" x="272" y="300">generates</text><path class="c4-edge" d="M180 536 L180 450" marker-end="url(#c4-arrow-tall)"/><text class="c4-label" text-anchor="start" x="190" y="488">Evaluates decisions,</text><text class="c4-label" text-anchor="start" x="190" y="504">in-process</text></svg>
+        <figcaption>System context, in the <a href="https://c4model.com">C4 model</a>: who and what Praecepta works
+          with. The <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/ARCHITECTURE.md">architecture</a>
+          document goes inside: modules, the bitset index, DMN and the Maven plugin.</figcaption>
+      </figure>
       <div class="how-grid">
         <div>
           <p>Every rule gets one bit. For every column, each value the rules can tell apart gets a
@@ -232,6 +240,35 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
       </ul>
     </section>
 
+    <section id="security" class="wrap section" aria-labelledby="security-title">
+      <h2 id="security-title">Secure by design</h2>
+      <div class="expect">
+        <div>
+          <h3>What you can expect</h3>
+          <ul class="plain">
+            <li><strong>Nothing reaches outside:</strong> no network, no processes, no cryptography, no stored data.</li>
+            <li><strong>Untrusted DMN is safe to read:</strong> DTDs and external entities are disabled (no XXE).</li>
+            <li><strong>Bad input fails cleanly,</strong> with an error naming the decision, rule and column.</li>
+            <li><strong>Declared input values are enforced:</strong> anything else is rejected, not matched.</li>
+            <li><strong>Generated code is safe to compile:</strong> names and text from tables are sanitised.</li>
+            <li><strong>Releases are authentic:</strong> signed, with provenance and an SBOM.</li>
+          </ul>
+        </div>
+        <div class="limits">
+          <h3>Know the limits</h3>
+          <ul class="plain">
+            <li>A table decides what your application does: who may change tables is up to you.</li>
+            <li>Building huge FIRST or PRIORITY tables can take minutes
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>): build untrusted tables off the request path.</li>
+            <li>Input size is limited only by the JDK's XML limits: cap uploads yourself.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="more">The threat model, trust boundaries and evidence are in the
+        <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/SECURITY-ASSURANCE.md">security assurance case</a>. To report a
+        vulnerability, see the <a href="https://github.com/brunopacheco1/praecepta/blob/main/SECURITY.md">security policy</a>.</p>
+    </section>
+
     <section class="wrap section" aria-labelledby="open-title">
       <h2 id="open-title">Open, and easy to check</h2>
       <ul class="plain two">
@@ -239,12 +276,48 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
           states its author and licence.</li>
         <li><strong>Signed releases</strong> with an SBOM, build provenance and third-party notices on every
           <a href="https://github.com/brunopacheco1/praecepta/releases">GitHub release</a>.</li>
-        <li><strong>Checked on every change:</strong> tests on Java 21, 25 and 27, SonarCloud, CodeQL,
-          dependency checks, and fuzzing of the parsers that read untrusted input.</li>
-        <li><strong>OpenSSF Scorecard:</strong> the project's
-          <a href="https://scorecard.dev/viewer/?uri=github.com/brunopacheco1/praecepta">current score</a>
-          and what is left to improve, in the open.</li>
+        <li><strong>Checked on every change:</strong> tests on Java 21, 25 and 27, an enforced code style,
+          compiler warnings as errors, SonarCloud, CodeQL, dependency checks, and fuzzing of the parsers
+          that read untrusted input.</li>
+        <li><strong>OpenSSF Best Practices:</strong> the
+          <a href="https://www.bestpractices.dev/projects/16426">passing badge</a>, and the project's
+          <a href="https://scorecard.dev/viewer/?uri=github.com/brunopacheco1/praecepta">Scorecard</a>, with
+          what is left to improve, in the open.</li>
       </ul>
+    </section>
+
+    <section id="roadmap" class="wrap section" aria-labelledby="roadmap-title">
+      <h2 id="roadmap-title">Roadmap</h2>
+      <ol class="timeline">
+        <li>
+          <h3>Next: 0.2</h3>
+          <ul class="plain">
+            <li>Fast builds for large FIRST and PRIORITY tables (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>)</li>
+            <li>Boolean, time and date-time columns (<a href="https://github.com/brunopacheco1/praecepta/issues/12">#12</a>)</li>
+            <li>The DMN conformance kit (<a href="https://github.com/brunopacheco1/praecepta/issues/22">#22</a>)</li>
+          </ul>
+        </li>
+        <li>
+          <h3>Later this year</h3>
+          <ul class="plain">
+            <li>String ranges, COUNT and list-valued inputs
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/13">#13</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/15">#15</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/25">#25</a>)</li>
+            <li>Faster number and date columns, compressed bitmaps
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/16">#16</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/17">#17</a>)</li>
+            <li>Gradle, GraalVM, Spring Boot and a playground, as people ask
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/18">#18</a>–<a href="https://github.com/brunopacheco1/praecepta/issues/21">#21</a>)</li>
+          </ul>
+        </li>
+        <li>
+          <h3>Towards 1.0</h3>
+          <ul class="plain">
+            <li>A stable API, once these features settle</li>
+            <li>A second maintainer, so every change is reviewed by someone other than its author</li>
+          </ul>
+        </li>
+      </ol>
+      <p class="more">These are intentions, not promises: the
+        <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/ROADMAP.md">roadmap</a> follows what people ask for.</p>
     </section>
 
     <section class="wrap section contribute" aria-labelledby="help-title">
@@ -254,7 +327,8 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
         <a href="https://github.com/brunopacheco1/praecepta/blob/main/CONTRIBUTING.md">contributing guide</a>
         explains how to build and test, and some issues are marked
         <a href="https://github.com/brunopacheco1/praecepta/labels/good%20first%20issue">good first issue</a>.
-        Reviewers and a co-maintainer are very welcome.</p>
+        Reviewers and a co-maintainer are very welcome: the <a href="https://github.com/brunopacheco1/praecepta/blob/main/GOVERNANCE.md">governance</a>
+        document explains how decisions are made and how to become a maintainer.</p>
     </section>
   </main>
 
@@ -263,6 +337,10 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
       <p>© Bruno Pacheco · Apache-2.0</p>
       <ul>
         <li><a href="https://github.com/brunopacheco1/praecepta/blob/main/CHANGELOG.md">Changelog</a></li>
+        <li><a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/ROADMAP.md">Roadmap</a></li>
+        <li><a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/ARCHITECTURE.md">Architecture</a></li>
+        <li><a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/SECURITY-ASSURANCE.md">Assurance case</a></li>
+        <li><a href="https://github.com/brunopacheco1/praecepta/blob/main/GOVERNANCE.md">Governance</a></li>
         <li><a href="https://github.com/brunopacheco1/praecepta/blob/main/SECURITY.md">Security</a></li>
         <li><a href="api/engine/">API</a></li>
         <li><a href="https://github.com/brunopacheco1/praecepta">GitHub</a></li>

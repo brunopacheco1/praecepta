@@ -139,11 +139,15 @@ h3 { font-size: 1.02rem; letter-spacing: .03em; margin: 0 0 .45rem; }
 .top nav a {
   display: block; padding: 6px 10px; border-radius: var(--radius);
   color: var(--muted); text-decoration: none;
-  font: 500 .82rem var(--display); letter-spacing: .08em;
+  font: 500 .82rem var(--display); letter-spacing: .08em; white-space: nowrap;
 }
 .top nav a:hover { color: var(--accent); }
-@media (max-width: 680px) {
+/* narrower screens keep the links that leave the page; the sections are a scroll away */
+@media (max-width: 960px) {
   .top nav li:nth-child(-n+3) { display: none; }
+}
+@media (max-width: 560px) {
+  .top nav li:nth-child(-n+4) { display: none; }
 }
 
 /* hero */
@@ -218,6 +222,32 @@ h3 { font-size: 1.02rem; letter-spacing: .03em; margin: 0 0 .45rem; }
 .how-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; align-items: start; }
 @media (min-width: 900px) { .how-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 52px; } }
 .how-grid p { margin: 0 0 14px; }
+/* the C4 system context diagram: a landscape layout, and a portrait one for phones */
+.context { margin: 0 0 40px; }
+.context svg { display: block; width: 100%; height: auto; }
+.context .c4-tall { display: none; max-width: 420px; margin: 0 auto; }
+@media (max-width: 640px) {
+  .context .c4-wide { display: none; }
+  .context .c4-tall { display: block; }
+}
+.context figcaption { color: var(--muted); font-size: 1rem; margin-top: 12px; max-width: 62em; }
+.c4 text { font-family: var(--serif); }
+.c4 g text { text-anchor: middle; }
+.c4 .c4-name { font: 600 15px var(--display); letter-spacing: .03em; }
+.c4-person .c4-name { font-size: 13.5px; }
+.c4 .c4-kind { font-size: 12px; font-style: italic; }
+.c4 .c4-desc { font-size: 13.5px; }
+.c4 .c4-label { font-size: 13px; font-style: italic; fill: var(--muted); }
+.c4-person circle, .c4-person rect { fill: var(--second); }
+.c4-person text { fill: var(--on-accent); }
+.c4-focus rect { fill: var(--accent); stroke: var(--accent-strong); stroke-width: 1.5; }
+.c4-focus text { fill: var(--on-accent); }
+.c4-ext rect { fill: var(--card); stroke: var(--line); stroke-width: 1.5; }
+.c4-ext text { fill: var(--text); }
+.c4-ext .c4-kind, .c4-ext .c4-desc { fill: var(--muted); }
+.c4-edge { fill: none; stroke: var(--muted); stroke-width: 1.4; stroke-dasharray: 5 4; }
+.c4-arrowhead { fill: var(--muted); }
+
 /* the worked example, set like an inscribed tablet */
 .bits {
   margin: 0; padding: 18px; overflow-x: auto;
@@ -245,6 +275,23 @@ h3 { font-size: 1.02rem; letter-spacing: .03em; margin: 0 0 .45rem; }
   .bits .cells td { padding: 5px 2px; }
   .bits th { padding-right: 2px; white-space: normal; font-size: .7rem; }
 }
+
+/* security: what to expect, and the limits */
+.expect { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+@media (min-width: 900px) { .expect { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px; } }
+.expect > div { background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--second); border-radius: var(--radius); padding: 20px 22px; }
+.expect > .limits { border-top-color: var(--accent); }
+.expect h3 { margin-bottom: .8rem; }
+
+/* roadmap: three stages, numbered in Roman numerals */
+.timeline { list-style: none; counter-reset: stage; margin: 0; padding: 0; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+.timeline > li { counter-increment: stage; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; }
+.timeline > li h3::before {
+  content: counter(stage, upper-roman); display: inline-grid; place-items: center;
+  width: 30px; height: 30px; margin-right: 10px; border: 1px solid var(--accent); color: var(--accent);
+  font: 600 .85rem var(--display); vertical-align: middle;
+}
+.timeline .plain li { margin-bottom: 8px; }
 
 .plain { margin: 0; padding-left: 1.2em; }
 .plain li { margin-bottom: 10px; }
