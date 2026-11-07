@@ -15,10 +15,18 @@ permissions:
 
 jobs:
   build:
-    name: Build & test (Java 25)
+    # One job per supported JDK: the code targets Java 21 (--release 21) and must build and pass
+    # on the oldest and newest JDKs. Licences, SBOMs and SonarCloud run once, on the LTS (25);
+    # "Build & test (Java 25)" is the required check in the main branch ruleset.
+    name: Build & test (Java ${{ matrix.java }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['21', '25', '27']
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      PRIMARY: ${{ matrix.java == '25' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -26,18 +34,21 @@ jobs:
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: ${{ matrix.java }}
           cache: maven
       - name: Build & test
-        # also checks SPDX headers (license-maven-plugin) and writes SBOMs (target/bom.json)
+        # also checks SPDX headers (license-maven-plugin), runs the plugin's integration tests and
+        # writes SBOMs (target/bom.json)
         run: mvn -B verify
       - name: Check dependency licences
+        if: ${{ env.PRIMARY == 'true' }}
         run: >
           python3 .github/scripts/check_sbom_licenses.py
           praecepta-engine/target/bom.json
           praecepta-loader/target/bom.json
           praecepta-maven-plugin/target/bom.json
       - name: Upload SBOMs
+        if: ${{ env.PRIMARY == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom
@@ -49,35 +60,17 @@ jobs:
         # Mandatory: the scanner waits for the quality gate and fails this job if the gate fails,
         # the token is missing or expired, or the analysis errors.
         # GitHub never gives secrets to pull requests from forks, so those cannot be analysed here.
-        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        if: ${{ env.PRIMARY == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         # `verify` in the same invocation lets the scanner resolve the reactor modules; tests and
         # coverage data come from the previous step.
         run: >
-          mvn -B verify -DskipTests
+          mvn -B verify -DskipTests -Dinvoker.skip
           org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar
           -Dsonar.qualitygate.wait=true
           -Dsonar.qualitygate.timeout=600
       - name: SonarCloud skipped (pull request from a fork)
-        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        if: ${{ env.PRIMARY == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
         run: echo "::warning title=SonarCloud not run::Pull requests from forks get no secrets; a maintainer must analyse this change before merging."
-
-  java:
-    # the code targets Java 21 (--release 21); prove it builds and passes on the oldest and newest JDKs
-    name: Java ${{ matrix.java }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        java: ['21', '27']
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
-        with:
-          distribution: temurin
-          java-version: ${{ matrix.java }}
-          cache: maven
-      - name: Build & test
-        run: mvn -B verify
 
   maven:
     # the Maven plugin's integration tests (src/it) run with the Maven building them

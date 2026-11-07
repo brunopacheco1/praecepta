@@ -509,8 +509,9 @@ What was done:
 - **Java and Maven support** (decided during the phase):
   - **Java 21** baseline instead of 25. The whole build, benchmarks included, passed unchanged on
     JDK 21 with `--release 21`. Java 17 would have needed rewriting the pattern-matching switches.
-  - **CI:** the required "Build & test (Java 25)" job is unchanged; new jobs build on **Java 21 and
-    27**.
+  - **CI:** one `Build & test` matrix over **Java 21, 25 and 27**, each building and testing once.
+    The licence check, SBOM upload and SonarCloud run only on the 25 entry, whose check name
+    ("Build & test (Java 25)") stays the ruleset's required check.
   - **Plugin integration test:** a user project (`praecepta-maven-plugin/src/it/csv-table`)
     compiles a CSV table with the plugin and runs JUnit tests on the generated classes. CI runs it
     under Maven **3.9.16** and **3.10.0** (required) and **4.0.0-rc-7** (preview), installed
