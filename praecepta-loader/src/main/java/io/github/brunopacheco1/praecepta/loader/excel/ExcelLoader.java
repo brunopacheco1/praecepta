@@ -27,7 +27,7 @@ import io.github.brunopacheco1.praecepta.loader.beans.FileRow;
 import io.github.brunopacheco1.praecepta.loader.exceptions.InvalidMatrixException;
 import io.github.brunopacheco1.praecepta.loader.exceptions.MissingFileException;
 
-public class ExcelLoader extends BaseLoader {
+public final class ExcelLoader extends BaseLoader {
 
     private final List<Praeceptum> praecepta = new ArrayList<>();
 
@@ -116,9 +116,9 @@ public class ExcelLoader extends BaseLoader {
     private FileRow readCells(Map<Integer, String> headers, Row row) {
         var fileRow = new FileRow(row.getRowNum());
 
-        headers.forEach((var colIndex,var header) ->  {
+        headers.forEach((var colIndex, var header) -> {
             var cell = row.getCell(colIndex);
-            if(cell != null) {
+            if (cell != null) {
                 fileRow.set(header, getCellValue(cell));
             } else {
                 fileRow.set(header, null);

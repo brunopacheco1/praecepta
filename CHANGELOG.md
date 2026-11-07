@@ -29,6 +29,14 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   - throughput with an engine shared by 1, 4 and 8 threads;
   - time to build an engine from DMN, warm and in a fresh JVM;
   - `run-benchmarks.sh` runs them all and records the machine and versions with the results.
+- **An enforced code style:** Checkstyle checks every build (`checkstyle.xml`, described in
+  CONTRIBUTING.md), and compiler warnings fail the build (`-Xlint:all -Werror`).
+
+### Changed
+- **`CsvLoader` and `ExcelLoader` are `final`**, and `BaseLoader`'s helpers are `final` too: the
+  loaders read their file in the constructor, which a subclass could otherwise observe half-built.
+  Extend `BaseLoader` to write a loader of your own.
+- **Exceptions declare a `serialVersionUID`.**
 
 ## [0.1.0] - 2026-11-07
 

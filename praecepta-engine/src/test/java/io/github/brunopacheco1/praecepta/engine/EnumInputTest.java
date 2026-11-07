@@ -106,7 +106,10 @@ class EnumInputTest {
 
     @SafeVarargs
     private static <E> List<E> withNull(E... values) {
-        var list = new java.util.ArrayList<E>(List.of(values));
+        var list = new java.util.ArrayList<E>();
+        for (var value : values) {
+            list.add(value);
+        }
         list.add(null);
         return list;
     }

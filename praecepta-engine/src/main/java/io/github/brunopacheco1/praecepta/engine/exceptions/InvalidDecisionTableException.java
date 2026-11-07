@@ -14,6 +14,9 @@ import io.github.brunopacheco1.praecepta.engine.ValidationReport;
  */
 public class InvalidDecisionTableException extends RuntimeException {
 
+    @java.io.Serial
+    private static final long serialVersionUID = 1L;
+
     private final transient ValidationReport report;
 
     public InvalidDecisionTableException(String message) {

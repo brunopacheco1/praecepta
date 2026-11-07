@@ -8,6 +8,7 @@
  * Praecepta: DMN decision tables with strict hit policies, bitset matching and build-time
  * validation. Needs nothing beyond the JDK; {@code java.xml} reads DMN files.
  */
+@SuppressWarnings("module") // the trailing digit comes from the groupId, io.github.brunopacheco1
 module io.github.brunopacheco1.praecepta.engine {
     requires java.xml;
 

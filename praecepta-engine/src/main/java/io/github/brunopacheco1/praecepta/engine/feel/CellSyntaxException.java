@@ -8,6 +8,9 @@ package io.github.brunopacheco1.praecepta.engine.feel;
 /** A table cell is not a valid unary test for its column type. */
 public class CellSyntaxException extends IllegalArgumentException {
 
+    @java.io.Serial
+    private static final long serialVersionUID = 1L;
+
     private final String cell;
 
     public CellSyntaxException(String cell, String problem) {

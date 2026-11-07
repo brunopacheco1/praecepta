@@ -158,7 +158,9 @@ public final class PraeceptaEngine<I, O> {
 
         int n = rules.size();
         outputByBit = new Object[n];
-        singleByBit = new List[n];
+        @SuppressWarnings({"rawtypes", "unchecked"}) // a generic array cannot be created otherwise
+        List<O>[] singles = new List[n];
+        singleByBit = singles;
         idByBit = new Integer[n];
         for (int bit = 0; bit < n; bit++) {
             var rule = rules.get(bitToRule[bit]);

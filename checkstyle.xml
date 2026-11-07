@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<!--
+SPDX-FileCopyrightText: Bruno Pacheco
+
+SPDX-License-Identifier: Apache-2.0
+-->
+<!DOCTYPE module PUBLIC "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+        "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+    Praecepta's code style, checked on every build (see CONTRIBUTING.md, "Code style"). It encodes the
+    conventions the code already follows: Java naming, 4-space indentation without tabs, braces on
+    every block, explicit imports, and lines of at most 150 characters.
+-->
+<module name="Checker">
+    <property name="charset" value="UTF-8"/>
+    <property name="severity" value="error"/>
+    <property name="fileExtensions" value="java"/>
+
+    <module name="FileTabCharacter"/>
+    <module name="NewlineAtEndOfFile"/>
+    <module name="RegexpSingleline">
+        <property name="format" value="\s+$"/>
+        <property name="message" value="Trailing whitespace"/>
+    </module>
+    <module name="LineLength">
+        <property name="max" value="150"/>
+        <!-- long string literals (inline DMN and messages), imports and URLs may run longer -->
+        <property name="ignorePattern" value="^\s*(\+\s*)?&quot;|^(package|import) |https?://"/>
+    </module>
+
+    <module name="TreeWalker">
+        <!-- imports -->
+        <module name="AvoidStarImport"/>
+        <module name="RedundantImport"/>
+        <module name="UnusedImports"/>
+
+        <!-- blocks -->
+        <module name="NeedBraces"/>
+        <module name="LeftCurly"/>
+        <module name="RightCurly"/>
+        <module name="EmptyStatement"/>
+
+        <!-- statements and declarations -->
+        <module name="OneStatementPerLine"/>
+        <module name="MultipleVariableDeclarations"/>
+        <module name="ModifierOrder"/>
+        <module name="UpperEll"/>
+        <module name="ArrayTypeStyle"/>
+        <module name="EqualsHashCode"/>
+        <module name="MissingOverride"/>
+
+        <!-- naming; test methods may use snake_case (engines_agree_with_praecepta) -->
+        <module name="PackageName"/>
+        <module name="TypeName"/>
+        <module name="MethodName">
+            <property name="format" value="^[a-z][a-zA-Z0-9_]*$"/>
+        </module>
+        <module name="ParameterName"/>
+        <module name="LambdaParameterName"/>
+        <module name="LocalVariableName"/>
+        <module name="LocalFinalVariableName"/>
+        <module name="MemberName"/>
+        <module name="StaticVariableName"/>
+        <module name="ConstantName"/>
+        <module name="ClassTypeParameterName">
+            <property name="format" value="^[A-Z][A-Z0-9]?$"/>
+        </module>
+        <module name="MethodTypeParameterName">
+            <property name="format" value="^[A-Z][A-Z0-9]?$"/>
+        </module>
+
+        <!-- whitespace -->
+        <module name="GenericWhitespace"/>
+        <module name="MethodParamPad"/>
+        <module name="ParenPad"/>
+        <module name="NoWhitespaceBefore"/>
+        <module name="WhitespaceAfter"/>
+        <module name="WhitespaceAround">
+            <property name="allowEmptyConstructors" value="true"/>
+            <property name="allowEmptyMethods" value="true"/>
+            <property name="allowEmptyTypes" value="true"/>
+            <property name="allowEmptyLambdas" value="true"/>
+            <property name="allowEmptyLoops" value="true"/>
+        </module>
+    </module>
+</module>

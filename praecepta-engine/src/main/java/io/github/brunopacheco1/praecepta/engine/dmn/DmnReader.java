@@ -256,7 +256,8 @@ public final class DmnReader {
             case "SUM" -> AggregationOperator.SUM;
             case "MIN" -> AggregationOperator.MIN;
             case "MAX" -> AggregationOperator.MAX;
-            default -> throw new InvalidDecisionTableException("%s: aggregation '%s' is not supported (SUM, MIN and MAX are)".formatted(where, value));
+            default -> throw new InvalidDecisionTableException(
+                    "%s: aggregation '%s' is not supported (SUM, MIN and MAX are)".formatted(where, value));
         };
     }
 

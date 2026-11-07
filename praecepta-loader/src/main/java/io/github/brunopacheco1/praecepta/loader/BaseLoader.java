@@ -20,7 +20,7 @@ import io.github.brunopacheco1.praecepta.loader.beans.FileRow;
 import io.github.brunopacheco1.praecepta.loader.exceptions.MissingFieldException;
 
 public abstract class BaseLoader implements PraeceptaLoader {
- 
+
     private final Set<String> inputs;
     private final Set<String> outputs;
 
@@ -29,7 +29,7 @@ public abstract class BaseLoader implements PraeceptaLoader {
         this.outputs = outputs;
     }
 
-    protected void validateFields(Map<Integer, String> positioning) {
+    protected final void validateFields(Map<Integer, String> positioning) {
         var missingFields = Stream.concat(inputs.stream(), outputs.stream())
                 .filter(Predicate.not(positioning::containsValue))
                 .collect(Collectors.toSet());
@@ -44,7 +44,7 @@ public abstract class BaseLoader implements PraeceptaLoader {
      *
      * @param records the rows extracted from the Excel file.
      */
-    protected List<Praeceptum> parseRowsToPraecepta(Iterable<FileRow> records) {
+    protected final List<Praeceptum> parseRowsToPraecepta(Iterable<FileRow> records) {
         var praecepta = new ArrayList<Praeceptum>();
         for (FileRow row : records) {
             var input = parseInput(row);

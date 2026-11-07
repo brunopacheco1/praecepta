@@ -31,6 +31,19 @@ The code targets **Java 21** (`--release 21`): newer language features or APIs f
 CI builds and tests on Java 21, 25 and 27, and runs the plugin's integration tests on Maven 3.9,
 3.10 and 4.0.
 
+## Code style
+The code follows standard Java conventions; the build enforces them, so a pull request that breaks
+them fails before the tests run:
+- **Checkstyle** (`checkstyle.xml`, in the `validate` phase): Java naming (test methods may use
+  `snake_case`), 4-space indentation without tabs, braces on every block, explicit imports with
+  none unused, whitespace around operators and after commas and keywords, no trailing whitespace,
+  and lines of at most 150 characters (long string literals, imports and URLs excepted).
+- **Compiler warnings are errors** (`-Xlint:all -Werror`). Suppress a warning only where it cannot be
+  fixed, as narrowly as possible, with a comment saying why.
+- **SonarCloud** reviews every pull request; its quality gate must pass.
+
+Run `mvn validate` to check the style alone.
+
 ## Fuzzing
 `CellParser` and `DmnReader` read untrusted input, so they have [Jazzer](https://github.com/CodeIntelligenceTesting/jazzer)
 fuzz tests (`*FuzzTest`). Every build replays their saved inputs; to fuzz for real (5 minutes per
