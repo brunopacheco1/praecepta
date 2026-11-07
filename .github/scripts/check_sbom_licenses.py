@@ -34,31 +34,44 @@ def licences(component):
     return found
 
 
+def load_bom(path, root):
+    """The SBOM at path, or None if it is not a .json file inside root (SBOMs come from this build)."""
+    resolved = (root / path).resolve()
+    if not resolved.is_relative_to(root) or resolved.suffix != ".json":
+        return None
+    with resolved.open(encoding="utf-8") as file:
+        return json.load(file)
+
+
+def check_bom(bom, path):
+    """Prints one line per third-party component; returns how many are not allowed."""
+    module = bom.get("metadata", {}).get("component", {}).get("name", path)
+    problems = 0
+    for component in bom.get("components", []):
+        if component.get("group") == OWN_GROUP:
+            continue
+        ids = licences(component)
+        coordinates = f"{component.get('group', '')}:{component['name']}:{component.get('version', '')}"
+        if any(licence in ALLOWED for licence in ids):
+            print(f"ok           {module}: {coordinates} {ids}")
+        else:
+            problems += 1
+            print(f"NOT ALLOWED  {module}: {coordinates} {ids or ['no licence information']}")
+    return problems
+
+
 def main(paths):
     if not paths:
         print(__doc__)
         return 2
-    problems = 0
     root = Path.cwd().resolve()
+    problems = 0
     for path in paths:
-        # SBOMs come from this repository's build; refuse anything outside it
-        resolved = (root / path).resolve()
-        if not resolved.is_relative_to(root) or resolved.suffix != ".json":
+        bom = load_bom(path, root)
+        if bom is None:
             print(f"Refusing {path}: expected a .json file inside {root}")
             return 2
-        with resolved.open(encoding="utf-8") as file:
-            bom = json.load(file)
-        module = bom.get("metadata", {}).get("component", {}).get("name", path)
-        for component in bom.get("components", []):
-            if component.get("group") == OWN_GROUP:
-                continue
-            ids = licences(component)
-            coordinates = f"{component.get('group', '')}:{component['name']}:{component.get('version', '')}"
-            if not any(licence in ALLOWED for licence in ids):
-                problems += 1
-                print(f"NOT ALLOWED  {module}: {coordinates} {ids or ['no licence information']}")
-            else:
-                print(f"ok           {module}: {coordinates} {ids}")
+        problems += check_bom(bom, path)
     if problems:
         print(f"\n{problems} component(s) need review: allow their licence above, or drop the dependency.")
         return 1
