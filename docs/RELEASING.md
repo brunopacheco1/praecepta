@@ -15,8 +15,8 @@ which:
 4. publishes `praecepta` (parent POM), `praecepta-engine`, `praecepta-loader` and
    `praecepta-maven-plugin` to Maven Central, waiting until they are live;
 5. records build provenance for the jars (GitHub artifact attestations);
-6. creates a GitHub release with the changelog section, jars, signatures, SBOMs and
-   `THIRD-PARTY-NOTICES.txt`.
+6. creates a GitHub release with the changelog section, jars, signatures, SBOMs, the provenance
+   bundle (`praecepta-X.Y.Z.intoto.jsonl`) and `THIRD-PARTY-NOTICES.txt`.
 
 ## One-time setup (owner)
 
@@ -85,7 +85,8 @@ every release waits for a click.
 
 ## Checking a release
 - Signatures: download a jar and its `.asc`, then `gpg --verify praecepta-engine-X.Y.Z.jar.asc`.
-- Provenance: `gh attestation verify praecepta-engine-X.Y.Z.jar --repo brunopacheco1/praecepta`.
+- Provenance: `gh attestation verify praecepta-engine-X.Y.Z.jar --repo brunopacheco1/praecepta`, or
+  offline against the release's `praecepta-X.Y.Z.intoto.jsonl` bundle (`--bundle`).
 - SBOM: `praecepta-engine-X.Y.Z-cyclonedx.json` on the release (and on Maven Central).
 
 If publishing fails after the tag is pushed, fix the cause, delete the tag (locally and with
