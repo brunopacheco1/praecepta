@@ -26,8 +26,8 @@ them when you build; evaluate them with a dependency-free engine.
 - Optional DMN input value lists: values outside them are rejected
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
   rules that can never be selected (FIRST, PRIORITY), and gaps (declared inputs no rule matches)
-- Bitset matching: memory grows linearly with the table (10,000 rules fit in under 1 MB) and
-  engines build in milliseconds
+- Bitset matching: memory grows linearly with the table (10,000 rules take 1.5 to 5 MB of heap,
+  against about 90 to 130 MB for Camunda and Drools) and most engines build in milliseconds
 - Enum inputs: lookups by ordinal instead of hashing
 - Immutable, thread-safe engines; no runtime dependencies
 - Rules from code, Excel, CSV or DMN files (DMN 1.1 to 1.5, as written by Camunda Modeler and
