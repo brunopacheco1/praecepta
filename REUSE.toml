@@ -16,7 +16,19 @@ path = [
     "**/*FuzzTestInputs/**",
     # benchmark results: JMH output, logs and generated summaries
     "praecepta-benchmarks/results/**",
+    # the social image, rendered from site/brand/social.svg
+    "site/brand/social.png",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "Bruno Pacheco"
 SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+# web fonts for the project site, subset from google/fonts; their licence travels with them
+path = ["site/fonts/*.woff2", "site/fonts/OFL.txt"]
+precedence = "override"
+SPDX-FileCopyrightText = [
+    "2020 The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel)",
+    "2017 The EB Garamond Project Authors (https://github.com/octaviopardo/EBGaramond12)",
+]
+SPDX-License-Identifier = "OFL-1.1"

@@ -13,7 +13,7 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ### Added
 - **A project website** at https://bruno.pacheco.lu/praecepta/, with the API documentation of the
-  latest release.
+  latest release, and a Classic Rome identity: a bronze *tabula ansata* logo, Cinzel and EB Garamond.
 - **Fuzz tests** (Jazzer) for the cell parser and the DMN reader: they replay saved inputs in every
   build, fuzz weekly in CI, and fuzz every pull request that touches the engine (ClusterFuzzLite).
 - **Releases attach their build provenance** (`praecepta-X.Y.Z.intoto.jsonl`) for offline

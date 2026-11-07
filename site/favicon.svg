@@ -1,17 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- SPDX-FileCopyrightText: Bruno Pacheco -->
-  <!-- SPDX-License-Identifier: Apache-2.0 -->
-  <!-- Praecepta's mark: two masks and the bits they share -->
-  <rect width="32" height="32" rx="7" fill="#0e7490"/>
-  <g fill="#ecfeff">
-    <rect x="6" y="7" width="4" height="4" rx="1"/>
-    <rect x="14" y="7" width="4" height="4" rx="1" opacity=".35"/>
-    <rect x="22" y="7" width="4" height="4" rx="1"/>
-    <rect x="6" y="14" width="4" height="4" rx="1"/>
-    <rect x="14" y="14" width="4" height="4" rx="1"/>
-    <rect x="22" y="14" width="4" height="4" rx="1" opacity=".35"/>
-    <rect x="6" y="21" width="4" height="4" rx="1"/>
-    <rect x="14" y="21" width="4" height="4" rx="1" opacity=".35"/>
-    <rect x="22" y="21" width="4" height="4" rx="1" opacity=".35"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Praecepta">
+<!-- SPDX-FileCopyrightText: Bruno Pacheco -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+  <title>Praecepta</title>
+  <path fill="#8C5A2B" fill-rule="evenodd" d="M6.5 4H25.5V28H6.5ZM6.5 12.4L0.02 7.84V24.16L6.5 19.6ZM25.5 12.4L31.98 7.84V24.16L25.5 19.6Z"/>
+  <path fill="#F7E9CF" d="M14.67 9.28H16.97Q18.62 9.28 19.66 9.76Q20.69 10.24 21.2 11.07Q21.71 11.9 21.74 12.96Q21.78 13.95 21.42 14.75Q21.05 15.55 20.41 16.09Q19.77 16.63 18.96 16.87Q18.15 17.11 17.27 16.99Q16.4 16.86 15.57 16.33V16.14Q15.57 16.14 15.81 16.14Q16.05 16.14 16.43 16.06Q16.8 15.98 17.22 15.76Q17.63 15.55 18 15.11Q18.37 14.67 18.56 13.95Q18.63 13.69 18.66 13.38Q18.69 13.07 18.67 12.79Q18.64 11.56 18 10.83Q17.36 10.09 16.2 10.09H14.86Q14.86 10.09 14.82 9.89Q14.77 9.68 14.72 9.48Q14.67 9.28 14.67 9.28ZM14.92 9.28V22.72H12.04V9.28ZM12.1 21.32V22.72H10.56V22.53Q10.59 22.53 10.69 22.53Q10.8 22.53 10.81 22.53Q11.31 22.53 11.67 22.17Q12.02 21.82 12.04 21.32ZM12.1 10.68H12.04Q12.04 10.18 11.68 9.83Q11.31 9.47 10.81 9.47Q10.8 9.47 10.7 9.47Q10.61 9.47 10.58 9.47L10.56 9.28H12.1ZM14.86 21.32H14.92Q14.94 21.82 15.3 22.17Q15.65 22.53 16.15 22.53Q16.17 22.53 16.28 22.53Q16.39 22.53 16.4 22.53V22.72H14.86Z"/>
 </svg>
