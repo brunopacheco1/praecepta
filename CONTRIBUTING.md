@@ -28,6 +28,18 @@ The code targets **Java 21** (`--release 21`): newer language features or APIs f
 CI builds and tests on Java 21, 25 and 27, and runs the plugin's integration tests on Maven 3.9,
 3.10 and 4.0.
 
+## Fuzzing
+`CellParser` and `DmnReader` read untrusted input, so they have [Jazzer](https://github.com/CodeIntelligenceTesting/jazzer)
+fuzz tests (`*FuzzTest`). Every build replays their saved inputs; to fuzz for real (5 minutes per
+target), run:
+
+```
+JAZZER_FUZZ=1 mvn -pl praecepta-engine test -Dtest=CellParserFuzzTest
+```
+
+A crash saves its input under `src/test/resources/.../<Test>Inputs/<method>/crash-*`: fix the bug
+and commit that file, so it stays a regression test. The `Fuzzing` workflow does the same weekly.
+
 ## Pull requests
 1. Fork the repository and create a branch from `main`.
 2. Keep the change focused, and add or update tests. Engine changes should keep

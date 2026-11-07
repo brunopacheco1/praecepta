@@ -12,6 +12,8 @@ path = [
     "**/*.csv",
     "**/*.xlsx",
     "**/*.dmn",
+    # fuzz-test inputs (seeds and any crash reproducers), which are raw data
+    "**/*FuzzTestInputs/**",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "Bruno Pacheco"

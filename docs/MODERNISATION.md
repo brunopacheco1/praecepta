@@ -523,9 +523,11 @@ What was done:
 Not done (owner actions): creating the Central token, the release key and the `release`
 environment, then tagging `v0.1.0`.
 
-### Phase 7 — Write-up
+### Phase 7 — Write-up and OpenSSF improvements
 A post on the maintainer's personal blog, written once 0.1.0 is on Maven Central, so readers can
-try it straight away. It covers:
+try it straight away, and the project improvements its "how open is it" section points to.
+
+The post covers:
 - **What changed**, from the 2022 trie engine to the 0.1.0 release: the bitset index, strict DMN,
   FEEL cells, DMN import, the Maven plugin, and the open-source hygiene (Apache-2.0, REUSE, SBOMs,
   signed releases).
@@ -545,6 +547,15 @@ try it straight away. It covers:
   - modelling tools and decision services;
   - mature ecosystems and support.
 - **How to use it:** the engine, DMN files and the Maven plugin, with copy-paste examples.
+- **How open the project is:**
+  - the Apache-2.0 licence and REUSE compliance;
+  - everything public: code, CI, plan, benchmarks, issues;
+  - release integrity: signed artifacts, SBOMs, build provenance, reproducible builds;
+  - the OpenSSF Scorecard result, explained: anyone can fork and propose changes. The Code-Review
+    check measures something else: whether each merged change was approved by someone other than
+    its author. With a single maintainer nobody can approve the maintainer's own changes, so every reviewed
+    outside contribution, and any co-maintainer, raises it;
+  - an invitation to contributors, reviewers and co-maintainers.
 - **How to contribute:** CONTRIBUTING, the issue templates, and good first issues.
 - **Nice-to-have features**, asking readers which they would use and inviting contributions:
   - boolean, time and date-time columns;
@@ -558,6 +569,25 @@ try it straight away. It covers:
   - a Spring Boot starter;
   - an online playground.
 
-  Each links to a GitHub issue or discussion, so interest can be counted.
+  Each links to a GitHub issue or discussion, so interest can be counted. Done: issues #12–#23
+  (with the DMN TCK and fuzzing added), labelled `enhancement` / `help wanted`, four of them
+  `good first issue`.
 
-Open before writing: where the blog lives (platform and repository or URL) and how it is published.
+**OpenSSF Scorecard improvements.** The score was 7.8/10 after 0.1.0. The checks below 10:
+
+| Check | Score | Work | By |
+|---|---:|---|---|
+| Fuzzing | 0 | Jazzer fuzz tests (`FuzzedDataProvider`) for `CellParser` and `DmnReader`, both of which parse untrusted input. They run as regression tests in every build, and fuzz longer on a schedule (issue #23). | code |
+| Signed-Releases | 8 | Attach each artifact's provenance bundle (`*.intoto.jsonl`) to the GitHub release, beside the signatures. | code (`release.yml`) |
+| Branch-Protection | 3 | Ruleset: require signed commits, and require a pull request (0 approvals, since there is a single maintainer). | owner (settings) |
+| CII-Best-Practices | 0 | Register at bestpractices.dev and answer the questionnaire; most criteria are already met. | owner |
+| Code-Review | 0 | Counts merged changes approved by someone other than their author. Contributions already arrive through forks and PRs; each one the maintainer reviews counts, and a co-maintainer reviewing the maintainer's PRs completes it. | community |
+| Contributors | 3 | Contributors from several organisations; grows with contributions. | community |
+
+Also: enable **secret scanning and push protection** (free for public repositories; owner,
+in settings).
+
+**Blog:** the Hugo site `brunopacheco1.github.io` (Congo theme, English and Portuguese, deployed
+from `master` by GitHub Actions). The post comes as a pull request there, with charts drawn by the
+theme's Chart.js shortcode. The 2023 trie post gets an update note: its benchmark was not
+like-for-like.

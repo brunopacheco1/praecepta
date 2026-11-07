@@ -36,5 +36,10 @@
             <artifactId>jqwik</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.code-intelligence</groupId>
+            <artifactId>jazzer-junit</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
