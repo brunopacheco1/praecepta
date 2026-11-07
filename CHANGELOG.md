@@ -12,6 +12,8 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 ## [Unreleased]
 
 ### Added
+- **A project website** at https://bruno.pacheco.lu/praecepta/, with the API documentation of the
+  latest release.
 - **Fuzz tests** (Jazzer) for the cell parser and the DMN reader: they replay saved inputs in every
   build and fuzz weekly in CI.
 - **Releases attach their build provenance** (`praecepta-X.Y.Z.intoto.jsonl`) for offline

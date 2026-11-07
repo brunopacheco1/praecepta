@@ -1,0 +1,74 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: Website
+# Publishes the project page (site/) with the API documentation of the latest release on GitHub
+# Pages: https://bruno.pacheco.lu/praecepta/. Runs when the page changes, on every release, and on
+# demand.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the release tags
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Find the latest release
+        run: |
+          tag=$(git tag --list 'v*' --sort=-version:refname | head -n 1)
+          echo "TAG=${tag}" >> "$GITHUB_ENV"
+          echo "VERSION=${tag#v}" >> "$GITHUB_ENV"
+      - name: Build the API documentation of ${{ env.TAG }}
+        # as the release workflow does: set the version, then build the javadoc jars
+        run: |
+          git worktree add ../release "${TAG}"
+          cd ../release
+          mvn -B -q versions:set -DnewVersion="${VERSION}" -DgenerateBackupPoms=false -DprocessAllModules
+          mvn -B -q -Prelease -DskipTests -Dlicense.skip -pl praecepta-engine,praecepta-loader -am package
+      - name: Assemble the site
+        run: |
+          mkdir -p _site/api
+          cp -R site/. _site/
+          sed -i "s/@VERSION@/${VERSION}/g" _site/index.html
+          cp -R ../release/praecepta-engine/target/reports/apidocs _site/api/engine
+          cp -R ../release/praecepta-loader/target/reports/apidocs _site/api/loader
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write # publish the site
+      id-token: write # prove the deployment comes from this workflow
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
