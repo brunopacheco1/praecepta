@@ -56,7 +56,11 @@ jobs:
           server-username: MAVEN_CENTRAL_USERNAME
           server-password: MAVEN_CENTRAL_PASSWORD
       - name: Set the version from the tag
-        run: mvn -B versions:set -DnewVersion="${VERSION}" -DgenerateBackupPoms=false -DprocessAllModules
+        # keep project.build.outputTimestamp as committed, so the release can be rebuilt from its
+        # tag with nothing but the version changed (versions:set would otherwise stamp the time now)
+        run: >
+          mvn -B versions:set -DnewVersion="${VERSION}" -DgenerateBackupPoms=false -DprocessAllModules
+          -DupdateBuildOutputTimestampPolicy=never
       - name: Build, test, sign and publish
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}

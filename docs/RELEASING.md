@@ -81,13 +81,35 @@ every release waits for a click.
 3. Watch **Actions → Release**. When it is green, the artifacts are on Maven Central (search can
    take a few hours to show them) and the GitHub release is published.
 4. Set the development version for the next release (`mvn versions:set -DnewVersion=X.Y.(Z+1)-SNAPSHOT
-   -DgenerateBackupPoms=false -DprocessAllModules`) in a pull request.
+   -DgenerateBackupPoms=false -DprocessAllModules`) in a pull request. This also refreshes
+   `project.build.outputTimestamp`, which the next release keeps (see *Rebuilding a release*).
 
 ## Checking a release
 - Signatures: download a jar and its `.asc`, then `gpg --verify praecepta-engine-X.Y.Z.jar.asc`.
 - Provenance: `gh attestation verify praecepta-engine-X.Y.Z.jar --repo brunopacheco1/praecepta`, or
   offline against the release's `praecepta-X.Y.Z.intoto.jsonl` bundle (`--bundle`).
 - SBOM: `praecepta-engine-X.Y.Z-cyclonedx.json` on the release (and on Maven Central).
+- Reproducibility: see the next section.
+
+## Rebuilding a release
+Builds are reproducible: the same sources, JDK major version and build timestamp give
+bit-for-bit identical artifacts. The release workflow changes only the version: it runs
+`versions:set` with `-DupdateBuildOutputTimestampPolicy=never`, so `project.build.outputTimestamp`
+stays as committed in the tag. To rebuild release X.Y.Z from its tag, with the JDK major version
+it was built with (in the jar manifests' `Build-Jdk-Spec`; 25 for the current workflow):
+
+```bash
+git checkout vX.Y.Z
+mvn versions:set -DnewVersion=X.Y.Z -DgenerateBackupPoms=false -DprocessAllModules -DupdateBuildOutputTimestampPolicy=never
+mvn -Prelease clean package -pl praecepta-engine,praecepta-loader,praecepta-maven-plugin -am -DskipTests -Dinvoker.skip -Dgpg.skip
+```
+
+[Reproducible Central](https://github.com/jvm-repo-rebuild/reproducible-central) rebuilds releases
+independently and compares them with Maven Central. Its `.buildspec` for a release uses the same
+command and replaces the version with
+`execBefore="perl -pi -e 's|<version>X.Y.Z-SNAPSHOT</version>|<version>X.Y.Z</version>|' pom.xml */pom.xml"`.
+0.2.0 is the exception: its workflow still stamped the time of the release run, so its `.buildspec`
+also sets `project.build.outputTimestamp` to `2026-11-08T20:08:06Z`.
 
 If publishing fails after the tag is pushed, fix the cause, delete the tag (locally and with
 `git push origin :refs/tags/vX.Y.Z`), and tag again. Maven Central never accepts the same version
