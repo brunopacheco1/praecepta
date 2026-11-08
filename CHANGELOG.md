@@ -43,6 +43,13 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   Extend `BaseLoader` to write a loader of your own.
 - **Exceptions declare a `serialVersionUID`.**
 
+### Fixed
+- **Large FIRST and PRIORITY tables build quickly** ([#29](https://github.com/brunopacheco1/praecepta/issues/29)):
+  the unreachable-rule check, still exact, now remembers the regions it has proven covered, tests
+  whether one rule covers the rest with a single mask intersection, and looks for an uncovered input
+  before searching deeper. A 1,000-rule, 9-column table now builds in 0.5 s under FIRST (was 3.2 s)
+  and 0.7 s under PRIORITY (was 65 s), against 0.3 s under COLLECT; the reports are unchanged.
+
 ## [0.1.0] - 2026-11-07
 
 The first release since the 2022–2023 prototype: the engine, loader and Maven plugin are rewritten.
