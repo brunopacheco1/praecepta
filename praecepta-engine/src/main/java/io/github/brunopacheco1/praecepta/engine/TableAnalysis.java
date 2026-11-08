@@ -180,7 +180,8 @@ final class TableAnalysis {
     private record State(int column, long[] candidates) {
         @Override
         public boolean equals(Object other) {
-            return other instanceof State state && column == state.column && Arrays.equals(candidates, state.candidates);
+            return other instanceof State(int otherColumn, long[] otherCandidates)
+                    && column == otherColumn && Arrays.equals(candidates, otherCandidates);
         }
 
         @Override
