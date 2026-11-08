@@ -10,7 +10,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Assertions;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 
 import io.github.brunopacheco1.praecepta.tck.TckResults.Result;
+import io.github.brunopacheco1.praecepta.tck.TckRunner.Outcome;
 
 /**
  * The DMN TCK's decision-table test cases. Every supported check must pass; unsupported ones are
@@ -30,32 +33,33 @@ import io.github.brunopacheco1.praecepta.tck.TckResults.Result;
 class TckTest {
 
     private static final Path RESULTS = Path.of("RESULTS.md");
-    private static final List<Result> RUN = run();
+    /** Every check's outcome, by TCK test case in name order. */
+    private static final Map<String, List<Result>> RUN = run();
 
-    private static List<Result> run() {
+    private static Map<String, List<Result>> run() {
         var runner = new TckRunner();
-        return TckSuite.load().values().stream()
-                .flatMap(List::stream)
-                .map(check -> new Result(check, runner.run(check)))
-                .toList();
+        var results = new LinkedHashMap<String, List<Result>>();
+        TckSuite.load().forEach((testCase, checks) -> results.put(testCase,
+                checks.stream().map(check -> new Result(check, runner.run(check))).toList()));
+        return results;
     }
 
     @TestFactory
     Stream<DynamicContainer> decision_table_test_cases() {
-        return RUN.stream()
-                .collect(java.util.stream.Collectors.groupingBy(result -> result.check().testCase(),
-                        java.util.TreeMap::new, java.util.stream.Collectors.toList()))
-                .entrySet().stream()
+        return RUN.entrySet().stream()
                 .map(entry -> DynamicContainer.dynamicContainer(entry.getKey(), entry.getValue().stream()
-                        .map(result -> DynamicTest.dynamicTest(result.check().label(), () -> {
-                            switch (result.outcome().status()) {
-                                case PASSED -> {
-                                    // nothing to report
-                                }
-                                case UNSUPPORTED -> Assumptions.abort("not supported: " + result.outcome().detail());
-                                case FAILED -> Assertions.fail(result.outcome().detail());
-                            }
-                        }))));
+                        .map(result -> DynamicTest.dynamicTest(result.check().label(), () -> report(result.outcome())))));
+    }
+
+    /** PASSED passes, UNSUPPORTED is skipped with the missing feature, FAILED fails. */
+    private static void report(Outcome outcome) {
+        switch (outcome.status()) {
+            case PASSED -> {
+                // nothing to report
+            }
+            case UNSUPPORTED -> Assumptions.abort("not supported: " + outcome.detail());
+            case FAILED -> Assertions.fail(outcome.detail());
+        }
     }
 
     @Test

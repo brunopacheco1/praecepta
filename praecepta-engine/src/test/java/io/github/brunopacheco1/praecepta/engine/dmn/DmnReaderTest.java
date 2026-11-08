@@ -25,6 +25,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
+import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
@@ -122,7 +123,7 @@ class DmnReaderTest {
     void map_based_inputs_take_the_table_types() {
         var engine = PraeceptaEngine.<Map<String, String>, String>builder()
                 .table(DmnReader.read(resource("camunda-modeler-discount.dmn")))
-                .inputs(io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput::new)
+                .inputs(PraeceptaInput::new)
                 .output(output -> output.values().get("tier"))
                 .build();
         Assertions.assertThat(engine.evaluate(Map.of("country", "PT", "customer.age", "30", "since", "2019-05-01")))
@@ -188,7 +189,7 @@ class DmnReaderTest {
                 .containsExactly("Credit Score", "Applicant data.Employment status");
         var engine = PraeceptaEngine.<Map<String, String>, String>builder()
                 .table(table)
-                .inputs(io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput::new)
+                .inputs(PraeceptaInput::new)
                 .output(output -> output.values().get("result"))
                 .build();
         Assertions.assertThat(engine.evaluate(Map.of("Credit Score", "720", "Applicant data.Employment status", "EMPLOYED")))
@@ -203,6 +204,8 @@ class DmnReaderTest {
             "Applicant data.Monthly income | true",
             "Rate 2                       | true",
             "is_ok?                       | true",
+            "𝓐ge                       | true",
+            "Ⅷ rate                    | false",
             "2nd rate                     | false",
             "a..b                         | false",
             "a. b                         | false",

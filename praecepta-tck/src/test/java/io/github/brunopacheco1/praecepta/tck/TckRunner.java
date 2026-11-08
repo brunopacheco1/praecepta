@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.function.BinaryOperator;
 import java.util.regex.Pattern;
@@ -32,6 +31,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException
 import io.github.brunopacheco1.praecepta.tck.TckSuite.Check;
 import io.github.brunopacheco1.praecepta.tck.TckValue.Components;
 import io.github.brunopacheco1.praecepta.tck.TckValue.Items;
+import io.github.brunopacheco1.praecepta.tck.TckValue.Nil;
 import io.github.brunopacheco1.praecepta.tck.TckValue.Simple;
 
 /**
@@ -57,26 +57,30 @@ final class TckRunner {
         static final Outcome PASSED = new Outcome(Status.PASSED, "");
     }
 
-    private final Map<String, Object> tables = new HashMap<>();
+    /** Thrown while preparing a check that needs a feature Praecepta lacks; the message names it. */
+    private static final class Unsupported extends RuntimeException {
+        private static final long serialVersionUID = 1L;
 
+        Unsupported(String feature) {
+            super(feature, null, false, false);
+        }
+    }
+
+    /** Decision tables already read, by model file and decision. */
+    private final Map<String, DecisionTable> tables = new HashMap<>();
+
+    /** UNSUPPORTED if the table or the inputs need a missing feature; else the comparison's outcome. */
     Outcome run(Check check) {
-        var read = tables.computeIfAbsent(check.model().file() + "#" + check.decision(), key -> read(check));
-        if (read instanceof Outcome unsupported) {
-            return unsupported;
+        try {
+            var table = tables.computeIfAbsent(check.model().file() + "#" + check.decision(), key -> read(check));
+            return evaluate(check, table, inputValues(check, table));
+        } catch (Unsupported e) {
+            return new Outcome(Status.UNSUPPORTED, e.getMessage());
         }
-        var table = (DecisionTable) read;
+    }
 
-        var values = new LinkedHashMap<String, String>();
-        for (var column : table.inputs()) {
-            var value = input(check, column.name());
-            if (value instanceof Outcome unsupported) {
-                return unsupported;
-            }
-            if (value != null) {
-                values.put(column.name(), (String) value);
-            }
-        }
-
+    /** Builds an engine, evaluates the inputs and compares the result with the expected one: PASSED or FAILED. */
+    private static Outcome evaluate(Check check, DecisionTable table, Map<String, String> inputs) {
         PraeceptaEngine<Map<String, String>, PraeceptaOutput> engine;
         try {
             engine = PraeceptaEngine.<Map<String, String>, PraeceptaOutput>builder()
@@ -90,13 +94,13 @@ final class TckRunner {
 
         List<PraeceptaOutput> outputs;
         try {
-            outputs = engine.evaluate(values);
+            outputs = engine.evaluate(inputs);
         } catch (HitPolicyViolationException | InvalidInputException e) {
-            return check.error() ? Outcome.PASSED
+            return check.expectsError() ? Outcome.PASSED
                     : new Outcome(Status.FAILED, "expected %s, but evaluation threw: %s".formatted(check.expected(), e.getMessage()));
         }
         var actual = result(table, outputs);
-        if (check.error()) {
+        if (check.expectsError()) {
             return new Outcome(Status.FAILED, "expected an error, got " + actual);
         }
         boolean ordered = table.hitPolicy() != HitPolicy.COLLECT;
@@ -104,44 +108,57 @@ final class TckRunner {
                 : new Outcome(Status.FAILED, "expected %s, got %s".formatted(check.expected(), actual));
     }
 
-    /** The decision table, or the UNSUPPORTED outcome explaining why it cannot be read. */
-    private static Object read(Check check) {
+    private static DecisionTable read(Check check) {
         try (InputStream dmn = Files.newInputStream(check.model().file())) {
             return DmnReader.read(dmn, check.decision());
         } catch (InvalidDecisionTableException e) {
-            return new Outcome(Status.UNSUPPORTED, unsupportedFeature(e.getMessage()));
+            throw new Unsupported(unsupportedFeature(e.getMessage()));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    /**
-     * The text value of an input column (null if missing), or the UNSUPPORTED outcome. A qualified
-     * column ({@code applicant.age}) reads a component of a structured input.
-     */
-    private static Object input(Check check, String column) {
+    /** The test case's inputs as text, by column; missing and null inputs are left out. */
+    private static Map<String, String> inputValues(Check check, DecisionTable table) {
+        var values = new LinkedHashMap<String, String>();
+        for (var column : table.inputs()) {
+            var value = input(check, column.name());
+            if (value != null) {
+                values.put(column.name(), value);
+            }
+        }
+        return values;
+    }
+
+    /** The text of an input column, or null. A qualified column ({@code applicant.age}) reads a component. */
+    private static String input(Check check, String column) {
         var path = column.split("\\.");
         TckValue value = check.inputs().get(path[0]);
-        if (value == null) {
-            return check.model().decisions().contains(path[0])
-                    ? new Outcome(Status.UNSUPPORTED, "inputs computed by other decisions (decision requirement graphs, #14)")
-                    : null;
+        if (value == null && check.model().decisions().contains(path[0])) {
+            throw new Unsupported("inputs computed by other decisions (decision requirement graphs, #14)");
         }
         for (int i = 1; i < path.length && value != null; i++) {
             value = value instanceof Components components ? components.values().get(path[i]) : null;
         }
         return switch (value) {
             case null -> null;
-            case TckValue.Nil nil -> null;
-            case Items items -> new Outcome(Status.UNSUPPORTED, "list inputs (#25)");
-            case Components components -> new Outcome(Status.UNSUPPORTED, "structured inputs compared as a whole");
-            case Simple simple -> switch (simple.type()) {
-                case "", "string", "decimal", "double", "integer", "int", "long", "float", "date", "boolean" -> simple.text();
-                case "time", "dateTime" -> ZONED.matcher(simple.text().strip()).matches()
-                        ? new Outcome(Status.UNSUPPORTED, "times and date-times with a time zone")
-                        : simple.text();
-                default -> new Outcome(Status.UNSUPPORTED, unsupportedType(simple.type()));
-            };
+            case Nil nil -> null;
+            case Items items -> throw new Unsupported("list inputs (#25)");
+            case Components components -> throw new Unsupported("structured inputs compared as a whole");
+            case Simple simple -> text(simple);
+        };
+    }
+
+    private static String text(Simple simple) {
+        return switch (simple.type()) {
+            case "", "string", "decimal", "double", "integer", "int", "long", "float", "date", "boolean" -> simple.text();
+            case "time", "dateTime" -> {
+                if (ZONED.matcher(simple.text().strip()).matches()) {
+                    throw new Unsupported("times and date-times with a time zone");
+                }
+                yield simple.text();
+            }
+            default -> throw new Unsupported(unsupportedType(simple.type()));
         };
     }
 
@@ -207,7 +224,7 @@ final class TckRunner {
 
     private static TckValue simple(DecisionTable.OutputColumn column, PraeceptaOutput output) {
         var text = output.values().get(column.name());
-        return text == null ? TckValue.NIL : new Simple(column.type().name().toLowerCase(Locale.ROOT), text);
+        return text == null ? TckValue.NIL : new Simple(column.type().feelName(), text);
     }
 
     // ---- reasons ----------------------------------------------------------------------------------
@@ -234,10 +251,8 @@ final class TckRunner {
         if (aggregation.find()) {
             return aggregation.group(1) + " aggregation" + (aggregation.group(1).equals("COUNT") ? " (#15)" : "");
         }
-        var expression = EXPRESSION.matcher(message);
-        if (expression.find()) {
-            return expression.group(1).matches("[\\p{L}_?][\\p{L}\\p{N}_? ]*")
-                    ? "input names with spaces" : "input expressions other than a variable name";
+        if (EXPRESSION.matcher(message).find()) {
+            return "input expressions other than a variable name";
         }
         if (REFERENCE.matcher(message).find()) {
             return "input entries that refer to other inputs";

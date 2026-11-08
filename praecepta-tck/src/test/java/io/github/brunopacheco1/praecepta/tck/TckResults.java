@@ -10,7 +10,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -27,7 +26,9 @@ final class TckResults {
     private TckResults() {
     }
 
-    static String render(List<Result> results) {
+    /** @param byCase every check's result, by TCK test case in name order */
+    static String render(Map<String, List<Result>> byCase) {
+        var results = byCase.values().stream().flatMap(List::stream).toList();
         var total = results.size();
         var counts = count(results, result -> result.outcome().status());
         int passed = counts.getOrDefault(Status.PASSED, 0);
@@ -75,7 +76,6 @@ final class TckResults {
                 passed, total, percent(passed, total), passed + failed, passed, percent(passed, passed + failed),
                 passed, failed, unsupported));
 
-        var byCase = results.stream().collect(Collectors.groupingBy(result -> result.check().testCase(), TreeMap::new, Collectors.toList()));
         byCase.forEach((testCase, caseResults) -> {
             var caseCounts = count(caseResults, result -> result.outcome().status());
             var reasons = caseResults.stream()
@@ -84,7 +84,7 @@ final class TckResults {
                     .distinct()
                     .sorted()
                     .collect(Collectors.joining("; "));
-            md.append("| [%s](https://github.com/dmn-tck/tck/tree/%s/TestCases/%s) | %d | %d | %d | %s |\n".formatted(
+            line(md, "| [%s](https://github.com/dmn-tck/tck/tree/%s/TestCases/%s) | %d | %d | %d | %s |".formatted(
                     testCase, TckSuite.TCK_COMMIT, testCase,
                     caseCounts.getOrDefault(Status.PASSED, 0), caseCounts.getOrDefault(Status.FAILED, 0),
                     caseCounts.getOrDefault(Status.UNSUPPORTED, 0), escape(reasons)));
@@ -94,10 +94,18 @@ final class TckResults {
                 .filter(result -> result.outcome().status() == Status.UNSUPPORTED)
                 .toList();
         if (!missing.isEmpty()) {
-            md.append("\n## Not supported\n\nWhat the unsupported checks need, by number of checks:\n\n| Feature | Checks |\n|---|---:|\n");
+            md.append("""
+
+                    ## Not supported
+
+                    What the unsupported checks need, by number of checks:
+
+                    | Feature | Checks |
+                    |---|---:|
+                    """);
             count(missing, result -> result.outcome().detail()).entrySet().stream()
                     .sorted(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
-                    .forEach(entry -> md.append("| %s | %d |\n".formatted(escape(entry.getKey()), entry.getValue())));
+                    .forEach(entry -> line(md, "| %s | %d |".formatted(escape(entry.getKey()), entry.getValue())));
         }
 
         var failures = results.stream()
@@ -105,11 +113,20 @@ final class TckResults {
                 .sorted(Comparator.comparing((Result result) -> result.check().testCase()).thenComparing(result -> result.check().label()))
                 .toList();
         if (!failures.isEmpty()) {
-            md.append("\n## Failures\n\n");
-            failures.forEach(result -> md.append("- `%s/%s`: %s\n".formatted(
+            md.append("""
+
+                    ## Failures
+
+                    """);
+            failures.forEach(result -> line(md, "- `%s/%s`: %s".formatted(
                     result.check().testCase(), result.check().label(), escape(result.outcome().detail()))));
         }
         return md.toString();
+    }
+
+    /** Appends a line ending in {@code \n} on every platform, so RESULTS.md is the same everywhere. */
+    private static void line(StringBuilder md, String text) {
+        md.append(text).append('\n');
     }
 
     private static <K> Map<K, Integer> count(List<Result> results, Function<Result, K> key) {

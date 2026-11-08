@@ -104,6 +104,19 @@ class CellParserTest {
     }
 
     @Test
+    void strict_feel_needs_the_date_and_time_functions() {
+        // in FEEL a bare 2025-01-31 is a subtraction and 08:30 is not valid at all
+        Assertions.assertThat(CellParser.parse("< 2025-01-31", ColumnType.DATE))
+                .isEqualTo(CellParser.parseFeel("< date(\"2025-01-31\")", ColumnType.DATE));
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel("< 2025-01-31", ColumnType.DATE))
+                .hasMessageContaining("is not a date; write date(\"yyyy-mm-dd\")");
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel("08:30", ColumnType.TIME))
+                .hasMessageContaining("is not a time");
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel("2025-01-31T08:30", ColumnType.DATE_TIME))
+                .hasMessageContaining("is not a date and time");
+    }
+
+    @Test
     void times_and_date_times_use_their_functions_or_iso_text() {
         var morning = LocalTime.of(8, 30);
         Assertions.assertThat(CellParser.parse("[time(\"08:30:00\")..12:00)", ColumnType.TIME))

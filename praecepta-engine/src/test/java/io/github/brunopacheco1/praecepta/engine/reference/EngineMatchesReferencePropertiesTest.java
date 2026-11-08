@@ -6,9 +6,6 @@
 package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -221,16 +218,7 @@ class EngineMatchesReferencePropertiesTest {
 
     private static <O> void configure(PraeceptaEngine.Builder<Map<String, Object>, O> builder, DecisionTableScenario s, boolean perColumn) {
         if (perColumn) {
-            for (var column : s.columns()) {
-                switch (s.types().get(column)) {
-                    case STRING -> builder.input(column, input -> (String) input.get(column));
-                    case NUMBER -> builder.numberInput(column, input -> (BigDecimal) input.get(column));
-                    case DATE -> builder.dateInput(column, input -> (LocalDate) input.get(column));
-                    case BOOLEAN -> builder.booleanInput(column, input -> (Boolean) input.get(column));
-                    case TIME -> builder.timeInput(column, input -> (LocalTime) input.get(column));
-                    case DATE_TIME -> builder.dateTimeInput(column, input -> (LocalDateTime) input.get(column));
-                }
-            }
+            s.bindColumns(builder);
         } else {
             builder.inputs(input -> new PraeceptaInput(DecisionTableScenario.asText(input)));
             s.types().forEach(builder::columnType);

@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
@@ -112,7 +113,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 Tuple.of(4, Arbitraries.just("")),
                 Tuple.of(1, Arbitraries.just("-")),
                 Tuple.of(4, single),
-                Tuple.of(ordered(column.type()) ? 4 : 0, test(column)),
+                Tuple.of(column.type().supportsComparisons() ? 4 : 0, test(column)),
                 Tuple.of(2, list),
                 Tuple.of(1, negated),
                 Tuple.of(1, Arbitraries.just("null")),
@@ -134,13 +135,9 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         };
     }
 
-    static boolean ordered(ColumnType type) {
-        return type != ColumnType.STRING && type != ColumnType.BOOLEAN;
-    }
-
     /** A comparison or an interval (ordered columns). */
     private static Arbitrary<String> test(Column column) {
-        if (!ordered(column.type())) {
+        if (!column.type().supportsComparisons()) {
             return literal(column);
         }
         var comparison = Combinators.combine(Arbitraries.of("<", "<=", ">", ">="), literal(column)).as((op, v) -> op + " " + v);
@@ -217,6 +214,20 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             inputs.add(input);
         }
         return new DecisionTableScenario(List.copyOf(names), Map.copyOf(types), Map.copyOf(allowed), List.copyOf(rules), List.copyOf(inputs));
+    }
+
+    /** Binds every column to the input map with the typed getter of its type. */
+    public <O> void bindColumns(PraeceptaEngine.Builder<Map<String, Object>, O> builder) {
+        for (var column : columns) {
+            switch (types.get(column)) {
+                case STRING -> builder.input(column, input -> (String) input.get(column));
+                case NUMBER -> builder.numberInput(column, input -> (BigDecimal) input.get(column));
+                case DATE -> builder.dateInput(column, input -> (LocalDate) input.get(column));
+                case BOOLEAN -> builder.booleanInput(column, input -> (Boolean) input.get(column));
+                case TIME -> builder.timeInput(column, input -> (LocalTime) input.get(column));
+                case DATE_TIME -> builder.dateTimeInput(column, input -> (LocalDateTime) input.get(column));
+            }
+        }
     }
 
     public ReferenceMatcher reference(List<Praeceptum> tableRules, io.github.brunopacheco1.praecepta.engine.beans.HitPolicy policy,

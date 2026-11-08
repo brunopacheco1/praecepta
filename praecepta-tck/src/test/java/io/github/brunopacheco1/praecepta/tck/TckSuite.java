@@ -33,7 +33,7 @@ final class TckSuite {
 
     /** One expected result: a decision evaluated with a test case's inputs. */
     record Check(String testCase, String testFile, String id, String decision, Model model,
-                 Map<String, TckValue> inputs, TckValue expected, boolean error) {
+                 Map<String, TckValue> inputs, TckValue expected, boolean expectsError) {
 
         String label() {
             return testFile + " #" + id + " " + decision;
@@ -58,7 +58,10 @@ final class TckSuite {
         }
     }
 
-    /** Every check, by TCK test case directory ({@code compliance-level-2/0004-simpletable-U}), in name order. */
+    /**
+     * Every check, by TCK test case directory ({@code compliance-level-2/0004-simpletable-U}), in name
+     * order. Test cases without a decision-table check are left out.
+     */
     static Map<String, List<Check>> load() {
         var root = root();
         var byCase = new LinkedHashMap<String, List<Check>>();
@@ -72,6 +75,7 @@ final class TckSuite {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+        byCase.values().removeIf(List::isEmpty);
         return byCase;
     }
 

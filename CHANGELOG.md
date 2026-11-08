@@ -40,9 +40,8 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   - `run-benchmarks.sh` runs them all and records the machine and versions with the results.
 - **DMN TCK results** ([#22](https://github.com/brunopacheco1/praecepta/issues/22)): a new
   `praecepta-tck` module runs the decision-table test cases of the DMN Technology Compatibility Kit
-  in every build, and keeps the published results (`praecepta-tck/RESULTS.md`) current. Every
-  supported check passes (16 of 86); the rest need boolean columns, names with spaces, expression
-  outputs, COUNT and other features listed there.
+  in every build, and keeps the published results (`praecepta-tck/RESULTS.md`) current: what passes,
+  and what each unsupported check needs. Every supported check passes.
 - **An enforced code style:** Checkstyle checks every build (`checkstyle.xml`, described in
   CONTRIBUTING.md), and compiler warnings fail the build (`-Xlint:all -Werror`).
 
@@ -53,8 +52,9 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 - **Exceptions declare a `serialVersionUID`.**
 - **`DmnReader` reads cells as strict FEEL:** an unquoted word in a string cell is a reference to
   another variable, so it is rejected as unsupported instead of being read as a string (the DMN TCK
-  caught `Complex.aString` being compared as text). Excel, CSV and code keep the shorter `PT,ES`
-  syntax; `CellParser.parseFeel` is the strict parser.
+  caught `Complex.aString` being compared as text); and dates and times need their functions
+  (`date("2025-01-31")`), since in FEEL a bare `2025-01-31` is a subtraction. Excel, CSV and code
+  keep the shorter `PT,ES` and bare ISO forms; `CellParser.parseFeel` is the strict parser.
 
 ### Fixed
 - **`date and time("2025-01-31")`** (a date without a time) is reported as an invalid date and time,

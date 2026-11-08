@@ -12,14 +12,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -27,6 +25,7 @@ import java.util.TreeSet;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
@@ -253,27 +252,28 @@ final class ColumnIndex {
                     case DATE -> LocalDate.parse(value);
                     case TIME -> LocalTime.parse(value);
                     case DATE_TIME -> LocalDateTime.parse(value);
-                    case BOOLEAN -> {
-                        if (!value.equalsIgnoreCase("true") && !value.equalsIgnoreCase("false")) {
-                            throw new IllegalArgumentException(value);
-                        }
-                        yield Boolean.valueOf(value);
-                    }
+                    case BOOLEAN -> bool(text);
                     case STRING -> throw new IllegalStateException("STRING columns are not ordered");
                 };
-            } catch (IllegalArgumentException | DateTimeParseException e) {
-                throw new InvalidInputException(name, text, "is not a valid " + typeName(type));
+            } catch (NumberFormatException | DateTimeParseException e) {
+                throw notValid(text);
             }
         }
         // typed getters already return the column's Java type (LocalDate, LocalTime, ...); numbers vary
         return type == ColumnType.NUMBER ? number((Number) raw) : raw;
     }
 
-    private static String typeName(ColumnType type) {
-        return switch (type) {
-            case DATE_TIME -> "date and time";
-            default -> type.name().toLowerCase(Locale.ROOT);
-        };
+    /** {@code true} or {@code false} in any case. */
+    private Boolean bool(String text) {
+        var value = text.strip();
+        if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false")) {
+            return Boolean.valueOf(value);
+        }
+        throw notValid(text);
+    }
+
+    private InvalidInputException notValid(String text) {
+        return new InvalidInputException(name, text, "is not a valid " + type.feelName());
     }
 
     private BigDecimal number(Number raw) {
@@ -312,7 +312,7 @@ final class ColumnIndex {
 
     /** A human-readable description of a class, for validation reports. */
     String describe(int valueClass) {
-        return classes.get(valueClass).describe(type);
+        return classes.get(valueClass).describe();
     }
 
     /**
@@ -321,7 +321,7 @@ final class ColumnIndex {
      * do not break a run.
      */
     List<String> describe(List<Integer> valueClasses) {
-        if (type == ColumnType.STRING || type == ColumnType.BOOLEAN) {
+        if (!type.supportsComparisons()) { // no intervals to merge
             return valueClasses.stream().map(this::describe).toList();
         }
         var sorted = valueClasses.stream().sorted().toList();
@@ -349,13 +349,13 @@ final class ColumnIndex {
         var first = classes.get(from);
         var last = classes.get(to);
         var low = switch (first) {
-            case ValueClass.Point p -> "[" + literal(p.value(), type);
-            case ValueClass.Between b -> b.low() == null ? "(-inf" : "(" + literal(b.low(), type);
+            case ValueClass.Point p -> "[" + FeelLiterals.literal(p.value());
+            case ValueClass.Between b -> b.low() == null ? "(-inf" : "(" + FeelLiterals.literal(b.low());
             default -> throw new IllegalStateException("not an ordered class");
         };
         var high = switch (last) {
-            case ValueClass.Point p -> literal(p.value(), type) + "]";
-            case ValueClass.Between b -> b.high() == null ? "+inf)" : literal(b.high(), type) + ")";
+            case ValueClass.Point p -> FeelLiterals.literal(p.value()) + "]";
+            case ValueClass.Between b -> b.high() == null ? "+inf)" : FeelLiterals.literal(b.high()) + ")";
             default -> throw new IllegalStateException("not an ordered class");
         };
         return low + ".." + high;
@@ -387,11 +387,11 @@ final class ColumnIndex {
         record Missing() implements ValueClass {
         }
 
-        default String describe(ColumnType type) {
+        default String describe() {
             return switch (this) {
-                case Point p -> literal(p.value(), type);
-                case Between b -> "(" + (b.low() == null ? "-inf" : literal(b.low(), type)) + ".."
-                        + (b.high() == null ? "+inf" : literal(b.high(), type)) + ")";
+                case Point p -> FeelLiterals.literal(p.value());
+                case Between b -> "(" + (b.low() == null ? "-inf" : FeelLiterals.literal(b.low())) + ".."
+                        + (b.high() == null ? "+inf" : FeelLiterals.literal(b.high())) + ")";
                 case OtherString o -> "any other value";
                 case Missing m -> "null";
             };
@@ -405,17 +405,6 @@ final class ColumnIndex {
                 case Missing m -> null;
             };
         }
-    }
-
-    private static String literal(Comparable<?> value, ColumnType type) {
-        return switch (type) {
-            case STRING -> "\"" + value + "\"";
-            case NUMBER -> ((BigDecimal) value).toPlainString();
-            case DATE -> "date(\"" + value + "\")";
-            case BOOLEAN -> value.toString();
-            case TIME -> "time(\"" + DateTimeFormatter.ISO_LOCAL_TIME.format((LocalTime) value) + "\")";
-            case DATE_TIME -> "date and time(\"" + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format((LocalDateTime) value) + "\")";
-        };
     }
 
     /** A value inside a non-empty open interval: a round step beyond an open end, else the midpoint. */

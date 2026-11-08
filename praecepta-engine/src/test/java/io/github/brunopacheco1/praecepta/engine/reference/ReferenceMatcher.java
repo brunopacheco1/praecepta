@@ -240,7 +240,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         if (allowedValues.containsKey(column)) {
             cells.add(parse(allowedValues.get(column), column));
         }
-        if (type == ColumnType.STRING) {
+        if (type == ColumnType.BOOLEAN) {
+            values.addAll(List.of(false, true)); // the whole domain
+        } else if (type == ColumnType.STRING) {
             var written = new TreeSet<String>();
             cells.forEach(cell -> literals(cell).forEach(v -> written.add((String) v)));
             values.addAll(written);
@@ -256,7 +258,6 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                     case NUMBER -> BigDecimal.ZERO;
                     case TIME -> LocalTime.NOON;
                     case DATE_TIME -> LocalDateTime.of(2025, 1, 1, 0, 0);
-                    case BOOLEAN -> Boolean.TRUE;
                     default -> LocalDate.of(2025, 1, 1);
                 });
             }
@@ -293,14 +294,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                             around.add(LocalDateTime.ofInstant(start.plus(Duration.between(start, end).dividedBy(2)), ZoneOffset.UTC));
                         }
                     }
-                    default -> {
-                        // booleans: both values are the whole domain
-                    }
+                    default -> throw new IllegalStateException("not an ordered value: " + point);
                 }
-            }
-            if (type == ColumnType.BOOLEAN) {
-                around.add(Boolean.FALSE);
-                around.add(Boolean.TRUE);
             }
             values.addAll(around);
         }
