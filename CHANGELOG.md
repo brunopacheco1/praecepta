@@ -11,6 +11,12 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+### Changed
+- **Releases keep the build timestamp committed in the tag** (`project.build.outputTimestamp`), so
+  a release can be rebuilt bit for bit from its tag with only the version changed. 0.2.0 was
+  stamped with the time of its release run; its rebuild sets that value explicitly (see
+  `docs/RELEASING.md`).
+
 ## [0.2.0] - 2026-11-08
 
 Boolean, time and date-time columns; the DMN conformance kit (TCK) in every build; fast builds for
