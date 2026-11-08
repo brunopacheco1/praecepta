@@ -258,6 +258,14 @@ mvn clean verify
 This runs the unit tests and the property-based tests in `praecepta-engine`, which check the
 engine against a naive reference implementation of DMN decision-table semantics on random tables.
 
+# DMN conformance
+`praecepta-tck` runs the decision-table test cases of the
+[DMN Technology Compatibility Kit](https://github.com/dmn-tck/tck) in every build. Every check whose
+table Praecepta can read passes; the others need features it does not have yet, mostly boolean
+columns ([#12](https://github.com/brunopacheco1/praecepta/issues/12)). The pass rate, the results per
+test case and what each unsupported check needs are in
+[praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md).
+
 # Benchmarks
 `praecepta-benchmarks` compares Praecepta in-process with Camunda 8's DMN engine (dmn-scala, as
 embedded by Zeebe) and Drools DMN, using [JMH](https://github.com/openjdk/jmh). Every engine reads

@@ -34,3 +34,10 @@ SPDX-FileCopyrightText = [
     "2017 The EB Garamond Project Authors (https://github.com/octaviopardo/EBGaramond12)",
 ]
 SPDX-License-Identifier = "OFL-1.1"
+
+[[annotations]]
+# test cases copied from the DMN TCK (https://github.com/dmn-tck/tck); see praecepta-tck/README.md
+path = "praecepta-tck/src/test/resources/tck/**"
+precedence = "override"
+SPDX-FileCopyrightText = "The DMN TCK contributors (https://github.com/dmn-tck/tck)"
+SPDX-License-Identifier = "Apache-2.0"

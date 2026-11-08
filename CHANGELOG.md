@@ -29,6 +29,11 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   - throughput with an engine shared by 1, 4 and 8 threads;
   - time to build an engine from DMN, warm and in a fresh JVM;
   - `run-benchmarks.sh` runs them all and records the machine and versions with the results.
+- **DMN TCK results** ([#22](https://github.com/brunopacheco1/praecepta/issues/22)): a new
+  `praecepta-tck` module runs the decision-table test cases of the DMN Technology Compatibility Kit
+  in every build, and keeps the published results (`praecepta-tck/RESULTS.md`) current. Every
+  supported check passes (16 of 86); the rest need boolean columns, names with spaces, expression
+  outputs, COUNT and other features listed there.
 - **An enforced code style:** Checkstyle checks every build (`checkstyle.xml`, described in
   CONTRIBUTING.md), and compiler warnings fail the build (`-Xlint:all -Werror`).
 
