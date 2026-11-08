@@ -7,6 +7,8 @@ package io.github.brunopacheco1.praecepta.engine.feel;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 import org.assertj.core.api.Assertions;
@@ -75,6 +77,31 @@ class CellParserTest {
                         new Compare(Operator.GE, new BigDecimal("65.5")))));
     }
 
+    @Test
+    void booleans_are_true_or_false_without_comparisons() {
+        Assertions.assertThat(CellParser.parse("true", ColumnType.BOOLEAN))
+                .isEqualTo(new UnaryTests.Positive(List.of(new Equals(true))));
+        Assertions.assertThat(CellParser.parse("not(false)", ColumnType.BOOLEAN))
+                .isEqualTo(new UnaryTests.Negated(List.of(new Equals(false))));
+        Assertions.assertThat(CellParser.parse("true, null", ColumnType.BOOLEAN))
+                .isEqualTo(new UnaryTests.Positive(List.of(new Equals(true), new NullTest())));
+        Assertions.assertThat(CellParser.parse("true", ColumnType.STRING))
+                .as("an unquoted word in a STRING column is still text")
+                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("true"))));
+    }
+
+    @Test
+    void times_and_date_times_use_their_functions_or_iso_text() {
+        var morning = LocalTime.of(8, 30);
+        Assertions.assertThat(CellParser.parse("[time(\"08:30:00\")..12:00)", ColumnType.TIME))
+                .isEqualTo(new UnaryTests.Positive(List.of(new Range(morning, true, LocalTime.NOON, false))));
+        Assertions.assertThat(CellParser.parse(">= 08:30", ColumnType.TIME))
+                .isEqualTo(new UnaryTests.Positive(List.of(new Compare(Operator.GE, morning))));
+        var moment = LocalDateTime.of(2025, 1, 31, 8, 30, 15, 500_000_000);
+        Assertions.assertThat(CellParser.parse("date and time(\"2025-01-31T08:30:15.5\"), 2025-01-31T08:30:15.5", ColumnType.DATE_TIME))
+                .isEqualTo(new UnaryTests.Positive(List.of(new Equals(moment), new Equals(moment))));
+    }
+
     @ParameterizedTest
     @CsvSource(delimiter = ';', value = {
             "[1..5];  true;  true",
@@ -109,8 +136,18 @@ class CellParserTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = ';', value = {
-            "STRING; < 10;            only supported on NUMBER and DATE",
-            "STRING; [a..b];          only supported on NUMBER and DATE",
+            "STRING; < 10;            only supported on NUMBER, DATE, TIME and DATE_TIME",
+            "STRING; [a..b];          only supported on NUMBER, DATE, TIME and DATE_TIME",
+            "BOOLEAN; < true;         only supported on NUMBER, DATE, TIME and DATE_TIME",
+            "BOOLEAN; yes;            is not a boolean",
+            "TIME;   time(\"25:00:00\"); invalid time",
+            "TIME;   8am;             is not a time",
+            "TIME;   time(\"10:00:00Z\"); has a time zone",
+            "TIME;   10:00:00+02:00;  is not a time",
+            "DATE_TIME; date and time(\"2025-01-01T10:00:00@Europe/Paris\"); has a time zone",
+            "DATE_TIME; date and time(\"2025-01-01T10:00:00-05:00\"); has a time zone",
+            "DATE_TIME; 2025-01-01;   is not a date and time",
+            "DATE_TIME; [date and time(\"2025-01-02T00:00:00\")..date and time(\"2025-01-01T00:00:00\")]; starts after it ends",
             "NUMBER; abc;             is not a number",
             "NUMBER; [5..1];          starts after it ends",
             "DATE;   date(\"2025-02-30\"); invalid date",

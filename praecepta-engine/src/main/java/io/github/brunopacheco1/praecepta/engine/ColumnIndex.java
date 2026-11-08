@@ -7,12 +7,18 @@ package io.github.brunopacheco1.praecepta.engine;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -34,10 +40,13 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  * <ul>
  * <li>STRING: one class per value written in the column (or declared allowed), one for every other
  * value, and one for a missing value.</li>
- * <li>NUMBER and DATE: with the boundary values {@code b0 < b1 < ... < bk} mentioned by the rules
- * (and the allowed values), the classes are {@code (-inf, b0), [b0], (b0, b1), [b1], ..., (bk, +inf)}
- * and a missing value. Lookup is a binary search. For dates, an open gap between consecutive days
- * holds no date; such classes are marked empty.</li>
+ * <li>NUMBER, DATE, TIME and DATE_TIME: with the boundary values {@code b0 < b1 < ... < bk} mentioned
+ * by the rules (and the allowed values), the classes are
+ * {@code (-inf, b0), [b0], (b0, b1), [b1], ..., (bk, +inf)} and a missing value. Lookup is a binary
+ * search. A gap that holds no value (between consecutive days, or consecutive nanoseconds; before
+ * midnight or after the last nanosecond of a day for times) is marked empty.</li>
+ * <li>BOOLEAN: ordered like the others with {@code false < true}, both always boundaries, so the
+ * classes are {@code [false]}, {@code [true]} and a missing value (the gaps are all empty).</li>
  * </ul>
  *
  * Membership is decided per class with FEEL's three-valued logic: a missing value fails comparisons
@@ -99,6 +108,10 @@ final class ColumnIndex {
             boundaries = null;
         } else {
             var points = new TreeSet<Comparable<?>>(ColumnIndex::compare);
+            if (type == ColumnType.BOOLEAN) {
+                points.add(Boolean.FALSE);
+                points.add(Boolean.TRUE);
+            }
             cellsByBit.forEach(cell -> collectBoundaries(cell, points));
             if (allowedValues != null) {
                 collectBoundaries(allowedValues, points);
@@ -169,11 +182,12 @@ final class ColumnIndex {
 
     /**
      * The mask of rules accepting a raw input value: a String (typed getter or text map) or, if the
-     * column is enum-bound, an enum constant for STRING columns; a Number, LocalDate or text for NUMBER
-     * and DATE columns. Blank text counts as missing.
+     * column is enum-bound, an enum constant for STRING columns; for the other types, the typed value
+     * (a Number, LocalDate, Boolean, LocalTime or LocalDateTime) or its text. Blank text counts as
+     * missing.
      *
      * @throws InvalidInputException if the value is outside the declared input values, or text that
-     *                               is not a valid number or date
+     *                               is not a valid value of the column's type
      */
     long[] maskFor(Object raw) {
         if (isString) {
@@ -222,7 +236,7 @@ final class ColumnIndex {
         return masks[valueClass];
     }
 
-    /** Converts a raw NUMBER or DATE input to {@code BigDecimal} / {@code LocalDate}; null if missing. */
+    /** Converts a raw input of an ordered column to the column's Java type; null if missing. */
     private Object convert(Object raw) {
         if (raw == null) {
             return null;
@@ -231,16 +245,43 @@ final class ColumnIndex {
             if (text.isBlank()) {
                 return null;
             }
+            var value = text.strip();
             try {
-                return type == ColumnType.NUMBER ? new BigDecimal(text.strip()) : LocalDate.parse(text.strip());
-            } catch (NumberFormatException | java.time.format.DateTimeParseException e) {
-                throw new InvalidInputException(name, text, "is not a valid " + type.name().toLowerCase());
+                return switch (type) {
+                    case NUMBER -> new BigDecimal(value);
+                    case DATE -> LocalDate.parse(value);
+                    case TIME -> LocalTime.parse(value);
+                    case DATE_TIME -> LocalDateTime.parse(value);
+                    case BOOLEAN -> {
+                        if (!value.equalsIgnoreCase("true") && !value.equalsIgnoreCase("false")) {
+                            throw new IllegalArgumentException(value);
+                        }
+                        yield Boolean.valueOf(value);
+                    }
+                    case STRING -> throw new IllegalStateException("STRING columns are not ordered");
+                };
+            } catch (IllegalArgumentException | DateTimeParseException e) {
+                throw new InvalidInputException(name, text, "is not a valid " + typeName(type));
             }
         }
-        if (type == ColumnType.DATE) {
-            return (LocalDate) raw;
-        }
-        return switch ((Number) raw) {
+        return switch (type) {
+            case DATE -> (LocalDate) raw;
+            case TIME -> (LocalTime) raw;
+            case DATE_TIME -> (LocalDateTime) raw;
+            case BOOLEAN -> (Boolean) raw;
+            default -> number((Number) raw);
+        };
+    }
+
+    private static String typeName(ColumnType type) {
+        return switch (type) {
+            case DATE_TIME -> "date and time";
+            default -> type.name().toLowerCase(Locale.ROOT);
+        };
+    }
+
+    private BigDecimal number(Number raw) {
+        return switch (raw) {
             case BigDecimal decimal -> decimal;
             case Integer i -> BigDecimal.valueOf(i);
             case Long l -> BigDecimal.valueOf(l);
@@ -284,7 +325,7 @@ final class ColumnIndex {
      * do not break a run.
      */
     List<String> describe(List<Integer> valueClasses) {
-        if (type == ColumnType.STRING) {
+        if (type == ColumnType.STRING || type == ColumnType.BOOLEAN) {
             return valueClasses.stream().map(this::describe).toList();
         }
         var sorted = valueClasses.stream().sorted().toList();
@@ -375,16 +416,48 @@ final class ColumnIndex {
             case STRING -> "\"" + value + "\"";
             case NUMBER -> ((BigDecimal) value).toPlainString();
             case DATE -> "date(\"" + value + "\")";
+            case BOOLEAN -> value.toString();
+            case TIME -> "time(\"" + DateTimeFormatter.ISO_LOCAL_TIME.format((LocalTime) value) + "\")";
+            case DATE_TIME -> "date and time(\"" + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format((LocalDateTime) value) + "\")";
         };
     }
 
+    /** A value inside a non-empty open interval: a round step beyond an open end, else the midpoint. */
     private static Object between(ValueClass.Between b, ColumnType type) {
-        if (type == ColumnType.DATE) {
-            if (b.low() == null) {
-                return b.high() == null ? LocalDate.EPOCH : ((LocalDate) b.high()).minusDays(1);
+        return switch (type) {
+            case DATE -> {
+                if (b.low() == null) {
+                    yield b.high() == null ? LocalDate.EPOCH : ((LocalDate) b.high()).minusDays(1);
+                }
+                yield ((LocalDate) b.low()).plusDays(1);
             }
-            return ((LocalDate) b.low()).plusDays(1);
-        }
+            case TIME -> {
+                var low = (LocalTime) b.low();
+                var high = (LocalTime) b.high();
+                if (low == null) {
+                    // non-empty, so high is after midnight; step back an hour unless that wraps around
+                    yield high == null ? LocalTime.NOON : high.getHour() >= 1 ? high.minusHours(1) : LocalTime.MIDNIGHT;
+                }
+                if (high == null) {
+                    yield low.getHour() <= 22 ? low.plusHours(1) : LocalTime.MAX;
+                }
+                yield low.plus(Duration.between(low, high).dividedBy(2));
+            }
+            case DATE_TIME -> {
+                var low = (LocalDateTime) b.low();
+                var high = (LocalDateTime) b.high();
+                if (low == null) {
+                    yield high == null ? LocalDate.EPOCH.atStartOfDay() : high.minusDays(1);
+                }
+                yield high == null ? low.plusDays(1) : low.plus(Duration.between(low, high).dividedBy(2));
+            }
+            case NUMBER -> betweenNumbers(b);
+            // BOOLEAN gaps are always empty, and STRING has no intervals
+            case BOOLEAN, STRING -> throw new IllegalStateException("no value between " + b);
+        };
+    }
+
+    private static BigDecimal betweenNumbers(ValueClass.Between b) {
         var low = (BigDecimal) b.low();
         var high = (BigDecimal) b.high();
         if (low == null) {
@@ -397,10 +470,25 @@ final class ColumnIndex {
     }
 
     private boolean isEmpty(ValueClass valueClass) {
-        return type == ColumnType.DATE
-                && valueClass instanceof ValueClass.Between b
-                && b.low() != null && b.high() != null
-                && !((LocalDate) b.low()).plusDays(1).isBefore((LocalDate) b.high());
+        if (!(valueClass instanceof ValueClass.Between b)) {
+            return false;
+        }
+        return switch (type) {
+            case BOOLEAN -> true; // false and true are both boundaries: nothing lies outside or between them
+            case DATE -> b.low() != null && b.high() != null
+                    && !((LocalDate) b.low()).plusDays(1).isBefore((LocalDate) b.high());
+            case TIME -> {
+                var low = (LocalTime) b.low();
+                var high = (LocalTime) b.high();
+                if (low == null || high == null) {
+                    yield low == null ? LocalTime.MIDNIGHT.equals(high) : LocalTime.MAX.equals(low);
+                }
+                yield !low.plusNanos(1).isBefore(high);
+            }
+            case DATE_TIME -> b.low() != null && b.high() != null
+                    && !((LocalDateTime) b.low()).plusNanos(1).isBefore((LocalDateTime) b.high());
+            case NUMBER, STRING -> false;
+        };
     }
 
     // ---- FEEL semantics per class ---------------------------------------------------------------

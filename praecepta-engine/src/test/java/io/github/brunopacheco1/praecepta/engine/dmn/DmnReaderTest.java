@@ -131,7 +131,8 @@ class DmnReaderTest {
 
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
-            "date-time column        | <input><inputExpression typeRef=\"dateTime\"><text>at</text></inputExpression></input> | type 'dateTime' is not supported",
+            "duration column         | <input><inputExpression typeRef=\"dayTimeDuration\"><text>at</text></inputExpression></input> | type 'dayTimeDuration' is not supported",
+            "zoned time cell         | <input><inputExpression typeRef=\"time\"><text>at</text></inputExpression></input>#<text>time(\"10:00:00Z\")</text> | rule 1, column 'at': Invalid cell",
             "computed input          | <input><inputExpression typeRef=\"number\"><text>age * 2</text></inputExpression></input> | input expression 'age * 2' is not supported",
             "unsupported cell        | <input><inputExpression typeRef=\"number\"><text>age</text></inputExpression></input>#<text>&gt; abs(x)</text> | rule 1, column 'age'",
             "computed output         | <input><inputExpression typeRef=\"string\"><text>a</text></inputExpression></input>#-#<text>a + \"x\"</text> | rule 1, output 'result': 'a + \"x\"' is not supported",

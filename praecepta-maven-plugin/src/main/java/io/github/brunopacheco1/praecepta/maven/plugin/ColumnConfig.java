@@ -33,7 +33,7 @@ public class ColumnConfig {
     /** The column's header in the sheet. */
     String name;
 
-    /** STRING (default), NUMBER or DATE. */
+    /** STRING (default), NUMBER, DATE, BOOLEAN, TIME or DATE_TIME. */
     ColumnType type = ColumnType.STRING;
 
     /**

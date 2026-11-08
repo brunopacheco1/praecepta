@@ -12,6 +12,13 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 ## [Unreleased]
 
 ### Added
+- **Boolean, time and date-time columns** ([#12](https://github.com/brunopacheco1/praecepta/issues/12)):
+  `ColumnType.BOOLEAN`, `TIME` and `DATE_TIME`, with cells `true` / `false`, `time("08:30:00")` and
+  `date and time("2025-01-31T08:30:00")` (or the bare ISO text), comparisons and intervals on times
+  and date-times, and the bindings `booleanInput`, `timeInput` and `dateTimeInput`. `DmnReader`
+  reads `boolean`, `time` and `dateTime` columns, `DmnWriter` writes them, and the Maven plugin
+  generates `Boolean`, `LocalTime` and `LocalDateTime` components. Times are local: values with a
+  zone or offset are rejected. The DMN TCK now passes 51 of 86 checks (was 16).
 - **Project documents:** governance (roles, decisions, continuity), architecture, a security
   assurance case and a one-year roadmap. The website shows the roadmap, a C4 system context diagram,
   and what users can expect on security, and links them all.

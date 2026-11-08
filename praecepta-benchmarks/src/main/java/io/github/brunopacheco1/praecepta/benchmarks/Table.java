@@ -263,6 +263,7 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
                     default -> "[" + date(a) + ".." + date(b) + "]";
                 };
             }
+            case BOOLEAN, TIME, DATE_TIME -> throw new IllegalArgumentException("generated tables use STRING, NUMBER and DATE columns");
         };
     }
 

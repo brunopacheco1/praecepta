@@ -21,38 +21,38 @@ same models (literal expressions, contexts, invocations) are outside Praecepta's
 is *not supported* when the table uses a feature Praecepta does not have (the DMN reader
 rejects it), or the inputs are of a kind it does not take.
 
-**16 of 86 checks pass (18.6 %).** Of the 16 checks Praecepta supports, 16 pass (100.0 %).
+**51 of 86 checks pass (59.3 %).** Of the 51 checks Praecepta supports, 51 pass (100.0 %).
 
 | Outcome | Checks |
 |---|---:|
-| Passed | 16 |
+| Passed | 51 |
 | Failed | 0 |
-| Not supported | 70 |
+| Not supported | 35 |
 
 ## By test case
 
 | TCK test case | Passed | Failed | Not supported | Not supported because |
 |---|---:|---:|---:|---|
-| [compliance-level-2/0004-simpletable-U](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0004-simpletable-U) | 0 | 0 | 3 | boolean columns (#12) |
-| [compliance-level-2/0005-simpletable-A](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0005-simpletable-A) | 0 | 0 | 3 | boolean columns (#12) |
-| [compliance-level-2/0006-simpletable-P1](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0006-simpletable-P1) | 0 | 0 | 3 | boolean columns (#12) |
-| [compliance-level-2/0007-simpletable-P2](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0007-simpletable-P2) | 0 | 0 | 3 | boolean columns (#12) |
-| [compliance-level-2/0010-multi-output-U](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0010-multi-output-U) | 0 | 0 | 3 | boolean columns (#12) |
-| [compliance-level-2/0108-first-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0108-first-hitpolicy) | 0 | 0 | 3 | boolean columns (#12) |
-| [compliance-level-2/0109-ruleOrder-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0109-ruleOrder-hitpolicy) | 0 | 0 | 3 | boolean columns (#12) |
-| [compliance-level-2/0110-outputOrder-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0110-outputOrder-hitpolicy) | 0 | 0 | 3 | boolean columns (#12) |
+| [compliance-level-2/0004-simpletable-U](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0004-simpletable-U) | 3 | 0 | 0 |  |
+| [compliance-level-2/0005-simpletable-A](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0005-simpletable-A) | 3 | 0 | 0 |  |
+| [compliance-level-2/0006-simpletable-P1](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0006-simpletable-P1) | 3 | 0 | 0 |  |
+| [compliance-level-2/0007-simpletable-P2](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0007-simpletable-P2) | 3 | 0 | 0 |  |
+| [compliance-level-2/0010-multi-output-U](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0010-multi-output-U) | 3 | 0 | 0 |  |
+| [compliance-level-2/0108-first-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0108-first-hitpolicy) | 3 | 0 | 0 |  |
+| [compliance-level-2/0109-ruleOrder-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0109-ruleOrder-hitpolicy) | 3 | 0 | 0 |  |
+| [compliance-level-2/0110-outputOrder-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0110-outputOrder-hitpolicy) | 3 | 0 | 0 |  |
 | [compliance-level-2/0111-first-hitpolicy-singleoutputcol](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0111-first-hitpolicy-singleoutputcol) | 3 | 0 | 0 |  |
 | [compliance-level-2/0112-ruleOrder-hitpolicy-singleinoutcol](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0112-ruleOrder-hitpolicy-singleinoutcol) | 3 | 0 | 0 |  |
 | [compliance-level-2/0113-outputOrder-hitpolicy-singleinoutcol](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0113-outputOrder-hitpolicy-singleinoutcol) | 3 | 0 | 0 |  |
 | [compliance-level-2/0114-min-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0114-min-collect-hitpolicy) | 3 | 0 | 0 |  |
 | [compliance-level-2/0115-sum-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0115-sum-collect-hitpolicy) | 3 | 0 | 0 |  |
 | [compliance-level-2/0116-count-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0116-count-collect-hitpolicy) | 0 | 0 | 3 | COUNT aggregation (#15) |
-| [compliance-level-2/0117-multi-any-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0117-multi-any-hitpolicy) | 0 | 0 | 3 | boolean columns (#12) |
-| [compliance-level-2/0118-multi-priority-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0118-multi-priority-hitpolicy) | 0 | 0 | 3 | boolean columns (#12) |
-| [compliance-level-2/0119-multi-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0119-multi-collect-hitpolicy) | 0 | 0 | 3 | boolean columns (#12) |
+| [compliance-level-2/0117-multi-any-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0117-multi-any-hitpolicy) | 3 | 0 | 0 |  |
+| [compliance-level-2/0118-multi-priority-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0118-multi-priority-hitpolicy) | 3 | 0 | 0 |  |
+| [compliance-level-2/0119-multi-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0119-multi-collect-hitpolicy) | 3 | 0 | 0 |  |
 | [compliance-level-3/0004-lending](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0004-lending) | 0 | 0 | 1 | inputs computed by other decisions (decision requirement graphs, #14) |
 | [compliance-level-3/0008-listGen](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0008-listGen) | 1 | 0 | 1 | output entries that are expressions |
-| [compliance-level-3/0017-tableTests](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0017-tableTests) | 0 | 0 | 4 | input entries that refer to other inputs; output entries that are expressions |
+| [compliance-level-3/0017-tableTests](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0017-tableTests) | 2 | 0 | 2 | input entries that refer to other inputs |
 | [compliance-level-3/0036-dt-variable-input](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0036-dt-variable-input) | 0 | 0 | 24 | input names with spaces |
 | [compliance-level-3/0039-dt-list-semantics](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0039-dt-list-semantics) | 0 | 0 | 2 | output entries that are expressions |
 | [compliance-level-3/0087-chapter-11-example](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0087-chapter-11-example) | 0 | 0 | 2 | columns typed by an item definition |
@@ -63,10 +63,9 @@ What the unsupported checks need, by number of checks:
 
 | Feature | Checks |
 |---|---:|
-| boolean columns (#12) | 33 |
 | input names with spaces | 24 |
-| output entries that are expressions | 5 |
 | COUNT aggregation (#15) | 3 |
+| output entries that are expressions | 3 |
 | columns typed by an item definition | 2 |
 | input entries that refer to other inputs | 2 |
 | inputs computed by other decisions (decision requirement graphs, #14) | 1 |

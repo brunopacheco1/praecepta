@@ -6,7 +6,10 @@
 package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -225,7 +228,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     /**
      * Values that visit every region the rules (and declared input values) distinguish: every value
      * written, the points between and around them (for dates, the neighbouring days, since there is
-     * no date between consecutive days), a string no rule mentions, and optionally a missing value.
+     * no date between consecutive days), both booleans, a string no rule mentions, and optionally a
+     * missing value.
      */
     public List<Object> representativeValues(String column, boolean withMissing) {
         var values = new ArrayList<Object>();
@@ -247,22 +251,52 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             var around = new TreeSet<Object>(ReferenceMatcher::compare);
             around.addAll(sorted);
             if (sorted.isEmpty()) {
-                around.add(type == ColumnType.NUMBER ? BigDecimal.ZERO : LocalDate.of(2025, 1, 1));
+                around.add(switch (type) {
+                    case NUMBER -> BigDecimal.ZERO;
+                    case TIME -> LocalTime.NOON;
+                    case DATE_TIME -> LocalDateTime.of(2025, 1, 1, 0, 0);
+                    case BOOLEAN -> Boolean.TRUE;
+                    default -> LocalDate.of(2025, 1, 1);
+                });
             }
             for (int i = 0; i < sorted.size(); i++) {
                 var point = sorted.get(i);
-                if (type == ColumnType.NUMBER) {
-                    var number = (BigDecimal) point;
-                    around.add(number.subtract(BigDecimal.ONE));
-                    around.add(number.add(BigDecimal.ONE));
-                    if (i + 1 < sorted.size()) {
-                        around.add(number.add((BigDecimal) sorted.get(i + 1)).divide(BigDecimal.TWO));
+                var next = i + 1 < sorted.size() ? sorted.get(i + 1) : null;
+                switch (point) {
+                    case BigDecimal number -> {
+                        around.add(number.subtract(BigDecimal.ONE));
+                        around.add(number.add(BigDecimal.ONE));
+                        if (next != null) {
+                            around.add(number.add((BigDecimal) next).divide(BigDecimal.TWO));
+                        }
                     }
-                } else {
-                    var date = (LocalDate) point;
-                    around.add(date.minusDays(1));
-                    around.add(date.plusDays(1));
+                    case LocalDate date -> {
+                        // no date lies between consecutive days
+                        around.add(date.minusDays(1));
+                        around.add(date.plusDays(1));
+                    }
+                    case LocalTime time -> {
+                        around.add(time.minusMinutes(1));
+                        around.add(time.plusMinutes(1));
+                        if (next != null) {
+                            around.add(time.plus(Duration.between(time, (LocalTime) next).dividedBy(2)));
+                        }
+                    }
+                    case LocalDateTime moment -> {
+                        around.add(moment.minusHours(1));
+                        around.add(moment.plusHours(1));
+                        if (next != null) {
+                            around.add(moment.plus(Duration.between(moment, (LocalDateTime) next).dividedBy(2)));
+                        }
+                    }
+                    default -> {
+                        // booleans: both values are the whole domain
+                    }
                 }
+            }
+            if (type == ColumnType.BOOLEAN) {
+                around.add(Boolean.FALSE);
+                around.add(Boolean.TRUE);
             }
             values.addAll(around);
         }

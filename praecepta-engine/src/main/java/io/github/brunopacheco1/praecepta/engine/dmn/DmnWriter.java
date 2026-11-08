@@ -7,7 +7,11 @@ package io.github.brunopacheco1.praecepta.engine.dmn;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
@@ -25,7 +29,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
 
 /**
  * Writes a {@link DecisionTable} as a DMN 1.3 model with one decision. Cells are parsed and written
- * back as standard FEEL (quoted strings, plain numbers, {@code date("...")}), so tables written in
+ * back as standard FEEL (quoted strings, plain numbers, {@code date("...")}, {@code time("...")},
+ * {@code date and time("...")}, {@code true} / {@code false}), so tables written in
  * Praecepta's shorter syntax ({@code PT,ES}) become portable. Each input also gets an
  * {@code inputData} element, which Drools needs to bind input values.
  *
@@ -122,6 +127,9 @@ public final class DmnWriter {
             case STRING -> "string";
             case NUMBER -> "number";
             case DATE -> "date";
+            case BOOLEAN -> "boolean";
+            case TIME -> "time";
+            case DATE_TIME -> "dateTime";
         };
     }
 
@@ -169,9 +177,16 @@ public final class DmnWriter {
                 case STRING -> literal(value);
                 case NUMBER -> new BigDecimal(value.strip()).toPlainString();
                 case DATE -> literal(LocalDate.parse(value.strip()));
+                case TIME -> literal(LocalTime.parse(value.strip()));
+                case DATE_TIME -> literal(LocalDateTime.parse(value.strip()));
+                case BOOLEAN -> switch (value.strip()) {
+                    case "true", "false" -> value.strip();
+                    default -> throw new IllegalArgumentException(value);
+                };
             };
         } catch (RuntimeException e) {
-            throw new InvalidDecisionTableException("%s: '%s' is not a %s".formatted(where, value, type.name().toLowerCase()));
+            throw new InvalidDecisionTableException("%s: '%s' is not a %s".formatted(where, value,
+                    type.name().toLowerCase(Locale.ROOT).replace('_', ' ')));
         }
     }
 
@@ -180,6 +195,9 @@ public final class DmnWriter {
             case null -> "null";
             case BigDecimal number -> number.toPlainString();
             case LocalDate date -> "date(\"" + date + "\")";
+            case LocalTime time -> "time(\"" + DateTimeFormatter.ISO_LOCAL_TIME.format(time) + "\")";
+            case LocalDateTime dateTime -> "date and time(\"" + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime) + "\")";
+            case Boolean bool -> bool.toString();
             default -> "\"" + value.toString().replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
         };
     }

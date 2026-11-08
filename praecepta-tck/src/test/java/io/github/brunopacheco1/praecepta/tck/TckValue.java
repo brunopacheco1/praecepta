@@ -7,6 +7,8 @@ package io.github.brunopacheco1.praecepta.tck;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -110,6 +112,8 @@ sealed interface TckValue {
                 case "decimal", "double", "integer", "int", "long", "float" ->
                         new BigDecimal(expected.text().strip()).compareTo(new BigDecimal(actual.strip())) == 0;
                 case "date" -> LocalDate.parse(expected.text().strip()).equals(LocalDate.parse(actual.strip()));
+                case "time" -> LocalTime.parse(expected.text().strip()).equals(LocalTime.parse(actual.strip()));
+                case "datetime" -> LocalDateTime.parse(expected.text().strip()).equals(LocalDateTime.parse(actual.strip()));
                 case "boolean" -> expected.text().strip().equalsIgnoreCase(actual.strip());
                 default -> expected.text().equals(actual);
             };

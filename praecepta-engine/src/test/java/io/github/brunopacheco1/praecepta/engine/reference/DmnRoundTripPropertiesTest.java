@@ -9,6 +9,8 @@ import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -74,6 +76,9 @@ class DmnRoundTripPropertiesTest {
                 case STRING -> builder.input(column, input -> (String) input.get(column));
                 case NUMBER -> builder.numberInput(column, input -> (BigDecimal) input.get(column));
                 case DATE -> builder.dateInput(column, input -> (LocalDate) input.get(column));
+                case BOOLEAN -> builder.booleanInput(column, input -> (Boolean) input.get(column));
+                case TIME -> builder.timeInput(column, input -> (LocalTime) input.get(column));
+                case DATE_TIME -> builder.dateTimeInput(column, input -> (LocalDateTime) input.get(column));
             }
         }
         var engine = builder.build();

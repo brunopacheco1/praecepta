@@ -11,7 +11,8 @@ import java.util.List;
  * A parsed table cell: the subset of DMN FEEL "simple unary tests" Praecepta supports. Every test
  * looks at a single column value, which is what lets rules be indexed with bitmasks.
  *
- * <p>Values are {@code String}, {@code BigDecimal} or {@code LocalDate}, depending on the column type.
+ * <p>Values are {@code String}, {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime} or
+ * {@code LocalDateTime}, depending on the column type.
  */
 public sealed interface UnaryTests {
 

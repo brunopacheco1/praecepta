@@ -10,6 +10,8 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -84,6 +86,9 @@ public class FirstDecisionBenchmark {
                 case STRING -> fields[2];
                 case NUMBER -> new BigDecimal(fields[2]);
                 case DATE -> LocalDate.parse(fields[2]);
+                case BOOLEAN -> Boolean.valueOf(fields[2]);
+                case TIME -> LocalTime.parse(fields[2]);
+                case DATE_TIME -> LocalDateTime.parse(fields[2]);
             });
         }
     }

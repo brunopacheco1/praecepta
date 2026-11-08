@@ -15,6 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -102,6 +104,39 @@ class TableCompilerTest {
             var outputs = (List<?>) evaluate.invoke(null, request);
             Assertions.assertThat(outputs).map(Object::toString)
                     .containsExactly("DiscountOutput[discount=0.15, tier=gold]", "DiscountOutput[discount=0.05, tier=silver]");
+        }
+    }
+
+    @Test
+    void boolean_time_and_date_time_columns_become_java_types() throws Exception {
+        var config = new TableConfig(table("shifts.csv"), "Shift", null, HitPolicy.FIRST, null,
+                List.of(new ColumnConfig("overtime", ColumnType.BOOLEAN, null, List.of()),
+                        new ColumnConfig("start", ColumnType.TIME, null, List.of()),
+                        new ColumnConfig("at", ColumnType.DATE_TIME, null, List.of())),
+                List.of(new ColumnConfig("paid", ColumnType.BOOLEAN, null, List.of()),
+                        new ColumnConfig("until", ColumnType.TIME, null, List.of()),
+                        new ColumnConfig("reviewed", ColumnType.DATE_TIME, null, List.of()),
+                        new ColumnConfig("rate", ColumnType.STRING, null, List.of())));
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+
+        Assertions.assertThat(result.sources().get("ShiftInput"))
+                .contains("public record ShiftInput(Boolean overtime, java.time.LocalTime start, java.time.LocalDateTime at)");
+        Assertions.assertThat(result.sources().get("ShiftOutput"))
+                .contains("public record ShiftOutput(Boolean paid, java.time.LocalTime until, java.time.LocalDateTime reviewed, String rate)");
+        Assertions.assertThat(result.dmn()).contains("typeRef=\"boolean\"", "typeRef=\"time\"", "typeRef=\"dateTime\"",
+                "&gt;= time(\"22:00:00\")", "&lt; time(\"06:00:00\")", "date and time(\"2025-01-02T09:30:00\")");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".ShiftInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Shift").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            var night = (Optional<?>) evaluate.invoke(null, constructor.newInstance(false, LocalTime.of(23, 0), LocalDateTime.of(2025, 3, 4, 23, 0)));
+            Assertions.assertThat(night).get().hasToString("ShiftOutput[paid=true, until=06:00, reviewed=null, rate=night]");
+            var overtime = (Optional<?>) evaluate.invoke(null, constructor.newInstance(true, null, null));
+            Assertions.assertThat(overtime).get().hasToString("ShiftOutput[paid=true, until=null, reviewed=2025-01-02T09:30, rate=double]");
+            var christmasNoon = LocalDateTime.of(2025, 12, 25, 12, 0);
+            var christmas = (Optional<?>) evaluate.invoke(null, constructor.newInstance(false, LocalTime.NOON, christmasNoon));
+            Assertions.assertThat(christmas).get().hasToString("ShiftOutput[paid=false, until=null, reviewed=null, rate=holiday]");
         }
     }
 

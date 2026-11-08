@@ -6,6 +6,8 @@
 package io.github.brunopacheco1.praecepta.engine;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -126,6 +128,97 @@ class TypedColumnsTest {
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("Rule 7, column 'age'")
                 .hasMessageContaining("interval starts after it ends");
+    }
+
+    record Shift(Boolean overtime, LocalTime start, LocalDateTime at) {
+    }
+
+    //   overtime   start                          at                                       → rate
+    // 1 true       -                              -                                         double
+    // 2 false      >= time("22:00:00")            -                                         night
+    // 3 false      < time("06:00:00")             -                                         night
+    // 4 false      -                              >= date and time("2025-12-25T00:00:00")   holiday
+    // 5 -          -                              -                                         standard
+    private static final List<Praeceptum> SHIFTS = List.of(
+            shift(1, "true", "-", "-", "double"),
+            shift(2, "false", ">= time(\"22:00:00\")", "-", "night"),
+            shift(3, "false", "< 06:00", "-", "night"),
+            shift(4, "false", "-", ">= date and time(\"2025-12-25T00:00:00\")", "holiday"),
+            shift(5, "-", "-", "-", "standard"));
+
+    @Test
+    void booleans_times_and_date_times() {
+        var engine = PraeceptaEngine.<Shift, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .booleanInput("overtime", Shift::overtime)
+                .timeInput("start", Shift::start)
+                .dateTimeInput("at", Shift::at)
+                .output(output -> output.values().get("rate"))
+                .rules(SHIFTS)
+                .build();
+        var weekday = LocalDateTime.of(2025, 3, 4, 9, 0);
+        Assertions.assertThat(engine.evaluate(new Shift(true, LocalTime.of(9, 0), weekday))).containsExactly("double");
+        Assertions.assertThat(engine.evaluate(new Shift(false, LocalTime.of(22, 0), weekday))).containsExactly("night");
+        Assertions.assertThat(engine.evaluate(new Shift(false, LocalTime.of(5, 59, 59), weekday))).containsExactly("night");
+        Assertions.assertThat(engine.evaluate(new Shift(false, LocalTime.of(6, 0), weekday))).containsExactly("standard");
+        Assertions.assertThat(engine.evaluate(new Shift(false, LocalTime.NOON, LocalDateTime.of(2025, 12, 25, 0, 0))))
+                .containsExactly("holiday");
+        Assertions.assertThat(engine.evaluate(new Shift(false, LocalTime.NOON, LocalDateTime.of(2025, 12, 24, 23, 59, 59, 999_999_999))))
+                .containsExactly("standard");
+        // a missing boolean is neither true nor false
+        Assertions.assertThat(engine.evaluate(new Shift(null, LocalTime.of(23, 0), weekday))).containsExactly("standard");
+    }
+
+    @Test
+    void map_based_inputs_parse_booleans_times_and_date_times() {
+        var engine = PraeceptaEngine.<Map<String, String>, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .inputs(PraeceptaInput::new)
+                .columnType("overtime", ColumnType.BOOLEAN)
+                .columnType("start", ColumnType.TIME)
+                .columnType("at", ColumnType.DATE_TIME)
+                .output(output -> output.values().get("rate"))
+                .rules(SHIFTS)
+                .build();
+        Assertions.assertThat(engine.evaluate(Map.of("overtime", "TRUE"))).containsExactly("double");
+        Assertions.assertThat(engine.evaluate(Map.of("overtime", "false", "start", "23:15"))).containsExactly("night");
+        Assertions.assertThat(engine.evaluate(Map.of("overtime", "false", "start", "12:00", "at", "2025-12-25T08:00")))
+                .containsExactly("holiday");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("overtime", "yes")))
+                .isInstanceOf(InvalidInputException.class)
+                .hasMessageContaining("is not a valid boolean");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("start", "10:00:00Z")))
+                .as("times have no zone")
+                .isInstanceOf(InvalidInputException.class)
+                .hasMessageContaining("is not a valid time");
+    }
+
+    @Test
+    void boolean_and_time_gaps_are_reported_as_feel_literals() {
+        var engine = PraeceptaEngine.<Shift, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .booleanInput("overtime", Shift::overtime)
+                .timeInput("start", Shift::start)
+                .dateTimeInput("at", Shift::at)
+                .output(output -> output.values().get("rate"))
+                .rules(List.of(
+                        shift(1, "true", "-", "-", "double"),
+                        shift(2, "false", "< time(\"12:00:00\")", "-", "morning"),
+                        shift(3, "-", "< time(\"00:00:00\")", "-", "never")))
+                .build();
+        Assertions.assertThat(engine.validationReport().issues(Kind.GAP)).singleElement().satisfies(gap -> {
+            Assertions.assertThat(gap.detail()).isEqualTo("overtime = false, start in [time(\"12:00:00\")..+inf)");
+            Assertions.assertThat(gap.example()).containsEntry("overtime", false).containsEntry("start", LocalTime.NOON);
+        });
+        // no time of day is before midnight
+        Assertions.assertThat(engine.validationReport().issues(Kind.UNREACHABLE_RULE))
+                .extracting(issue -> issue.ruleIds().getFirst())
+                .containsExactly(3);
+    }
+
+    private static Praeceptum shift(int id, String overtime, String start, String at, String rate) {
+        return new Praeceptum(id, new PraeceptaInput(Map.of("overtime", overtime, "start", start, "at", at)),
+                new PraeceptaOutput(Map.of("rate", rate)));
     }
 
     private static PraeceptaEngine.Builder<Applicant, String> engine(HitPolicy policy) {
