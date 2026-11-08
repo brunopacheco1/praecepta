@@ -1,0 +1,2271 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Sampling time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = praecepta, table = real, workload = match)
+
+# Run progress: 0.00% complete, ETA 00:11:15
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:35:23.699269209Z io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate-jmh-worker-1 ERROR Log4j API could not find a logging provider.
+0.452 ±(99.9%) 0.017 us/op
+# Warmup Iteration   2: 0.413 ±(99.9%) 0.014 us/op
+# Warmup Iteration   3: 0.448 ±(99.9%) 0.162 us/op
+# Warmup Iteration   4: 0.372 ±(99.9%) 0.008 us/op
+# Warmup Iteration   5: 0.407 ±(99.9%) 0.130 us/op
+Iteration   1: 0.409 ±(99.9%) 0.010 us/op
+                 p0.00:   0.261 us/op
+                 p0.50:   0.350 us/op
+                 p0.90:   0.391 us/op
+                 p0.95:   0.430 us/op
+                 p0.99:   1.910 us/op
+                 p0.999:  12.737 us/op
+                 p0.9999: 23.693 us/op
+                 p1.00:   61.632 us/op
+
+Iteration   2: 0.382 ±(99.9%) 0.017 us/op
+                 p0.00:   0.240 us/op
+                 p0.50:   0.351 us/op
+                 p0.90:   0.381 us/op
+                 p0.95:   0.401 us/op
+                 p0.99:   0.561 us/op
+                 p0.999:  9.689 us/op
+                 p0.9999: 21.762 us/op
+                 p1.00:   324.096 us/op
+
+Iteration   3: 0.375 ±(99.9%) 0.008 us/op
+                 p0.00:   0.240 us/op
+                 p0.50:   0.341 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.391 us/op
+                 p0.99:   0.541 us/op
+                 p0.999:  9.518 us/op
+                 p0.9999: 21.973 us/op
+                 p1.00:   76.800 us/op
+
+Iteration   4: 0.373 ±(99.9%) 0.007 us/op
+                 p0.00:   0.250 us/op
+                 p0.50:   0.341 us/op
+                 p0.90:   0.381 us/op
+                 p0.95:   0.401 us/op
+                 p0.99:   0.591 us/op
+                 p0.999:  9.112 us/op
+                 p0.9999: 19.305 us/op
+                 p1.00:   68.224 us/op
+
+Iteration   5: 0.382 ±(99.9%) 0.008 us/op
+                 p0.00:   0.251 us/op
+                 p0.50:   0.350 us/op
+                 p0.90:   0.390 us/op
+                 p0.95:   0.410 us/op
+                 p0.99:   0.581 us/op
+                 p0.999:  9.605 us/op
+                 p0.9999: 20.539 us/op
+                 p1.00:   70.656 us/op
+
+
+# Run progress: 3.70% complete, ETA 00:11:29
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:35:50.178575636Z io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate-jmh-worker-1 ERROR Log4j API could not find a logging provider.
+0.486 ±(99.9%) 0.016 us/op
+# Warmup Iteration   2: 0.428 ±(99.9%) 0.066 us/op
+# Warmup Iteration   3: 0.465 ±(99.9%) 0.229 us/op
+# Warmup Iteration   4: 0.390 ±(99.9%) 0.008 us/op
+# Warmup Iteration   5: 0.377 ±(99.9%) 0.007 us/op
+Iteration   1: 0.386 ±(99.9%) 0.006 us/op
+                 p0.00:   0.250 us/op
+                 p0.50:   0.351 us/op
+                 p0.90:   0.391 us/op
+                 p0.95:   0.401 us/op
+                 p0.99:   0.641 us/op
+                 p0.999:  9.150 us/op
+                 p0.9999: 19.311 us/op
+                 p1.00:   35.072 us/op
+
+Iteration   2: 0.375 ±(99.9%) 0.005 us/op
+                 p0.00:   0.251 us/op
+                 p0.50:   0.351 us/op
+                 p0.90:   0.390 us/op
+                 p0.95:   0.401 us/op
+                 p0.99:   0.531 us/op
+                 p0.999:  8.852 us/op
+                 p0.9999: 17.338 us/op
+                 p1.00:   21.504 us/op
+
+Iteration   3: 0.377 ±(99.9%) 0.006 us/op
+                 p0.00:   0.251 us/op
+                 p0.50:   0.351 us/op
+                 p0.90:   0.391 us/op
+                 p0.95:   0.421 us/op
+                 p0.99:   0.571 us/op
+                 p0.999:  8.898 us/op
+                 p0.9999: 19.070 us/op
+                 p1.00:   30.272 us/op
+
+Iteration   4: 0.388 ±(99.9%) 0.008 us/op
+                 p0.00:   0.260 us/op
+                 p0.50:   0.351 us/op
+                 p0.90:   0.391 us/op
+                 p0.95:   0.411 us/op
+                 p0.99:   0.632 us/op
+                 p0.999:  9.378 us/op
+                 p0.9999: 21.289 us/op
+                 p1.00:   78.336 us/op
+
+Iteration   5: 0.393 ±(99.9%) 0.007 us/op
+                 p0.00:   0.240 us/op
+                 p0.50:   0.351 us/op
+                 p0.90:   0.410 us/op
+                 p0.95:   0.461 us/op
+                 p0.99:   0.701 us/op
+                 p0.999:  9.839 us/op
+                 p0.9999: 20.266 us/op
+                 p1.00:   21.152 us/op
+
+
+# Run progress: 7.41% complete, ETA 00:11:02
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:36:16.696328631Z io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate-jmh-worker-1 ERROR Log4j API could not find a logging provider.
+0.459 ±(99.9%) 0.015 us/op
+# Warmup Iteration   2: 0.410 ±(99.9%) 0.013 us/op
+# Warmup Iteration   3: 0.372 ±(99.9%) 0.012 us/op
+# Warmup Iteration   4: 0.372 ±(99.9%) 0.009 us/op
+# Warmup Iteration   5: 0.357 ±(99.9%) 0.007 us/op
+Iteration   1: 0.363 ±(99.9%) 0.007 us/op
+                 p0.00:   0.241 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.391 us/op
+                 p0.99:   0.491 us/op
+                 p0.999:  9.588 us/op
+                 p0.9999: 21.371 us/op
+                 p1.00:   31.168 us/op
+
+Iteration   2: 0.359 ±(99.9%) 0.006 us/op
+                 p0.00:   0.240 us/op
+                 p0.50:   0.331 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.381 us/op
+                 p0.99:   0.481 us/op
+                 p0.999:  9.441 us/op
+                 p0.9999: 19.767 us/op
+                 p1.00:   28.672 us/op
+
+Iteration   3: 0.353 ±(99.9%) 0.005 us/op
+                 p0.00:   0.250 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.381 us/op
+                 p0.99:   0.430 us/op
+                 p0.999:  9.024 us/op
+                 p0.9999: 15.975 us/op
+                 p1.00:   23.712 us/op
+
+Iteration   4: 0.359 ±(99.9%) 0.005 us/op
+                 p0.00:   0.241 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.391 us/op
+                 p0.99:   0.471 us/op
+                 p0.999:  9.256 us/op
+                 p0.9999: 14.555 us/op
+                 p1.00:   24.448 us/op
+
+Iteration   5: 0.356 ±(99.9%) 0.005 us/op
+                 p0.00:   0.251 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.381 us/op
+                 p0.99:   0.460 us/op
+                 p0.999:  9.109 us/op
+                 p0.9999: 16.611 us/op
+                 p1.00:   22.080 us/op
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  N = 1028533
+  mean =      0.375 ±(99.9%) 0.002 us/op
+
+  Histogram, us/op:
+    [  0.000,  25.000) = 1028503 
+    [ 25.000,  50.000) = 24 
+    [ 50.000,  75.000) = 3 
+    [ 75.000, 100.000) = 2 
+    [100.000, 125.000) = 0 
+    [125.000, 150.000) = 0 
+    [150.000, 175.000) = 0 
+    [175.000, 200.000) = 0 
+    [200.000, 225.000) = 0 
+    [225.000, 250.000) = 0 
+    [250.000, 275.000) = 0 
+    [275.000, 300.000) = 0 
+    [300.000, 325.000) = 1 
+    [325.000, 350.000) = 0 
+    [350.000, 375.000) = 0 
+
+  Percentiles, us/op:
+      p(0.0000) =      0.240 us/op
+     p(50.0000) =      0.350 us/op
+     p(90.0000) =      0.381 us/op
+     p(95.0000) =      0.401 us/op
+     p(99.0000) =      0.571 us/op
+     p(99.9000) =      9.360 us/op
+     p(99.9900) =     20.009 us/op
+     p(99.9990) =     39.836 us/op
+     p(99.9999) =    317.083 us/op
+    p(100.0000) =    324.096 us/op
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Sampling time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = praecepta, table = mixed-1000, workload = match)
+
+# Run progress: 11.11% complete, ETA 00:10:36
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1.079 ±(99.9%) 0.018 us/op
+# Warmup Iteration   2: 1.124 ±(99.9%) 0.015 us/op
+# Warmup Iteration   3: 1.033 ±(99.9%) 0.048 us/op
+# Warmup Iteration   4: 1.151 ±(99.9%) 0.012 us/op
+# Warmup Iteration   5: 1.100 ±(99.9%) 0.015 us/op
+Iteration   1: 1.006 ±(99.9%) 0.067 us/op
+                 p0.00:   0.441 us/op
+                 p0.50:   0.952 us/op
+                 p0.90:   1.092 us/op
+                 p0.95:   1.142 us/op
+                 p0.99:   1.502 us/op
+                 p0.999:  11.248 us/op
+                 p0.9999: 21.197 us/op
+                 p1.00:   2029.568 us/op
+
+Iteration   2: 0.981 ±(99.9%) 0.007 us/op
+                 p0.00:   0.470 us/op
+                 p0.50:   0.952 us/op
+                 p0.90:   1.090 us/op
+                 p0.95:   1.122 us/op
+                 p0.99:   1.332 us/op
+                 p0.999:  10.855 us/op
+                 p0.9999: 23.413 us/op
+                 p1.00:   54.720 us/op
+
+Iteration   3: 0.974 ±(99.9%) 0.006 us/op
+                 p0.00:   0.451 us/op
+                 p0.50:   0.942 us/op
+                 p0.90:   1.082 us/op
+                 p0.95:   1.122 us/op
+                 p0.99:   1.432 us/op
+                 p0.999:  10.610 us/op
+                 p0.9999: 21.639 us/op
+                 p1.00:   25.920 us/op
+
+Iteration   4: 0.995 ±(99.9%) 0.006 us/op
+                 p0.00:   0.461 us/op
+                 p0.50:   0.971 us/op
+                 p0.90:   1.112 us/op
+                 p0.95:   1.162 us/op
+                 p0.99:   1.422 us/op
+                 p0.999:  10.560 us/op
+                 p0.9999: 22.055 us/op
+                 p1.00:   52.480 us/op
+
+Iteration   5: 1.026 ±(99.9%) 0.133 us/op
+                 p0.00:   0.471 us/op
+                 p0.50:   0.962 us/op
+                 p0.90:   1.112 us/op
+                 p0.95:   1.162 us/op
+                 p0.99:   1.462 us/op
+                 p0.999:  10.415 us/op
+                 p0.9999: 20.565 us/op
+                 p1.00:   3989.504 us/op
+
+
+# Run progress: 14.81% complete, ETA 00:10:09
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1.160 ±(99.9%) 0.286 us/op
+# Warmup Iteration   2: 1.103 ±(99.9%) 0.031 us/op
+# Warmup Iteration   3: 1.040 ±(99.9%) 0.011 us/op
+# Warmup Iteration   4: 1.100 ±(99.9%) 0.015 us/op
+# Warmup Iteration   5: 1.030 ±(99.9%) 0.012 us/op
+Iteration   1: 0.967 ±(99.9%) 0.006 us/op
+                 p0.00:   0.471 us/op
+                 p0.50:   0.942 us/op
+                 p0.90:   1.082 us/op
+                 p0.95:   1.132 us/op
+                 p0.99:   1.392 us/op
+                 p0.999:  10.903 us/op
+                 p0.9999: 18.855 us/op
+                 p1.00:   28.512 us/op
+
+Iteration   2: 1.014 ±(99.9%) 0.006 us/op
+                 p0.00:   0.451 us/op
+                 p0.50:   0.972 us/op
+                 p0.90:   1.152 us/op
+                 p0.95:   1.252 us/op
+                 p0.99:   1.584 us/op
+                 p0.999:  11.066 us/op
+                 p0.9999: 18.521 us/op
+                 p1.00:   24.256 us/op
+
+Iteration   3: 0.974 ±(99.9%) 0.005 us/op
+                 p0.00:   0.461 us/op
+                 p0.50:   0.952 us/op
+                 p0.90:   1.092 us/op
+                 p0.95:   1.142 us/op
+                 p0.99:   1.422 us/op
+                 p0.999:  10.608 us/op
+                 p0.9999: 18.080 us/op
+                 p1.00:   26.240 us/op
+
+Iteration   4: 0.958 ±(99.9%) 0.006 us/op
+                 p0.00:   0.461 us/op
+                 p0.50:   0.942 us/op
+                 p0.90:   1.062 us/op
+                 p0.95:   1.102 us/op
+                 p0.99:   1.202 us/op
+                 p0.999:  10.464 us/op
+                 p0.9999: 18.918 us/op
+                 p1.00:   42.688 us/op
+
+Iteration   5: 0.970 ±(99.9%) 0.006 us/op
+                 p0.00:   0.451 us/op
+                 p0.50:   0.942 us/op
+                 p0.90:   1.072 us/op
+                 p0.95:   1.122 us/op
+                 p0.99:   1.352 us/op
+                 p0.999:  10.624 us/op
+                 p0.9999: 21.716 us/op
+                 p1.00:   31.616 us/op
+
+
+# Run progress: 18.52% complete, ETA 00:09:42
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 1.250 ±(99.9%) 0.389 us/op
+# Warmup Iteration   2: 1.103 ±(99.9%) 0.015 us/op
+# Warmup Iteration   3: 0.989 ±(99.9%) 0.007 us/op
+# Warmup Iteration   4: 1.107 ±(99.9%) 0.016 us/op
+# Warmup Iteration   5: 1.028 ±(99.9%) 0.013 us/op
+Iteration   1: 1.004 ±(99.9%) 0.005 us/op
+                 p0.00:   0.460 us/op
+                 p0.50:   0.972 us/op
+                 p0.90:   1.122 us/op
+                 p0.95:   1.192 us/op
+                 p0.99:   1.562 us/op
+                 p0.999:  10.712 us/op
+                 p0.9999: 18.960 us/op
+                 p1.00:   28.608 us/op
+
+Iteration   2: 1.028 ±(99.9%) 0.130 us/op
+                 p0.00:   0.461 us/op
+                 p0.50:   0.962 us/op
+                 p0.90:   1.102 us/op
+                 p0.95:   1.142 us/op
+                 p0.99:   1.392 us/op
+                 p0.999:  11.210 us/op
+                 p0.9999: 21.432 us/op
+                 p1.00:   3903.488 us/op
+
+Iteration   3: 0.981 ±(99.9%) 0.006 us/op
+                 p0.00:   0.461 us/op
+                 p0.50:   0.952 us/op
+                 p0.90:   1.092 us/op
+                 p0.95:   1.142 us/op
+                 p0.99:   1.542 us/op
+                 p0.999:  10.611 us/op
+                 p0.9999: 19.230 us/op
+                 p1.00:   54.144 us/op
+
+Iteration   4: 0.996 ±(99.9%) 0.006 us/op
+                 p0.00:   0.460 us/op
+                 p0.50:   0.962 us/op
+                 p0.90:   1.112 us/op
+                 p0.95:   1.172 us/op
+                 p0.99:   1.471 us/op
+                 p0.999:  10.592 us/op
+                 p0.9999: 18.289 us/op
+                 p1.00:   40.640 us/op
+
+Iteration   5: 1.002 ±(99.9%) 0.006 us/op
+                 p0.00:   0.451 us/op
+                 p0.50:   0.972 us/op
+                 p0.90:   1.112 us/op
+                 p0.95:   1.172 us/op
+                 p0.99:   1.522 us/op
+                 p0.999:  10.719 us/op
+                 p0.9999: 21.606 us/op
+                 p1.00:   49.280 us/op
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  N = 1491168
+  mean =      0.992 ±(99.9%) 0.013 us/op
+
+  Histogram, us/op:
+    [   0.000,  250.000) = 1491165 
+    [ 250.000,  500.000) = 0 
+    [ 500.000,  750.000) = 0 
+    [ 750.000, 1000.000) = 0 
+    [1000.000, 1250.000) = 0 
+    [1250.000, 1500.000) = 0 
+    [1500.000, 1750.000) = 0 
+    [1750.000, 2000.000) = 0 
+    [2000.000, 2250.000) = 1 
+    [2250.000, 2500.000) = 0 
+    [2500.000, 2750.000) = 0 
+    [2750.000, 3000.000) = 0 
+    [3000.000, 3250.000) = 0 
+    [3250.000, 3500.000) = 0 
+    [3500.000, 3750.000) = 0 
+
+  Percentiles, us/op:
+      p(0.0000) =      0.441 us/op
+     p(50.0000) =      0.961 us/op
+     p(90.0000) =      1.102 us/op
+     p(95.0000) =      1.152 us/op
+     p(99.0000) =      1.462 us/op
+     p(99.9000) =     10.720 us/op
+     p(99.9900) =     20.537 us/op
+     p(99.9990) =     40.115 us/op
+     p(99.9999) =   3947.256 us/op
+    p(100.0000) =   3989.504 us/op
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Sampling time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = praecepta, table = unique-1000, workload = match)
+
+# Run progress: 22.22% complete, ETA 00:09:15
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.511 ±(99.9%) 0.024 us/op
+# Warmup Iteration   2: 0.414 ±(99.9%) 0.014 us/op
+# Warmup Iteration   3: 0.442 ±(99.9%) 0.018 us/op
+# Warmup Iteration   4: 0.367 ±(99.9%) 0.007 us/op
+# Warmup Iteration   5: 0.368 ±(99.9%) 0.008 us/op
+Iteration   1: 0.361 ±(99.9%) 0.006 us/op
+                 p0.00:   0.280 us/op
+                 p0.50:   0.331 us/op
+                 p0.90:   0.370 us/op
+                 p0.95:   0.381 us/op
+                 p0.99:   0.531 us/op
+                 p0.999:  9.368 us/op
+                 p0.9999: 17.968 us/op
+                 p1.00:   49.472 us/op
+
+Iteration   2: 0.362 ±(99.9%) 0.005 us/op
+                 p0.00:   0.270 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.390 us/op
+                 p0.99:   0.491 us/op
+                 p0.999:  9.591 us/op
+                 p0.9999: 16.815 us/op
+                 p1.00:   29.600 us/op
+
+Iteration   3: 0.362 ±(99.9%) 0.005 us/op
+                 p0.00:   0.270 us/op
+                 p0.50:   0.341 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.391 us/op
+                 p0.99:   0.471 us/op
+                 p0.999:  9.332 us/op
+                 p0.9999: 17.871 us/op
+                 p1.00:   32.960 us/op
+
+Iteration   4: 0.356 ±(99.9%) 0.005 us/op
+                 p0.00:   0.280 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.390 us/op
+                 p0.99:   0.460 us/op
+                 p0.999:  9.263 us/op
+                 p0.9999: 15.964 us/op
+                 p1.00:   41.792 us/op
+
+Iteration   5: 0.366 ±(99.9%) 0.007 us/op
+                 p0.00:   0.270 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.391 us/op
+                 p0.99:   0.501 us/op
+                 p0.999:  10.011 us/op
+                 p0.9999: 20.653 us/op
+                 p1.00:   63.936 us/op
+
+
+# Run progress: 25.93% complete, ETA 00:08:48
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.646 ±(99.9%) 0.428 us/op
+# Warmup Iteration   2: 0.420 ±(99.9%) 0.015 us/op
+# Warmup Iteration   3: 0.444 ±(99.9%) 0.018 us/op
+# Warmup Iteration   4: 0.366 ±(99.9%) 0.008 us/op
+# Warmup Iteration   5: 0.366 ±(99.9%) 0.008 us/op
+Iteration   1: 0.368 ±(99.9%) 0.006 us/op
+                 p0.00:   0.271 us/op
+                 p0.50:   0.341 us/op
+                 p0.90:   0.381 us/op
+                 p0.95:   0.411 us/op
+                 p0.99:   0.511 us/op
+                 p0.999:  9.943 us/op
+                 p0.9999: 17.988 us/op
+                 p1.00:   33.984 us/op
+
+Iteration   2: 0.362 ±(99.9%) 0.005 us/op
+                 p0.00:   0.280 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.400 us/op
+                 p0.99:   0.501 us/op
+                 p0.999:  9.617 us/op
+                 p0.9999: 15.546 us/op
+                 p1.00:   24.832 us/op
+
+Iteration   3: 0.366 ±(99.9%) 0.005 us/op
+                 p0.00:   0.280 us/op
+                 p0.50:   0.341 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.391 us/op
+                 p0.99:   0.511 us/op
+                 p0.999:  9.585 us/op
+                 p0.9999: 17.011 us/op
+                 p1.00:   26.944 us/op
+
+Iteration   4: 0.412 ±(99.9%) 0.171 us/op
+                 p0.00:   0.280 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.390 us/op
+                 p0.99:   0.481 us/op
+                 p0.999:  9.513 us/op
+                 p0.9999: 17.185 us/op
+                 p1.00:   3764.224 us/op
+
+Iteration   5: 0.363 ±(99.9%) 0.006 us/op
+                 p0.00:   0.280 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.391 us/op
+                 p0.99:   0.511 us/op
+                 p0.999:  9.709 us/op
+                 p0.9999: 19.970 us/op
+                 p1.00:   41.216 us/op
+
+
+# Run progress: 29.63% complete, ETA 00:08:20
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 0.570 ±(99.9%) 0.032 us/op
+# Warmup Iteration   2: 0.411 ±(99.9%) 0.015 us/op
+# Warmup Iteration   3: 0.443 ±(99.9%) 0.020 us/op
+# Warmup Iteration   4: 0.361 ±(99.9%) 0.008 us/op
+# Warmup Iteration   5: 0.361 ±(99.9%) 0.007 us/op
+Iteration   1: 0.356 ±(99.9%) 0.005 us/op
+                 p0.00:   0.270 us/op
+                 p0.50:   0.331 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.381 us/op
+                 p0.99:   0.531 us/op
+                 p0.999:  9.174 us/op
+                 p0.9999: 16.662 us/op
+                 p1.00:   25.568 us/op
+
+Iteration   2: 0.370 ±(99.9%) 0.007 us/op
+                 p0.00:   0.280 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.391 us/op
+                 p0.99:   0.531 us/op
+                 p0.999:  10.408 us/op
+                 p0.9999: 21.910 us/op
+                 p1.00:   31.808 us/op
+
+Iteration   3: 0.358 ±(99.9%) 0.005 us/op
+                 p0.00:   0.270 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.371 us/op
+                 p0.95:   0.381 us/op
+                 p0.99:   0.461 us/op
+                 p0.999:  9.140 us/op
+                 p0.9999: 18.849 us/op
+                 p1.00:   27.392 us/op
+
+Iteration   4: 0.361 ±(99.9%) 0.005 us/op
+                 p0.00:   0.280 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.370 us/op
+                 p0.95:   0.381 us/op
+                 p0.99:   0.581 us/op
+                 p0.999:  9.653 us/op
+                 p0.9999: 17.913 us/op
+                 p1.00:   32.256 us/op
+
+Iteration   5: 0.359 ±(99.9%) 0.006 us/op
+                 p0.00:   0.270 us/op
+                 p0.50:   0.340 us/op
+                 p0.90:   0.370 us/op
+                 p0.95:   0.390 us/op
+                 p0.99:   0.501 us/op
+                 p0.999:  9.386 us/op
+                 p0.9999: 18.063 us/op
+                 p1.00:   36.224 us/op
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  N = 1086390
+  mean =      0.365 ±(99.9%) 0.011 us/op
+
+  Histogram, us/op:
+    [   0.000,  250.000) = 1086389 
+    [ 250.000,  500.000) = 0 
+    [ 500.000,  750.000) = 0 
+    [ 750.000, 1000.000) = 0 
+    [1000.000, 1250.000) = 0 
+    [1250.000, 1500.000) = 0 
+    [1500.000, 1750.000) = 0 
+    [1750.000, 2000.000) = 0 
+    [2000.000, 2250.000) = 0 
+    [2250.000, 2500.000) = 0 
+    [2500.000, 2750.000) = 0 
+    [2750.000, 3000.000) = 0 
+    [3000.000, 3250.000) = 0 
+    [3250.000, 3500.000) = 0 
+    [3500.000, 3750.000) = 0 
+
+  Percentiles, us/op:
+      p(0.0000) =      0.270 us/op
+     p(50.0000) =      0.340 us/op
+     p(90.0000) =      0.371 us/op
+     p(95.0000) =      0.391 us/op
+     p(99.0000) =      0.510 us/op
+     p(99.9000) =      9.520 us/op
+     p(99.9900) =     18.124 us/op
+     p(99.9990) =     32.960 us/op
+     p(99.9999) =   3444.552 us/op
+    p(100.0000) =   3764.224 us/op
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Sampling time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = camunda, table = real, workload = match)
+
+# Run progress: 33.33% complete, ETA 00:07:53
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:39:20.687021217Z io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate-jmh-worker-1 ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+31.641 ±(99.9%) 2.334 us/op
+# Warmup Iteration   2: 23.144 ±(99.9%) 1.475 us/op
+# Warmup Iteration   3: 22.885 ±(99.9%) 1.172 us/op
+# Warmup Iteration   4: 22.232 ±(99.9%) 0.305 us/op
+# Warmup Iteration   5: 22.177 ±(99.9%) 0.244 us/op
+Iteration   1: 22.145 ±(99.9%) 0.175 us/op
+                 p0.00:   5.744 us/op
+                 p0.50:   22.016 us/op
+                 p0.90:   33.408 us/op
+                 p0.95:   35.392 us/op
+                 p0.99:   41.664 us/op
+                 p0.999:  59.260 us/op
+                 p0.9999: 115.236 us/op
+                 p1.00:   1454.080 us/op
+
+Iteration   2: 22.167 ±(99.9%) 0.183 us/op
+                 p0.00:   5.736 us/op
+                 p0.50:   22.048 us/op
+                 p0.90:   33.280 us/op
+                 p0.95:   35.584 us/op
+                 p0.99:   42.176 us/op
+                 p0.999:  60.011 us/op
+                 p0.9999: 95.038 us/op
+                 p1.00:   1513.472 us/op
+
+Iteration   3: 22.092 ±(99.9%) 0.181 us/op
+                 p0.00:   5.736 us/op
+                 p0.50:   21.952 us/op
+                 p0.90:   33.152 us/op
+                 p0.95:   35.328 us/op
+                 p0.99:   41.344 us/op
+                 p0.999:  57.031 us/op
+                 p0.9999: 325.000 us/op
+                 p1.00:   1476.608 us/op
+
+Iteration   4: 22.171 ±(99.9%) 0.189 us/op
+                 p0.00:   5.656 us/op
+                 p0.50:   22.048 us/op
+                 p0.90:   33.344 us/op
+                 p0.95:   35.328 us/op
+                 p0.99:   42.048 us/op
+                 p0.999:  61.280 us/op
+                 p0.9999: 105.416 us/op
+                 p1.00:   1517.568 us/op
+
+Iteration   5: 22.118 ±(99.9%) 0.178 us/op
+                 p0.00:   5.768 us/op
+                 p0.50:   21.984 us/op
+                 p0.90:   33.216 us/op
+                 p0.95:   35.520 us/op
+                 p0.99:   41.920 us/op
+                 p0.999:  58.880 us/op
+                 p0.9999: 114.024 us/op
+                 p1.00:   1409.024 us/op
+
+
+# Run progress: 37.04% complete, ETA 00:07:30
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:39:48.723961879Z io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate-jmh-worker-1 ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+32.716 ±(99.9%) 2.242 us/op
+# Warmup Iteration   2: 23.031 ±(99.9%) 1.421 us/op
+# Warmup Iteration   3: 22.937 ±(99.9%) 1.173 us/op
+# Warmup Iteration   4: 22.345 ±(99.9%) 0.313 us/op
+# Warmup Iteration   5: 22.234 ±(99.9%) 0.201 us/op
+Iteration   1: 22.310 ±(99.9%) 0.202 us/op
+                 p0.00:   5.824 us/op
+                 p0.50:   22.112 us/op
+                 p0.90:   33.408 us/op
+                 p0.95:   35.456 us/op
+                 p0.99:   42.176 us/op
+                 p0.999:  60.202 us/op
+                 p0.9999: 444.734 us/op
+                 p1.00:   1576.960 us/op
+
+Iteration   2: 22.172 ±(99.9%) 0.189 us/op
+                 p0.00:   5.784 us/op
+                 p0.50:   21.984 us/op
+                 p0.90:   33.152 us/op
+                 p0.95:   35.456 us/op
+                 p0.99:   41.836 us/op
+                 p0.999:  58.731 us/op
+                 p0.9999: 82.314 us/op
+                 p1.00:   1515.520 us/op
+
+Iteration   3: 22.312 ±(99.9%) 0.233 us/op
+                 p0.00:   5.744 us/op
+                 p0.50:   22.048 us/op
+                 p0.90:   33.280 us/op
+                 p0.95:   35.776 us/op
+                 p0.99:   43.136 us/op
+                 p0.999:  65.934 us/op
+                 p0.9999: 296.444 us/op
+                 p1.00:   3256.320 us/op
+
+Iteration   4: 22.246 ±(99.9%) 0.205 us/op
+                 p0.00:   5.728 us/op
+                 p0.50:   22.112 us/op
+                 p0.90:   33.344 us/op
+                 p0.95:   35.328 us/op
+                 p0.99:   41.728 us/op
+                 p0.999:  58.606 us/op
+                 p0.9999: 434.792 us/op
+                 p1.00:   1628.160 us/op
+
+Iteration   5: 22.323 ±(99.9%) 0.208 us/op
+                 p0.00:   5.848 us/op
+                 p0.50:   22.080 us/op
+                 p0.90:   33.280 us/op
+                 p0.95:   35.904 us/op
+                 p0.99:   43.456 us/op
+                 p0.999:  65.473 us/op
+                 p0.9999: 1136.600 us/op
+                 p1.00:   1542.144 us/op
+
+
+# Run progress: 40.74% complete, ETA 00:07:06
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:40:16.789190520Z io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate-jmh-worker-1 ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+36.080 ±(99.9%) 2.956 us/op
+# Warmup Iteration   2: 23.195 ±(99.9%) 1.404 us/op
+# Warmup Iteration   3: 23.515 ±(99.9%) 1.467 us/op
+# Warmup Iteration   4: 22.420 ±(99.9%) 0.278 us/op
+# Warmup Iteration   5: 22.407 ±(99.9%) 0.208 us/op
+Iteration   1: 22.399 ±(99.9%) 0.204 us/op
+                 p0.00:   5.968 us/op
+                 p0.50:   22.240 us/op
+                 p0.90:   33.600 us/op
+                 p0.95:   35.584 us/op
+                 p0.99:   41.792 us/op
+                 p0.999:  58.252 us/op
+                 p0.9999: 1260.169 us/op
+                 p1.00:   1429.504 us/op
+
+Iteration   2: 22.380 ±(99.9%) 0.210 us/op
+                 p0.00:   5.920 us/op
+                 p0.50:   22.208 us/op
+                 p0.90:   33.600 us/op
+                 p0.95:   35.392 us/op
+                 p0.99:   41.472 us/op
+                 p0.999:  57.219 us/op
+                 p0.9999: 1307.691 us/op
+                 p1.00:   1501.184 us/op
+
+Iteration   3: 22.420 ±(99.9%) 0.216 us/op
+                 p0.00:   5.880 us/op
+                 p0.50:   22.208 us/op
+                 p0.90:   33.472 us/op
+                 p0.95:   35.712 us/op
+                 p0.99:   42.048 us/op
+                 p0.999:  59.072 us/op
+                 p0.9999: 1149.961 us/op
+                 p1.00:   1515.520 us/op
+
+Iteration   4: 22.439 ±(99.9%) 0.209 us/op
+                 p0.00:   5.976 us/op
+                 p0.50:   22.272 us/op
+                 p0.90:   33.600 us/op
+                 p0.95:   35.520 us/op
+                 p0.99:   41.857 us/op
+                 p0.999:  59.853 us/op
+                 p0.9999: 1102.097 us/op
+                 p1.00:   1499.136 us/op
+
+Iteration   5: 22.423 ±(99.9%) 0.209 us/op
+                 p0.00:   5.992 us/op
+                 p0.50:   22.240 us/op
+                 p0.90:   33.600 us/op
+                 p0.95:   35.520 us/op
+                 p0.99:   42.048 us/op
+                 p0.999:  59.227 us/op
+                 p0.9999: 1204.224 us/op
+                 p1.00:   1472.512 us/op
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  N = 1007257
+  mean =     22.274 ±(99.9%) 0.052 us/op
+
+  Histogram, us/op:
+    [   0.000,  250.000) = 1007163 
+    [ 250.000,  500.000) = 0 
+    [ 500.000,  750.000) = 1 
+    [ 750.000, 1000.000) = 1 
+    [1000.000, 1250.000) = 23 
+    [1250.000, 1500.000) = 58 
+    [1500.000, 1750.000) = 10 
+    [1750.000, 2000.000) = 0 
+    [2000.000, 2250.000) = 0 
+    [2250.000, 2500.000) = 0 
+    [2500.000, 2750.000) = 0 
+    [2750.000, 3000.000) = 0 
+    [3000.000, 3250.000) = 0 
+    [3250.000, 3500.000) = 1 
+    [3500.000, 3750.000) = 0 
+
+  Percentiles, us/op:
+      p(0.0000) =      5.656 us/op
+     p(50.0000) =     22.112 us/op
+     p(90.0000) =     33.408 us/op
+     p(95.0000) =     35.520 us/op
+     p(99.0000) =     41.984 us/op
+     p(99.9000) =     60.032 us/op
+     p(99.9900) =    110.371 us/op
+     p(99.9990) =   1512.580 us/op
+     p(99.9999) =   3244.503 us/op
+    p(100.0000) =   3256.320 us/op
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Sampling time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = camunda, table = mixed-1000, workload = match)
+
+# Run progress: 44.44% complete, ETA 00:06:41
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+496.965 ±(99.9%) 24.796 us/op
+# Warmup Iteration   2: 490.274 ±(99.9%) 22.361 us/op
+# Warmup Iteration   3: 478.494 ±(99.9%) 14.493 us/op
+# Warmup Iteration   4: 473.796 ±(99.9%) 3.058 us/op
+# Warmup Iteration   5: 472.641 ±(99.9%) 2.774 us/op
+Iteration   1: 471.032 ±(99.9%) 1.977 us/op
+                 p0.00:   395.776 us/op
+                 p0.50:   465.920 us/op
+                 p0.90:   512.512 us/op
+                 p0.95:   546.816 us/op
+                 p0.99:   571.392 us/op
+                 p0.999:  1234.151 us/op
+                 p0.9999: 1695.744 us/op
+                 p1.00:   1695.744 us/op
+
+Iteration   2: 473.289 ±(99.9%) 2.064 us/op
+                 p0.00:   394.240 us/op
+                 p0.50:   468.480 us/op
+                 p0.90:   511.488 us/op
+                 p0.95:   547.174 us/op
+                 p0.99:   574.126 us/op
+                 p0.999:  1469.807 us/op
+                 p0.9999: 1601.536 us/op
+                 p1.00:   1601.536 us/op
+
+Iteration   3: 472.739 ±(99.9%) 2.171 us/op
+                 p0.00:   398.336 us/op
+                 p0.50:   466.432 us/op
+                 p0.90:   516.966 us/op
+                 p0.95:   547.840 us/op
+                 p0.99:   574.464 us/op
+                 p0.999:  1305.811 us/op
+                 p0.9999: 1785.856 us/op
+                 p1.00:   1785.856 us/op
+
+Iteration   4: 472.880 ±(99.9%) 2.042 us/op
+                 p0.00:   394.752 us/op
+                 p0.50:   467.968 us/op
+                 p0.90:   513.024 us/op
+                 p0.95:   546.816 us/op
+                 p0.99:   569.344 us/op
+                 p0.999:  1324.677 us/op
+                 p0.9999: 1648.640 us/op
+                 p1.00:   1648.640 us/op
+
+Iteration   5: 477.473 ±(99.9%) 2.145 us/op
+                 p0.00:   396.800 us/op
+                 p0.50:   471.552 us/op
+                 p0.90:   527.360 us/op
+                 p0.95:   551.936 us/op
+                 p0.99:   589.210 us/op
+                 p0.999:  1285.612 us/op
+                 p0.9999: 1779.712 us/op
+                 p1.00:   1779.712 us/op
+
+
+# Run progress: 48.15% complete, ETA 00:06:19
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+536.364 ±(99.9%) 24.550 us/op
+# Warmup Iteration   2: 546.085 ±(99.9%) 21.895 us/op
+# Warmup Iteration   3: 543.930 ±(99.9%) 20.555 us/op
+# Warmup Iteration   4: 531.831 ±(99.9%) 3.543 us/op
+# Warmup Iteration   5: 533.917 ±(99.9%) 2.677 us/op
+Iteration   1: 533.511 ±(99.9%) 2.354 us/op
+                 p0.00:   446.464 us/op
+                 p0.50:   527.360 us/op
+                 p0.90:   581.632 us/op
+                 p0.95:   616.448 us/op
+                 p0.99:   651.090 us/op
+                 p0.999:  1473.733 us/op
+                 p0.9999: 1789.952 us/op
+                 p1.00:   1789.952 us/op
+
+Iteration   2: 534.624 ±(99.9%) 2.397 us/op
+                 p0.00:   449.536 us/op
+                 p0.50:   528.384 us/op
+                 p0.90:   582.656 us/op
+                 p0.95:   619.520 us/op
+                 p0.99:   656.333 us/op
+                 p0.999:  1313.229 us/op
+                 p0.9999: 1693.696 us/op
+                 p1.00:   1693.696 us/op
+
+Iteration   3: 531.268 ±(99.9%) 2.234 us/op
+                 p0.00:   441.856 us/op
+                 p0.50:   525.312 us/op
+                 p0.90:   577.536 us/op
+                 p0.95:   614.400 us/op
+                 p0.99:   641.024 us/op
+                 p0.999:  1509.376 us/op
+                 p0.9999: 1673.216 us/op
+                 p1.00:   1673.216 us/op
+
+Iteration   4: 529.585 ±(99.9%) 2.108 us/op
+                 p0.00:   444.928 us/op
+                 p0.50:   524.288 us/op
+                 p0.90:   570.368 us/op
+                 p0.95:   611.277 us/op
+                 p0.99:   636.928 us/op
+                 p0.999:  1127.834 us/op
+                 p0.9999: 1615.872 us/op
+                 p1.00:   1615.872 us/op
+
+Iteration   5: 529.633 ±(99.9%) 2.275 us/op
+                 p0.00:   437.248 us/op
+                 p0.50:   524.288 us/op
+                 p0.90:   573.440 us/op
+                 p0.95:   611.328 us/op
+                 p0.99:   644.495 us/op
+                 p0.999:  1464.564 us/op
+                 p0.9999: 1894.400 us/op
+                 p1.00:   1894.400 us/op
+
+
+# Run progress: 51.85% complete, ETA 00:05:56
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+506.288 ±(99.9%) 23.167 us/op
+# Warmup Iteration   2: 501.766 ±(99.9%) 23.803 us/op
+# Warmup Iteration   3: 491.413 ±(99.9%) 15.639 us/op
+# Warmup Iteration   4: 482.201 ±(99.9%) 2.970 us/op
+# Warmup Iteration   5: 479.993 ±(99.9%) 2.621 us/op
+Iteration   1: 479.073 ±(99.9%) 2.083 us/op
+                 p0.00:   402.432 us/op
+                 p0.50:   474.112 us/op
+                 p0.90:   521.933 us/op
+                 p0.95:   553.984 us/op
+                 p0.99:   580.608 us/op
+                 p0.999:  1371.849 us/op
+                 p0.9999: 1816.576 us/op
+                 p1.00:   1816.576 us/op
+
+Iteration   2: 480.831 ±(99.9%) 2.139 us/op
+                 p0.00:   404.992 us/op
+                 p0.50:   475.136 us/op
+                 p0.90:   529.408 us/op
+                 p0.95:   556.032 us/op
+                 p0.99:   583.680 us/op
+                 p0.999:  1274.049 us/op
+                 p0.9999: 1703.936 us/op
+                 p1.00:   1703.936 us/op
+
+Iteration   3: 480.076 ±(99.9%) 2.128 us/op
+                 p0.00:   400.384 us/op
+                 p0.50:   474.624 us/op
+                 p0.90:   533.504 us/op
+                 p0.95:   555.008 us/op
+                 p0.99:   578.560 us/op
+                 p0.999:  1336.418 us/op
+                 p0.9999: 1783.808 us/op
+                 p1.00:   1783.808 us/op
+
+Iteration   4: 480.783 ±(99.9%) 1.995 us/op
+                 p0.00:   402.432 us/op
+                 p0.50:   476.160 us/op
+                 p0.90:   521.216 us/op
+                 p0.95:   553.984 us/op
+                 p0.99:   578.560 us/op
+                 p0.999:  1275.622 us/op
+                 p0.9999: 1673.216 us/op
+                 p1.00:   1673.216 us/op
+
+Iteration   5: 483.512 ±(99.9%) 2.247 us/op
+                 p0.00:   405.504 us/op
+                 p0.50:   477.696 us/op
+                 p0.90:   528.384 us/op
+                 p0.95:   557.056 us/op
+                 p0.99:   595.937 us/op
+                 p0.999:  1435.216 us/op
+                 p0.9999: 1806.336 us/op
+                 p1.00:   1806.336 us/op
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  N = 91006
+  mean =    494.036 ±(99.9%) 0.622 us/op
+
+  Histogram, us/op:
+    [   0.000,  125.000) = 0 
+    [ 125.000,  250.000) = 0 
+    [ 250.000,  375.000) = 0 
+    [ 375.000,  500.000) = 57889 
+    [ 500.000,  625.000) = 32031 
+    [ 625.000,  750.000) = 893 
+    [ 750.000,  875.000) = 62 
+    [ 875.000, 1000.000) = 35 
+    [1000.000, 1125.000) = 5 
+    [1125.000, 1250.000) = 1 
+    [1250.000, 1375.000) = 1 
+    [1375.000, 1500.000) = 16 
+    [1500.000, 1625.000) = 45 
+    [1625.000, 1750.000) = 19 
+    [1750.000, 1875.000) = 8 
+
+  Percentiles, us/op:
+      p(0.0000) =    394.240 us/op
+     p(50.0000) =    484.352 us/op
+     p(90.0000) =    550.912 us/op
+     p(95.0000) =    567.296 us/op
+     p(99.0000) =    628.736 us/op
+     p(99.9000) =   1186.980 us/op
+     p(99.9900) =   1771.079 us/op
+     p(99.9990) =   1894.400 us/op
+     p(99.9999) =   1894.400 us/op
+    p(100.0000) =   1894.400 us/op
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Sampling time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = camunda, table = unique-1000, workload = match)
+
+# Run progress: 55.56% complete, ETA 00:05:32
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+208.371 ±(99.9%) 11.591 us/op
+# Warmup Iteration   2: 198.234 ±(99.9%) 9.969 us/op
+# Warmup Iteration   3: 190.385 ±(99.9%) 1.055 us/op
+# Warmup Iteration   4: 189.557 ±(99.9%) 0.872 us/op
+# Warmup Iteration   5: 189.956 ±(99.9%) 0.937 us/op
+Iteration   1: 190.078 ±(99.9%) 0.730 us/op
+                 p0.00:   180.992 us/op
+                 p0.50:   186.368 us/op
+                 p0.90:   196.608 us/op
+                 p0.95:   200.448 us/op
+                 p0.99:   222.551 us/op
+                 p0.999:  342.375 us/op
+                 p0.9999: 1458.650 us/op
+                 p1.00:   1601.536 us/op
+
+Iteration   2: 190.037 ±(99.9%) 0.966 us/op
+                 p0.00:   180.992 us/op
+                 p0.50:   186.368 us/op
+                 p0.90:   196.352 us/op
+                 p0.95:   199.680 us/op
+                 p0.99:   219.464 us/op
+                 p0.999:  326.656 us/op
+                 p0.9999: 2133.816 us/op
+                 p1.00:   3207.168 us/op
+
+Iteration   3: 189.484 ±(99.9%) 0.683 us/op
+                 p0.00:   181.248 us/op
+                 p0.50:   186.368 us/op
+                 p0.90:   196.096 us/op
+                 p0.95:   198.912 us/op
+                 p0.99:   217.856 us/op
+                 p0.999:  314.231 us/op
+                 p0.9999: 1249.133 us/op
+                 p1.00:   1257.472 us/op
+
+Iteration   4: 189.420 ±(99.9%) 0.716 us/op
+                 p0.00:   180.736 us/op
+                 p0.50:   186.112 us/op
+                 p0.90:   196.096 us/op
+                 p0.95:   198.912 us/op
+                 p0.99:   216.576 us/op
+                 p0.999:  315.333 us/op
+                 p0.9999: 1360.053 us/op
+                 p1.00:   1366.016 us/op
+
+Iteration   5: 189.224 ±(99.9%) 0.635 us/op
+                 p0.00:   181.248 us/op
+                 p0.50:   186.112 us/op
+                 p0.90:   196.096 us/op
+                 p0.95:   198.912 us/op
+                 p0.99:   214.016 us/op
+                 p0.999:  296.837 us/op
+                 p0.9999: 1179.632 us/op
+                 p1.00:   1193.984 us/op
+
+
+# Run progress: 59.26% complete, ETA 00:05:05
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+205.539 ±(99.9%) 6.431 us/op
+# Warmup Iteration   2: 204.527 ±(99.9%) 6.032 us/op
+# Warmup Iteration   3: 203.453 ±(99.9%) 1.267 us/op
+# Warmup Iteration   4: 202.965 ±(99.9%) 0.929 us/op
+# Warmup Iteration   5: 203.565 ±(99.9%) 1.206 us/op
+Iteration   1: 202.652 ±(99.9%) 0.749 us/op
+                 p0.00:   192.256 us/op
+                 p0.50:   198.656 us/op
+                 p0.90:   208.640 us/op
+                 p0.95:   212.480 us/op
+                 p0.99:   255.145 us/op
+                 p0.999:  396.433 us/op
+                 p0.9999: 1219.714 us/op
+                 p1.00:   1222.656 us/op
+
+Iteration   2: 201.805 ±(99.9%) 0.734 us/op
+                 p0.00:   193.280 us/op
+                 p0.50:   198.656 us/op
+                 p0.90:   208.640 us/op
+                 p0.95:   212.224 us/op
+                 p0.99:   229.496 us/op
+                 p0.999:  329.879 us/op
+                 p0.9999: 1403.090 us/op
+                 p1.00:   1443.840 us/op
+
+Iteration   3: 202.526 ±(99.9%) 0.754 us/op
+                 p0.00:   193.536 us/op
+                 p0.50:   199.168 us/op
+                 p0.90:   209.664 us/op
+                 p0.95:   214.016 us/op
+                 p0.99:   232.448 us/op
+                 p0.999:  318.259 us/op
+                 p0.9999: 1474.724 us/op
+                 p1.00:   1527.808 us/op
+
+Iteration   4: 202.694 ±(99.9%) 0.726 us/op
+                 p0.00:   193.536 us/op
+                 p0.50:   199.424 us/op
+                 p0.90:   209.920 us/op
+                 p0.95:   213.248 us/op
+                 p0.99:   230.945 us/op
+                 p0.999:  341.831 us/op
+                 p0.9999: 1272.157 us/op
+                 p1.00:   1280.000 us/op
+
+Iteration   5: 204.582 ±(99.9%) 1.174 us/op
+                 p0.00:   193.280 us/op
+                 p0.50:   199.680 us/op
+                 p0.90:   211.200 us/op
+                 p0.95:   217.203 us/op
+                 p0.99:   269.793 us/op
+                 p0.999:  373.427 us/op
+                 p0.9999: 3020.021 us/op
+                 p1.00:   3883.008 us/op
+
+
+# Run progress: 62.96% complete, ETA 00:04:38
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+218.347 ±(99.9%) 11.694 us/op
+# Warmup Iteration   2: 195.942 ±(99.9%) 10.217 us/op
+# Warmup Iteration   3: 186.711 ±(99.9%) 1.049 us/op
+# Warmup Iteration   4: 187.019 ±(99.9%) 0.956 us/op
+# Warmup Iteration   5: 186.102 ±(99.9%) 0.779 us/op
+Iteration   1: 186.895 ±(99.9%) 0.699 us/op
+                 p0.00:   178.176 us/op
+                 p0.50:   183.296 us/op
+                 p0.90:   193.280 us/op
+                 p0.95:   196.608 us/op
+                 p0.99:   220.672 us/op
+                 p0.999:  345.088 us/op
+                 p0.9999: 1353.513 us/op
+                 p1.00:   1390.592 us/op
+
+Iteration   2: 186.785 ±(99.9%) 0.692 us/op
+                 p0.00:   178.432 us/op
+                 p0.50:   183.552 us/op
+                 p0.90:   193.792 us/op
+                 p0.95:   196.608 us/op
+                 p0.99:   213.130 us/op
+                 p0.999:  277.710 us/op
+                 p0.9999: 1345.451 us/op
+                 p1.00:   1464.320 us/op
+
+Iteration   3: 186.815 ±(99.9%) 0.707 us/op
+                 p0.00:   178.176 us/op
+                 p0.50:   183.296 us/op
+                 p0.90:   193.459 us/op
+                 p0.95:   196.608 us/op
+                 p0.99:   215.552 us/op
+                 p0.999:  343.266 us/op
+                 p0.9999: 1287.443 us/op
+                 p1.00:   1392.640 us/op
+
+Iteration   4: 186.365 ±(99.9%) 0.667 us/op
+                 p0.00:   177.920 us/op
+                 p0.50:   183.040 us/op
+                 p0.90:   193.280 us/op
+                 p0.95:   196.096 us/op
+                 p0.99:   211.968 us/op
+                 p0.999:  316.844 us/op
+                 p0.9999: 1304.310 us/op
+                 p1.00:   1415.168 us/op
+
+Iteration   5: 185.993 ±(99.9%) 0.650 us/op
+                 p0.00:   178.176 us/op
+                 p0.50:   183.040 us/op
+                 p0.90:   192.768 us/op
+                 p0.95:   195.072 us/op
+                 p0.99:   208.346 us/op
+                 p0.999:  261.850 us/op
+                 p0.9999: 1208.541 us/op
+                 p1.00:   1218.560 us/op
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  N = 233204
+  mean =    192.769 ±(99.9%) 0.202 us/op
+
+  Histogram, us/op:
+    [   0.000,  250.000) = 232187 
+    [ 250.000,  500.000) = 868 
+    [ 500.000,  750.000) = 3 
+    [ 750.000, 1000.000) = 0 
+    [1000.000, 1250.000) = 120 
+    [1250.000, 1500.000) = 21 
+    [1500.000, 1750.000) = 2 
+    [1750.000, 2000.000) = 0 
+    [2000.000, 2250.000) = 1 
+    [2250.000, 2500.000) = 0 
+    [2500.000, 2750.000) = 0 
+    [2750.000, 3000.000) = 0 
+    [3000.000, 3250.000) = 1 
+    [3250.000, 3500.000) = 0 
+    [3500.000, 3750.000) = 0 
+
+  Percentiles, us/op:
+      p(0.0000) =    177.920 us/op
+     p(50.0000) =    188.416 us/op
+     p(90.0000) =    204.032 us/op
+     p(95.0000) =    208.896 us/op
+     p(99.0000) =    225.280 us/op
+     p(99.9000) =    358.295 us/op
+     p(99.9900) =   1265.008 us/op
+     p(99.9990) =   2815.466 us/op
+     p(99.9999) =   3883.008 us/op
+    p(100.0000) =   3883.008 us/op
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Sampling time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = drools, table = real, workload = match)
+
+# Run progress: 66.67% complete, ETA 00:04:11
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:43:46.707971716Z io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate-jmh-worker-1 ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+82.442 ±(99.9%) 2.557 us/op
+# Warmup Iteration   2: 64.033 ±(99.9%) 1.990 us/op
+# Warmup Iteration   3: 62.674 ±(99.9%) 1.431 us/op
+# Warmup Iteration   4: 62.333 ±(99.9%) 1.450 us/op
+# Warmup Iteration   5: 62.432 ±(99.9%) 1.541 us/op
+Iteration   1: 62.340 ±(99.9%) 1.142 us/op
+                 p0.00:   38.720 us/op
+                 p0.50:   61.824 us/op
+                 p0.90:   73.088 us/op
+                 p0.95:   75.264 us/op
+                 p0.99:   83.840 us/op
+                 p0.999:  100.724 us/op
+                 p0.9999: 131.599 us/op
+                 p1.00:   10715.136 us/op
+
+Iteration   2: 62.045 ±(99.9%) 0.292 us/op
+                 p0.00:   39.168 us/op
+                 p0.50:   61.952 us/op
+                 p0.90:   73.088 us/op
+                 p0.95:   75.264 us/op
+                 p0.99:   84.224 us/op
+                 p0.999:  108.346 us/op
+                 p0.9999: 339.339 us/op
+                 p1.00:   3088.384 us/op
+
+Iteration   3: 61.963 ±(99.9%) 0.196 us/op
+                 p0.00:   39.232 us/op
+                 p0.50:   61.888 us/op
+                 p0.90:   73.088 us/op
+                 p0.95:   75.392 us/op
+                 p0.99:   83.968 us/op
+                 p0.999:  102.528 us/op
+                 p0.9999: 144.384 us/op
+                 p1.00:   1277.952 us/op
+
+Iteration   4: 61.969 ±(99.9%) 0.194 us/op
+                 p0.00:   38.912 us/op
+                 p0.50:   61.888 us/op
+                 p0.90:   73.088 us/op
+                 p0.95:   75.392 us/op
+                 p0.99:   84.055 us/op
+                 p0.999:  106.198 us/op
+                 p0.9999: 158.382 us/op
+                 p1.00:   1198.080 us/op
+
+Iteration   5: 61.911 ±(99.9%) 0.220 us/op
+                 p0.00:   39.232 us/op
+                 p0.50:   61.824 us/op
+                 p0.90:   72.960 us/op
+                 p0.95:   75.136 us/op
+                 p0.99:   83.840 us/op
+                 p0.999:  101.793 us/op
+                 p0.9999: 332.596 us/op
+                 p1.00:   1425.408 us/op
+
+
+# Run progress: 70.37% complete, ETA 00:03:43
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:44:14.596302676Z io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate-jmh-worker-1 ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+77.319 ±(99.9%) 2.327 us/op
+# Warmup Iteration   2: 66.631 ±(99.9%) 1.729 us/op
+# Warmup Iteration   3: 63.156 ±(99.9%) 1.436 us/op
+# Warmup Iteration   4: 63.447 ±(99.9%) 1.760 us/op
+# Warmup Iteration   5: 63.237 ±(99.9%) 1.458 us/op
+Iteration   1: 62.916 ±(99.9%) 1.127 us/op
+                 p0.00:   38.912 us/op
+                 p0.50:   62.272 us/op
+                 p0.90:   73.728 us/op
+                 p0.95:   76.032 us/op
+                 p0.99:   84.992 us/op
+                 p0.999:  104.242 us/op
+                 p0.9999: 145.638 us/op
+                 p1.00:   10813.440 us/op
+
+Iteration   2: 62.827 ±(99.9%) 0.277 us/op
+                 p0.00:   39.232 us/op
+                 p0.50:   62.784 us/op
+                 p0.90:   74.240 us/op
+                 p0.95:   76.672 us/op
+                 p0.99:   85.248 us/op
+                 p0.999:  103.808 us/op
+                 p0.9999: 150.298 us/op
+                 p1.00:   3026.944 us/op
+
+Iteration   3: 62.975 ±(99.9%) 0.225 us/op
+                 p0.00:   38.784 us/op
+                 p0.50:   62.912 us/op
+                 p0.90:   74.496 us/op
+                 p0.95:   76.800 us/op
+                 p0.99:   85.504 us/op
+                 p0.999:  101.617 us/op
+                 p0.9999: 141.088 us/op
+                 p1.00:   1929.216 us/op
+
+Iteration   4: 62.820 ±(99.9%) 0.215 us/op
+                 p0.00:   38.784 us/op
+                 p0.50:   62.656 us/op
+                 p0.90:   74.112 us/op
+                 p0.95:   76.544 us/op
+                 p0.99:   86.144 us/op
+                 p0.999:  116.519 us/op
+                 p0.9999: 390.294 us/op
+                 p1.00:   1253.376 us/op
+
+Iteration   5: 62.582 ±(99.9%) 0.198 us/op
+                 p0.00:   38.976 us/op
+                 p0.50:   62.528 us/op
+                 p0.90:   73.856 us/op
+                 p0.95:   76.160 us/op
+                 p0.99:   84.992 us/op
+                 p0.999:  111.296 us/op
+                 p0.9999: 151.296 us/op
+                 p1.00:   1329.152 us/op
+
+
+# Run progress: 74.07% complete, ETA 00:03:15
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:44:42.618791194Z io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate-jmh-worker-1 ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+81.659 ±(99.9%) 3.372 us/op
+# Warmup Iteration   2: 71.285 ±(99.9%) 1.931 us/op
+# Warmup Iteration   3: 65.786 ±(99.9%) 1.555 us/op
+# Warmup Iteration   4: 65.883 ±(99.9%) 1.721 us/op
+# Warmup Iteration   5: 65.920 ±(99.9%) 1.607 us/op
+Iteration   1: 65.387 ±(99.9%) 1.364 us/op
+                 p0.00:   39.168 us/op
+                 p0.50:   64.704 us/op
+                 p0.90:   76.928 us/op
+                 p0.95:   79.232 us/op
+                 p0.99:   88.704 us/op
+                 p0.999:  119.522 us/op
+                 p0.9999: 159.032 us/op
+                 p1.00:   11223.040 us/op
+
+Iteration   2: 64.922 ±(99.9%) 0.573 us/op
+                 p0.00:   38.976 us/op
+                 p0.50:   64.768 us/op
+                 p0.90:   76.928 us/op
+                 p0.95:   79.232 us/op
+                 p0.99:   88.960 us/op
+                 p0.999:  129.391 us/op
+                 p0.9999: 163.154 us/op
+                 p1.00:   7004.160 us/op
+
+Iteration   3: 64.954 ±(99.9%) 0.238 us/op
+                 p0.00:   39.232 us/op
+                 p0.50:   64.896 us/op
+                 p0.90:   77.184 us/op
+                 p0.95:   79.616 us/op
+                 p0.99:   89.472 us/op
+                 p0.999:  119.282 us/op
+                 p0.9999: 554.146 us/op
+                 p1.00:   1388.544 us/op
+
+Iteration   4: 64.652 ±(99.9%) 0.213 us/op
+                 p0.00:   39.104 us/op
+                 p0.50:   64.640 us/op
+                 p0.90:   76.928 us/op
+                 p0.95:   79.104 us/op
+                 p0.99:   88.448 us/op
+                 p0.999:  118.870 us/op
+                 p0.9999: 176.349 us/op
+                 p1.00:   1236.992 us/op
+
+Iteration   5: 64.743 ±(99.9%) 0.213 us/op
+                 p0.00:   38.848 us/op
+                 p0.50:   64.768 us/op
+                 p0.90:   76.928 us/op
+                 p0.95:   79.232 us/op
+                 p0.99:   88.832 us/op
+                 p0.999:  114.688 us/op
+                 p0.9999: 159.029 us/op
+                 p1.00:   1236.992 us/op
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  N = 710386
+  mean =     63.243 ±(99.9%) 0.153 us/op
+
+  Histogram, us/op:
+    [    0.000,  1250.000) = 710359 
+    [ 1250.000,  2500.000) = 14 
+    [ 2500.000,  3750.000) = 3 
+    [ 3750.000,  5000.000) = 0 
+    [ 5000.000,  6250.000) = 0 
+    [ 6250.000,  7500.000) = 3 
+    [ 7500.000,  8750.000) = 0 
+    [ 8750.000, 10000.000) = 1 
+    [10000.000, 11250.000) = 6 
+    [11250.000, 12500.000) = 0 
+    [12500.000, 13750.000) = 0 
+    [13750.000, 15000.000) = 0 
+    [15000.000, 16250.000) = 0 
+    [16250.000, 17500.000) = 0 
+    [17500.000, 18750.000) = 0 
+
+  Percentiles, us/op:
+      p(0.0000) =     38.720 us/op
+     p(50.0000) =     63.104 us/op
+     p(90.0000) =     74.880 us/op
+     p(95.0000) =     77.696 us/op
+     p(99.0000) =     86.400 us/op
+     p(99.9000) =    111.104 us/op
+     p(99.9900) =    151.296 us/op
+     p(99.9990) =   9669.179 us/op
+     p(99.9999) =  11223.040 us/op
+    p(100.0000) =  11223.040 us/op
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Sampling time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = drools, table = mixed-1000, workload = match)
+
+# Run progress: 77.78% complete, ETA 00:02:47
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+413.499 ±(99.9%) 4.503 us/op
+# Warmup Iteration   2: 414.318 ±(99.9%) 5.052 us/op
+# Warmup Iteration   3: 398.068 ±(99.9%) 3.556 us/op
+# Warmup Iteration   4: 397.072 ±(99.9%) 4.393 us/op
+# Warmup Iteration   5: 397.440 ±(99.9%) 4.355 us/op
+Iteration   1: 397.527 ±(99.9%) 3.086 us/op
+                 p0.00:   279.552 us/op
+                 p0.50:   401.920 us/op
+                 p0.90:   427.008 us/op
+                 p0.95:   435.200 us/op
+                 p0.99:   482.038 us/op
+                 p0.999:  821.488 us/op
+                 p0.9999: 4726.784 us/op
+                 p1.00:   4726.784 us/op
+
+Iteration   2: 395.357 ±(99.9%) 3.415 us/op
+                 p0.00:   278.528 us/op
+                 p0.50:   400.896 us/op
+                 p0.90:   424.960 us/op
+                 p0.95:   432.128 us/op
+                 p0.99:   453.120 us/op
+                 p0.999:  578.626 us/op
+                 p0.9999: 4882.432 us/op
+                 p1.00:   4882.432 us/op
+
+Iteration   3: 396.540 ±(99.9%) 1.895 us/op
+                 p0.00:   285.696 us/op
+                 p0.50:   402.432 us/op
+                 p0.90:   427.008 us/op
+                 p0.95:   434.688 us/op
+                 p0.99:   456.192 us/op
+                 p0.999:  706.135 us/op
+                 p0.9999: 3063.808 us/op
+                 p1.00:   3063.808 us/op
+
+Iteration   4: 398.682 ±(99.9%) 1.629 us/op
+                 p0.00:   280.576 us/op
+                 p0.50:   404.480 us/op
+                 p0.90:   429.568 us/op
+                 p0.95:   436.224 us/op
+                 p0.99:   458.240 us/op
+                 p0.999:  829.932 us/op
+                 p0.9999: 1591.296 us/op
+                 p1.00:   1591.296 us/op
+
+Iteration   5: 397.816 ±(99.9%) 1.562 us/op
+                 p0.00:   285.184 us/op
+                 p0.50:   403.968 us/op
+                 p0.90:   429.568 us/op
+                 p0.95:   437.248 us/op
+                 p0.99:   460.288 us/op
+                 p0.999:  671.039 us/op
+                 p0.9999: 1550.336 us/op
+                 p1.00:   1550.336 us/op
+
+
+# Run progress: 81.48% complete, ETA 00:02:20
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+373.108 ±(99.9%) 4.417 us/op
+# Warmup Iteration   2: 364.906 ±(99.9%) 3.874 us/op
+# Warmup Iteration   3: 368.413 ±(99.9%) 4.025 us/op
+# Warmup Iteration   4: 361.844 ±(99.9%) 3.898 us/op
+# Warmup Iteration   5: 369.221 ±(99.9%) 3.918 us/op
+Iteration   1: 368.777 ±(99.9%) 2.894 us/op
+                 p0.00:   252.672 us/op
+                 p0.50:   373.760 us/op
+                 p0.90:   397.312 us/op
+                 p0.95:   404.480 us/op
+                 p0.99:   428.406 us/op
+                 p0.999:  717.694 us/op
+                 p0.9999: 4997.120 us/op
+                 p1.00:   4997.120 us/op
+
+Iteration   2: 363.546 ±(99.9%) 2.903 us/op
+                 p0.00:   250.368 us/op
+                 p0.50:   368.640 us/op
+                 p0.90:   392.704 us/op
+                 p0.95:   398.848 us/op
+                 p0.99:   421.140 us/op
+                 p0.999:  546.597 us/op
+                 p0.9999: 4874.240 us/op
+                 p1.00:   4874.240 us/op
+
+Iteration   3: 361.855 ±(99.9%) 1.434 us/op
+                 p0.00:   252.160 us/op
+                 p0.50:   367.616 us/op
+                 p0.90:   390.656 us/op
+                 p0.95:   396.800 us/op
+                 p0.99:   416.256 us/op
+                 p0.999:  701.592 us/op
+                 p0.9999: 1540.096 us/op
+                 p1.00:   1540.096 us/op
+
+Iteration   4: 362.900 ±(99.9%) 1.527 us/op
+                 p0.00:   253.696 us/op
+                 p0.50:   367.616 us/op
+                 p0.90:   392.192 us/op
+                 p0.95:   399.360 us/op
+                 p0.99:   431.616 us/op
+                 p0.999:  742.359 us/op
+                 p0.9999: 1642.496 us/op
+                 p1.00:   1642.496 us/op
+
+Iteration   5: 361.161 ±(99.9%) 1.333 us/op
+                 p0.00:   251.392 us/op
+                 p0.50:   367.616 us/op
+                 p0.90:   390.144 us/op
+                 p0.95:   396.800 us/op
+                 p0.99:   416.256 us/op
+                 p0.999:  683.439 us/op
+                 p0.9999: 1406.976 us/op
+                 p1.00:   1406.976 us/op
+
+
+# Run progress: 85.19% complete, ETA 00:01:52
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+395.623 ±(99.9%) 10.814 us/op
+# Warmup Iteration   2: 387.236 ±(99.9%) 10.571 us/op
+# Warmup Iteration   3: 396.408 ±(99.9%) 10.919 us/op
+# Warmup Iteration   4: 387.782 ±(99.9%) 7.343 us/op
+# Warmup Iteration   5: 395.619 ±(99.9%) 11.056 us/op
+Iteration   1: 386.397 ±(99.9%) 9.073 us/op
+                 p0.00:   265.216 us/op
+                 p0.50:   389.120 us/op
+                 p0.90:   414.208 us/op
+                 p0.95:   421.376 us/op
+                 p0.99:   438.497 us/op
+                 p0.999:  508.541 us/op
+                 p0.9999: 13795.328 us/op
+                 p1.00:   13795.328 us/op
+
+Iteration   2: 383.635 ±(99.9%) 2.924 us/op
+                 p0.00:   264.704 us/op
+                 p0.50:   389.632 us/op
+                 p0.90:   414.208 us/op
+                 p0.95:   420.864 us/op
+                 p0.99:   438.272 us/op
+                 p0.999:  523.489 us/op
+                 p0.9999: 4685.824 us/op
+                 p1.00:   4685.824 us/op
+
+Iteration   3: 385.422 ±(99.9%) 1.551 us/op
+                 p0.00:   271.360 us/op
+                 p0.50:   392.192 us/op
+                 p0.90:   416.768 us/op
+                 p0.95:   423.936 us/op
+                 p0.99:   442.993 us/op
+                 p0.999:  787.452 us/op
+                 p0.9999: 1667.072 us/op
+                 p1.00:   1667.072 us/op
+
+Iteration   4: 388.463 ±(99.9%) 1.744 us/op
+                 p0.00:   270.848 us/op
+                 p0.50:   394.240 us/op
+                 p0.90:   419.482 us/op
+                 p0.95:   427.008 us/op
+                 p0.99:   463.273 us/op
+                 p0.999:  812.901 us/op
+                 p0.9999: 1480.704 us/op
+                 p1.00:   1480.704 us/op
+
+Iteration   5: 386.378 ±(99.9%) 1.453 us/op
+                 p0.00:   267.264 us/op
+                 p0.50:   393.728 us/op
+                 p0.90:   418.304 us/op
+                 p0.95:   424.448 us/op
+                 p0.99:   444.114 us/op
+                 p0.999:  556.341 us/op
+                 p0.9999: 1462.272 us/op
+                 p1.00:   1462.272 us/op
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  N = 117775
+  mean =    381.769 ±(99.9%) 0.824 us/op
+
+  Histogram, us/op:
+    [    0.000,  1250.000) = 117734 
+    [ 1250.000,  2500.000) = 24 
+    [ 2500.000,  3750.000) = 3 
+    [ 3750.000,  5000.000) = 11 
+    [ 5000.000,  6250.000) = 0 
+    [ 6250.000,  7500.000) = 0 
+    [ 7500.000,  8750.000) = 0 
+    [ 8750.000, 10000.000) = 0 
+    [10000.000, 11250.000) = 0 
+    [11250.000, 12500.000) = 2 
+    [12500.000, 13750.000) = 0 
+    [13750.000, 15000.000) = 1 
+    [15000.000, 16250.000) = 0 
+    [16250.000, 17500.000) = 0 
+    [17500.000, 18750.000) = 0 
+
+  Percentiles, us/op:
+      p(0.0000) =    250.368 us/op
+     p(50.0000) =    385.024 us/op
+     p(90.0000) =    418.816 us/op
+     p(95.0000) =    427.008 us/op
+     p(99.0000) =    448.000 us/op
+     p(99.9000) =    748.544 us/op
+     p(99.9900) =   4479.215 us/op
+     p(99.9990) =  13518.648 us/op
+     p(99.9999) =  13795.328 us/op
+    p(100.0000) =  13795.328 us/op
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Sampling time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate
+# Parameters: (engine = drools, table = unique-1000, workload = match)
+
+# Run progress: 88.89% complete, ETA 00:01:25
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+188.860 ±(99.9%) 1.985 us/op
+# Warmup Iteration   2: 152.096 ±(99.9%) 1.165 us/op
+# Warmup Iteration   3: 150.273 ±(99.9%) 1.133 us/op
+# Warmup Iteration   4: 150.538 ±(99.9%) 1.340 us/op
+# Warmup Iteration   5: 151.727 ±(99.9%) 1.187 us/op
+Iteration   1: 150.666 ±(99.9%) 0.972 us/op
+                 p0.00:   138.752 us/op
+                 p0.50:   148.736 us/op
+                 p0.90:   157.952 us/op
+                 p0.95:   162.048 us/op
+                 p0.99:   176.673 us/op
+                 p0.999:  229.207 us/op
+                 p0.9999: 3563.613 us/op
+                 p1.00:   3571.712 us/op
+
+Iteration   2: 149.495 ±(99.9%) 0.696 us/op
+                 p0.00:   139.776 us/op
+                 p0.50:   146.944 us/op
+                 p0.90:   156.672 us/op
+                 p0.95:   161.280 us/op
+                 p0.99:   173.824 us/op
+                 p0.999:  226.640 us/op
+                 p0.9999: 1824.359 us/op
+                 p1.00:   3723.264 us/op
+
+Iteration   3: 147.476 ±(99.9%) 0.389 us/op
+                 p0.00:   139.264 us/op
+                 p0.50:   145.152 us/op
+                 p0.90:   154.624 us/op
+                 p0.95:   157.440 us/op
+                 p0.99:   174.336 us/op
+                 p0.999:  294.237 us/op
+                 p0.9999: 1277.974 us/op
+                 p1.00:   1384.448 us/op
+
+Iteration   4: 148.003 ±(99.9%) 0.383 us/op
+                 p0.00:   139.264 us/op
+                 p0.50:   145.664 us/op
+                 p0.90:   154.624 us/op
+                 p0.95:   157.696 us/op
+                 p0.99:   178.688 us/op
+                 p0.999:  299.395 us/op
+                 p0.9999: 1199.015 us/op
+                 p1.00:   1239.040 us/op
+
+Iteration   5: 147.774 ±(99.9%) 0.355 us/op
+                 p0.00:   139.264 us/op
+                 p0.50:   145.408 us/op
+                 p0.90:   154.624 us/op
+                 p0.95:   157.440 us/op
+                 p0.99:   173.568 us/op
+                 p0.999:  296.960 us/op
+                 p0.9999: 1129.310 us/op
+                 p1.00:   1132.544 us/op
+
+
+# Run progress: 92.59% complete, ETA 00:00:56
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+197.388 ±(99.9%) 4.494 us/op
+# Warmup Iteration   2: 159.439 ±(99.9%) 3.693 us/op
+# Warmup Iteration   3: 159.681 ±(99.9%) 3.700 us/op
+# Warmup Iteration   4: 156.084 ±(99.9%) 3.621 us/op
+# Warmup Iteration   5: 158.680 ±(99.9%) 3.607 us/op
+Iteration   1: 159.723 ±(99.9%) 2.974 us/op
+                 p0.00:   146.176 us/op
+                 p0.50:   156.672 us/op
+                 p0.90:   165.632 us/op
+                 p0.95:   168.448 us/op
+                 p0.99:   182.016 us/op
+                 p0.999:  232.620 us/op
+                 p0.9999: 9961.472 us/op
+                 p1.00:   9961.472 us/op
+
+Iteration   2: 158.546 ±(99.9%) 2.188 us/op
+                 p0.00:   148.736 us/op
+                 p0.50:   155.904 us/op
+                 p0.90:   164.864 us/op
+                 p0.95:   167.680 us/op
+                 p0.99:   182.016 us/op
+                 p0.999:  248.115 us/op
+                 p0.9999: 4530.708 us/op
+                 p1.00:   12124.160 us/op
+
+Iteration   3: 156.341 ±(99.9%) 0.368 us/op
+                 p0.00:   147.456 us/op
+                 p0.50:   154.112 us/op
+                 p0.90:   163.584 us/op
+                 p0.95:   166.656 us/op
+                 p0.99:   182.528 us/op
+                 p0.999:  285.694 us/op
+                 p0.9999: 1226.922 us/op
+                 p1.00:   1251.328 us/op
+
+Iteration   4: 157.635 ±(99.9%) 0.368 us/op
+                 p0.00:   146.432 us/op
+                 p0.50:   155.392 us/op
+                 p0.90:   165.376 us/op
+                 p0.95:   168.704 us/op
+                 p0.99:   181.248 us/op
+                 p0.999:  237.281 us/op
+                 p0.9999: 1182.102 us/op
+                 p1.00:   1185.792 us/op
+
+Iteration   5: 156.732 ±(99.9%) 0.353 us/op
+                 p0.00:   147.712 us/op
+                 p0.50:   154.624 us/op
+                 p0.90:   164.096 us/op
+                 p0.95:   167.168 us/op
+                 p0.99:   181.248 us/op
+                 p0.999:  215.808 us/op
+                 p0.9999: 1151.582 us/op
+                 p1.00:   1370.112 us/op
+
+
+# Run progress: 96.30% complete, ETA 00:00:28
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+187.793 ±(99.9%) 4.388 us/op
+# Warmup Iteration   2: 157.128 ±(99.9%) 3.641 us/op
+# Warmup Iteration   3: 153.566 ±(99.9%) 4.358 us/op
+# Warmup Iteration   4: 155.932 ±(99.9%) 3.670 us/op
+# Warmup Iteration   5: 152.240 ±(99.9%) 3.457 us/op
+Iteration   1: 153.246 ±(99.9%) 3.244 us/op
+                 p0.00:   140.288 us/op
+                 p0.50:   150.272 us/op
+                 p0.90:   159.232 us/op
+                 p0.95:   162.560 us/op
+                 p0.99:   175.360 us/op
+                 p0.999:  227.072 us/op
+                 p0.9999: 11090.880 us/op
+                 p1.00:   12468.224 us/op
+
+Iteration   2: 151.788 ±(99.9%) 0.698 us/op
+                 p0.00:   142.336 us/op
+                 p0.50:   149.248 us/op
+                 p0.90:   158.976 us/op
+                 p0.95:   163.072 us/op
+                 p0.99:   179.200 us/op
+                 p0.999:  228.864 us/op
+                 p0.9999: 1513.615 us/op
+                 p1.00:   3829.760 us/op
+
+Iteration   3: 152.198 ±(99.9%) 0.366 us/op
+                 p0.00:   142.080 us/op
+                 p0.50:   150.016 us/op
+                 p0.90:   159.488 us/op
+                 p0.95:   163.328 us/op
+                 p0.99:   176.927 us/op
+                 p0.999:  214.335 us/op
+                 p0.9999: 1283.259 us/op
+                 p1.00:   1384.448 us/op
+
+Iteration   4: 153.344 ±(99.9%) 0.365 us/op
+                 p0.00:   142.336 us/op
+                 p0.50:   151.296 us/op
+                 p0.90:   161.536 us/op
+                 p0.95:   165.888 us/op
+                 p0.99:   179.610 us/op
+                 p0.999:  231.127 us/op
+                 p0.9999: 1165.058 us/op
+                 p1.00:   1372.160 us/op
+
+Iteration   5: 152.904 ±(99.9%) 0.414 us/op
+                 p0.00:   142.848 us/op
+                 p0.50:   150.016 us/op
+                 p0.90:   159.744 us/op
+                 p0.95:   164.608 us/op
+                 p0.99:   184.576 us/op
+                 p0.999:  311.502 us/op
+                 p0.9999: 1138.936 us/op
+                 p1.00:   1144.832 us/op
+
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.EvaluationBenchmark.evaluate":
+  N = 293832
+  mean =    152.960 ±(99.9%) 0.343 us/op
+
+  Histogram, us/op:
+    [    0.000,  1250.000) = 293808 
+    [ 1250.000,  2500.000) = 11 
+    [ 2500.000,  3750.000) = 5 
+    [ 3750.000,  5000.000) = 1 
+    [ 5000.000,  6250.000) = 0 
+    [ 6250.000,  7500.000) = 0 
+    [ 7500.000,  8750.000) = 0 
+    [ 8750.000, 10000.000) = 3 
+    [10000.000, 11250.000) = 2 
+    [11250.000, 12500.000) = 2 
+    [12500.000, 13750.000) = 0 
+    [13750.000, 15000.000) = 0 
+    [15000.000, 16250.000) = 0 
+    [16250.000, 17500.000) = 0 
+    [17500.000, 18750.000) = 0 
+
+  Percentiles, us/op:
+      p(0.0000) =    138.752 us/op
+     p(50.0000) =    151.552 us/op
+     p(90.0000) =    161.280 us/op
+     p(95.0000) =    165.376 us/op
+     p(99.0000) =    179.200 us/op
+     p(99.9000) =    287.232 us/op
+     p(99.9900) =   1184.222 us/op
+     p(99.9990) =  11094.129 us/op
+     p(99.9999) =  12468.224 us/op
+    p(100.0000) =  12468.224 us/op
+
+
+# Run complete. Total time: 00:12:46
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                              (engine)      (table)  (workload)    Mode      Cnt      Score   Error  Units
+EvaluationBenchmark.evaluate          praecepta         real       match  sample  1028533      0.375 ± 0.002  us/op
+EvaluationBenchmark.evaluate:p0.00    praecepta         real       match  sample               0.240          us/op
+EvaluationBenchmark.evaluate:p0.50    praecepta         real       match  sample               0.350          us/op
+EvaluationBenchmark.evaluate:p0.90    praecepta         real       match  sample               0.381          us/op
+EvaluationBenchmark.evaluate:p0.95    praecepta         real       match  sample               0.401          us/op
+EvaluationBenchmark.evaluate:p0.99    praecepta         real       match  sample               0.571          us/op
+EvaluationBenchmark.evaluate:p0.999   praecepta         real       match  sample               9.360          us/op
+EvaluationBenchmark.evaluate:p0.9999  praecepta         real       match  sample              20.009          us/op
+EvaluationBenchmark.evaluate:p1.00    praecepta         real       match  sample             324.096          us/op
+EvaluationBenchmark.evaluate          praecepta   mixed-1000       match  sample  1491168      0.992 ± 0.013  us/op
+EvaluationBenchmark.evaluate:p0.00    praecepta   mixed-1000       match  sample               0.441          us/op
+EvaluationBenchmark.evaluate:p0.50    praecepta   mixed-1000       match  sample               0.961          us/op
+EvaluationBenchmark.evaluate:p0.90    praecepta   mixed-1000       match  sample               1.102          us/op
+EvaluationBenchmark.evaluate:p0.95    praecepta   mixed-1000       match  sample               1.152          us/op
+EvaluationBenchmark.evaluate:p0.99    praecepta   mixed-1000       match  sample               1.462          us/op
+EvaluationBenchmark.evaluate:p0.999   praecepta   mixed-1000       match  sample              10.720          us/op
+EvaluationBenchmark.evaluate:p0.9999  praecepta   mixed-1000       match  sample              20.537          us/op
+EvaluationBenchmark.evaluate:p1.00    praecepta   mixed-1000       match  sample            3989.504          us/op
+EvaluationBenchmark.evaluate          praecepta  unique-1000       match  sample  1086390      0.365 ± 0.011  us/op
+EvaluationBenchmark.evaluate:p0.00    praecepta  unique-1000       match  sample               0.270          us/op
+EvaluationBenchmark.evaluate:p0.50    praecepta  unique-1000       match  sample               0.340          us/op
+EvaluationBenchmark.evaluate:p0.90    praecepta  unique-1000       match  sample               0.371          us/op
+EvaluationBenchmark.evaluate:p0.95    praecepta  unique-1000       match  sample               0.391          us/op
+EvaluationBenchmark.evaluate:p0.99    praecepta  unique-1000       match  sample               0.510          us/op
+EvaluationBenchmark.evaluate:p0.999   praecepta  unique-1000       match  sample               9.520          us/op
+EvaluationBenchmark.evaluate:p0.9999  praecepta  unique-1000       match  sample              18.124          us/op
+EvaluationBenchmark.evaluate:p1.00    praecepta  unique-1000       match  sample            3764.224          us/op
+EvaluationBenchmark.evaluate            camunda         real       match  sample  1007257     22.274 ± 0.052  us/op
+EvaluationBenchmark.evaluate:p0.00      camunda         real       match  sample               5.656          us/op
+EvaluationBenchmark.evaluate:p0.50      camunda         real       match  sample              22.112          us/op
+EvaluationBenchmark.evaluate:p0.90      camunda         real       match  sample              33.408          us/op
+EvaluationBenchmark.evaluate:p0.95      camunda         real       match  sample              35.520          us/op
+EvaluationBenchmark.evaluate:p0.99      camunda         real       match  sample              41.984          us/op
+EvaluationBenchmark.evaluate:p0.999     camunda         real       match  sample              60.032          us/op
+EvaluationBenchmark.evaluate:p0.9999    camunda         real       match  sample             110.371          us/op
+EvaluationBenchmark.evaluate:p1.00      camunda         real       match  sample            3256.320          us/op
+EvaluationBenchmark.evaluate            camunda   mixed-1000       match  sample    91006    494.036 ± 0.622  us/op
+EvaluationBenchmark.evaluate:p0.00      camunda   mixed-1000       match  sample             394.240          us/op
+EvaluationBenchmark.evaluate:p0.50      camunda   mixed-1000       match  sample             484.352          us/op
+EvaluationBenchmark.evaluate:p0.90      camunda   mixed-1000       match  sample             550.912          us/op
+EvaluationBenchmark.evaluate:p0.95      camunda   mixed-1000       match  sample             567.296          us/op
+EvaluationBenchmark.evaluate:p0.99      camunda   mixed-1000       match  sample             628.736          us/op
+EvaluationBenchmark.evaluate:p0.999     camunda   mixed-1000       match  sample            1186.980          us/op
+EvaluationBenchmark.evaluate:p0.9999    camunda   mixed-1000       match  sample            1771.079          us/op
+EvaluationBenchmark.evaluate:p1.00      camunda   mixed-1000       match  sample            1894.400          us/op
+EvaluationBenchmark.evaluate            camunda  unique-1000       match  sample   233204    192.769 ± 0.202  us/op
+EvaluationBenchmark.evaluate:p0.00      camunda  unique-1000       match  sample             177.920          us/op
+EvaluationBenchmark.evaluate:p0.50      camunda  unique-1000       match  sample             188.416          us/op
+EvaluationBenchmark.evaluate:p0.90      camunda  unique-1000       match  sample             204.032          us/op
+EvaluationBenchmark.evaluate:p0.95      camunda  unique-1000       match  sample             208.896          us/op
+EvaluationBenchmark.evaluate:p0.99      camunda  unique-1000       match  sample             225.280          us/op
+EvaluationBenchmark.evaluate:p0.999     camunda  unique-1000       match  sample             358.295          us/op
+EvaluationBenchmark.evaluate:p0.9999    camunda  unique-1000       match  sample            1265.008          us/op
+EvaluationBenchmark.evaluate:p1.00      camunda  unique-1000       match  sample            3883.008          us/op
+EvaluationBenchmark.evaluate             drools         real       match  sample   710386     63.243 ± 0.153  us/op
+EvaluationBenchmark.evaluate:p0.00       drools         real       match  sample              38.720          us/op
+EvaluationBenchmark.evaluate:p0.50       drools         real       match  sample              63.104          us/op
+EvaluationBenchmark.evaluate:p0.90       drools         real       match  sample              74.880          us/op
+EvaluationBenchmark.evaluate:p0.95       drools         real       match  sample              77.696          us/op
+EvaluationBenchmark.evaluate:p0.99       drools         real       match  sample              86.400          us/op
+EvaluationBenchmark.evaluate:p0.999      drools         real       match  sample             111.104          us/op
+EvaluationBenchmark.evaluate:p0.9999     drools         real       match  sample             151.296          us/op
+EvaluationBenchmark.evaluate:p1.00       drools         real       match  sample           11223.040          us/op
+EvaluationBenchmark.evaluate             drools   mixed-1000       match  sample   117775    381.769 ± 0.824  us/op
+EvaluationBenchmark.evaluate:p0.00       drools   mixed-1000       match  sample             250.368          us/op
+EvaluationBenchmark.evaluate:p0.50       drools   mixed-1000       match  sample             385.024          us/op
+EvaluationBenchmark.evaluate:p0.90       drools   mixed-1000       match  sample             418.816          us/op
+EvaluationBenchmark.evaluate:p0.95       drools   mixed-1000       match  sample             427.008          us/op
+EvaluationBenchmark.evaluate:p0.99       drools   mixed-1000       match  sample             448.000          us/op
+EvaluationBenchmark.evaluate:p0.999      drools   mixed-1000       match  sample             748.544          us/op
+EvaluationBenchmark.evaluate:p0.9999     drools   mixed-1000       match  sample            4479.215          us/op
+EvaluationBenchmark.evaluate:p1.00       drools   mixed-1000       match  sample           13795.328          us/op
+EvaluationBenchmark.evaluate             drools  unique-1000       match  sample   293832    152.960 ± 0.343  us/op
+EvaluationBenchmark.evaluate:p0.00       drools  unique-1000       match  sample             138.752          us/op
+EvaluationBenchmark.evaluate:p0.50       drools  unique-1000       match  sample             151.552          us/op
+EvaluationBenchmark.evaluate:p0.90       drools  unique-1000       match  sample             161.280          us/op
+EvaluationBenchmark.evaluate:p0.95       drools  unique-1000       match  sample             165.376          us/op
+EvaluationBenchmark.evaluate:p0.99       drools  unique-1000       match  sample             179.200          us/op
+EvaluationBenchmark.evaluate:p0.999      drools  unique-1000       match  sample             287.232          us/op
+EvaluationBenchmark.evaluate:p0.9999     drools  unique-1000       match  sample            1184.222          us/op
+EvaluationBenchmark.evaluate:p1.00       drools  unique-1000       match  sample           12468.224          us/op
+
+Benchmark result is saved to benchmark-results/tails.json

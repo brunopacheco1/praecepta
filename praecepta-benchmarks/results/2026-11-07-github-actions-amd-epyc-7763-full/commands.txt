@@ -1,0 +1,62 @@
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta real 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda real 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools real 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta synthetic-10 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda synthetic-10 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools synthetic-10 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta synthetic-100 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda synthetic-100 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools synthetic-100 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta synthetic-1000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda synthetic-1000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools synthetic-1000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta synthetic-10000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda synthetic-10000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools synthetic-10000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta mixed-10 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda mixed-10 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools mixed-10 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta mixed-100 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda mixed-100 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools mixed-100 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta mixed-1000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda mixed-1000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools mixed-1000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta mixed-10000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda mixed-10000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools mixed-10000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta synthetic-1000x5 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda synthetic-1000x5 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools synthetic-1000x5 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta synthetic-1000x20 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda synthetic-1000x20 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools synthetic-1000x20 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta mixed-1000x6 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda mixed-1000x6 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools mixed-1000x6 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta mixed-1000x18 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda mixed-1000x18 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools mixed-1000x18 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta mixed-1000-first 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda mixed-1000-first 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools mixed-1000-first 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta mixed-1000-priority 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda mixed-1000-priority 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools mixed-1000-priority 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta mixed-1000-ruleorder 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda mixed-1000-ruleorder 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools mixed-1000-ruleorder 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta unique-1000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport camunda unique-1000 
+java -Xmx6g -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport drools unique-1000 
+java -jar praecepta-benchmarks/target/benchmarks.jar -foe true -rf json -rff benchmark-results/scale.json EvaluationBenchmark -f 3 -wi 5 -w 2s -i 5 -r 3s -prof gc -p engine=praecepta\,camunda\,drools -p table=real\,synthetic-10\,synthetic-100\,synthetic-1000\,synthetic-10000\,mixed-10\,mixed-100\,mixed-1000\,mixed-10000 
+java -jar praecepta-benchmarks/target/benchmarks.jar -foe true -rf json -rff benchmark-results/columns.json EvaluationBenchmark -f 3 -wi 5 -w 2s -i 5 -r 3s -prof gc -p engine=praecepta\,camunda\,drools -p table=synthetic-1000x5\,synthetic-1000x20\,mixed-1000x6\,mixed-1000x18 
+java -jar praecepta-benchmarks/target/benchmarks.jar -foe true -rf json -rff benchmark-results/policies.json EvaluationBenchmark -f 3 -wi 5 -w 2s -i 5 -r 3s -prof gc -p engine=praecepta\,camunda\,drools -p table=mixed-1000-first\,mixed-1000-priority\,mixed-1000-ruleorder\,unique-1000 
+java -jar praecepta-benchmarks/target/benchmarks.jar -foe true -rf json -rff benchmark-results/nomatch.json EvaluationBenchmark -f 3 -wi 5 -w 2s -i 5 -r 3s -prof gc -p engine=praecepta\,camunda\,drools -p table=synthetic-1000\,mixed-100\,mixed-1000\,unique-1000 -p workload=nomatch 
+java -jar praecepta-benchmarks/target/benchmarks.jar -foe true -rf json -rff benchmark-results/tails.json EvaluationBenchmark -f 3 -wi 5 -w 2s -i 5 -r 3s -bm sample -tu us -p engine=praecepta\,camunda\,drools -p table=real\,mixed-1000\,unique-1000 
+java -jar praecepta-benchmarks/target/benchmarks.jar -foe true -rf json -rff benchmark-results/throughput-1.json ThroughputBenchmark -f 3 -wi 5 -w 2s -i 5 -r 3s -t 1 -p engine=praecepta\,camunda\,drools -p table=real\,mixed-1000 
+java -jar praecepta-benchmarks/target/benchmarks.jar -foe true -rf json -rff benchmark-results/throughput-4.json ThroughputBenchmark -f 3 -wi 5 -w 2s -i 5 -r 3s -t 4 -p engine=praecepta\,camunda\,drools -p table=real\,mixed-1000 
+java -jar praecepta-benchmarks/target/benchmarks.jar -foe true -rf json -rff benchmark-results/throughput-8.json ThroughputBenchmark -f 3 -wi 5 -w 2s -i 5 -r 3s -t 8 -p engine=praecepta\,camunda\,drools -p table=real\,mixed-1000 
+java -jar praecepta-benchmarks/target/benchmarks.jar -foe true -rf json -rff benchmark-results/build.json LifecycleBenchmark -p engine=praecepta\,camunda\,drools -p table=real\,mixed-100\,mixed-1000 
+java -cp praecepta-benchmarks/target/benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FirstDecisionFixtures benchmark-results/fixtures real mixed-100 mixed-1000 
+java -jar praecepta-benchmarks/target/benchmarks.jar -foe true -rf json -rff benchmark-results/first-decision.json FirstDecisionBenchmark -f 10 -jvmArgsAppend -Dpraecepta.fixtures=benchmark-results/fixtures -p engine=praecepta\,camunda\,drools -p table=real\,mixed-100\,mixed-1000 

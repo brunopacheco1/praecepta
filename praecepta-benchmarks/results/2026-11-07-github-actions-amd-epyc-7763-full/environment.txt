@@ -1,0 +1,13 @@
+date: 2026-11-07T20:42:07Z
+profile: full (-f 3 -wi 5 -w 2s -i 5 -r 3s)
+commit: a7faa28
+cpu: AMD EPYC 7763 64-Core Processor
+cores: 4
+memory: 15 GiB
+os: Linux 7.0.0-1019-azure
+java: 25.0.5+8-LTS (OpenJDK 64-Bit Server VM)
+praecepta: 0.2.0-SNAPSHOT
+camunda dmn-scala: 1.12.6
+drools (kie-dmn-core): 10.2.0
+jmh: 1.37
+benchmarks.jar sha256: 455a52703c63b5ab06a1acea24c6969b26a3d74774c767c23868efe3c5b66781
