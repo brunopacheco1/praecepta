@@ -255,13 +255,13 @@ final class TckRunner {
             return "input expressions other than a variable name";
         }
         if (REFERENCE.matcher(message).find()) {
-            return "input entries that refer to other inputs";
+            return "cells that compare with another input (#51)";
         }
         if (message.contains("has a time zone")) {
             return "times and date-times with a time zone";
         }
         if (message.contains("output entries must be literals")) {
-            return "output entries that are expressions";
+            return "output entries that are expressions (#53)";
         }
         return "input entries outside the supported FEEL subset";
     }
@@ -270,9 +270,9 @@ final class TckRunner {
         var local = type.contains(":") ? type.substring(type.indexOf(':') + 1) : type;
         return switch (local) {
             case "dayTimeDuration", "yearMonthDuration", "duration", "days and time duration", "years and months duration" ->
-                    "duration columns";
+                    "duration columns (#52)";
             default -> local.length() > 1 && local.startsWith("t") && Character.isUpperCase(local.charAt(1))
-                    ? "columns typed by an item definition" : local + " columns";
+                    ? "columns typed by an item definition (#54)" : local + " columns";
         };
     }
 }

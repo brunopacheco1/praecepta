@@ -51,14 +51,14 @@ Java 21 or later (tested on 21, 25 and 27). Pick the modules you need:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-engine</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
 </dependency>
 
 <!-- optional: load rules from Excel or CSV at runtime (brings Apache POI) -->
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-loader</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
@@ -72,7 +72,8 @@ Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drool
   (e.g. `income > 2 * rent`). Praecepta cells are FEEL *simple unary tests* on one column.
 - **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
   boxed expressions.
-- **Durations, times with a time zone**, and string ranges.
+- **Durations** ([planned](https://github.com/brunopacheco1/praecepta/issues/52)), **times with a
+  time zone**, and string ranges ([planned](https://github.com/brunopacheco1/praecepta/issues/13)).
 - **A process engine, a modeller or a decision service** around the tables.
 
 # Getting Started
@@ -224,7 +225,7 @@ Numbers are `BigDecimal` and dates `LocalDate`. At runtime the generated code ne
 <plugin>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-maven-plugin</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
   <executions><execution><goals><goal>generate</goal></goals></execution></executions>
   <configuration>
     <packageName>com.acme.pricing</packageName>

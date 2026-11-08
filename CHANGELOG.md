@@ -11,6 +11,12 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-08
+
+Boolean, time and date-time columns; the DMN conformance kit (TCK) in every build; fast builds for
+large FIRST and PRIORITY tables; and strict FEEL when reading DMN files. Read *Changed* before
+upgrading: DMN files that relied on unquoted strings or bare dates no longer load.
+
 ### Added
 - **Boolean, time and date-time columns** ([#12](https://github.com/brunopacheco1/praecepta/issues/12)):
   `ColumnType.BOOLEAN`, `TIME` and `DATE_TIME`, with cells `true` / `false`, `time("08:30:00")` and
@@ -21,15 +27,10 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   zone or offset are rejected. The DMN TCK now passes 51 of 86 checks (was 16).
 - **Input names with spaces** ([#47](https://github.com/brunopacheco1/praecepta/issues/47)):
   `DmnReader` accepts FEEL names such as `Credit Score` or `Applicant data.Monthly income`.
-- **Project documents:** governance (roles, decisions, continuity), architecture, a security
-  assurance case and a one-year roadmap. The website shows the roadmap, a C4 system context diagram,
-  and what users can expect on security, and links them all.
-- **A project website** at https://bruno.pacheco.lu/praecepta/, with the API documentation of the
-  latest release, and a Classic Rome identity: a bronze *tabula ansata* logo, Cinzel and EB Garamond.
-- **Fuzz tests** (Jazzer) for the cell parser and the DMN reader: they replay saved inputs in every
-  build, fuzz weekly in CI, and fuzz every pull request that touches the engine (ClusterFuzzLite).
-- **Releases attach their build provenance** (`praecepta-X.Y.Z.intoto.jsonl`) for offline
-  verification.
+- **DMN TCK results** ([#22](https://github.com/brunopacheco1/praecepta/issues/22)): a new
+  `praecepta-tck` module runs the decision-table test cases of the DMN Technology Compatibility Kit
+  in every build, and keeps the published results (`praecepta-tck/RESULTS.md`) current: what passes,
+  and what each unsupported check needs. Every supported check passes.
 - **Broader benchmarks**, in which every engine, Praecepta included, reads the same DMN document:
   - tables from 10 to 10,000 rules, and with 5 to 20 columns;
   - every hit policy, including UNIQUE and PRIORITY;
@@ -38,27 +39,32 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   - throughput with an engine shared by 1, 4 and 8 threads;
   - time to build an engine from DMN, warm and in a fresh JVM;
   - `run-benchmarks.sh` runs them all and records the machine and versions with the results.
-- **DMN TCK results** ([#22](https://github.com/brunopacheco1/praecepta/issues/22)): a new
-  `praecepta-tck` module runs the decision-table test cases of the DMN Technology Compatibility Kit
-  in every build, and keeps the published results (`praecepta-tck/RESULTS.md`) current: what passes,
-  and what each unsupported check needs. Every supported check passes.
+- **Fuzz tests** (Jazzer) for the cell parser and the DMN reader: they replay saved inputs in every
+  build, fuzz weekly in CI, and fuzz every pull request that touches the engine (ClusterFuzzLite).
+- **Releases attach their build provenance** (`praecepta-X.Y.Z.intoto.jsonl`) for offline
+  verification.
+- **Project documents:** governance (roles, decisions, continuity), architecture, a security
+  assurance case and a one-year roadmap. The website shows the roadmap, a C4 system context diagram,
+  and what users can expect on security, and links them all.
+- **A project website** at https://bruno.pacheco.lu/praecepta/, with the API documentation of the
+  latest release, and a Classic Rome identity: a bronze *tabula ansata* logo, Cinzel and EB Garamond.
 - **An enforced code style:** Checkstyle checks every build (`checkstyle.xml`, described in
   CONTRIBUTING.md), and compiler warnings fail the build (`-Xlint:all -Werror`).
 
 ### Changed
-- **`CsvLoader` and `ExcelLoader` are `final`**, and `BaseLoader`'s helpers are `final` too: the
-  loaders read their file in the constructor, which a subclass could otherwise observe half-built.
-  Extend `BaseLoader` to write a loader of your own.
-- **Exceptions declare a `serialVersionUID`.**
 - **`DmnReader` reads cells as strict FEEL:** an unquoted word in a string cell is a reference to
   another variable, so it is rejected as unsupported instead of being read as a string (the DMN TCK
   caught `Complex.aString` being compared as text); and dates and times need their functions
   (`date("2025-01-31")`), since in FEEL a bare `2025-01-31` is a subtraction. Excel, CSV and code
   keep the shorter `PT,ES` and bare ISO forms; `CellParser.parseFeel` is the strict parser.
+- **`ColumnType` has three new constants** (`BOOLEAN`, `TIME`, `DATE_TIME`): an exhaustive `switch`
+  over it needs new cases.
+- **`CsvLoader` and `ExcelLoader` are `final`**, and `BaseLoader`'s helpers are `final` too: the
+  loaders read their file in the constructor, which a subclass could otherwise observe half-built.
+  Extend `BaseLoader` to write a loader of your own.
+- **Exceptions declare a `serialVersionUID`.**
 
 ### Fixed
-- **`date and time("2025-01-31")`** (a date without a time) is reported as an invalid date and time,
-  not as a value with a time zone.
 - **Large FIRST and PRIORITY tables build quickly** ([#29](https://github.com/brunopacheco1/praecepta/issues/29)):
   the unreachable-rule check, still exact, now remembers the regions it has proven covered, tests
   whether one rule covers the rest with a single mask intersection, and looks for an uncovered input
@@ -139,5 +145,6 @@ Code written against the prototype needs the changes listed under *Changed*.
 - **`MissingOutputException`** (no match now yields an empty result), **`InvalidPraeceptaException`**
   and the trie visitor API.
 
-[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/brunopacheco1/praecepta/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/brunopacheco1/praecepta/releases/tag/v0.1.0
