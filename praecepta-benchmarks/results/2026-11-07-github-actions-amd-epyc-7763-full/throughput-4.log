@@ -1,0 +1,498 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 4 threads, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate
+# Parameters: (engine = praecepta, table = real)
+
+# Run progress: 0.00% complete, ETA 00:07:30
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:56:46.383722623Z io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate-jmh-worker-4 ERROR Log4j API could not find a logging provider.
+7229.010 ops/ms
+# Warmup Iteration   2: 7707.001 ops/ms
+# Warmup Iteration   3: 7706.946 ops/ms
+# Warmup Iteration   4: 7889.359 ops/ms
+# Warmup Iteration   5: 7809.967 ops/ms
+Iteration   1: 7815.004 ops/ms
+Iteration   2: 7938.328 ops/ms
+Iteration   3: 7861.644 ops/ms
+Iteration   4: 7899.334 ops/ms
+Iteration   5: 7958.276 ops/ms
+
+# Run progress: 5.56% complete, ETA 00:07:30
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:57:12.841268613Z io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate-jmh-worker-2 ERROR Log4j API could not find a logging provider.
+6406.457 ops/ms
+# Warmup Iteration   2: 7436.717 ops/ms
+# Warmup Iteration   3: 7850.993 ops/ms
+# Warmup Iteration   4: 7449.921 ops/ms
+# Warmup Iteration   5: 7414.069 ops/ms
+Iteration   1: 7718.105 ops/ms
+Iteration   2: 8090.429 ops/ms
+Iteration   3: 8115.148 ops/ms
+Iteration   4: 8107.717 ops/ms
+Iteration   5: 8106.637 ops/ms
+
+# Run progress: 11.11% complete, ETA 00:07:03
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:57:39.296188332Z io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate-jmh-worker-2 ERROR Log4j API could not find a logging provider.
+7403.304 ops/ms
+# Warmup Iteration   2: 8180.155 ops/ms
+# Warmup Iteration   3: 8108.826 ops/ms
+# Warmup Iteration   4: 8162.529 ops/ms
+# Warmup Iteration   5: 8300.586 ops/ms
+Iteration   1: 8278.186 ops/ms
+Iteration   2: 8313.638 ops/ms
+Iteration   3: 8353.354 ops/ms
+Iteration   4: 8312.031 ops/ms
+Iteration   5: 8261.783 ops/ms
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate":
+  8075.308 ±(99.9%) 216.536 ops/ms [Average]
+  (min, avg, max) = (7718.105, 8075.308, 8353.354), stdev = 202.548
+  CI (99.9%): [7858.772, 8291.844] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 4 threads, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate
+# Parameters: (engine = praecepta, table = mixed-1000)
+
+# Run progress: 16.67% complete, ETA 00:06:37
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2652.995 ops/ms
+# Warmup Iteration   2: 2736.619 ops/ms
+# Warmup Iteration   3: 2861.896 ops/ms
+# Warmup Iteration   4: 2837.222 ops/ms
+# Warmup Iteration   5: 2366.924 ops/ms
+Iteration   1: 2858.360 ops/ms
+Iteration   2: 2852.924 ops/ms
+Iteration   3: 2847.427 ops/ms
+Iteration   4: 2845.442 ops/ms
+Iteration   5: 2844.931 ops/ms
+
+# Run progress: 22.22% complete, ETA 00:06:09
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2693.879 ops/ms
+# Warmup Iteration   2: 2742.703 ops/ms
+# Warmup Iteration   3: 2860.767 ops/ms
+# Warmup Iteration   4: 2880.852 ops/ms
+# Warmup Iteration   5: 2883.851 ops/ms
+Iteration   1: 2900.618 ops/ms
+Iteration   2: 2892.211 ops/ms
+Iteration   3: 2868.198 ops/ms
+Iteration   4: 2879.779 ops/ms
+Iteration   5: 2868.698 ops/ms
+
+# Run progress: 27.78% complete, ETA 00:05:43
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2645.509 ops/ms
+# Warmup Iteration   2: 2749.277 ops/ms
+# Warmup Iteration   3: 2855.663 ops/ms
+# Warmup Iteration   4: 2856.631 ops/ms
+# Warmup Iteration   5: 2858.617 ops/ms
+Iteration   1: 2851.325 ops/ms
+Iteration   2: 2763.652 ops/ms
+Iteration   3: 2645.109 ops/ms
+Iteration   4: 2845.825 ops/ms
+Iteration   5: 2837.469 ops/ms
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate":
+  2840.131 ±(99.9%) 66.515 ops/ms [Average]
+  (min, avg, max) = (2645.109, 2840.131, 2900.618), stdev = 62.218
+  CI (99.9%): [2773.616, 2906.646] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 4 threads, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate
+# Parameters: (engine = camunda, table = real)
+
+# Run progress: 33.33% complete, ETA 00:05:16
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:59:24.662098306Z io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate-jmh-worker-4 ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+64.276 ops/ms
+# Warmup Iteration   2: 81.963 ops/ms
+# Warmup Iteration   3: 83.763 ops/ms
+# Warmup Iteration   4: 83.916 ops/ms
+# Warmup Iteration   5: 83.859 ops/ms
+Iteration   1: 83.446 ops/ms
+Iteration   2: 83.772 ops/ms
+Iteration   3: 83.998 ops/ms
+Iteration   4: 83.702 ops/ms
+Iteration   5: 83.590 ops/ms
+
+# Run progress: 38.89% complete, ETA 00:04:52
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T22:59:52.611960809Z io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate-jmh-worker-1 ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+69.752 ops/ms
+# Warmup Iteration   2: 98.140 ops/ms
+# Warmup Iteration   3: 99.372 ops/ms
+# Warmup Iteration   4: 99.702 ops/ms
+# Warmup Iteration   5: 99.349 ops/ms
+Iteration   1: 100.024 ops/ms
+Iteration   2: 99.131 ops/ms
+Iteration   3: 99.789 ops/ms
+Iteration   4: 88.077 ops/ms
+Iteration   5: 99.682 ops/ms
+
+# Run progress: 44.44% complete, ETA 00:04:27
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T23:00:20.606652215Z io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate-jmh-worker-2 ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+70.791 ops/ms
+# Warmup Iteration   2: 92.501 ops/ms
+# Warmup Iteration   3: 98.035 ops/ms
+# Warmup Iteration   4: 99.256 ops/ms
+# Warmup Iteration   5: 99.557 ops/ms
+Iteration   1: 99.650 ops/ms
+Iteration   2: 99.224 ops/ms
+Iteration   3: 99.153 ops/ms
+Iteration   4: 98.965 ops/ms
+Iteration   5: 99.429 ops/ms
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate":
+  93.442 ±(99.9%) 8.227 ops/ms [Average]
+  (min, avg, max) = (83.446, 93.442, 100.024), stdev = 7.696
+  CI (99.9%): [85.215, 101.669] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 4 threads, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate
+# Parameters: (engine = camunda, table = mixed-1000)
+
+# Run progress: 50.00% complete, ETA 00:04:02
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+3.794 ops/ms
+# Warmup Iteration   2: 4.267 ops/ms
+# Warmup Iteration   3: 4.357 ops/ms
+# Warmup Iteration   4: 4.354 ops/ms
+# Warmup Iteration   5: 4.353 ops/ms
+Iteration   1: 4.358 ops/ms
+Iteration   2: 4.349 ops/ms
+Iteration   3: 4.368 ops/ms
+Iteration   4: 3.881 ops/ms
+Iteration   5: 4.339 ops/ms
+
+# Run progress: 55.56% complete, ETA 00:03:39
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+4.160 ops/ms
+# Warmup Iteration   2: 4.734 ops/ms
+# Warmup Iteration   3: 4.791 ops/ms
+# Warmup Iteration   4: 4.810 ops/ms
+# Warmup Iteration   5: 4.815 ops/ms
+Iteration   1: 4.783 ops/ms
+Iteration   2: 4.808 ops/ms
+Iteration   3: 4.796 ops/ms
+Iteration   4: 4.790 ops/ms
+Iteration   5: 4.789 ops/ms
+
+# Run progress: 61.11% complete, ETA 00:03:14
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+3.908 ops/ms
+# Warmup Iteration   2: 4.352 ops/ms
+# Warmup Iteration   3: 4.380 ops/ms
+# Warmup Iteration   4: 4.390 ops/ms
+# Warmup Iteration   5: 4.361 ops/ms
+Iteration   1: 4.387 ops/ms
+Iteration   2: 4.387 ops/ms
+Iteration   3: 3.910 ops/ms
+Iteration   4: 4.387 ops/ms
+Iteration   5: 4.380 ops/ms
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate":
+  4.448 ±(99.9%) 0.321 ops/ms [Average]
+  (min, avg, max) = (3.881, 4.448, 4.808), stdev = 0.300
+  CI (99.9%): [4.127, 4.768] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 4 threads, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate
+# Parameters: (engine = drools, table = real)
+
+# Run progress: 66.67% complete, ETA 00:02:48
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T23:02:23.804066353Z io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate-jmh-worker-3 ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+28.202 ops/ms
+# Warmup Iteration   2: 34.903 ops/ms
+# Warmup Iteration   3: 35.575 ops/ms
+# Warmup Iteration   4: 35.846 ops/ms
+# Warmup Iteration   5: 36.117 ops/ms
+Iteration   1: 36.077 ops/ms
+Iteration   2: 36.091 ops/ms
+Iteration   3: 36.111 ops/ms
+Iteration   4: 36.131 ops/ms
+Iteration   5: 35.978 ops/ms
+
+# Run progress: 72.22% complete, ETA 00:02:20
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T23:02:51.754999694Z io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate-jmh-worker-3 ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+28.492 ops/ms
+# Warmup Iteration   2: 33.965 ops/ms
+# Warmup Iteration   3: 33.664 ops/ms
+# Warmup Iteration   4: 34.307 ops/ms
+# Warmup Iteration   5: 34.550 ops/ms
+Iteration   1: 34.513 ops/ms
+Iteration   2: 34.366 ops/ms
+Iteration   3: 34.459 ops/ms
+Iteration   4: 30.562 ops/ms
+Iteration   5: 34.370 ops/ms
+
+# Run progress: 77.78% complete, ETA 00:01:52
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: 2026-11-07T23:03:19.841900144Z io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate-jmh-worker-3 ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+30.029 ops/ms
+# Warmup Iteration   2: 36.367 ops/ms
+# Warmup Iteration   3: 36.378 ops/ms
+# Warmup Iteration   4: 36.901 ops/ms
+# Warmup Iteration   5: 36.988 ops/ms
+Iteration   1: 36.959 ops/ms
+Iteration   2: 36.940 ops/ms
+Iteration   3: 36.985 ops/ms
+Iteration   4: 36.959 ops/ms
+Iteration   5: 37.006 ops/ms
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate":
+  35.567 ±(99.9%) 1.839 ops/ms [Average]
+  (min, avg, max) = (30.562, 35.567, 37.006), stdev = 1.720
+  CI (99.9%): [33.728, 37.406] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 25.0.5, OpenJDK 64-Bit Server VM, 25.0.5+8-LTS
+# VM invoker: /usr/lib/jvm/temurin-25-jdk-amd64/bin/java
+# VM options: -Xms2g -Xmx6g
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 2 s each
+# Measurement: 5 iterations, 3 s each
+# Timeout: 10 min per iteration
+# Threads: 4 threads, will synchronize iterations
+# Benchmark mode: Throughput, ops/time
+# Benchmark: io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate
+# Parameters: (engine = drools, table = mixed-1000)
+
+# Run progress: 83.33% complete, ETA 00:01:24
+# Fork: 1 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+5.536 ops/ms
+# Warmup Iteration   2: 5.792 ops/ms
+# Warmup Iteration   3: 5.775 ops/ms
+# Warmup Iteration   4: 5.818 ops/ms
+# Warmup Iteration   5: 5.835 ops/ms
+Iteration   1: 5.856 ops/ms
+Iteration   2: 5.855 ops/ms
+Iteration   3: 5.853 ops/ms
+Iteration   4: 5.518 ops/ms
+Iteration   5: 5.576 ops/ms
+
+# Run progress: 88.89% complete, ETA 00:00:56
+# Fork: 2 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+5.026 ops/ms
+# Warmup Iteration   2: 5.359 ops/ms
+# Warmup Iteration   3: 5.365 ops/ms
+# Warmup Iteration   4: 5.363 ops/ms
+# Warmup Iteration   5: 5.461 ops/ms
+Iteration   1: 5.449 ops/ms
+Iteration   2: 5.440 ops/ms
+Iteration   3: 5.457 ops/ms
+Iteration   4: 5.448 ops/ms
+Iteration   5: 5.443 ops/ms
+
+# Run progress: 94.44% complete, ETA 00:00:28
+# Fork: 3 of 3
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.openjdk.jmh.util.Utils (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class org.openjdk.jmh.util.Utils
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+# Warmup Iteration   1: SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+5.157 ops/ms
+# Warmup Iteration   2: 5.467 ops/ms
+# Warmup Iteration   3: 5.489 ops/ms
+# Warmup Iteration   4: 5.549 ops/ms
+# Warmup Iteration   5: 5.577 ops/ms
+Iteration   1: 5.575 ops/ms
+Iteration   2: 5.550 ops/ms
+Iteration   3: 5.450 ops/ms
+Iteration   4: 5.059 ops/ms
+Iteration   5: 5.528 ops/ms
+
+
+Result "io.github.brunopacheco1.praecepta.benchmarks.ThroughputBenchmark.evaluate":
+  5.537 ±(99.9%) 0.218 ops/ms [Average]
+  (min, avg, max) = (5.059, 5.537, 5.856), stdev = 0.204
+  CI (99.9%): [5.319, 5.755] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:08:34
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                      (engine)     (table)   Mode  Cnt     Score     Error   Units
+ThroughputBenchmark.evaluate  praecepta        real  thrpt   15  8075.308 ± 216.536  ops/ms
+ThroughputBenchmark.evaluate  praecepta  mixed-1000  thrpt   15  2840.131 ±  66.515  ops/ms
+ThroughputBenchmark.evaluate    camunda        real  thrpt   15    93.442 ±   8.227  ops/ms
+ThroughputBenchmark.evaluate    camunda  mixed-1000  thrpt   15     4.448 ±   0.321  ops/ms
+ThroughputBenchmark.evaluate     drools        real  thrpt   15    35.567 ±   1.839  ops/ms
+ThroughputBenchmark.evaluate     drools  mixed-1000  thrpt   15     5.537 ±   0.218  ops/ms
+
+Benchmark result is saved to benchmark-results/throughput-4.json

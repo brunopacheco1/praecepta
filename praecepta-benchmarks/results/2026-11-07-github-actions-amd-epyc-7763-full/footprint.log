@@ -1,0 +1,865 @@
+== praecepta real
+engine     table            retained heap      build
+2026-11-07T20:42:07.985871366Z main ERROR Log4j API could not find a logging provider.
+praecepta  real                    0.2 MB     174 ms
+== camunda real
+engine     table            retained heap      build
+2026-11-07T20:42:09.822967003Z main ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    real                    5.0 MB    1080 ms
+== drools real
+engine     table            retained heap      build
+2026-11-07T20:42:12.520575406Z main ERROR Log4j API could not find a logging provider.
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     real                    7.6 MB    1074 ms
+== praecepta synthetic-10
+engine     table            retained heap      build
+praecepta  synthetic-10            0.4 MB     123 ms
+== camunda synthetic-10
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    synthetic-10            3.6 MB     953 ms
+== drools synthetic-10
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     synthetic-10            7.1 MB     760 ms
+== praecepta synthetic-100
+engine     table            retained heap      build
+praecepta  synthetic-100           0.4 MB     198 ms
+== camunda synthetic-100
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    synthetic-100           4.9 MB    1116 ms
+== drools synthetic-100
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     synthetic-100           7.8 MB     999 ms
+== praecepta synthetic-1000
+engine     table            retained heap      build
+praecepta  synthetic-1000          0.5 MB     503 ms
+== camunda synthetic-1000
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    synthetic-1000         17.5 MB    1857 ms
+== drools synthetic-1000
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     synthetic-1000         15.1 MB    1805 ms
+== praecepta synthetic-10000
+engine     table            retained heap      build
+praecepta  synthetic-10000         1.5 MB    1374 ms
+== camunda synthetic-10000
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    synthetic-10000       146.0 MB    4213 ms
+== drools synthetic-10000
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     synthetic-10000        96.5 MB    4094 ms
+== praecepta mixed-10
+engine     table            retained heap      build
+praecepta  mixed-10                0.5 MB     152 ms
+== camunda mixed-10
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    mixed-10                3.7 MB     976 ms
+== drools mixed-10
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     mixed-10                7.3 MB     871 ms
+== praecepta mixed-100
+engine     table            retained heap      build
+praecepta  mixed-100               0.5 MB     271 ms
+== camunda mixed-100
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    mixed-100               5.0 MB    1266 ms
+== drools mixed-100
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     mixed-100               8.3 MB    1292 ms
+== praecepta mixed-1000
+engine     table            retained heap      build
+praecepta  mixed-1000              1.0 MB     804 ms
+== camunda mixed-1000
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    mixed-1000             17.6 MB    2127 ms
+== drools mixed-1000
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     mixed-1000             17.6 MB    3094 ms
+== praecepta mixed-10000
+engine     table            retained heap      build
+praecepta  mixed-10000             5.0 MB    2445 ms
+== camunda mixed-10000
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    mixed-10000           145.0 MB    5070 ms
+== drools mixed-10000
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     mixed-10000           116.4 MB   10651 ms
+== praecepta synthetic-1000x5
+engine     table            retained heap      build
+praecepta  synthetic-1000x5         0.5 MB     392 ms
+== camunda synthetic-1000x5
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    synthetic-1000x5        11.6 MB    1650 ms
+== drools synthetic-1000x5
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     synthetic-1000x5        12.1 MB    1514 ms
+== praecepta synthetic-1000x20
+engine     table            retained heap      build
+praecepta  synthetic-1000x20         0.5 MB     723 ms
+== camunda synthetic-1000x20
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    synthetic-1000x20        29.2 MB    1939 ms
+== drools synthetic-1000x20
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     synthetic-1000x20        21.9 MB    2880 ms
+== praecepta mixed-1000x6
+engine     table            retained heap      build
+praecepta  mixed-1000x6            0.9 MB     737 ms
+== camunda mixed-1000x6
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    mixed-1000x6           13.7 MB    1976 ms
+== drools mixed-1000x6
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     mixed-1000x6           14.7 MB    2335 ms
+== praecepta mixed-1000x18
+engine     table            retained heap      build
+praecepta  mixed-1000x18           1.5 MB    1103 ms
+== camunda mixed-1000x18
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    mixed-1000x18          29.1 MB    2540 ms
+== drools mixed-1000x18
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     mixed-1000x18          26.2 MB    3878 ms
+== praecepta mixed-1000-first
+engine     table            retained heap      build
+Nov 07, 2026 8:43:57 PM io.github.brunopacheco1.praecepta.engine.PraeceptaEngine <init>
+WARNING: Decision table has 294 validation issue(s):
+WARNING rule 106 can never be selected
+WARNING rule 141 can never be selected
+WARNING rule 203 can never be selected
+WARNING rule 244 can never be selected
+WARNING rule 289 can never be selected
+WARNING rule 311 can never be selected
+WARNING rule 315 can never be selected
+WARNING rule 316 can never be selected
+WARNING rule 318 can never be selected
+WARNING rule 326 can never be selected
+WARNING rule 327 can never be selected
+WARNING rule 346 can never be selected
+WARNING rule 347 can never be selected
+WARNING rule 352 can never be selected
+WARNING rule 360 can never be selected
+WARNING rule 373 can never be selected
+WARNING rule 376 can never be selected
+WARNING rule 377 can never be selected
+WARNING rule 383 can never be selected
+WARNING rule 385 can never be selected
+WARNING rule 386 can never be selected
+WARNING rule 391 can never be selected
+WARNING rule 398 can never be selected
+WARNING rule 400 can never be selected
+WARNING rule 402 can never be selected
+WARNING rule 407 can never be selected
+WARNING rule 436 can never be selected
+WARNING rule 438 can never be selected
+WARNING rule 439 can never be selected
+WARNING rule 443 can never be selected
+WARNING rule 462 can never be selected
+WARNING rule 463 can never be selected
+WARNING rule 472 can never be selected
+WARNING rule 475 can never be selected
+WARNING rule 481 can never be selected
+WARNING rule 505 can never be selected
+WARNING rule 509 can never be selected
+WARNING rule 514 can never be selected
+WARNING rule 532 can never be selected
+WARNING rule 554 can never be selected
+WARNING rule 559 can never be selected
+WARNING rule 561 can never be selected
+WARNING rule 565 can never be selected
+WARNING rule 566 can never be selected
+WARNING rule 574 can never be selected
+WARNING rule 578 can never be selected
+WARNING rule 579 can never be selected
+WARNING rule 582 can never be selected
+WARNING rule 584 can never be selected
+WARNING rule 589 can never be selected
+WARNING rule 596 can never be selected
+WARNING rule 597 can never be selected
+WARNING rule 598 can never be selected
+WARNING rule 602 can never be selected
+WARNING rule 607 can never be selected
+WARNING rule 608 can never be selected
+WARNING rule 610 can never be selected
+WARNING rule 611 can never be selected
+WARNING rule 612 can never be selected
+WARNING rule 615 can never be selected
+WARNING rule 616 can never be selected
+WARNING rule 618 can never be selected
+WARNING rule 620 can never be selected
+WARNING rule 622 can never be selected
+WARNING rule 624 can never be selected
+WARNING rule 625 can never be selected
+WARNING rule 626 can never be selected
+WARNING rule 627 can never be selected
+WARNING rule 629 can never be selected
+WARNING rule 630 can never be selected
+WARNING rule 632 can never be selected
+WARNING rule 633 can never be selected
+WARNING rule 634 can never be selected
+WARNING rule 636 can never be selected
+WARNING rule 637 can never be selected
+WARNING rule 638 can never be selected
+WARNING rule 639 can never be selected
+WARNING rule 640 can never be selected
+WARNING rule 641 can never be selected
+WARNING rule 642 can never be selected
+WARNING rule 643 can never be selected
+WARNING rule 644 can never be selected
+WARNING rule 645 can never be selected
+WARNING rule 649 can never be selected
+WARNING rule 650 can never be selected
+WARNING rule 652 can never be selected
+WARNING rule 654 can never be selected
+WARNING rule 656 can never be selected
+WARNING rule 657 can never be selected
+WARNING rule 658 can never be selected
+WARNING rule 660 can never be selected
+WARNING rule 662 can never be selected
+WARNING rule 663 can never be selected
+WARNING rule 666 can never be selected
+WARNING rule 668 can never be selected
+WARNING rule 670 can never be selected
+WARNING rule 672 can never be selected
+WARNING rule 674 can never be selected
+WARNING rule 675 can never be selected
+WARNING rule 676 can never be selected
+WARNING rule 678 can never be selected
+WARNING rule 681 can never be selected
+WARNING rule 683 can never be selected
+WARNING rule 685 can never be selected
+WARNING rule 688 can never be selected
+WARNING rule 690 can never be selected
+WARNING rule 691 can never be selected
+WARNING rule 695 can never be selected
+WARNING rule 696 can never be selected
+WARNING rule 698 can never be selected
+WARNING rule 702 can never be selected
+WARNING rule 703 can never be selected
+WARNING rule 704 can never be selected
+WARNING rule 705 can never be selected
+WARNING rule 706 can never be selected
+WARNING rule 707 can never be selected
+WARNING rule 709 can never be selected
+WARNING rule 710 can never be selected
+WARNING rule 712 can never be selected
+WARNING rule 713 can never be selected
+WARNING rule 714 can never be selected
+WARNING rule 715 can never be selected
+WARNING rule 717 can never be selected
+WARNING rule 718 can never be selected
+WARNING rule 720 can never be selected
+WARNING rule 721 can never be selected
+WARNING rule 722 can never be selected
+WARNING rule 723 can never be selected
+WARNING rule 727 can never be selected
+WARNING rule 728 can never be selected
+WARNING rule 729 can never be selected
+WARNING rule 730 can never be selected
+WARNING rule 731 can never be selected
+WARNING rule 735 can never be selected
+WARNING rule 737 can never be selected
+WARNING rule 739 can never be selected
+WARNING rule 740 can never be selected
+WARNING rule 741 can never be selected
+WARNING rule 742 can never be selected
+WARNING rule 743 can never be selected
+WARNING rule 745 can never be selected
+WARNING rule 746 can never be selected
+WARNING rule 749 can never be selected
+WARNING rule 750 can never be selected
+WARNING rule 752 can never be selected
+WARNING rule 754 can never be selected
+WARNING rule 755 can never be selected
+WARNING rule 758 can never be selected
+WARNING rule 759 can never be selected
+WARNING rule 760 can never be selected
+WARNING rule 762 can never be selected
+WARNING rule 763 can never be selected
+WARNING rule 767 can never be selected
+WARNING rule 768 can never be selected
+WARNING rule 769 can never be selected
+WARNING rule 770 can never be selected
+WARNING rule 771 can never be selected
+WARNING rule 772 can never be selected
+WARNING rule 773 can never be selected
+WARNING rule 776 can never be selected
+WARNING rule 778 can never be selected
+WARNING rule 784 can never be selected
+WARNING rule 787 can never be selected
+WARNING rule 789 can never be selected
+WARNING rule 790 can never be selected
+WARNING rule 791 can never be selected
+WARNING rule 796 can never be selected
+WARNING rule 797 can never be selected
+WARNING rule 798 can never be selected
+WARNING rule 799 can never be selected
+WARNING rule 801 can never be selected
+WARNING rule 802 can never be selected
+WARNING rule 803 can never be selected
+WARNING rule 804 can never be selected
+WARNING rule 805 can never be selected
+WARNING rule 806 can never be selected
+WARNING rule 807 can never be selected
+WARNING rule 808 can never be selected
+WARNING rule 809 can never be selected
+WARNING rule 810 can never be selected
+WARNING rule 811 can never be selected
+WARNING rule 819 can never be selected
+WARNING rule 825 can never be selected
+WARNING rule 828 can never be selected
+WARNING rule 830 can never be selected
+WARNING rule 833 can never be selected
+WARNING rule 834 can never be selected
+WARNING rule 835 can never be selected
+WARNING rule 836 can never be selected
+WARNING rule 839 can never be selected
+WARNING rule 848 can never be selected
+WARNING rule 849 can never be selected
+WARNING rule 851 can never be selected
+WARNING rule 852 can never be selected
+WARNING rule 855 can never be selected
+WARNING rule 858 can never be selected
+WARNING rule 859 can never be selected
+WARNING rule 860 can never be selected
+WARNING rule 863 can never be selected
+WARNING rule 864 can never be selected
+WARNING rule 866 can never be selected
+WARNING rule 867 can never be selected
+WARNING rule 869 can never be selected
+WARNING rule 872 can never be selected
+WARNING rule 873 can never be selected
+WARNING rule 874 can never be selected
+WARNING rule 876 can never be selected
+WARNING rule 878 can never be selected
+WARNING rule 879 can never be selected
+WARNING rule 880 can never be selected
+WARNING rule 881 can never be selected
+WARNING rule 883 can never be selected
+WARNING rule 884 can never be selected
+WARNING rule 885 can never be selected
+WARNING rule 886 can never be selected
+WARNING rule 887 can never be selected
+WARNING rule 888 can never be selected
+WARNING rule 889 can never be selected
+WARNING rule 892 can never be selected
+WARNING rule 893 can never be selected
+WARNING rule 894 can never be selected
+WARNING rule 895 can never be selected
+WARNING rule 897 can never be selected
+WARNING rule 899 can never be selected
+WARNING rule 900 can never be selected
+WARNING rule 901 can never be selected
+WARNING rule 903 can never be selected
+WARNING rule 905 can never be selected
+WARNING rule 906 can never be selected
+WARNING rule 907 can never be selected
+WARNING rule 908 can never be selected
+WARNING rule 910 can never be selected
+WARNING rule 912 can never be selected
+WARNING rule 913 can never be selected
+WARNING rule 914 can never be selected
+WARNING rule 915 can never be selected
+WARNING rule 916 can never be selected
+WARNING rule 917 can never be selected
+WARNING rule 918 can never be selected
+WARNING rule 919 can never be selected
+WARNING rule 920 can never be selected
+WARNING rule 923 can never be selected
+WARNING rule 925 can never be selected
+WARNING rule 926 can never be selected
+WARNING rule 927 can never be selected
+WARNING rule 928 can never be selected
+WARNING rule 930 can never be selected
+WARNING rule 931 can never be selected
+WARNING rule 932 can never be selected
+WARNING rule 936 can never be selected
+WARNING rule 939 can never be selected
+WARNING rule 940 can never be selected
+WARNING rule 942 can never be selected
+WARNING rule 943 can never be selected
+WARNING rule 944 can never be selected
+WARNING rule 945 can never be selected
+WARNING rule 947 can never be selected
+WARNING rule 950 can never be selected
+WARNING rule 951 can never be selected
+WARNING rule 952 can never be selected
+WARNING rule 954 can never be selected
+WARNING rule 955 can never be selected
+WARNING rule 957 can never be selected
+WARNING rule 958 can never be selected
+WARNING rule 959 can never be selected
+WARNING rule 962 can never be selected
+WARNING rule 963 can never be selected
+WARNING rule 964 can never be selected
+WARNING rule 966 can never be selected
+WARNING rule 967 can never be selected
+WARNING rule 968 can never be selected
+WARNING rule 970 can never be selected
+WARNING rule 971 can never be selected
+WARNING rule 972 can never be selected
+WARNING rule 973 can never be selected
+WARNING rule 974 can never be selected
+WARNING rule 975 can never be selected
+WARNING rule 977 can never be selected
+WARNING rule 978 can never be selected
+WARNING rule 980 can never be selected
+WARNING rule 981 can never be selected
+WARNING rule 984 can never be selected
+WARNING rule 986 can never be selected
+WARNING rule 987 can never be selected
+WARNING rule 988 can never be selected
+WARNING rule 989 can never be selected
+WARNING rule 990 can never be selected
+WARNING rule 991 can never be selected
+WARNING rule 992 can never be selected
+WARNING rule 993 can never be selected
+WARNING rule 994 can never be selected
+WARNING rule 995 can never be selected
+WARNING rule 996 can never be selected
+WARNING rule 999 can never be selected
+praecepta  mixed-1000-first         1.7 MB    4144 ms
+== camunda mixed-1000-first
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    mixed-1000-first        17.6 MB    2217 ms
+== drools mixed-1000-first
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     mixed-1000-first        17.5 MB    2767 ms
+== praecepta mixed-1000-priority
+engine     table            retained heap      build
+Nov 07, 2026 8:45:24 PM io.github.brunopacheco1.praecepta.engine.PraeceptaEngine <init>
+WARNING: Decision table has 241 validation issue(s):
+WARNING rule 3 can never be selected
+WARNING rule 5 can never be selected
+WARNING rule 12 can never be selected
+WARNING rule 18 can never be selected
+WARNING rule 19 can never be selected
+WARNING rule 22 can never be selected
+WARNING rule 27 can never be selected
+WARNING rule 30 can never be selected
+WARNING rule 32 can never be selected
+WARNING rule 39 can never be selected
+WARNING rule 42 can never be selected
+WARNING rule 43 can never be selected
+WARNING rule 46 can never be selected
+WARNING rule 47 can never be selected
+WARNING rule 48 can never be selected
+WARNING rule 59 can never be selected
+WARNING rule 62 can never be selected
+WARNING rule 68 can never be selected
+WARNING rule 74 can never be selected
+WARNING rule 77 can never be selected
+WARNING rule 88 can never be selected
+WARNING rule 93 can never be selected
+WARNING rule 96 can never be selected
+WARNING rule 107 can never be selected
+WARNING rule 109 can never be selected
+WARNING rule 111 can never be selected
+WARNING rule 113 can never be selected
+WARNING rule 127 can never be selected
+WARNING rule 132 can never be selected
+WARNING rule 134 can never be selected
+WARNING rule 139 can never be selected
+WARNING rule 141 can never be selected
+WARNING rule 153 can never be selected
+WARNING rule 158 can never be selected
+WARNING rule 161 can never be selected
+WARNING rule 164 can never be selected
+WARNING rule 167 can never be selected
+WARNING rule 197 can never be selected
+WARNING rule 201 can never be selected
+WARNING rule 203 can never be selected
+WARNING rule 206 can never be selected
+WARNING rule 207 can never be selected
+WARNING rule 208 can never be selected
+WARNING rule 219 can never be selected
+WARNING rule 226 can never be selected
+WARNING rule 236 can never be selected
+WARNING rule 243 can never be selected
+WARNING rule 244 can never be selected
+WARNING rule 245 can never be selected
+WARNING rule 249 can never be selected
+WARNING rule 251 can never be selected
+WARNING rule 253 can never be selected
+WARNING rule 254 can never be selected
+WARNING rule 256 can never be selected
+WARNING rule 259 can never be selected
+WARNING rule 261 can never be selected
+WARNING rule 263 can never be selected
+WARNING rule 273 can never be selected
+WARNING rule 275 can never be selected
+WARNING rule 278 can never be selected
+WARNING rule 279 can never be selected
+WARNING rule 280 can never be selected
+WARNING rule 281 can never be selected
+WARNING rule 286 can never be selected
+WARNING rule 287 can never be selected
+WARNING rule 289 can never be selected
+WARNING rule 290 can never be selected
+WARNING rule 297 can never be selected
+WARNING rule 303 can never be selected
+WARNING rule 310 can never be selected
+WARNING rule 315 can never be selected
+WARNING rule 319 can never be selected
+WARNING rule 322 can never be selected
+WARNING rule 329 can never be selected
+WARNING rule 330 can never be selected
+WARNING rule 331 can never be selected
+WARNING rule 340 can never be selected
+WARNING rule 353 can never be selected
+WARNING rule 358 can never be selected
+WARNING rule 360 can never be selected
+WARNING rule 361 can never be selected
+WARNING rule 362 can never be selected
+WARNING rule 369 can never be selected
+WARNING rule 377 can never be selected
+WARNING rule 380 can never be selected
+WARNING rule 384 can never be selected
+WARNING rule 385 can never be selected
+WARNING rule 391 can never be selected
+WARNING rule 395 can never be selected
+WARNING rule 398 can never be selected
+WARNING rule 402 can never be selected
+WARNING rule 405 can never be selected
+WARNING rule 414 can never be selected
+WARNING rule 420 can never be selected
+WARNING rule 421 can never be selected
+WARNING rule 430 can never be selected
+WARNING rule 436 can never be selected
+WARNING rule 438 can never be selected
+WARNING rule 456 can never be selected
+WARNING rule 462 can never be selected
+WARNING rule 467 can never be selected
+WARNING rule 470 can never be selected
+WARNING rule 473 can never be selected
+WARNING rule 479 can never be selected
+WARNING rule 484 can never be selected
+WARNING rule 487 can never be selected
+WARNING rule 489 can never be selected
+WARNING rule 494 can never be selected
+WARNING rule 496 can never be selected
+WARNING rule 498 can never be selected
+WARNING rule 500 can never be selected
+WARNING rule 505 can never be selected
+WARNING rule 509 can never be selected
+WARNING rule 514 can never be selected
+WARNING rule 515 can never be selected
+WARNING rule 532 can never be selected
+WARNING rule 540 can never be selected
+WARNING rule 541 can never be selected
+WARNING rule 542 can never be selected
+WARNING rule 543 can never be selected
+WARNING rule 545 can never be selected
+WARNING rule 548 can never be selected
+WARNING rule 551 can never be selected
+WARNING rule 554 can never be selected
+WARNING rule 561 can never be selected
+WARNING rule 562 can never be selected
+WARNING rule 566 can never be selected
+WARNING rule 579 can never be selected
+WARNING rule 580 can never be selected
+WARNING rule 581 can never be selected
+WARNING rule 582 can never be selected
+WARNING rule 597 can never be selected
+WARNING rule 598 can never be selected
+WARNING rule 601 can never be selected
+WARNING rule 602 can never be selected
+WARNING rule 610 can never be selected
+WARNING rule 618 can never be selected
+WARNING rule 624 can never be selected
+WARNING rule 626 can never be selected
+WARNING rule 627 can never be selected
+WARNING rule 630 can never be selected
+WARNING rule 639 can never be selected
+WARNING rule 642 can never be selected
+WARNING rule 643 can never be selected
+WARNING rule 645 can never be selected
+WARNING rule 660 can never be selected
+WARNING rule 663 can never be selected
+WARNING rule 668 can never be selected
+WARNING rule 676 can never be selected
+WARNING rule 683 can never be selected
+WARNING rule 695 can never be selected
+WARNING rule 698 can never be selected
+WARNING rule 702 can never be selected
+WARNING rule 704 can never be selected
+WARNING rule 705 can never be selected
+WARNING rule 709 can never be selected
+WARNING rule 712 can never be selected
+WARNING rule 714 can never be selected
+WARNING rule 715 can never be selected
+WARNING rule 716 can never be selected
+WARNING rule 723 can never be selected
+WARNING rule 727 can never be selected
+WARNING rule 730 can never be selected
+WARNING rule 740 can never be selected
+WARNING rule 742 can never be selected
+WARNING rule 746 can never be selected
+WARNING rule 749 can never be selected
+WARNING rule 750 can never be selected
+WARNING rule 752 can never be selected
+WARNING rule 754 can never be selected
+WARNING rule 755 can never be selected
+WARNING rule 759 can never be selected
+WARNING rule 760 can never be selected
+WARNING rule 771 can never be selected
+WARNING rule 772 can never be selected
+WARNING rule 796 can never be selected
+WARNING rule 798 can never be selected
+WARNING rule 801 can never be selected
+WARNING rule 804 can never be selected
+WARNING rule 806 can never be selected
+WARNING rule 807 can never be selected
+WARNING rule 809 can never be selected
+WARNING rule 812 can never be selected
+WARNING rule 815 can never be selected
+WARNING rule 827 can never be selected
+WARNING rule 833 can never be selected
+WARNING rule 835 can never be selected
+WARNING rule 836 can never be selected
+WARNING rule 854 can never be selected
+WARNING rule 858 can never be selected
+WARNING rule 860 can never be selected
+WARNING rule 867 can never be selected
+WARNING rule 872 can never be selected
+WARNING rule 874 can never be selected
+WARNING rule 876 can never be selected
+WARNING rule 880 can never be selected
+WARNING rule 883 can never be selected
+WARNING rule 884 can never be selected
+WARNING rule 886 can never be selected
+WARNING rule 888 can never be selected
+WARNING rule 892 can never be selected
+WARNING rule 894 can never be selected
+WARNING rule 895 can never be selected
+WARNING rule 907 can never be selected
+WARNING rule 916 can never be selected
+WARNING rule 919 can never be selected
+WARNING rule 920 can never be selected
+WARNING rule 928 can never be selected
+WARNING rule 930 can never be selected
+WARNING rule 932 can never be selected
+WARNING rule 939 can never be selected
+WARNING rule 942 can never be selected
+WARNING rule 943 can never be selected
+WARNING rule 944 can never be selected
+WARNING rule 945 can never be selected
+WARNING rule 947 can never be selected
+WARNING rule 955 can never be selected
+WARNING rule 957 can never be selected
+WARNING rule 959 can never be selected
+WARNING rule 962 can never be selected
+WARNING rule 963 can never be selected
+WARNING rule 964 can never be selected
+WARNING rule 966 can never be selected
+WARNING rule 967 can never be selected
+WARNING rule 972 can never be selected
+WARNING rule 974 can never be selected
+WARNING rule 975 can never be selected
+WARNING rule 977 can never be selected
+WARNING rule 978 can never be selected
+WARNING rule 981 can never be selected
+WARNING rule 984 can never be selected
+WARNING rule 986 can never be selected
+WARNING rule 988 can never be selected
+WARNING rule 989 can never be selected
+WARNING rule 990 can never be selected
+WARNING rule 991 can never be selected
+WARNING rule 992 can never be selected
+WARNING rule 993 can never be selected
+WARNING rule 994 can never be selected
+WARNING rule 996 can never be selected
+WARNING rule 999 can never be selected
+praecepta  mixed-1000-priority         1.7 MB   79759 ms
+== camunda mixed-1000-priority
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    mixed-1000-priority        18.7 MB    2255 ms
+== drools mixed-1000-priority
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     mixed-1000-priority        18.3 MB    3066 ms
+== praecepta mixed-1000-ruleorder
+engine     table            retained heap      build
+praecepta  mixed-1000-ruleorder         1.0 MB     794 ms
+== camunda mixed-1000-ruleorder
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    mixed-1000-ruleorder        17.6 MB    2204 ms
+== drools mixed-1000-ruleorder
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     mixed-1000-ruleorder        17.5 MB    2968 ms
+== praecepta unique-1000
+engine     table            retained heap      build
+praecepta  unique-1000             0.5 MB     562 ms
+== camunda unique-1000
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+camunda    unique-1000            17.5 MB    1851 ms
+== drools unique-1000
+engine     table            retained heap      build
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider (file:/home/runner/work/praecepta/praecepta/praecepta-benchmarks/target/benchmarks.jar)
+WARNING: Please consider reporting this to the maintainers of class com.thoughtworks.xstream.converters.reflection.SunUnsafeReflectionProvider
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+drools     unique-1000            15.6 MB    1887 ms
