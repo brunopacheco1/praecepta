@@ -1,0 +1,51 @@
+<!--
+
+    SPDX-FileCopyrightText: Bruno Pacheco
+
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.brunopacheco1</groupId>
+        <artifactId>praecepta</artifactId>
+        <version>0.2.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>praecepta-tck</artifactId>
+    <packaging>jar</packaging>
+    <name>praecepta-tck</name>
+    <description>
+        Runs the decision-table test cases of the DMN Technology Compatibility Kit against the engine,
+        and keeps the published results (RESULTS.md) current. Not published.
+    </description>
+
+    <properties>
+        <maven.install.skip>true</maven.install.skip>
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <maven.jar.skipIfEmpty>true</maven.jar.skipIfEmpty>
+        <jacoco.skip>true</jacoco.skip>
+        <!-- not published: no SBOM -->
+        <cyclonedx.skip>true</cyclonedx.skip>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.brunopacheco1</groupId>
+            <artifactId>praecepta-engine</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
