@@ -7,6 +7,7 @@ package io.github.brunopacheco1.praecepta.engine;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -92,7 +93,7 @@ final class TableAnalysis {
                 continue;
             }
             BitsetIndex.and(candidates, BitsetIndex.below(index.words(), bit));
-            if (!BitsetIndex.isEmpty(candidates) && covered(bit, 0, candidates)) {
+            if (!BitsetIndex.isEmpty(candidates) && new CoverSearch(bit).covered(0, candidates)) {
                 unreachable.add(index.ruleAt(bit));
             }
         }
@@ -103,47 +104,94 @@ final class TableAnalysis {
     }
 
     /**
-     * Whether every input the rule owning {@code bit} accepts, with the classes already fixed for the
-     * columns before {@code column}, is matched by some rule in {@code candidates} (non-empty).
+     * Whether the inputs one rule accepts are all matched by rules with a lower bit. The search fixes one
+     * class per column, keeping the candidates that accept every class fixed so far; it is exact, and
+     * three things keep it small:
+     * <ul>
+     * <li>{@code coversRest[c]}: the rules that accept every class this rule accepts in columns
+     * {@code c} and after, so "one candidate covers what is left" is a single mask intersection;</li>
+     * <li>each column's classes are tried for an immediate witness (no candidate left) before any is
+     * searched further, and then fewest candidates first;</li>
+     * <li>a state (column, candidates) proven covered is remembered: whether it is covered depends on
+     * nothing else, since the candidates already accept every class fixed before that column.</li>
+     * </ul>
      */
-    private boolean covered(int bit, int column, long[] candidates) {
-        if (column == index.columnCount() || coversRemainder(bit, column, candidates)) {
-            return true;
-        }
-        var col = index.column(column);
-        Set<List<Long>> explored = new HashSet<>();
-        for (int k = 0; k < col.classCount(); k++) {
-            if (col.empty[k] || !col.allowed[k] || !BitsetIndex.get(col.masks[k], bit)) {
-                continue;
-            }
-            var next = candidates.clone();
-            BitsetIndex.and(next, col.masks[k]);
-            if (BitsetIndex.isEmpty(next)) {
-                return false; // inputs of this class reach the rule
-            }
-            if (explored.add(key(next)) && !covered(bit, column + 1, next)) {
-                return false;
-            }
-        }
-        return true;
-    }
+    private final class CoverSearch {
+        /** Per column, the masks of the non-empty, allowed classes this rule accepts. */
+        private final long[][][] accepted;
+        /** Per column (and one past the last, all rules): rules accepting all of this rule's classes from there on. */
+        private final long[][] coversRest;
+        private final Set<State> coveredStates = new HashSet<>();
 
-    /** Some candidate accepts every class the rule accepts, in every column from {@code column} on. */
-    private boolean coversRemainder(int bit, int column, long[] candidates) {
-        for (int candidate = BitsetIndex.first(candidates); candidate >= 0; candidate = BitsetIndex.next(candidates, candidate + 1)) {
-            boolean covers = true;
-            for (int c = column; c < index.columnCount() && covers; c++) {
+        CoverSearch(int bit) {
+            int columns = index.columnCount();
+            accepted = new long[columns][][];
+            coversRest = new long[columns + 1][];
+            coversRest[columns] = index.allRules();
+            for (int c = columns - 1; c >= 0; c--) {
                 var col = index.column(c);
-                for (int k = 0; k < col.classCount() && covers; k++) {
-                    covers = col.empty[k] || !col.allowed[k] || !BitsetIndex.get(col.masks[k], bit)
-                            || BitsetIndex.get(col.masks[k], candidate);
+                var masks = new ArrayList<long[]>();
+                var rest = coversRest[c + 1].clone();
+                for (int k = 0; k < col.classCount(); k++) {
+                    if (!col.empty[k] && col.allowed[k] && BitsetIndex.get(col.masks[k], bit)) {
+                        masks.add(col.masks[k]);
+                        BitsetIndex.and(rest, col.masks[k]);
+                    }
                 }
+                accepted[c] = masks.toArray(long[][]::new);
+                coversRest[c] = rest;
             }
-            if (covers) {
+        }
+
+        /**
+         * Whether every input the rule accepts, with the classes already fixed for the columns before
+         * {@code column}, is matched by some rule in {@code candidates} (non-empty).
+         */
+        boolean covered(int column, long[] candidates) {
+            if (column == accepted.length || BitsetIndex.intersects(candidates, coversRest[column])) {
                 return true;
             }
+            var state = new State(column, candidates);
+            if (coveredStates.contains(state)) {
+                return true;
+            }
+            var nexts = new LinkedHashMap<State, long[]>();
+            for (var mask : accepted[column]) {
+                var next = candidates.clone();
+                BitsetIndex.and(next, mask);
+                if (BitsetIndex.isEmpty(next)) {
+                    return false; // inputs of this class reach the rule
+                }
+                nexts.putIfAbsent(new State(column + 1, next), next);
+            }
+            var ordered = new ArrayList<>(nexts.values());
+            ordered.sort(Comparator.comparingInt(BitsetIndex::count));
+            for (var next : ordered) {
+                if (!covered(column + 1, next)) {
+                    return false;
+                }
+            }
+            coveredStates.add(state);
+            return true;
         }
-        return false;
+    }
+
+    /** A search state: the next column to fix, and the candidates left. */
+    private record State(int column, long[] candidates) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof State state && column == state.column && Arrays.equals(candidates, state.candidates);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * column + Arrays.hashCode(candidates);
+        }
+
+        @Override
+        public String toString() {
+            return "State[" + column + ", " + Arrays.toString(candidates) + "]";
+        }
     }
 
     // ---- gaps ------------------------------------------------------------------------------------

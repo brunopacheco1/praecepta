@@ -152,6 +152,16 @@ final class BitsetIndex {
         }
     }
 
+    /** Whether the two masks share a set bit. */
+    static boolean intersects(long[] a, long[] b) {
+        for (int w = 0; w < a.length; w++) {
+            if ((a[w] & b[w]) != 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static boolean isEmpty(long[] mask) {
         for (long word : mask) {
             if (word != 0) {
