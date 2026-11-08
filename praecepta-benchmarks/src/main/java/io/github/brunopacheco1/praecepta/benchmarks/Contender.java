@@ -9,6 +9,8 @@ import java.io.ByteArrayInputStream;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -89,6 +91,9 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
                     case STRING -> builder.input(column, input -> (String) input.get(column));
                     case NUMBER -> builder.numberInput(column, input -> (Number) input.get(column));
                     case DATE -> builder.dateInput(column, input -> (LocalDate) input.get(column));
+                    case BOOLEAN -> builder.booleanInput(column, input -> (Boolean) input.get(column));
+                    case TIME -> builder.timeInput(column, input -> (LocalTime) input.get(column));
+                    case DATE_TIME -> builder.dateTimeInput(column, input -> (LocalDateTime) input.get(column));
                 }
             }
             engine = builder.build();

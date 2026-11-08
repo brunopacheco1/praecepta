@@ -7,6 +7,8 @@ package io.github.brunopacheco1.praecepta.engine;
 
 import java.lang.System.Logger.Level;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -195,7 +197,7 @@ public final class PraeceptaEngine<I, O> {
      * @throws HitPolicyViolationException if the input matches several rules under UNIQUE, or rules
      *                                     with different outputs under ANY
      * @throws io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException if a value is
-     *         outside its column's declared input values, or (map-based inputs) not a valid number or date
+     *         outside its column's declared input values, or (map-based inputs) not a valid value of the column's type
      */
     @SuppressWarnings("unchecked")
     public List<O> evaluate(I input) {
@@ -470,6 +472,21 @@ public final class PraeceptaEngine<I, O> {
         /** Binds a DATE column to a getter. */
         public Builder<I, O> dateInput(String column, Function<? super I, LocalDate> extractor) {
             return bind(column, ColumnType.DATE, extractor);
+        }
+
+        /** Binds a BOOLEAN column to a getter; null counts as missing. */
+        public Builder<I, O> booleanInput(String column, Function<? super I, Boolean> extractor) {
+            return bind(column, ColumnType.BOOLEAN, extractor);
+        }
+
+        /** Binds a TIME column to a getter returning a time of day without a zone. */
+        public Builder<I, O> timeInput(String column, Function<? super I, LocalTime> extractor) {
+            return bind(column, ColumnType.TIME, extractor);
+        }
+
+        /** Binds a DATE_TIME column to a getter returning a date and time without a zone. */
+        public Builder<I, O> dateTimeInput(String column, Function<? super I, LocalDateTime> extractor) {
+            return bind(column, ColumnType.DATE_TIME, extractor);
         }
 
         /**

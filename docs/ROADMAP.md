@@ -13,14 +13,14 @@ are made is in [GOVERNANCE.md](../GOVERNANCE.md); past decisions are in
 
 ## Next: 0.2
 Already done for 0.2: fast builds for large FIRST and PRIORITY tables
-([#29](https://github.com/brunopacheco1/praecepta/issues/29)), and the DMN conformance kit (TCK) in
+([#29](https://github.com/brunopacheco1/praecepta/issues/29)); the DMN conformance kit (TCK) in
 every build ([#22](https://github.com/brunopacheco1/praecepta/issues/22)), with its results in
-[praecepta-tck/RESULTS.md](../praecepta-tck/RESULTS.md). Every TCK check Praecepta supports passes;
-these close most of the gap with the rest:
-- **Boolean, time and date-time columns** ([#12](https://github.com/brunopacheco1/praecepta/issues/12)),
-  the main gap with the TCK: 33 of the checks Praecepta does not support yet need boolean columns.
+[praecepta-tck/RESULTS.md](../praecepta-tck/RESULTS.md); and boolean, time and date-time columns
+([#12](https://github.com/brunopacheco1/praecepta/issues/12)), which took the TCK from 16 to 51 of
+86 checks. Every check Praecepta supports passes. Next:
 - **Input names with spaces**, which FEEL allows
-  ([#47](https://github.com/brunopacheco1/praecepta/issues/47)): 24 more checks need them.
+  ([#47](https://github.com/brunopacheco1/praecepta/issues/47)): 24 of the remaining 35 checks
+  need them.
 
 ## Later in the year
 - **More of DMN's decision tables:** string ranges in cells

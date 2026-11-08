@@ -13,4 +13,13 @@ public enum ColumnType {
     NUMBER,
     /** Calendar dates ({@code LocalDate}). Cells use {@code date("2025-01-31")}, comparisons and intervals. */
     DATE,
+    /** {@code true} or {@code false} ({@code Boolean}). Cells: {@code true}, {@code false}, lists, {@code not(...)}; no comparisons. */
+    BOOLEAN,
+    /** Times of day without a zone ({@code LocalTime}). Cells use {@code time("08:30:00")}, comparisons and intervals. */
+    TIME,
+    /**
+     * Dates with a time of day, without a zone ({@code LocalDateTime}). Cells use
+     * {@code date and time("2025-01-31T08:30:00")}, comparisons and intervals.
+     */
+    DATE_TIME,
 }

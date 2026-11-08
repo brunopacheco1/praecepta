@@ -29,15 +29,16 @@ builds an engine once and calls it.
 
 1. **Rules and cells.** A rule (`Praeceptum`) maps input columns to cells and output columns to
    values. `CellParser` parses each cell, according to its column's type (`ColumnType`: STRING,
-   NUMBER, DATE), into `UnaryTests`: the subset of DMN FEEL *simple unary tests* that looks at one
+   NUMBER, DATE, BOOLEAN, TIME, DATE_TIME), into `UnaryTests`: the subset of DMN FEEL *simple unary tests* that looks at one
    column value (lists, `not(...)`, comparisons, intervals, `null`, "any").
 2. **The bitset index** (`BitsetIndex`, `ColumnIndex`). Every rule owns one bit. Each column splits
    its values into *classes* that no rule can tell apart, and each class carries a mask: the rules
    that accept it.
    - **Strings:** one class per value a rule mentions (or the column declares), one for any other
      value, and one for a missing value. Lookup is a hash, or an array index for enum inputs.
-   - **Numbers and dates:** the boundaries the rules mention split the line into intervals and
-     points; lookup is a binary search.
+   - **Numbers, dates, times and date-times:** the boundaries the rules mention split the line into
+     intervals and points; lookup is a binary search. Booleans are the same with `false < true`,
+     both always boundaries, so they get one class each.
    - **Memory** grows with columns × classes × rules, never with the product of the values.
 3. **Evaluation.** `evaluate(input)` reads each column's value through the bound getter
    (`InputStrategy`), finds its class, and ANDs the masks, 64 rules per machine word. The hit policy
@@ -55,7 +56,7 @@ An engine is **immutable** once built: any number of threads may share it withou
 - `DmnReader` reads DMN 1.1 to 1.5 (as written by Camunda Modeler, Drools, Trisotech and
   `DmnWriter`) into a `DecisionTable`: hit policy, aggregation, column types, value lists and rules.
   It uses the JDK's XML parser with DTDs and external entities disabled. Anything it does not
-  support (boolean or date-time columns, computed expressions, function calls, COUNT) is rejected
+  support (durations, times with a zone, computed expressions, function calls, COUNT) is rejected
   with an error naming the decision, rule and column.
 - `DmnWriter` writes a `DecisionTable` as standard DMN 1.3, which `DmnReader` reads back unchanged
   and which Camunda 8 and Drools evaluate identically (the benchmarks check this).

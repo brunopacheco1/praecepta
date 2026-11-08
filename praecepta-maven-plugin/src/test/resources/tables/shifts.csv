@@ -1,0 +1,6 @@
+overtime;start;at;paid;until;reviewed;rate
+true;;;true;;2025-01-02T09:30:00;double
+false;>= time("22:00:00");;true;06:00:00;;night
+false;< 06:00;;true;06:00:00;;night
+false;;>= date and time("2025-12-25T00:00:00");false;;;holiday
+;;;true;;;standard

@@ -7,6 +7,9 @@ package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -23,11 +26,13 @@ import net.jqwik.api.Combinators;
 import net.jqwik.api.Tuple;
 
 /**
- * A random decision table plus inputs to evaluate against it. Columns are STRING, NUMBER or DATE, and
- * cells use every form of the grammar: wildcards, literals (quoted and legacy unquoted), lists,
- * comparisons, intervals with every bracket style, {@code not(...)} and {@code null}. Values come from
- * small domains, and dates are consecutive days, so overlaps, boundaries and empty gaps between days
- * are frequent. Some columns declare input values, and inputs include values outside them.
+ * A random decision table plus inputs to evaluate against it. Columns are STRING, NUMBER, DATE,
+ * BOOLEAN, TIME or DATE_TIME, and cells use every form of the grammar: wildcards, literals (quoted
+ * and legacy unquoted, function and bare forms), lists, comparisons, intervals with every bracket
+ * style, {@code not(...)} and {@code null}. Values come from small domains, and dates are consecutive
+ * days, so overlaps, boundaries and empty gaps between days are frequent; times and date-times step
+ * by half an hour and twelve hours, and inputs fall on and between those steps. Some columns declare
+ * input values, and inputs include values outside them.
  *
  * <p>Every rule has outputs {@code id} (its 1-based position, unique), {@code out} (one of x/y/z,
  * often shared) and {@code n} (a small number, for aggregation).
@@ -41,6 +46,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     public static final List<String> OUT_VALUES = List.of("x", "y", "z");
 
     static final LocalDate DAY0 = LocalDate.of(2025, 1, 1);
+    static final LocalTime TIME0 = LocalTime.of(8, 0);
+    static final LocalDateTime MOMENT0 = DAY0.atTime(6, 0);
     private static final List<String> LETTERS = List.of("a", "b", "c", "d");
 
     /** Column definition: type, string domain, and declared input values (null if none). */
@@ -76,7 +83,14 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 .map(allowed -> new Column(ColumnType.NUMBER, List.of(), allowed));
         var date = Arbitraries.oneOf(Arbitraries.just((String) null), Arbitraries.just((String) null), interval(ColumnType.DATE))
                 .map(allowed -> new Column(ColumnType.DATE, List.of(), allowed));
-        return Arbitraries.frequencyOf(Tuple.of(2, string), Tuple.of(1, number), Tuple.of(1, date));
+        var bool = Arbitraries.oneOf(Arbitraries.just((String) null), Arbitraries.just((String) null), Arbitraries.of("true", "false", "true, false"))
+                .map(allowed -> new Column(ColumnType.BOOLEAN, List.of(), allowed));
+        var time = Arbitraries.oneOf(Arbitraries.just((String) null), Arbitraries.just((String) null), interval(ColumnType.TIME))
+                .map(allowed -> new Column(ColumnType.TIME, List.of(), allowed));
+        var dateTime = Arbitraries.oneOf(Arbitraries.just((String) null), Arbitraries.just((String) null), interval(ColumnType.DATE_TIME))
+                .map(allowed -> new Column(ColumnType.DATE_TIME, List.of(), allowed));
+        return Arbitraries.frequencyOf(Tuple.of(4, string), Tuple.of(2, number), Tuple.of(2, date),
+                Tuple.of(1, bool), Tuple.of(1, time), Tuple.of(1, dateTime));
     }
 
     private record RuleRow(List<String> cells, String out, int number) {
@@ -98,7 +112,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 Tuple.of(4, Arbitraries.just("")),
                 Tuple.of(1, Arbitraries.just("-")),
                 Tuple.of(4, single),
-                Tuple.of(column.type() == ColumnType.STRING ? 0 : 4, test(column)),
+                Tuple.of(ordered(column.type()) ? 4 : 0, test(column)),
                 Tuple.of(2, list),
                 Tuple.of(1, negated),
                 Tuple.of(1, Arbitraries.just("null")),
@@ -112,12 +126,21 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             case NUMBER -> Arbitraries.integers().between(0, 5).map(String::valueOf);
             case DATE -> Arbitraries.integers().between(0, 5).flatMap(d -> Arbitraries.of(
                     "date(\"" + DAY0.plusDays(d) + "\")", DAY0.plusDays(d).toString()));
+            case BOOLEAN -> Arbitraries.of("true", "false");
+            case TIME -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(
+                    value(ColumnType.TIME, i), TIME0.plusMinutes(30L * i).toString()));
+            case DATE_TIME -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(
+                    value(ColumnType.DATE_TIME, i), MOMENT0.plusHours(12L * i).toString()));
         };
     }
 
-    /** A comparison or an interval (NUMBER and DATE columns). */
+    static boolean ordered(ColumnType type) {
+        return type != ColumnType.STRING && type != ColumnType.BOOLEAN;
+    }
+
+    /** A comparison or an interval (ordered columns). */
     private static Arbitrary<String> test(Column column) {
-        if (column.type() == ColumnType.STRING) {
+        if (!ordered(column.type())) {
             return literal(column);
         }
         var comparison = Combinators.combine(Arbitraries.of("<", "<=", ">", ">="), literal(column)).as((op, v) -> op + " " + v);
@@ -131,7 +154,13 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     }
 
     private static String value(ColumnType type, int i) {
-        return type == ColumnType.NUMBER ? String.valueOf(i) : "date(\"" + DAY0.plusDays(i) + "\")";
+        return switch (type) {
+            case NUMBER -> String.valueOf(i);
+            case DATE -> "date(\"" + DAY0.plusDays(i) + "\")";
+            case TIME -> "time(\"" + DateTimeFormatter.ISO_LOCAL_TIME.format(TIME0.plusMinutes(30L * i)) + "\")";
+            case DATE_TIME -> "date and time(\"" + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(MOMENT0.plusHours(12L * i)) + "\")";
+            case STRING, BOOLEAN -> throw new IllegalArgumentException("no intervals on " + type);
+        };
     }
 
     private static Arbitrary<List<Object>> input(List<Column> columns) {
@@ -148,6 +177,10 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                         .<Object>map(half -> BigDecimal.valueOf(half).divide(BigDecimal.TWO))
                         .injectNull(0.15);
                 case DATE -> Arbitraries.integers().between(-1, 6).<Object>map(DAY0::plusDays).injectNull(0.15);
+                case BOOLEAN -> Arbitraries.<Object>of(true, false).injectNull(0.15);
+                // quarter steps: on every boundary and halfway between them
+                case TIME -> Arbitraries.integers().between(-2, 12).<Object>map(q -> TIME0.plusMinutes(15L * q)).injectNull(0.15);
+                case DATE_TIME -> Arbitraries.integers().between(-2, 12).<Object>map(q -> MOMENT0.plusHours(6L * q)).injectNull(0.15);
             });
         }
         return Combinators.combine(values).as(row -> new ArrayList<>(row));

@@ -136,7 +136,10 @@ final class TckRunner {
             case Items items -> new Outcome(Status.UNSUPPORTED, "list inputs (#25)");
             case Components components -> new Outcome(Status.UNSUPPORTED, "structured inputs compared as a whole");
             case Simple simple -> switch (simple.type()) {
-                case "", "string", "decimal", "double", "integer", "int", "long", "float", "date" -> simple.text();
+                case "", "string", "decimal", "double", "integer", "int", "long", "float", "date", "boolean" -> simple.text();
+                case "time", "dateTime" -> ZONED.matcher(simple.text().strip()).matches()
+                        ? new Outcome(Status.UNSUPPORTED, "times and date-times with a time zone")
+                        : simple.text();
                 default -> new Outcome(Status.UNSUPPORTED, unsupportedType(simple.type()));
             };
         };
@@ -210,6 +213,8 @@ final class TckRunner {
     // ---- reasons ----------------------------------------------------------------------------------
 
     private static final Pattern TYPE = Pattern.compile("type '([^']*)' is not supported");
+    /** An xsd:time or xsd:dateTime value with an offset or zone. */
+    private static final Pattern ZONED = Pattern.compile(".*\\d([Zz]|[+-]\\d{2}:?\\d{2}|@.+)");
     private static final Pattern AGGREGATION = Pattern.compile("aggregation '([^']*)' is not supported");
     private static final Pattern EXPRESSION = Pattern.compile("input expression '([^']*)' is not supported");
     /** A cell naming a variable where a literal is expected, e.g. {@code > otherDate}. */
@@ -233,6 +238,9 @@ final class TckRunner {
         if (REFERENCE.matcher(message).find()) {
             return "input entries that refer to other inputs";
         }
+        if (message.contains("has a time zone")) {
+            return "times and date-times with a time zone";
+        }
         if (message.contains("output entries must be literals")) {
             return "output entries that are expressions";
         }
@@ -242,7 +250,6 @@ final class TckRunner {
     private static String unsupportedType(String type) {
         var local = type.contains(":") ? type.substring(type.indexOf(':') + 1) : type;
         return switch (local) {
-            case "boolean", "time", "dateTime", "date and time" -> local + " columns (#12)";
             case "dayTimeDuration", "yearMonthDuration", "duration", "days and time duration", "years and months duration" ->
                     "duration columns";
             default -> local.length() > 1 && local.startsWith("t") && Character.isUpperCase(local.charAt(1))

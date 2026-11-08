@@ -9,6 +9,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -43,8 +46,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * entities disabled.
  *
  * <p>Supported: decision tables whose input expressions name an input variable, with
- * {@code string}, {@code number} (or {@code integer}, {@code long}, {@code double}) and {@code date}
- * columns; input entries in Praecepta's FEEL subset (lists, {@code not(...)}, {@code null},
+ * {@code string}, {@code number} (or {@code integer}, {@code long}, {@code double}), {@code date},
+ * {@code boolean}, {@code time} and {@code dateTime} (or {@code date and time}) columns, times without
+ * a zone; input entries in Praecepta's FEEL subset (lists, {@code not(...)}, {@code null},
  * comparisons, intervals, {@code -}); input and output value lists; literal output entries; every
  * hit policy; SUM, MIN and MAX aggregation. Anything else is rejected with an
  * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered
@@ -195,8 +199,17 @@ public final class DmnReader {
             if (literal.matches("-?\\d+(\\.\\d+)?")) {
                 return literal;
             }
+            if (literal.equals("true") || literal.equals("false")) {
+                return literal;
+            }
             if (literal.startsWith("date(")) {
                 return plain(single(literal, ColumnType.DATE, where));
+            }
+            if (literal.startsWith("time(")) {
+                return plain(single(literal, ColumnType.TIME, where));
+            }
+            if (literal.matches("date\\s+and\\s+time\\(.*")) {
+                return plain(single(literal, ColumnType.DATE_TIME, where));
             }
             throw new InvalidDecisionTableException("%s: '%s' is not supported; output entries must be literals (quote text)"
                     .formatted(where, literal));
@@ -222,6 +235,8 @@ public final class DmnReader {
         return switch (value) {
             case BigDecimal number -> number.toPlainString();
             case LocalDate date -> date.toString();
+            case LocalTime time -> DateTimeFormatter.ISO_LOCAL_TIME.format(time);
+            case LocalDateTime dateTime -> DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime);
             default -> value.toString();
         };
     }
@@ -232,8 +247,11 @@ public final class DmnReader {
             case "", "string" -> ColumnType.STRING;
             case "number", "integer", "long", "double", "decimal", "int" -> ColumnType.NUMBER;
             case "date" -> ColumnType.DATE;
+            case "boolean" -> ColumnType.BOOLEAN;
+            case "time" -> ColumnType.TIME;
+            case "datetime", "date and time" -> ColumnType.DATE_TIME;
             default -> throw new InvalidDecisionTableException(
-                    "%s: type '%s' is not supported (string, number and date are)".formatted(where, typeRef));
+                    "%s: type '%s' is not supported (string, number, date, boolean, time and dateTime are)".formatted(where, typeRef));
         };
     }
 

@@ -7,6 +7,8 @@ package io.github.brunopacheco1.praecepta.engine.feel;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,19 +31,31 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   PT, ES                   unquoted words are string literals too (Praecepta's original syntax)
  *   18, 2.5                  number literals (NUMBER columns)
  *   date("2025-01-31")       date literal (DATE columns; a bare 2025-01-31 is accepted as well)
- *   &lt; 18, &gt;= 2.5            comparisons (NUMBER and DATE columns)
+ *   time("08:30:00")         time literal (TIME columns; a bare 08:30:00 is accepted as well)
+ *   date and time("2025-01-31T08:30:00")
+ *                            date-time literal (DATE_TIME columns; a bare 2025-01-31T08:30:00 too)
+ *   true, false              boolean literals (BOOLEAN columns)
+ *   &lt; 18, &gt;= 2.5            comparisons (NUMBER, DATE, TIME and DATE_TIME columns)
  *   [18..65), (0..1], ]a..b[  intervals; [ and ] close, ( ) and outward-facing brackets open
  *   null                     only a missing value
  *   not(t1, t2)              anything but these tests
  * </pre>
  *
  * Tests are separated by commas outside quotes and brackets. Surrounding whitespace is ignored.
+ * Times and date-times have no zone: a literal with an offset ({@code Z}, {@code +02:00}) or a zone
+ * ({@code @Europe/Paris}) is rejected.
  */
 public final class CellParser {
 
     private static final Pattern NUMBER = Pattern.compile("-?\\d+(\\.\\d+)?");
     private static final Pattern DATE_CALL = Pattern.compile("date\\(\\s*\"([^\"]*)\"\\s*\\)");
     private static final Pattern BARE_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
+    private static final Pattern TIME_CALL = Pattern.compile("time\\(\\s*\"([^\"]*)\"\\s*\\)");
+    private static final Pattern BARE_TIME = Pattern.compile("\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?");
+    private static final Pattern DATE_TIME_CALL = Pattern.compile("date\\s+and\\s+time\\(\\s*\"([^\"]*)\"\\s*\\)");
+    private static final Pattern BARE_DATE_TIME = Pattern.compile("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?");
+    /** An offset or zone at the end of a time or date-time: Z, +02:00, -0500, @Europe/Paris. */
+    private static final Pattern ZONE = Pattern.compile(".*([Zz]|[+-]\\d{2}(:?\\d{2})?|@.+)");
 
     private CellParser() {
     }
@@ -135,7 +149,42 @@ public final class CellParser {
                     throw new CellSyntaxException(cell, "invalid date '" + iso + "'");
                 }
             }
+            case BOOLEAN -> switch (text) {
+                case "true" -> Boolean.TRUE;
+                case "false" -> Boolean.FALSE;
+                default -> throw new CellSyntaxException(cell, "'" + text + "' is not a boolean; write true or false");
+            };
+            case TIME -> {
+                var iso = temporal(text, TIME_CALL, BARE_TIME, cell, "a time; write time(\"hh:mm:ss\")");
+                try {
+                    yield LocalTime.parse(iso);
+                } catch (DateTimeParseException e) {
+                    throw new CellSyntaxException(cell, "invalid time '" + iso + "'");
+                }
+            }
+            case DATE_TIME -> {
+                var iso = temporal(text, DATE_TIME_CALL, BARE_DATE_TIME, cell,
+                        "a date and time; write date and time(\"yyyy-mm-ddThh:mm:ss\")");
+                try {
+                    yield LocalDateTime.parse(iso);
+                } catch (DateTimeParseException e) {
+                    throw new CellSyntaxException(cell, "invalid date and time '" + iso + "'");
+                }
+            }
         };
+    }
+
+    /** The ISO text of a {@code time(...)} / {@code date and time(...)} literal or a bare value. */
+    private static String temporal(String text, Pattern call, Pattern bare, String cell, String expected) {
+        var matcher = call.matcher(text);
+        var iso = matcher.matches() ? matcher.group(1).strip() : text;
+        if (!matcher.matches() && !bare.matcher(text).matches() || matcher.matches() && iso.isEmpty()) {
+            throw new CellSyntaxException(cell, "'" + text + "' is not " + expected);
+        }
+        if (ZONE.matcher(iso).matches()) {
+            throw new CellSyntaxException(cell, "'" + iso + "' has a time zone; only local times are supported");
+        }
+        return iso;
     }
 
     private static String quoted(String text, String cell) {
@@ -157,8 +206,8 @@ public final class CellParser {
     }
 
     private static void requireOrdered(ColumnType type, String cell, String what) {
-        if (type == ColumnType.STRING) {
-            throw new CellSyntaxException(cell, what + " are only supported on NUMBER and DATE columns");
+        if (type == ColumnType.STRING || type == ColumnType.BOOLEAN) {
+            throw new CellSyntaxException(cell, what + " are only supported on NUMBER, DATE, TIME and DATE_TIME columns");
         }
     }
 

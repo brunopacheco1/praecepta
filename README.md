@@ -29,8 +29,8 @@ them when you build; evaluate them with a dependency-free engine.
 # Features
 - All DMN hit policies: UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER and COLLECT
   (with SUM / MIN / MAX aggregation)
-- DMN FEEL cells on STRING, NUMBER and DATE columns: lists, `not(...)`, comparisons, intervals,
-  `null`; unquoted `PT,ES` cells from earlier versions keep working
+- DMN FEEL cells on STRING, NUMBER, DATE, BOOLEAN, TIME and DATE_TIME columns: lists, `not(...)`,
+  comparisons, intervals, `null`; unquoted `PT,ES` cells from earlier versions keep working
 - Optional DMN input value lists: values outside them are rejected
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
   rules that can never be selected (FIRST, PRIORITY), and gaps (declared inputs no rule matches)
@@ -72,7 +72,7 @@ Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drool
   (e.g. `income > 2 * rent`). Praecepta cells are FEEL *simple unary tests* on one column.
 - **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
   boxed expressions.
-- **Boolean, time and date-time columns** (planned), and string ranges.
+- **Durations, times with a time zone**, and string ranges.
 - **A process engine, a modeller or a decision service** around the tables.
 
 # Getting Started
@@ -112,13 +112,17 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 | `"PT","ES"` or `PT,ES` | one of the values (unquoted words are string literals) | STRING |
 | `18`, `2.5` | that number (`1.0` equals `1`) | NUMBER |
 | `date("2025-01-31")` or `2025-01-31` | that date | DATE |
-| `< 18`, `<= 18`, `> 18`, `>= 18` | comparisons | NUMBER, DATE |
-| `[18..65)`, `(0..1]`, `]a..b[` | intervals: `[`/`]` closed, `(`/`)` or outward brackets open | NUMBER, DATE |
+| `true`, `false` | that boolean | BOOLEAN |
+| `time("08:30:00")` or `08:30:00` | that time of day | TIME |
+| `date and time("2025-01-31T08:30:00")` or `2025-01-31T08:30:00` | that date and time | DATE_TIME |
+| `< 18`, `<= 18`, `> 18`, `>= 18` | comparisons | NUMBER, DATE, TIME, DATE_TIME |
+| `[18..65)`, `(0..1]`, `]a..b[` | intervals: `[`/`]` closed, `(`/`)` or outward brackets open | NUMBER, DATE, TIME, DATE_TIME |
 | `null` | only a missing value | all |
 | `not(...)` | anything the list inside does not match | all |
 
 Missing values follow FEEL: they fail comparisons and intervals, equal only `null`, and so satisfy
-`not("FR")`. Blank text counts as missing.
+`not("FR")`. Blank text counts as missing. Times and date-times are local: values with a time zone or
+offset (`Z`, `+02:00`, `@Europe/Paris`) are rejected.
 
 ### Typed columns and input value lists
 ```java
@@ -127,6 +131,9 @@ var engine = PraeceptaEngine.<Applicant, String>builder()
         .input("country", Applicant::country)          // STRING
         .numberInput("age", Applicant::age)            // any Number, compared as exact decimals
         .dateInput("since", Applicant::since)          // LocalDate
+        .booleanInput("student", Applicant::student)   // Boolean
+        .timeInput("callTime", Applicant::callTime)    // LocalTime
+        .dateTimeInput("appliedAt", Applicant::appliedAt) // LocalDateTime
         .allowedValues("country", List.of("PT", "ES", "FR"))
         .allowedValues("age", "[0..120]")
         .output(output -> output.values().get("tier"))

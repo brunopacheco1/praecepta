@@ -17,7 +17,8 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
  * Generates, for a table {@code Discount}:
  * <ul>
  * <li>{@code DiscountInput}: a record with one component per input column ({@code String},
- * {@code BigDecimal} or {@code LocalDate}); a string column with a value list gets a nested enum,
+ * {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime} or {@code LocalDateTime});
+ * a string column with a value list gets a nested enum,
  * bound to the engine's int-coded path;</li>
  * <li>{@code DiscountOutput}: a record with one component per output column;</li>
  * <li>{@code Discount}: loads {@code Discount.dmn} from the classpath once and evaluates it.</li>
@@ -140,6 +141,9 @@ final class SourceGenerator {
                 case STRING -> value;
                 case NUMBER -> "number(" + value + ")";
                 case DATE -> "date(" + value + ")";
+                case BOOLEAN -> "bool(" + value + ")";
+                case TIME -> "time(" + value + ")";
+                case DATE_TIME -> "dateTime(" + value + ")";
             });
         }
         java.append(");\n    }\n");
@@ -150,6 +154,18 @@ final class SourceGenerator {
         if (table.outputs().stream().anyMatch(column -> column.type() == ColumnType.DATE)) {
             java.append("\n    private static java.time.LocalDate date(String value) {\n")
                 .append("        return value == null ? null : java.time.LocalDate.parse(value);\n    }\n");
+        }
+        if (table.outputs().stream().anyMatch(column -> column.type() == ColumnType.BOOLEAN)) {
+            java.append("\n    private static Boolean bool(String value) {\n")
+                .append("        return value == null ? null : Boolean.valueOf(value);\n    }\n");
+        }
+        if (table.outputs().stream().anyMatch(column -> column.type() == ColumnType.TIME)) {
+            java.append("\n    private static java.time.LocalTime time(String value) {\n")
+                .append("        return value == null ? null : java.time.LocalTime.parse(value);\n    }\n");
+        }
+        if (table.outputs().stream().anyMatch(column -> column.type() == ColumnType.DATE_TIME)) {
+            java.append("\n    private static java.time.LocalDateTime dateTime(String value) {\n")
+                .append("        return value == null ? null : java.time.LocalDateTime.parse(value);\n    }\n");
         }
         return java.append("}\n").toString();
     }
@@ -216,6 +232,9 @@ final class SourceGenerator {
                     case STRING -> "input";
                     case NUMBER -> "numberInput";
                     case DATE -> "dateInput";
+                    case BOOLEAN -> "booleanInput";
+                    case TIME -> "timeInput";
+                    case DATE_TIME -> "dateTimeInput";
                 }).append('(').append(name).append(", ").append(getter).append(")\n");
             }
         }
@@ -285,6 +304,9 @@ final class SourceGenerator {
             case STRING -> "String";
             case NUMBER -> "java.math.BigDecimal";
             case DATE -> "java.time.LocalDate";
+            case BOOLEAN -> "Boolean";
+            case TIME -> "java.time.LocalTime";
+            case DATE_TIME -> "java.time.LocalDateTime";
         };
     }
 
