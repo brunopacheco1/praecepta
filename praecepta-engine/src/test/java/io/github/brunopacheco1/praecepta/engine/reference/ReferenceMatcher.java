@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -239,7 +240,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         if (allowedValues.containsKey(column)) {
             cells.add(parse(allowedValues.get(column), column));
         }
-        if (type == ColumnType.STRING) {
+        if (type == ColumnType.BOOLEAN) {
+            values.addAll(List.of(false, true)); // the whole domain
+        } else if (type == ColumnType.STRING) {
             var written = new TreeSet<String>();
             cells.forEach(cell -> literals(cell).forEach(v -> written.add((String) v)));
             values.addAll(written);
@@ -255,7 +258,6 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                     case NUMBER -> BigDecimal.ZERO;
                     case TIME -> LocalTime.NOON;
                     case DATE_TIME -> LocalDateTime.of(2025, 1, 1, 0, 0);
-                    case BOOLEAN -> Boolean.TRUE;
                     default -> LocalDate.of(2025, 1, 1);
                 });
             }
@@ -279,24 +281,21 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                         around.add(time.minusMinutes(1));
                         around.add(time.plusMinutes(1));
                         if (next != null) {
-                            around.add(time.plus(Duration.between(time, (LocalTime) next).dividedBy(2)));
+                            around.add(LocalTime.ofNanoOfDay((time.toNanoOfDay() + ((LocalTime) next).toNanoOfDay()) / 2));
                         }
                     }
                     case LocalDateTime moment -> {
                         around.add(moment.minusHours(1));
                         around.add(moment.plusHours(1));
                         if (next != null) {
-                            around.add(moment.plus(Duration.between(moment, (LocalDateTime) next).dividedBy(2)));
+                            // no zone: measure on the UTC timeline
+                            var start = moment.toInstant(ZoneOffset.UTC);
+                            var end = ((LocalDateTime) next).toInstant(ZoneOffset.UTC);
+                            around.add(LocalDateTime.ofInstant(start.plus(Duration.between(start, end).dividedBy(2)), ZoneOffset.UTC));
                         }
                     }
-                    default -> {
-                        // booleans: both values are the whole domain
-                    }
+                    default -> throw new IllegalStateException("not an ordered value: " + point);
                 }
-            }
-            if (type == ColumnType.BOOLEAN) {
-                around.add(Boolean.FALSE);
-                around.add(Boolean.TRUE);
             }
             values.addAll(around);
         }

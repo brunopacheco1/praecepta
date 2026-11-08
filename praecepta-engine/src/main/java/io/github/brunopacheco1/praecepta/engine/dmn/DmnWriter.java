@@ -9,9 +9,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
-import java.util.Locale;
 import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
@@ -20,6 +19,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
@@ -161,9 +161,10 @@ public final class DmnWriter {
     private static String test(Test test) {
         return switch (test) {
             case NullTest n -> "null";
-            case Equals e -> literal(e.value());
-            case Compare c -> c.operator().symbol() + " " + literal(c.value());
-            case Range r -> (r.lowClosed() ? "[" : "(") + literal(r.low()) + ".." + literal(r.high()) + (r.highClosed() ? "]" : ")");
+            case Equals e -> FeelLiterals.literal(e.value());
+            case Compare c -> c.operator().symbol() + " " + FeelLiterals.literal(c.value());
+            case Range r -> (r.lowClosed() ? "[" : "(") + FeelLiterals.literal(r.low()) + ".."
+                    + FeelLiterals.literal(r.high()) + (r.highClosed() ? "]" : ")");
         };
     }
 
@@ -172,34 +173,26 @@ public final class DmnWriter {
         if (value == null) {
             return "null";
         }
+        var text = value.strip();
         try {
-            return switch (type) {
-                case STRING -> literal(value);
-                case NUMBER -> new BigDecimal(value.strip()).toPlainString();
-                case DATE -> literal(LocalDate.parse(value.strip()));
-                case TIME -> literal(LocalTime.parse(value.strip()));
-                case DATE_TIME -> literal(LocalDateTime.parse(value.strip()));
-                case BOOLEAN -> switch (value.strip()) {
-                    case "true", "false" -> value.strip();
-                    default -> throw new IllegalArgumentException(value);
-                };
-            };
-        } catch (RuntimeException e) {
-            throw new InvalidDecisionTableException("%s: '%s' is not a %s".formatted(where, value,
-                    type.name().toLowerCase(Locale.ROOT).replace('_', ' ')));
+            return FeelLiterals.literal(switch (type) {
+                case STRING -> value;
+                case NUMBER -> new BigDecimal(text);
+                case DATE -> LocalDate.parse(text);
+                case TIME -> LocalTime.parse(text);
+                case DATE_TIME -> LocalDateTime.parse(text);
+                case BOOLEAN -> bool(text);
+            });
+        } catch (IllegalArgumentException | DateTimeParseException e) {
+            throw new InvalidDecisionTableException("%s: '%s' is not a %s".formatted(where, value, type.feelName()));
         }
     }
 
-    static String literal(Object value) {
-        return switch (value) {
-            case null -> "null";
-            case BigDecimal number -> number.toPlainString();
-            case LocalDate date -> "date(\"" + date + "\")";
-            case LocalTime time -> "time(\"" + DateTimeFormatter.ISO_LOCAL_TIME.format(time) + "\")";
-            case LocalDateTime dateTime -> "date and time(\"" + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime) + "\")";
-            case Boolean bool -> bool.toString();
-            default -> "\"" + value.toString().replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
-        };
+    private static Boolean bool(String text) {
+        if (!text.equals("true") && !text.equals("false")) {
+            throw new IllegalArgumentException("not a boolean: " + text);
+        }
+        return Boolean.valueOf(text);
     }
 
     private static String identifier(String name) {

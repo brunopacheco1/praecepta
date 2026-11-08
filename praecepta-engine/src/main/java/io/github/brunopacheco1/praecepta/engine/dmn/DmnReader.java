@@ -7,16 +7,12 @@ package io.github.brunopacheco1.praecepta.engine.dmn;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -38,6 +34,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
 /**
@@ -142,7 +139,7 @@ public final class DmnReader {
                         || !positive.tests().stream().allMatch(UnaryTests.Equals.class::isInstance)) {
                     throw new InvalidDecisionTableException(outputWhere + ": the output value list must be a list of values");
                 }
-                positive.tests().forEach(test -> values.add(plain(((UnaryTests.Equals) test).value())));
+                positive.tests().forEach(test -> values.add(FeelLiterals.text(((UnaryTests.Equals) test).value())));
             }
             outputs.add(new OutputColumn(column, type, values));
         }
@@ -182,63 +179,50 @@ public final class DmnReader {
 
     private static UnaryTests parse(String text, ColumnType type, String where) {
         try {
-            return CellParser.parse(text, type);
+            return CellParser.parseFeel(text, type);
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }
     }
 
-    /** A literal output entry as plain text (unquoted string, decimal number, ISO date), or null. */
+    /** Literal types an unquoted output entry of an untyped (string) output may hold, kept as their text. */
+    private static final List<ColumnType> UNQUOTED_OUTPUT_TYPES =
+            List.of(ColumnType.NUMBER, ColumnType.BOOLEAN, ColumnType.DATE, ColumnType.TIME, ColumnType.DATE_TIME);
+
+    /**
+     * A literal output entry as plain text ({@link FeelLiterals#text}), or null. An unquoted entry of a
+     * string output may still be a number, boolean, date, time or date-time literal.
+     */
     private static String outputValue(String text, ColumnType type, String where) {
         var literal = text.strip();
         if (literal.isEmpty() || literal.equals("null")) {
             return null;
         }
         if (type == ColumnType.STRING && !literal.startsWith("\"")) {
-            // untyped or string outputs holding numbers or dates are kept as their text
-            if (literal.matches("-?\\d+(\\.\\d+)?")) {
-                return literal;
-            }
-            if (literal.equals("true") || literal.equals("false")) {
-                return literal;
-            }
-            if (literal.startsWith("date(")) {
-                return plain(single(literal, ColumnType.DATE, where));
-            }
-            if (literal.startsWith("time(")) {
-                return plain(single(literal, ColumnType.TIME, where));
-            }
-            if (literal.matches("date\\s+and\\s+time\\(.*")) {
-                return plain(single(literal, ColumnType.DATE_TIME, where));
-            }
-            throw new InvalidDecisionTableException("%s: '%s' is not supported; output entries must be literals (quote text)"
-                    .formatted(where, literal));
+            return UNQUOTED_OUTPUT_TYPES.stream()
+                    .flatMap(other -> literalValue(literal, other).stream())
+                    .findFirst()
+                    .map(FeelLiterals::text)
+                    .orElseThrow(() -> new InvalidDecisionTableException(
+                            "%s: '%s' is not supported; output entries must be literals (quote text)".formatted(where, literal)));
         }
-        return plain(single(literal, type, where));
+        return literalValue(literal, type)
+                .map(FeelLiterals::text)
+                .orElseThrow(() -> new InvalidDecisionTableException(
+                        "%s: '%s' is not supported; output entries must be literals".formatted(where, literal)));
     }
 
-    private static Object single(String literal, ColumnType type, String where) {
-        UnaryTests tests;
+    /** The value of an entry that is a single literal of the type (no list, comparison or name). */
+    private static Optional<Object> literalValue(String literal, ColumnType type) {
         try {
-            tests = CellParser.parse(literal, type);
+            if (CellParser.parseFeel(literal, type) instanceof UnaryTests.Positive(var tests)
+                    && tests.size() == 1 && tests.getFirst() instanceof UnaryTests.Equals(var value)) {
+                return Optional.of(value);
+            }
         } catch (CellSyntaxException e) {
-            throw new InvalidDecisionTableException("%s: '%s' is not supported; output entries must be literals".formatted(where, literal));
+            // not a literal of this type
         }
-        if (tests instanceof UnaryTests.Positive positive && positive.tests().size() == 1
-                && positive.tests().getFirst() instanceof UnaryTests.Equals equals) {
-            return equals.value();
-        }
-        throw new InvalidDecisionTableException("%s: '%s' is not supported; output entries must be literals".formatted(where, literal));
-    }
-
-    private static String plain(Object value) {
-        return switch (value) {
-            case BigDecimal number -> number.toPlainString();
-            case LocalDate date -> date.toString();
-            case LocalTime time -> DateTimeFormatter.ISO_LOCAL_TIME.format(time);
-            case LocalDateTime dateTime -> DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime);
-            default -> value.toString();
-        };
+        return Optional.empty();
     }
 
     private static ColumnType type(String typeRef, String where) {
@@ -279,9 +263,30 @@ public final class DmnReader {
         };
     }
 
-    /** A FEEL name or a qualified name such as {@code applicant.age}. */
-    private static boolean isName(String text) {
-        return text.matches("[\\p{L}_?][\\p{L}\\p{N}_?]*(\\.[\\p{L}_?][\\p{L}\\p{N}_?]*)*");
+    /**
+     * A FEEL name, or a qualified name such as {@code applicant.age}. Each part starts with a letter,
+     * {@code _} or {@code ?}, continues with letters, digits, {@code _} and {@code ?}, and may hold single
+     * spaces between words, as FEEL allows: {@code Credit Score}, {@code Applicant data.Monthly income}.
+     * Checked one code point at a time, so long input costs linear time and no stack.
+     */
+    static boolean isName(String text) {
+        int previous = '.'; // the text starts a part, as if after a dot
+        for (int c : text.codePoints().toArray()) {
+            boolean separator = c == '.' || c == ' ';
+            boolean afterSeparator = previous == '.' || previous == ' ';
+            boolean valid = separator
+                    ? !afterSeparator // no empty part, no space next to a dot, no double space
+                    : isNameStart(c) || previous != '.' && Character.isDigit(c); // digits never start a part
+            if (!valid) {
+                return false;
+            }
+            previous = c;
+        }
+        return previous != '.' && previous != ' ';
+    }
+
+    private static boolean isNameStart(int c) {
+        return Character.isLetter(c) || c == '_' || c == '?';
     }
 
     // ---- XML ---------------------------------------------------------------------------------

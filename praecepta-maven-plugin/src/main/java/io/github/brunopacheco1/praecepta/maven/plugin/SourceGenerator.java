@@ -5,6 +5,7 @@
  */
 package io.github.brunopacheco1.praecepta.maven.plugin;
 
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -137,36 +138,20 @@ final class SourceGenerator {
                 java.append(",\n                ");
             }
             var value = "values.get(" + stringLiteral(column.name()) + ")";
-            java.append(switch (column.type()) {
-                case STRING -> value;
-                case NUMBER -> "number(" + value + ")";
-                case DATE -> "date(" + value + ")";
-                case BOOLEAN -> "bool(" + value + ")";
-                case TIME -> "time(" + value + ")";
-                case DATE_TIME -> "dateTime(" + value + ")";
-            });
+            var converter = Converter.of(column.type());
+            java.append(converter.parser() == null ? value : converter.method() + "(" + value + ")");
         }
         java.append(");\n    }\n");
-        if (table.outputs().stream().anyMatch(column -> column.type() == ColumnType.NUMBER)) {
-            java.append("\n    private static java.math.BigDecimal number(String value) {\n")
-                .append("        return value == null ? null : new java.math.BigDecimal(value);\n    }\n");
-        }
-        if (table.outputs().stream().anyMatch(column -> column.type() == ColumnType.DATE)) {
-            java.append("\n    private static java.time.LocalDate date(String value) {\n")
-                .append("        return value == null ? null : java.time.LocalDate.parse(value);\n    }\n");
-        }
-        if (table.outputs().stream().anyMatch(column -> column.type() == ColumnType.BOOLEAN)) {
-            java.append("\n    private static Boolean bool(String value) {\n")
-                .append("        return value == null ? null : Boolean.valueOf(value);\n    }\n");
-        }
-        if (table.outputs().stream().anyMatch(column -> column.type() == ColumnType.TIME)) {
-            java.append("\n    private static java.time.LocalTime time(String value) {\n")
-                .append("        return value == null ? null : java.time.LocalTime.parse(value);\n    }\n");
-        }
-        if (table.outputs().stream().anyMatch(column -> column.type() == ColumnType.DATE_TIME)) {
-            java.append("\n    private static java.time.LocalDateTime dateTime(String value) {\n")
-                .append("        return value == null ? null : java.time.LocalDateTime.parse(value);\n    }\n");
-        }
+        // one parsing helper per output type that needs it, sorted by name so the source is stable
+        table.outputs().stream()
+                .map(column -> Converter.of(column.type()))
+                .filter(converter -> converter.parser() != null)
+                .distinct()
+                .sorted(Comparator.comparing(Converter::method))
+                .forEach(converter -> java
+                        .append("\n    private static ").append(converter.javaType()).append(' ').append(converter.method())
+                        .append("(String value) {\n")
+                        .append("        return value == null ? null : ").append(converter.parser()).append("(value);\n    }\n"));
         return java.append("}\n").toString();
     }
 
@@ -228,14 +213,8 @@ final class SourceGenerator {
                 java.append("                    .enumInput(").append(name).append(", ").append(enumType).append(".class, ")
                     .append(enumType).append("::value, ").append(getter).append(")\n");
             } else {
-                java.append("                    .").append(switch (column.type()) {
-                    case STRING -> "input";
-                    case NUMBER -> "numberInput";
-                    case DATE -> "dateInput";
-                    case BOOLEAN -> "booleanInput";
-                    case TIME -> "timeInput";
-                    case DATE_TIME -> "dateTimeInput";
-                }).append('(').append(name).append(", ").append(getter).append(")\n");
+                java.append("                    .").append(Converter.of(column.type()).binding())
+                    .append('(').append(name).append(", ").append(getter).append(")\n");
             }
         }
         java.append("                    .output(").append(outputStrategy()).append(")\n")
@@ -300,14 +279,29 @@ final class SourceGenerator {
     }
 
     private static String javaType(ColumnType type) {
-        return switch (type) {
-            case STRING -> "String";
-            case NUMBER -> "java.math.BigDecimal";
-            case DATE -> "java.time.LocalDate";
-            case BOOLEAN -> "Boolean";
-            case TIME -> "java.time.LocalTime";
-            case DATE_TIME -> "java.time.LocalDateTime";
-        };
+        return Converter.of(type).javaType();
+    }
+
+    /**
+     * How generated code handles a column type.
+     *
+     * @param javaType the Java type of its record components
+     * @param binding  the engine builder method that binds an input column of the type
+     * @param method   the name of the generated helper that parses an output value
+     * @param parser   the expression that parses a non-null output value, or null for strings
+     */
+    private record Converter(String javaType, String binding, String method, String parser) {
+
+        static Converter of(ColumnType type) {
+            return switch (type) {
+                case STRING -> new Converter("String", "input", null, null);
+                case NUMBER -> new Converter("java.math.BigDecimal", "numberInput", "number", "new java.math.BigDecimal");
+                case DATE -> new Converter("java.time.LocalDate", "dateInput", "date", "java.time.LocalDate.parse");
+                case BOOLEAN -> new Converter("Boolean", "booleanInput", "bool", "Boolean.valueOf");
+                case TIME -> new Converter("java.time.LocalTime", "timeInput", "time", "java.time.LocalTime.parse");
+                case DATE_TIME -> new Converter("java.time.LocalDateTime", "dateTimeInput", "dateTime", "java.time.LocalDateTime.parse");
+            };
+        }
     }
 
     static String stringLiteral(String value) {

@@ -17,10 +17,12 @@ Already done for 0.2: fast builds for large FIRST and PRIORITY tables
 every build ([#22](https://github.com/brunopacheco1/praecepta/issues/22)), with its results in
 [praecepta-tck/RESULTS.md](../praecepta-tck/RESULTS.md); and boolean, time and date-time columns
 ([#12](https://github.com/brunopacheco1/praecepta/issues/12)), which took the TCK from 16 to 51 of
-86 checks. Every check Praecepta supports passes. Next:
-- **Input names with spaces**, which FEEL allows
-  ([#47](https://github.com/brunopacheco1/praecepta/issues/47)): 24 of the remaining 35 checks
-  need them.
+86 checks; and input names with spaces ([#47](https://github.com/brunopacheco1/praecepta/issues/47)).
+Every check Praecepta supports passes. Most of the other 35 compare a cell with another input
+(`> Complex.aNumber`, 20 checks), which a table indexed ahead of evaluation cannot do; the rest need
+durations, COUNT ([#15](https://github.com/brunopacheco1/praecepta/issues/15)), expression outputs,
+item-definition types or decision requirement graphs
+([#14](https://github.com/brunopacheco1/praecepta/issues/14)).
 
 ## Later in the year
 - **More of DMN's decision tables:** string ranges in cells

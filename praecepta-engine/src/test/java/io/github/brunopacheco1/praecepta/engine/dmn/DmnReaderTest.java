@@ -25,6 +25,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
+import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
@@ -122,7 +123,7 @@ class DmnReaderTest {
     void map_based_inputs_take_the_table_types() {
         var engine = PraeceptaEngine.<Map<String, String>, String>builder()
                 .table(DmnReader.read(resource("camunda-modeler-discount.dmn")))
-                .inputs(io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput::new)
+                .inputs(PraeceptaInput::new)
                 .output(output -> output.values().get("tier"))
                 .build();
         Assertions.assertThat(engine.evaluate(Map.of("country", "PT", "customer.age", "30", "since", "2019-05-01")))
@@ -133,6 +134,7 @@ class DmnReaderTest {
     @CsvSource(delimiter = '|', value = {
             "duration column         | <input><inputExpression typeRef=\"dayTimeDuration\"><text>at</text></inputExpression></input> | type 'dayTimeDuration' is not supported",
             "zoned time cell         | <input><inputExpression typeRef=\"time\"><text>at</text></inputExpression></input>#<text>time(\"10:00:00Z\")</text> | rule 1, column 'at': Invalid cell",
+            "variable in a cell      | <input><inputExpression typeRef=\"string\"><text>a</text></inputExpression></input>#<text>not(Complex.aString)</text> | rule 1, column 'a': Invalid cell 'not(Complex.aString)': 'Complex.aString' is a FEEL name",
             "computed input          | <input><inputExpression typeRef=\"number\"><text>age * 2</text></inputExpression></input> | input expression 'age * 2' is not supported",
             "unsupported cell        | <input><inputExpression typeRef=\"number\"><text>age</text></inputExpression></input>#<text>&gt; abs(x)</text> | rule 1, column 'age'",
             "computed output         | <input><inputExpression typeRef=\"string\"><text>a</text></inputExpression></input>#-#<text>a + \"x\"</text> | rule 1, output 'result': 'a + \"x\"' is not supported",
@@ -166,6 +168,60 @@ class DmnReaderTest {
                   </decisionTable></decision>
                 </definitions>""";
         Assertions.assertThatThrownBy(() -> DmnReader.read(stream(xml))).hasMessageContaining("aggregation 'COUNT' is not supported");
+    }
+
+    @Test
+    void input_names_may_contain_spaces() {
+        var xml = """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="t" name="Approval"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="number"><text>Credit Score</text></inputExpression></input>
+                    <input><inputExpression typeRef="string"><text>Applicant data.Employment status</text></inputExpression></input>
+                    <output name="result" typeRef="string"/>
+                    <rule><inputEntry><text>&gt;= 700</text></inputEntry><inputEntry><text>"EMPLOYED"</text></inputEntry>
+                      <outputEntry><text>"approved"</text></outputEntry></rule>
+                    <rule><inputEntry><text>-</text></inputEntry><inputEntry><text>-</text></inputEntry>
+                      <outputEntry><text>"referred"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""";
+        var table = DmnReader.read(stream(xml));
+        Assertions.assertThat(table.inputs()).extracting(InputColumn::name)
+                .containsExactly("Credit Score", "Applicant data.Employment status");
+        var engine = PraeceptaEngine.<Map<String, String>, String>builder()
+                .table(table)
+                .inputs(PraeceptaInput::new)
+                .output(output -> output.values().get("result"))
+                .build();
+        Assertions.assertThat(engine.evaluate(Map.of("Credit Score", "720", "Applicant data.Employment status", "EMPLOYED")))
+                .containsExactly("approved");
+        Assertions.assertThat(DmnReader.read(stream(DmnWriter.write(table))).inputs()).isEqualTo(table.inputs());
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "age                          | true",
+            "Credit Score                 | true",
+            "Applicant data.Monthly income | true",
+            "Rate 2                       | true",
+            "is_ok?                       | true",
+            "𝓐ge                       | true",
+            "Ⅷ rate                    | false",
+            "2nd rate                     | false",
+            "a..b                         | false",
+            "a. b                         | false",
+            "a  b                         | false",
+            "a.2b                         | false",
+            "age * 2                      | false",
+            "f(x)                         | false",
+    })
+    void feel_names_allow_single_spaces_between_words(String text, boolean name) {
+        Assertions.assertThat(DmnReader.isName(text)).as(text).isEqualTo(name);
+    }
+
+    @Test
+    void very_long_names_are_checked_without_a_stack_overflow() {
+        Assertions.assertThat(DmnReader.isName("a".repeat(1_000_000))).isTrue();
+        Assertions.assertThat(DmnReader.isName("a b.".repeat(250_000) + "c")).isTrue();
     }
 
     @Test

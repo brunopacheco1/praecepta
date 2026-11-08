@@ -16,8 +16,9 @@ mvn -pl praecepta-tck -am test
 `TckTest` turns every expected result of every TCK test file into a check:
 
 - **passed**: the engine returns the expected result;
-- **skipped**: the table uses a feature Praecepta does not have (`DmnReader` rejects it), or the
-  inputs are of a kind it does not take. The skip message names the feature;
+- **not supported** (JUnit reports it as skipped): the table uses a feature Praecepta does not have
+  (`DmnReader` rejects it), or the inputs are of a kind it does not take. The message names the
+  feature;
 - **failed**: anything else. Every supported check must pass, so a failure fails the build.
 
 Only decisions whose logic is a decision table are checked. RESULTS.md must match the run, so a
@@ -33,7 +34,7 @@ mvn -pl praecepta-tck -am test -Dtck.update=true
 - A single-hit table (and a COLLECT aggregation) yields one value or null, a multi-hit table a
   list; a multi-output table yields a context per matching rule. COLLECT lists are compared in any
   order, other lists in order. Praecepta has no null list, so an empty list matches null.
-- Numbers compare as decimals, dates as dates.
+- Numbers compare as decimals; dates, times and date-times by value; booleans ignoring case.
 - DMN reports errors (a hit policy violation, an input outside its value list) as a null result
   flagged `errorResult`; Praecepta throws instead. A check flagged `errorResult` passes when
   evaluation throws `HitPolicyViolationException` or `InvalidInputException`, and fails otherwise.

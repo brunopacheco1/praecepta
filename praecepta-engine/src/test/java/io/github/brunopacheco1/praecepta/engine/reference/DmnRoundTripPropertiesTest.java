@@ -6,11 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.io.ByteArrayInputStream;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -71,16 +67,7 @@ class DmnRoundTripPropertiesTest {
         var builder = PraeceptaEngine.<Map<String, Object>, PraeceptaOutput>builder()
                 .table(read)
                 .output(output -> output);
-        for (var column : s.columns()) {
-            switch (s.types().get(column)) {
-                case STRING -> builder.input(column, input -> (String) input.get(column));
-                case NUMBER -> builder.numberInput(column, input -> (BigDecimal) input.get(column));
-                case DATE -> builder.dateInput(column, input -> (LocalDate) input.get(column));
-                case BOOLEAN -> builder.booleanInput(column, input -> (Boolean) input.get(column));
-                case TIME -> builder.timeInput(column, input -> (LocalTime) input.get(column));
-                case DATE_TIME -> builder.dateTimeInput(column, input -> (LocalDateTime) input.get(column));
-            }
-        }
+        s.bindColumns(builder);
         var engine = builder.build();
 
         var needsPriority = policy == HitPolicy.PRIORITY || policy == HitPolicy.OUTPUT_ORDER;

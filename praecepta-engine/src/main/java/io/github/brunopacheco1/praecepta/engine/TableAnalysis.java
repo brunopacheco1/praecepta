@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -104,9 +105,9 @@ final class TableAnalysis {
     }
 
     /**
-     * Whether the inputs one rule accepts are all matched by rules with a lower bit. The search fixes one
-     * class per column, keeping the candidates that accept every class fixed so far; it is exact, and
-     * three things keep it small:
+     * Decides whether one rule is unreachable: whether every input it accepts is also matched by a rule
+     * with a lower bit. The search fixes one class per column, keeping the candidates that accept every
+     * class fixed so far; it is exact, and three things keep it small:
      * <ul>
      * <li>{@code coversRest[c]}: the rules that accept every class this rule accepts in columns
      * {@code c} and after, so "one candidate covers what is left" is a single mask intersection;</li>
@@ -118,14 +119,17 @@ final class TableAnalysis {
      */
     private final class CoverSearch {
         /** Per column, the masks of the non-empty, allowed classes this rule accepts. */
-        private final long[][][] accepted;
-        /** Per column (and one past the last, all rules): rules accepting all of this rule's classes from there on. */
+        private final long[][][] acceptedMasks;
+        /**
+         * Per column, the rules that accept all of this rule's classes in that column and after.
+         * {@code coversRest[columns]} is all rules, so the recursion ends on an empty suffix.
+         */
         private final long[][] coversRest;
         private final Set<State> coveredStates = new HashSet<>();
 
         CoverSearch(int bit) {
             int columns = index.columnCount();
-            accepted = new long[columns][][];
+            acceptedMasks = new long[columns][][];
             coversRest = new long[columns + 1][];
             coversRest[columns] = index.allRules();
             for (int c = columns - 1; c >= 0; c--) {
@@ -138,7 +142,7 @@ final class TableAnalysis {
                         BitsetIndex.and(rest, col.masks[k]);
                     }
                 }
-                accepted[c] = masks.toArray(long[][]::new);
+                acceptedMasks[c] = masks.toArray(long[][]::new);
                 coversRest[c] = rest;
             }
         }
@@ -148,26 +152,27 @@ final class TableAnalysis {
          * {@code column}, is matched by some rule in {@code candidates} (non-empty).
          */
         boolean covered(int column, long[] candidates) {
-            if (column == accepted.length || BitsetIndex.intersects(candidates, coversRest[column])) {
+            if (column == acceptedMasks.length || BitsetIndex.intersects(candidates, coversRest[column])) {
                 return true;
             }
             var state = new State(column, candidates);
             if (coveredStates.contains(state)) {
                 return true;
             }
-            var nexts = new LinkedHashMap<State, long[]>();
-            for (var mask : accepted[column]) {
+            var nexts = new LinkedHashSet<State>(); // classes leading to the same candidates are searched once
+            for (var mask : acceptedMasks[column]) {
                 var next = candidates.clone();
                 BitsetIndex.and(next, mask);
                 if (BitsetIndex.isEmpty(next)) {
                     return false; // inputs of this class reach the rule
                 }
-                nexts.putIfAbsent(new State(column + 1, next), next);
+                nexts.add(new State(column + 1, next));
             }
-            var ordered = new ArrayList<>(nexts.values());
-            ordered.sort(Comparator.comparingInt(BitsetIndex::count));
-            for (var next : ordered) {
-                if (!covered(column + 1, next)) {
+            var fewestCandidatesFirst = nexts.stream()
+                    .sorted(Comparator.comparingInt((State next) -> BitsetIndex.count(next.candidates())))
+                    .toList();
+            for (var next : fewestCandidatesFirst) {
+                if (!covered(next.column(), next.candidates())) {
                     return false;
                 }
             }

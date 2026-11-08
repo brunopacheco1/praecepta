@@ -89,9 +89,9 @@ sealed interface TckValue {
     }
 
     /**
-     * Whether {@code actual} is the value this expected value describes. Numbers compare as decimals and
-     * dates as dates; a list compares in order unless {@code ordered} is false. Praecepta has no null
-     * list, so an empty list stands for null.
+     * Whether {@code actual} is the value this expected value describes. Numbers compare as decimals,
+     * dates, times and date-times by value, and booleans ignoring case; a list compares in order unless
+     * {@code ordered} is false. Praecepta has no null list, so an empty list stands for null.
      */
     default boolean matches(TckValue actual, boolean ordered) {
         return switch (this) {

@@ -184,10 +184,12 @@ class TypedColumnsTest {
         Assertions.assertThat(engine.evaluate(Map.of("overtime", "false", "start", "23:15"))).containsExactly("night");
         Assertions.assertThat(engine.evaluate(Map.of("overtime", "false", "start", "12:00", "at", "2025-12-25T08:00")))
                 .containsExactly("holiday");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("overtime", "yes")))
+        var notABoolean = Map.of("overtime", "yes");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(notABoolean))
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("is not a valid boolean");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("start", "10:00:00Z")))
+        var zoned = Map.of("start", "10:00:00Z");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(zoned))
                 .as("times have no zone")
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("is not a valid time");

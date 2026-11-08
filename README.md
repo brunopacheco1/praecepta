@@ -176,11 +176,14 @@ var engine = PraeceptaEngine.<Customer, String>builder()
         .build();
 ```
 
-Supported: input expressions that name a variable (`age`, `customer.age`); `string`, `number`
-(`integer`, `long`, `double`) and `date` columns; input entries in the cell syntax above; literal
-output entries; every hit policy, with SUM, MIN and MAX aggregation. Anything else (boolean or
-date-time columns, computed expressions, function calls, COUNT) is rejected with a message naming
-the decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
+Supported: input expressions that name a variable, including FEEL names with spaces (`age`,
+`customer.age`, `Credit Score`); `string`, `number` (`integer`, `long`, `double`), `date`,
+`boolean`, `time` and `dateTime` columns; input entries in the cell syntax above, as strict FEEL
+(strings quoted, since an unquoted word is a reference to another variable, and dates and times
+written with `date(...)`, `time(...)` and `date and time(...)`); literal output
+entries; every hit policy, with SUM, MIN and MAX aggregation. Anything else (durations, times with a
+zone, cells that refer to other variables, computed expressions, function calls, COUNT) is rejected
+with a message naming the decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
 evaluate identically, which is how the benchmarks feed them.
 
 ## Praecepta Loader
