@@ -55,8 +55,8 @@
         <sonar.projectKey>brunopacheco1_praecepta</sonar.projectKey>
         <sonar.organization>brunopacheco1-github</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <!-- one SonarCloud project for all modules; the benchmarks are not published, so not analysed -->
-        <sonar.exclusions>**/praecepta/benchmarks/**/*</sonar.exclusions>
+        <!-- one SonarCloud project for all modules; the benchmarks and TCK runner are not published, so not analysed -->
+        <sonar.exclusions>**/praecepta/benchmarks/**/*,**/praecepta/tck/**/*</sonar.exclusions>
         <!-- CI tooling under .github is analysed for bugs and security, but has no coverage target -->
         <sonar.coverage.exclusions>.github/**/*</sonar.coverage.exclusions>
 
@@ -93,6 +93,7 @@
         <module>praecepta-loader</module>
         <module>praecepta-maven-plugin</module>
         <module>praecepta-benchmarks</module>
+        <module>praecepta-tck</module>
     </modules>
 
     <dependencyManagement>
