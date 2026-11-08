@@ -12,12 +12,15 @@ are made is in [GOVERNANCE.md](../GOVERNANCE.md); past decisions are in
 [MODERNISATION.md](MODERNISATION.md).
 
 ## Next: 0.2
-- **Fast builds for large FIRST and PRIORITY tables**: make the unreachable-rule check optional,
-  bounded or cheaper ([#29](https://github.com/brunopacheco1/praecepta/issues/29)).
+Already done for 0.2: fast builds for large FIRST and PRIORITY tables
+([#29](https://github.com/brunopacheco1/praecepta/issues/29)), and the DMN conformance kit (TCK) in
+every build ([#22](https://github.com/brunopacheco1/praecepta/issues/22)), with its results in
+[praecepta-tck/RESULTS.md](../praecepta-tck/RESULTS.md). Every TCK check Praecepta supports passes;
+these close most of the gap with the rest:
 - **Boolean, time and date-time columns** ([#12](https://github.com/brunopacheco1/praecepta/issues/12)),
-  the main gap with the DMN conformance kit.
-- **The DMN conformance kit (TCK)** for the decision tables Praecepta supports
-  ([#22](https://github.com/brunopacheco1/praecepta/issues/22)).
+  the main gap with the TCK: 33 of the checks Praecepta does not support yet need boolean columns.
+- **Input names with spaces**, which FEEL allows
+  ([#47](https://github.com/brunopacheco1/praecepta/issues/47)): 24 more checks need them.
 
 ## Later in the year
 - **More of DMN's decision tables:** string ranges in cells

@@ -98,8 +98,8 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
           JMH on an Apple M2 Pro, every engine reading the same DMN file and checked to give the same
           answers. Every log and raw result is
           <a href="https://github.com/brunopacheco1/praecepta/tree/main/praecepta-benchmarks/results">published</a>,
-          including where Praecepta is slower: building large FIRST and PRIORITY tables
-          (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>).
+          including where Praecepta 0.1.0 is slower: building large FIRST and PRIORITY tables
+          (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>, fixed for 0.2).
         </p>
       </div>
     </section>
@@ -258,8 +258,8 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
           <h3>Know the limits</h3>
           <ul class="plain">
             <li>A table decides what your application does: who may change tables is up to you.</li>
-            <li>Building huge FIRST or PRIORITY tables can take minutes
-              (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>): build untrusted tables off the request path.</li>
+            <li>In 0.1.0, building huge FIRST or PRIORITY tables can take minutes
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>, fixed for 0.2): build untrusted tables off the request path.</li>
             <li>Input size is limited only by the JDK's XML limits: cap uploads yourself.</li>
           </ul>
         </div>
@@ -396,9 +396,11 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
         <li>
           <h3>Next: 0.2</h3>
           <ul class="plain">
-            <li>Fast builds for large FIRST and PRIORITY tables (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>)</li>
+            <li>Done: fast builds for large FIRST and PRIORITY tables (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>)</li>
+            <li>Done: the DMN conformance kit in every build (<a href="https://github.com/brunopacheco1/praecepta/issues/22">#22</a>,
+              <a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
             <li>Boolean, time and date-time columns (<a href="https://github.com/brunopacheco1/praecepta/issues/12">#12</a>)</li>
-            <li>The DMN conformance kit (<a href="https://github.com/brunopacheco1/praecepta/issues/22">#22</a>)</li>
+            <li>Input names with spaces (<a href="https://github.com/brunopacheco1/praecepta/issues/47">#47</a>)</li>
           </ul>
         </li>
         <li>

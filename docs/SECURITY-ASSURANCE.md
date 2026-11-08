@@ -33,10 +33,11 @@ data and needs no configuration.
 **Users cannot expect (out of scope):**
 - **Protection from a malicious table's logic.** A table decides what the application does with
   its answer; who may change tables is the application's responsibility.
-- **Bounded build time for huge FIRST or PRIORITY tables.** Validation of a large table with many
-  overlapping rules can take minutes ([#29](https://github.com/brunopacheco1/praecepta/issues/29)).
-  Applications that build engines from untrusted tables should limit the table size, or build
-  them off the request path.
+- **Bounded build time for crafted FIRST or PRIORITY tables.** The unreachable-rule check is exact,
+  so a table built to defeat it can still be slow to validate. Since 0.2, large realistic tables
+  build in under a second (1,000 rules and 9 columns: 0.7 s, against 65 s in 0.1.0;
+  [#29](https://github.com/brunopacheco1/praecepta/issues/29)). Applications that build engines
+  from untrusted tables should limit the table size, or build them off the request path.
 - **Limits on the size of input documents** beyond the JDK's XML processing limits
   (`FEATURE_SECURE_PROCESSING`); applications should cap upload sizes.
 - **Spreadsheet safety beyond Apache POI's.** Excel files are parsed by Apache POI, kept up to date
@@ -81,7 +82,7 @@ data and needs no configuration.
 | CWE-776, entity expansion | DTDs disallowed; JDK secure-processing limits |
 | CWE-20, improper input validation | Cells parsed against a grammar; value lists enforced; DMN elements checked |
 | CWE-94, code injection (plugin) | Identifiers sanitised; string literals and comment text escaped |
-| CWE-400, resource exhaustion | Fuzzed parsers; JDK limits; a known gap for huge FIRST and PRIORITY tables (#29) |
+| CWE-400, resource exhaustion | Fuzzed parsers; JDK limits; FIRST and PRIORITY validation fast on large tables since 0.2 (#29), but a crafted table can still be slow |
 | CWE-362, race conditions | Immutable engines, no shared mutable state |
 | CWE-1104, unmaintained components | One runtime dependency (Apache POI, loader only), monitored by Dependabot and OSV |
 
