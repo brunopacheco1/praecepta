@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -279,14 +280,17 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                         around.add(time.minusMinutes(1));
                         around.add(time.plusMinutes(1));
                         if (next != null) {
-                            around.add(time.plus(Duration.between(time, (LocalTime) next).dividedBy(2)));
+                            around.add(LocalTime.ofNanoOfDay((time.toNanoOfDay() + ((LocalTime) next).toNanoOfDay()) / 2));
                         }
                     }
                     case LocalDateTime moment -> {
                         around.add(moment.minusHours(1));
                         around.add(moment.plusHours(1));
                         if (next != null) {
-                            around.add(moment.plus(Duration.between(moment, (LocalDateTime) next).dividedBy(2)));
+                            // no zone: measure on the UTC timeline
+                            var start = moment.toInstant(ZoneOffset.UTC);
+                            var end = ((LocalDateTime) next).toInstant(ZoneOffset.UTC);
+                            around.add(LocalDateTime.ofInstant(start.plus(Duration.between(start, end).dividedBy(2)), ZoneOffset.UTC));
                         }
                     }
                     default -> {

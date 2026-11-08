@@ -91,6 +91,19 @@ class CellParserTest {
     }
 
     @Test
+    void strict_feel_reads_unquoted_words_as_names_not_strings() {
+        // Praecepta's own tables (Excel, CSV, code) keep the shorter syntax
+        Assertions.assertThat(CellParser.parse("PT, ES", ColumnType.STRING))
+                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("PT"), new Equals("ES"))));
+        // in DMN an unquoted word refers to another variable, which is not supported
+        Assertions.assertThat(CellParser.parseFeel("\"PT\", \"ES\"", ColumnType.STRING))
+                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("PT"), new Equals("ES"))));
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel("not(Complex.aString)", ColumnType.STRING))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining("'Complex.aString' is a FEEL name");
+    }
+
+    @Test
     void times_and_date_times_use_their_functions_or_iso_text() {
         var morning = LocalTime.of(8, 30);
         Assertions.assertThat(CellParser.parse("[time(\"08:30:00\")..12:00)", ColumnType.TIME))
@@ -147,6 +160,8 @@ class CellParserTest {
             "DATE_TIME; date and time(\"2025-01-01T10:00:00@Europe/Paris\"); has a time zone",
             "DATE_TIME; date and time(\"2025-01-01T10:00:00-05:00\"); has a time zone",
             "DATE_TIME; 2025-01-01;   is not a date and time",
+            "DATE_TIME; date and time(\"2025-01-31\"); invalid date and time",
+            "TIME;   time(\"10:00:00+0200\"); has a time zone",
             "DATE_TIME; [date and time(\"2025-01-02T00:00:00\")..date and time(\"2025-01-01T00:00:00\")]; starts after it ends",
             "NUMBER; abc;             is not a number",
             "NUMBER; [5..1];          starts after it ends",

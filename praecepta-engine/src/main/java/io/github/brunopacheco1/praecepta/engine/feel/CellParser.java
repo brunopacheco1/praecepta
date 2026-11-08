@@ -54,8 +54,8 @@ public final class CellParser {
     private static final Pattern BARE_TIME = Pattern.compile("\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?");
     private static final Pattern DATE_TIME_CALL = Pattern.compile("date\\s+and\\s+time\\(\\s*\"([^\"]*)\"\\s*\\)");
     private static final Pattern BARE_DATE_TIME = Pattern.compile("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?");
-    /** An offset or zone at the end of a time or date-time: Z, +02:00, -0500, @Europe/Paris. */
-    private static final Pattern ZONE = Pattern.compile(".*([Zz]|[+-]\\d{2}(:?\\d{2})?|@.+)");
+    /** The digits of an offset after its sign: 02, 0200 or 02:00. */
+    private static final Pattern OFFSET_DIGITS = Pattern.compile("\\d{2}(:?\\d{2})?");
 
     private CellParser() {
     }
@@ -64,6 +64,20 @@ public final class CellParser {
      * @throws CellSyntaxException if the cell is not valid for the column type
      */
     public static UnaryTests parse(String cell, ColumnType type) {
+        return parse(cell, type, false);
+    }
+
+    /**
+     * Parses a cell as strict DMN FEEL, as DMN files hold it: string literals must be quoted, because an
+     * unquoted word is a FEEL name (a reference to another variable), which Praecepta does not support.
+     *
+     * @throws CellSyntaxException if the cell is not valid for the column type, or names a variable
+     */
+    public static UnaryTests parseFeel(String cell, ColumnType type) {
+        return parse(cell, type, true);
+    }
+
+    private static UnaryTests parse(String cell, ColumnType type, boolean feel) {
         var text = cell == null ? "" : cell.strip();
         if (text.isEmpty() || text.equals("-")) {
             return new UnaryTests.Any();
@@ -71,15 +85,15 @@ public final class CellParser {
         // FEEL only allows not(...) around the whole cell; its contents may hold intervals like [1..2)
         if (text.startsWith("not(") && text.endsWith(")")) {
             var inner = text.substring(4, text.length() - 1);
-            return new UnaryTests.Negated(tests(inner, type, cell));
+            return new UnaryTests.Negated(tests(inner, type, cell, feel));
         }
-        return new UnaryTests.Positive(tests(text, type, cell));
+        return new UnaryTests.Positive(tests(text, type, cell, feel));
     }
 
-    private static List<Test> tests(String text, ColumnType type, String cell) {
+    private static List<Test> tests(String text, ColumnType type, String cell, boolean feel) {
         var tests = new ArrayList<Test>();
         for (var part : splitTopLevel(text, cell)) {
-            tests.add(test(part.strip(), type, cell));
+            tests.add(test(part.strip(), type, cell, feel));
         }
         if (tests.isEmpty()) {
             throw new CellSyntaxException(cell, "no tests");
@@ -87,7 +101,7 @@ public final class CellParser {
         return tests;
     }
 
-    private static Test test(String text, ColumnType type, String cell) {
+    private static Test test(String text, ColumnType type, String cell, boolean feel) {
         if (text.isEmpty()) {
             throw new CellSyntaxException(cell, "empty test between commas");
         }
@@ -97,7 +111,7 @@ public final class CellParser {
         for (var operator : List.of(Operator.LE, Operator.GE, Operator.LT, Operator.GT)) {
             if (text.startsWith(operator.symbol())) {
                 requireOrdered(type, cell, "comparisons");
-                return new Compare(operator, literal(text.substring(operator.symbol().length()).strip(), type, cell));
+                return new Compare(operator, literal(text.substring(operator.symbol().length()).strip(), type, cell, feel));
             }
         }
         char first = text.charAt(0);
@@ -106,18 +120,18 @@ public final class CellParser {
             int dots = topLevelDots(text, cell);
             if (dots > 0) {
                 requireOrdered(type, cell, "intervals");
-                var low = literal(text.substring(1, dots).strip(), type, cell);
-                var high = literal(text.substring(dots + 2, text.length() - 1).strip(), type, cell);
+                var low = literal(text.substring(1, dots).strip(), type, cell, feel);
+                var high = literal(text.substring(dots + 2, text.length() - 1).strip(), type, cell, feel);
                 if (compare(low, high) > 0) {
                     throw new CellSyntaxException(cell, "interval starts after it ends");
                 }
                 return new Range(low, first == '[', high, last == ']');
             }
         }
-        return new Equals(literal(text, type, cell));
+        return new Equals(literal(text, type, cell, feel));
     }
 
-    private static Comparable<?> literal(String text, ColumnType type, String cell) {
+    private static Comparable<?> literal(String text, ColumnType type, String cell, boolean feel) {
         if (text.isEmpty()) {
             throw new CellSyntaxException(cell, "missing value");
         }
@@ -125,6 +139,9 @@ public final class CellParser {
             case STRING -> {
                 if (text.startsWith("\"")) {
                     yield quoted(text, cell);
+                }
+                if (feel) {
+                    throw new CellSyntaxException(cell, "'" + text + "' is a FEEL name (a variable), which is not supported; quote string literals");
                 }
                 if (text.matches(".*[\"()\\[\\]].*")) {
                     throw new CellSyntaxException(cell, "unexpected characters in '" + text + "'; quote the text");
@@ -181,7 +198,7 @@ public final class CellParser {
         if (!matcher.matches() && !bare.matcher(text).matches() || matcher.matches() && iso.isEmpty()) {
             throw new CellSyntaxException(cell, "'" + text + "' is not " + expected);
         }
-        if (ZONE.matcher(iso).matches()) {
+        if (hasZone(iso)) {
             throw new CellSyntaxException(cell, "'" + iso + "' has a time zone; only local times are supported");
         }
         return iso;
@@ -203,6 +220,19 @@ public final class CellParser {
             }
         }
         return value.toString();
+    }
+
+    /**
+     * Whether a time or date-time ends with an offset or a zone: {@code Z}, {@code +02:00},
+     * {@code -0500}, {@code @Europe/Paris}. An offset follows the time, so its sign comes after a
+     * colon; the dashes of a date ({@code 2025-01-31}) do not count.
+     */
+    static boolean hasZone(String iso) {
+        if (iso.indexOf('@') >= 0 || iso.endsWith("Z") || iso.endsWith("z")) {
+            return true;
+        }
+        int sign = Math.max(iso.lastIndexOf('+'), iso.lastIndexOf('-'));
+        return sign > 0 && iso.lastIndexOf(':', sign) >= 0 && OFFSET_DIGITS.matcher(iso.substring(sign + 1)).matches();
     }
 
     private static void requireOrdered(ColumnType type, String cell, String what) {

@@ -217,8 +217,12 @@ final class TckRunner {
     private static final Pattern ZONED = Pattern.compile(".*\\d([Zz]|[+-]\\d{2}:?\\d{2}|@.+)");
     private static final Pattern AGGREGATION = Pattern.compile("aggregation '([^']*)' is not supported");
     private static final Pattern EXPRESSION = Pattern.compile("input expression '([^']*)' is not supported");
-    /** A cell naming a variable where a literal is expected, e.g. {@code > otherDate}. */
-    private static final Pattern REFERENCE = Pattern.compile("'[\\p{L}_][\\p{L}\\p{N}_]*' is not a (number|date)");
+    /**
+     * A cell naming a variable where a literal is expected, e.g. {@code > otherDate},
+     * {@code Complex.aString} or {@code < Another number}.
+     */
+    private static final Pattern REFERENCE = Pattern.compile(
+            "'[\\p{L}_?][\\p{L}\\p{N}_?. ]*' (is a FEEL name|is not a (number|date|boolean|time|date and time))");
 
     /** A short, stable name for what {@link DmnReader} rejected, used to group results. */
     static String unsupportedFeature(String message) {

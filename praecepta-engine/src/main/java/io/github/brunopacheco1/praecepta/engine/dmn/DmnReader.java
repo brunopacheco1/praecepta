@@ -182,7 +182,7 @@ public final class DmnReader {
 
     private static UnaryTests parse(String text, ColumnType type, String where) {
         try {
-            return CellParser.parse(text, type);
+            return CellParser.parseFeel(text, type);
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }
@@ -220,7 +220,7 @@ public final class DmnReader {
     private static Object single(String literal, ColumnType type, String where) {
         UnaryTests tests;
         try {
-            tests = CellParser.parse(literal, type);
+            tests = CellParser.parseFeel(literal, type);
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException("%s: '%s' is not supported; output entries must be literals".formatted(where, literal));
         }
@@ -279,9 +279,35 @@ public final class DmnReader {
         };
     }
 
-    /** A FEEL name or a qualified name such as {@code applicant.age}. */
-    private static boolean isName(String text) {
-        return text.matches("[\\p{L}_?][\\p{L}\\p{N}_?]*(\\.[\\p{L}_?][\\p{L}\\p{N}_?]*)*");
+    /**
+     * A FEEL name, or a qualified name such as {@code applicant.age}. Each part starts with a letter,
+     * {@code _} or {@code ?}, continues with letters, digits, {@code _} and {@code ?}, and may hold
+     * single spaces between words, as FEEL allows: {@code Credit Score}, {@code Applicant data.Monthly income}.
+     * Checked character by character, so long input costs linear time and no stack.
+     */
+    static boolean isName(String text) {
+        boolean partStart = true;
+        boolean afterSpace = false;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '.' || c == ' ') {
+                if (partStart || afterSpace) {
+                    return false; // an empty part, a space after a dot, or two separators in a row
+                }
+                partStart = c == '.';
+                afterSpace = c == ' ';
+            } else if (partStart ? isNameStart(c) : isNameStart(c) || Character.isDigit(c)) {
+                partStart = false;
+                afterSpace = false;
+            } else {
+                return false;
+            }
+        }
+        return !partStart && !afterSpace;
+    }
+
+    private static boolean isNameStart(char c) {
+        return Character.isLetter(c) || c == '_' || c == '?';
     }
 
     // ---- XML ---------------------------------------------------------------------------------

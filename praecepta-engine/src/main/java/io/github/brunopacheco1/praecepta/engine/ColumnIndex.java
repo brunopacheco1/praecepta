@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -264,13 +265,8 @@ final class ColumnIndex {
                 throw new InvalidInputException(name, text, "is not a valid " + typeName(type));
             }
         }
-        return switch (type) {
-            case DATE -> (LocalDate) raw;
-            case TIME -> (LocalTime) raw;
-            case DATE_TIME -> (LocalDateTime) raw;
-            case BOOLEAN -> (Boolean) raw;
-            default -> number((Number) raw);
-        };
+        // typed getters already return the column's Java type (LocalDate, LocalTime, ...); numbers vary
+        return type == ColumnType.NUMBER ? number((Number) raw) : raw;
     }
 
     private static String typeName(ColumnType type) {
@@ -425,36 +421,48 @@ final class ColumnIndex {
     /** A value inside a non-empty open interval: a round step beyond an open end, else the midpoint. */
     private static Object between(ValueClass.Between b, ColumnType type) {
         return switch (type) {
-            case DATE -> {
-                if (b.low() == null) {
-                    yield b.high() == null ? LocalDate.EPOCH : ((LocalDate) b.high()).minusDays(1);
-                }
-                yield ((LocalDate) b.low()).plusDays(1);
-            }
-            case TIME -> {
-                var low = (LocalTime) b.low();
-                var high = (LocalTime) b.high();
-                if (low == null) {
-                    // non-empty, so high is after midnight; step back an hour unless that wraps around
-                    yield high == null ? LocalTime.NOON : high.getHour() >= 1 ? high.minusHours(1) : LocalTime.MIDNIGHT;
-                }
-                if (high == null) {
-                    yield low.getHour() <= 22 ? low.plusHours(1) : LocalTime.MAX;
-                }
-                yield low.plus(Duration.between(low, high).dividedBy(2));
-            }
-            case DATE_TIME -> {
-                var low = (LocalDateTime) b.low();
-                var high = (LocalDateTime) b.high();
-                if (low == null) {
-                    yield high == null ? LocalDate.EPOCH.atStartOfDay() : high.minusDays(1);
-                }
-                yield high == null ? low.plusDays(1) : low.plus(Duration.between(low, high).dividedBy(2));
-            }
+            case DATE -> betweenDates((LocalDate) b.low(), (LocalDate) b.high());
+            case TIME -> betweenTimes((LocalTime) b.low(), (LocalTime) b.high());
+            case DATE_TIME -> betweenDateTimes((LocalDateTime) b.low(), (LocalDateTime) b.high());
             case NUMBER -> betweenNumbers(b);
             // BOOLEAN gaps are always empty, and STRING has no intervals
             case BOOLEAN, STRING -> throw new IllegalStateException("no value between " + b);
         };
+    }
+
+    private static LocalDate betweenDates(LocalDate low, LocalDate high) {
+        if (low != null) {
+            return low.plusDays(1);
+        }
+        return high == null ? LocalDate.EPOCH : high.minusDays(1);
+    }
+
+    private static LocalTime betweenTimes(LocalTime low, LocalTime high) {
+        if (low == null && high == null) {
+            return LocalTime.NOON;
+        }
+        if (low == null) {
+            // the gap is not empty, so high is after midnight: step back an hour unless that wraps around
+            return high.getHour() >= 1 ? high.minusHours(1) : LocalTime.MIDNIGHT;
+        }
+        if (high == null) {
+            return low.getHour() <= 22 ? low.plusHours(1) : LocalTime.MAX;
+        }
+        // at least two nanoseconds apart (the gap is not empty), so the midpoint lies strictly inside
+        return LocalTime.ofNanoOfDay((low.toNanoOfDay() + high.toNanoOfDay()) / 2);
+    }
+
+    private static LocalDateTime betweenDateTimes(LocalDateTime low, LocalDateTime high) {
+        if (low == null) {
+            return high == null ? LocalDate.EPOCH.atStartOfDay() : high.minusDays(1);
+        }
+        if (high == null) {
+            return low.plusDays(1);
+        }
+        // date-times have no zone: measure on the UTC timeline, which has no daylight-saving gaps or overlaps
+        var start = low.toInstant(ZoneOffset.UTC);
+        var middle = start.plus(Duration.between(start, high.toInstant(ZoneOffset.UTC)).dividedBy(2));
+        return LocalDateTime.ofInstant(middle, ZoneOffset.UTC);
     }
 
     private static BigDecimal betweenNumbers(ValueClass.Between b) {
@@ -470,25 +478,27 @@ final class ColumnIndex {
     }
 
     private boolean isEmpty(ValueClass valueClass) {
-        if (!(valueClass instanceof ValueClass.Between b)) {
+        if (!(valueClass instanceof ValueClass.Between(var low, var high))) {
             return false;
         }
         return switch (type) {
             case BOOLEAN -> true; // false and true are both boundaries: nothing lies outside or between them
-            case DATE -> b.low() != null && b.high() != null
-                    && !((LocalDate) b.low()).plusDays(1).isBefore((LocalDate) b.high());
-            case TIME -> {
-                var low = (LocalTime) b.low();
-                var high = (LocalTime) b.high();
-                if (low == null || high == null) {
-                    yield low == null ? LocalTime.MIDNIGHT.equals(high) : LocalTime.MAX.equals(low);
-                }
-                yield !low.plusNanos(1).isBefore(high);
-            }
-            case DATE_TIME -> b.low() != null && b.high() != null
-                    && !((LocalDateTime) b.low()).plusNanos(1).isBefore((LocalDateTime) b.high());
+            case DATE -> low != null && high != null && !((LocalDate) low).plusDays(1).isBefore((LocalDate) high);
+            case TIME -> emptyTimes((LocalTime) low, (LocalTime) high);
+            case DATE_TIME -> low != null && high != null && !((LocalDateTime) low).plusNanos(1).isBefore((LocalDateTime) high);
             case NUMBER, STRING -> false;
         };
+    }
+
+    /** No time of day lies before midnight, after the last nanosecond, or between consecutive nanoseconds. */
+    private static boolean emptyTimes(LocalTime low, LocalTime high) {
+        if (low == null) {
+            return LocalTime.MIDNIGHT.equals(high);
+        }
+        if (high == null) {
+            return LocalTime.MAX.equals(low);
+        }
+        return !low.plusNanos(1).isBefore(high);
     }
 
     // ---- FEEL semantics per class ---------------------------------------------------------------

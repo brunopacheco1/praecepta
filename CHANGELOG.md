@@ -19,6 +19,8 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   reads `boolean`, `time` and `dateTime` columns, `DmnWriter` writes them, and the Maven plugin
   generates `Boolean`, `LocalTime` and `LocalDateTime` components. Times are local: values with a
   zone or offset are rejected. The DMN TCK now passes 51 of 86 checks (was 16).
+- **Input names with spaces** ([#47](https://github.com/brunopacheco1/praecepta/issues/47)):
+  `DmnReader` accepts FEEL names such as `Credit Score` or `Applicant data.Monthly income`.
 - **Project documents:** governance (roles, decisions, continuity), architecture, a security
   assurance case and a one-year roadmap. The website shows the roadmap, a C4 system context diagram,
   and what users can expect on security, and links them all.
@@ -49,8 +51,14 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   loaders read their file in the constructor, which a subclass could otherwise observe half-built.
   Extend `BaseLoader` to write a loader of your own.
 - **Exceptions declare a `serialVersionUID`.**
+- **`DmnReader` reads cells as strict FEEL:** an unquoted word in a string cell is a reference to
+  another variable, so it is rejected as unsupported instead of being read as a string (the DMN TCK
+  caught `Complex.aString` being compared as text). Excel, CSV and code keep the shorter `PT,ES`
+  syntax; `CellParser.parseFeel` is the strict parser.
 
 ### Fixed
+- **`date and time("2025-01-31")`** (a date without a time) is reported as an invalid date and time,
+  not as a value with a time zone.
 - **Large FIRST and PRIORITY tables build quickly** ([#29](https://github.com/brunopacheco1/praecepta/issues/29)):
   the unreachable-rule check, still exact, now remembers the regions it has proven covered, tests
   whether one rule covers the rest with a single mask intersection, and looks for an uncovered input
