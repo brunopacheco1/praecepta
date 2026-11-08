@@ -98,8 +98,8 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
           JMH on an Apple M2 Pro, every engine reading the same DMN file and checked to give the same
           answers. Every log and raw result is
           <a href="https://github.com/brunopacheco1/praecepta/tree/main/praecepta-benchmarks/results">published</a>,
-          including where Praecepta 0.1.0 is slower: building large FIRST and PRIORITY tables
-          (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>, fixed for 0.2).
+          including where Praecepta 0.1.0 was slower: building large FIRST and PRIORITY tables
+          (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>, fixed in 0.2).
         </p>
       </div>
     </section>
@@ -113,8 +113,8 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
         </article>
         <article>
           <h3>FEEL cells</h3>
-          <p>Lists, <code>not(...)</code>, comparisons, intervals and <code>null</code> on string, number and
-            date columns, with optional input value lists.</p>
+          <p>Lists, <code>not(...)</code>, comparisons, intervals and <code>null</code> on string, number,
+            date, boolean, time and date-time columns, with optional input value lists.</p>
         </article>
         <article>
           <h3>Validation when you build</h3>
@@ -234,8 +234,8 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
           column.</li>
         <li><strong>Decision requirement graphs:</strong> decisions feeding other decisions, business
           knowledge models and boxed expressions.</li>
-        <li><strong>More column types:</strong> boolean, time and date-time columns arrive in 0.2
-          (<a href="https://github.com/brunopacheco1/praecepta/issues/12">#12</a>); durations and times with a zone are not planned.</li>
+        <li><strong>Durations and times with a zone:</strong> duration columns are
+          <a href="https://github.com/brunopacheco1/praecepta/issues/52">planned</a>; times and date-times are local.</li>
         <li><strong>A process engine, a modeller or a decision service</strong> around the tables.</li>
       </ul>
     </section>
@@ -258,8 +258,8 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
           <h3>Know the limits</h3>
           <ul class="plain">
             <li>A table decides what your application does: who may change tables is up to you.</li>
-            <li>In 0.1.0, building huge FIRST or PRIORITY tables can take minutes
-              (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>, fixed for 0.2): build untrusted tables off the request path.</li>
+            <li>A table crafted to defeat validation can still be slow to build
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>): build untrusted tables off the request path.</li>
             <li>Input size is limited only by the JDK's XML limits: cap uploads yourself.</li>
           </ul>
         </div>
@@ -394,20 +394,27 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
       <h2 id="roadmap-title">Roadmap</h2>
       <ol class="timeline">
         <li>
-          <h3>Next: 0.2</h3>
+          <h3>0.2</h3>
           <ul class="plain">
-            <li>Done: fast builds for large FIRST and PRIORITY tables (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>)</li>
-            <li>Done: the DMN conformance kit in every build (<a href="https://github.com/brunopacheco1/praecepta/issues/22">#22</a>,
+            <li>Fast builds for large FIRST and PRIORITY tables (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>)</li>
+            <li>The DMN conformance kit in every build (<a href="https://github.com/brunopacheco1/praecepta/issues/22">#22</a>,
               <a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
-            <li>Done: boolean, time and date-time columns (<a href="https://github.com/brunopacheco1/praecepta/issues/12">#12</a>)</li>
-            <li>Done: input names with spaces (<a href="https://github.com/brunopacheco1/praecepta/issues/47">#47</a>)</li>
+            <li>Boolean, time and date-time columns, and input names with spaces
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/12">#12</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/47">#47</a>)</li>
+          </ul>
+        </li>
+        <li>
+          <h3>Next: 0.3</h3>
+          <ul class="plain">
+            <li>Item-definition types, COUNT, outputs that name an input, string ranges
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/54">#54</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/15">#15</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/53">#53</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/13">#13</a>)</li>
           </ul>
         </li>
         <li>
           <h3>Later this year</h3>
           <ul class="plain">
-            <li>String ranges, COUNT and list-valued inputs
-              (<a href="https://github.com/brunopacheco1/praecepta/issues/13">#13</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/15">#15</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/25">#25</a>)</li>
+            <li>Cells that compare with another input, durations and list-valued inputs
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/51">#51</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/52">#52</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/25">#25</a>)</li>
             <li>Faster number and date columns, compressed bitmaps
               (<a href="https://github.com/brunopacheco1/praecepta/issues/16">#16</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/17">#17</a>)</li>
             <li>Gradle, GraalVM, Spring Boot and a playground, as people ask
