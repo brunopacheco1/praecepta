@@ -41,6 +41,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 final class SourceGenerator {
 
     /** A {@code ${name}} slot in a template. */
+    /** Starts each input binding: generated sources always use {@code \n}, whatever the platform. */
+    private static final String BINDING_LINE = "\n                    ";
+
     private static final Pattern SLOT = Pattern.compile("\\$\\{(\\w+)}");
 
     // ---- templates ------------------------------------------------------------------------------
@@ -324,10 +327,10 @@ final class SourceGenerator {
         var column = stringLiteral(input.column().name());
         var getter = inputType + "::" + input.member();
         if (!input.isEnum()) {
-            return "\n                    .%s(%s, %s)".formatted(Converter.of(input.column().type()).binding(), column, getter);
+            return BINDING_LINE + ".%s(%s, %s)".formatted(Converter.of(input.column().type()).binding(), column, getter);
         }
         var enumType = inputType + "." + input.enumName();
-        return "\n                    .enumInput(%s, %s.class, %s::value, %s)".formatted(column, enumType, enumType, getter);
+        return BINDING_LINE + ".enumInput(%s, %s.class, %s::value, %s)".formatted(column, enumType, enumType, getter);
     }
 
     private String outputStrategy() {
@@ -378,23 +381,6 @@ final class SourceGenerator {
         }));
     }
 
-    /**
-     * The values of a string column's value list, or an empty list if it has none (it then stays a
-     * String). A value list always holds at least one value.
-     */
-    private static List<String> valueListOf(InputColumn column) {
-        if (column.type() != ColumnType.STRING || column.allowedValues() == null) {
-            return List.of();
-        }
-        // the engine has already checked that a string column's value list is a list of values
-        var tests = (UnaryTests.Positive) CellParser.parse(column.allowedValues(), ColumnType.STRING);
-        var values = new LinkedHashSet<String>();
-        for (var test : tests.tests()) {
-            values.add((String) ((UnaryTests.Equals) test).value());
-        }
-        return List.copyOf(values);
-    }
-
     private static String stringLiteral(String value) {
         var java = new StringBuilder("\"");
         for (char c : value.toCharArray()) {
@@ -440,6 +426,23 @@ final class SourceGenerator {
 
         boolean isEnum() {
             return !enumValues.isEmpty();
+        }
+
+        /**
+         * The values of a string column's value list, or an empty list if it has none (it then stays a
+         * String). A value list always holds at least one value.
+         */
+        private static List<String> valueListOf(InputColumn column) {
+            if (column.type() != ColumnType.STRING || column.allowedValues() == null) {
+                return List.of();
+            }
+            // the engine has already checked that a string column's value list is a list of values
+            var tests = (UnaryTests.Positive) CellParser.parse(column.allowedValues(), ColumnType.STRING);
+            var values = new LinkedHashSet<String>();
+            for (var test : tests.tests()) {
+                values.add((String) ((UnaryTests.Equals) test).value());
+            }
+            return List.copyOf(values);
         }
 
         String javaType() {

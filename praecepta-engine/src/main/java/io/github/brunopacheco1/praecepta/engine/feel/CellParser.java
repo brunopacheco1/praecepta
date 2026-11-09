@@ -86,12 +86,6 @@ public final class CellParser {
         return new Parser(type, cell, true).parse();
     }
 
-    /** Compares two values of the same column type. */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static int compare(Comparable<?> a, Comparable<?> b) {
-        return ((Comparable) a).compareTo(b);
-    }
-
     /**
      * One cell being parsed for a column type; {@code strictFeel} turns off Praecepta's shorter forms.
      * The cell is split into tests, each test is read as {@code null}, a comparison, an interval or a
@@ -274,6 +268,12 @@ public final class CellParser {
             } catch (DateTimeParseException e) {
                 throw new CellSyntaxException(cell, "invalid " + type.feelName() + " '" + iso + "'");
             }
+        }
+
+        /** Compares two values of the same column type. */
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        private static int compare(Comparable<?> a, Comparable<?> b) {
+            return ((Comparable) a).compareTo(b);
         }
 
         /**

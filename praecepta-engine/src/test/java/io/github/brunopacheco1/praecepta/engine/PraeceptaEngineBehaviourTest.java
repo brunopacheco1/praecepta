@@ -138,14 +138,17 @@ class PraeceptaEngineBehaviourTest {
 
         @Test
         void bindings_and_priority_lists_are_declared_once() {
-            Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST).input("country", input -> input.get("x")))
+            var bound = byColumn(HitPolicy.FIRST);
+            Assertions.assertThatThrownBy(() -> bound.input("country", input -> input.get("x")))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Input column 'country' is declared twice");
             var builder = byColumn(HitPolicy.PRIORITY).outputPriority("grade", List.of("A", "B"));
-            Assertions.assertThatThrownBy(() -> builder.outputPriority("grade", List.of("A")))
+            var gradeAgain = List.of("A");
+            Assertions.assertThatThrownBy(() -> builder.outputPriority("grade", gradeAgain))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Priority list for 'grade' is declared twice");
-            Assertions.assertThatThrownBy(() -> builder.outputPriority("other", List.of("A", "A")))
+            var duplicates = List.of("A", "A");
+            Assertions.assertThatThrownBy(() -> builder.outputPriority("other", duplicates))
                     .isExactlyInstanceOf(IllegalArgumentException.class)
                     .hasMessage("Priority list for 'other' has duplicates: [A, A]");
         }
@@ -245,10 +248,12 @@ class PraeceptaEngineBehaviourTest {
 
         @Test
         void unique_and_any_violations_list_the_matching_rules() {
-            Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.UNIQUE).build().evaluate(PT_SMB))
+            var unique = byColumn(HitPolicy.UNIQUE).build();
+            Assertions.assertThatThrownBy(() -> unique.evaluate(PT_SMB))
                     .isExactlyInstanceOf(HitPolicyViolationException.class)
                     .hasMessage("UNIQUE hit policy violated: rules [1, 2, 3] all match");
-            Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.ANY).build().evaluate(PT_SMB))
+            var any = byColumn(HitPolicy.ANY).build();
+            Assertions.assertThatThrownBy(() -> any.evaluate(PT_SMB))
                     .isExactlyInstanceOf(HitPolicyViolationException.class)
                     .hasMessage("ANY hit policy violated: matching rules [1, 2, 3] have different outputs");
         }
@@ -333,7 +338,8 @@ class PraeceptaEngineBehaviourTest {
                     .build();
             Assertions.assertThat(engine.evaluate(Map.of("country", "P\"T"))).containsExactly("A");
             Assertions.assertThat(engine.evaluate(Map.of("country", "E\\S"))).containsExactly("A");
-            Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("country", "PT")))
+            var notAllowed = Map.of("country", "PT");
+            Assertions.assertThatThrownBy(() -> engine.evaluate(notAllowed))
                     .isExactlyInstanceOf(InvalidInputException.class)
                     .hasMessage("Input country=PT is not one of the column's allowed input values");
         }
@@ -381,7 +387,8 @@ class PraeceptaEngineBehaviourTest {
                     .build();
             Assertions.assertThat(engine.inputs()).containsExactly("zeta", "beta", "country", "alpha", "age");
             Assertions.assertThat(engine.evaluate(Map.of("country", "PT", "age", "3"))).containsExactly("A");
-            Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("age", "three")))
+            var notANumber = Map.of("age", "three");
+            Assertions.assertThatThrownBy(() -> engine.evaluate(notANumber))
                     .isExactlyInstanceOf(InvalidInputException.class)
                     .hasMessageStartingWith("Input age=three ");
         }

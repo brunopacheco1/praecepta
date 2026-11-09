@@ -49,8 +49,10 @@ class ExcelLoaderBehaviourTest {
 
     @Test
     void a_declared_column_missing_from_the_header_is_named() throws IOException {
-        var bytes = workbook();
-        assertThatThrownBy(() -> new ExcelLoader(new ByteArrayInputStream(bytes), "rules.xlsx", Set.of("missing"), Set.of("out")))
+        var stream = new ByteArrayInputStream(workbook());
+        var inputs = Set.of("missing");
+        var outputs = Set.of("out");
+        assertThatThrownBy(() -> new ExcelLoader(stream, "rules.xlsx", inputs, outputs))
                 .isInstanceOf(InvalidMatrixException.class)
                 .hasMessage("Error loading rules.xlsx: Fields not found in file: missing")
                 .hasCauseInstanceOf(MissingFieldException.class);
@@ -59,7 +61,9 @@ class ExcelLoaderBehaviourTest {
     @Test
     void a_file_that_is_not_a_workbook_is_reported() {
         var stream = new ByteArrayInputStream(new byte[] {1, 2, 3});
-        assertThatThrownBy(() -> new ExcelLoader(stream, "rules.xlsx", Set.of("a"), Set.of("b")))
+        var inputs = Set.of("a");
+        var outputs = Set.of("b");
+        assertThatThrownBy(() -> new ExcelLoader(stream, "rules.xlsx", inputs, outputs))
                 .isInstanceOf(InvalidMatrixException.class)
                 .hasMessage("Error loading rules.xlsx: The file not found: rules.xlsx")
                 .hasCauseInstanceOf(MissingFileException.class);

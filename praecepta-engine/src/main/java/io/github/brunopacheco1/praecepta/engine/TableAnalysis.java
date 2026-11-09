@@ -210,8 +210,17 @@ final class TableAnalysis {
     private record Step(int column, List<Integer> classes) {
     }
 
-    /** The classes of a column that leave the same candidates, which behave alike from there on. */
-    private record Branch(long[] candidates, List<Integer> classes) {
+    /**
+     * The classes of a column that leave the same candidates, which behave alike from there on. A plain
+     * class, not a record: branches are grouped by their candidates' content, never compared themselves.
+     */
+    private static final class Branch {
+        final long[] candidates;
+        final List<Integer> classes = new ArrayList<>();
+
+        Branch(long[] candidates) {
+            this.candidates = candidates;
+        }
     }
 
     private List<Issue> gaps() {
@@ -277,15 +286,15 @@ final class TableAnalysis {
             var nextPath = path;
             if (branches.size() > 1) { // a column that does not discriminate here is left out ("any value")
                 nextPath = new ArrayList<>(path);
-                nextPath.add(new Step(column, branch.classes()));
+                nextPath.add(new Step(column, branch.classes));
             }
-            if (BitsetIndex.isEmpty(branch.candidates())) {
+            if (BitsetIndex.isEmpty(branch.candidates)) {
                 gaps.add(gapIssue(nextPath));
                 if (gaps.size() >= MAX_GAPS) {
                     return;
                 }
             } else {
-                searchGaps(column + 1, branch.candidates(), nextPath, gaps);
+                searchGaps(column + 1, branch.candidates, nextPath, gaps);
             }
         }
     }
@@ -300,7 +309,7 @@ final class TableAnalysis {
             }
             var next = candidates.clone();
             BitsetIndex.and(next, col.masks[k]);
-            byCandidates.computeIfAbsent(key(next), mask -> new Branch(next, new ArrayList<>())).classes().add(k);
+            byCandidates.computeIfAbsent(key(next), mask -> new Branch(next)).classes.add(k);
         }
         return byCandidates.values();
     }
