@@ -41,10 +41,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 final class SourceGenerator {
 
     /** A {@code ${name}} slot in a template. */
+    private static final Pattern SLOT = Pattern.compile("\\$\\{(\\w+)}");
+
     /** Starts each input binding: generated sources always use {@code \n}, whatever the platform. */
     private static final String BINDING_LINE = "\n                    ";
-
-    private static final Pattern SLOT = Pattern.compile("\\$\\{(\\w+)}");
 
     // ---- templates ------------------------------------------------------------------------------
 
