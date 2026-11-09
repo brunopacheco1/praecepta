@@ -18,6 +18,7 @@ import java.util.Map;
 
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
@@ -77,21 +78,22 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             var domain = LETTERS.subList(0, size);
             var declared = Arbitraries.of(domain).set().ofMinSize(1).ofMaxSize(size)
                     .map(values -> String.join(",", values.stream().sorted().map(v -> "\"" + v + "\"").toList()));
-            var maybe = declareStrings ? declared : Arbitraries.oneOf(declared, Arbitraries.just((String) null), Arbitraries.just((String) null));
+            var maybe = declareStrings ? declared : oneTimeInThree(declared);
             return maybe.map(allowed -> new Column(ColumnType.STRING, domain, allowed));
         });
-        var number = Arbitraries.oneOf(Arbitraries.just((String) null), Arbitraries.just((String) null), interval(ColumnType.NUMBER))
-                .map(allowed -> new Column(ColumnType.NUMBER, List.of(), allowed));
-        var date = Arbitraries.oneOf(Arbitraries.just((String) null), Arbitraries.just((String) null), interval(ColumnType.DATE))
-                .map(allowed -> new Column(ColumnType.DATE, List.of(), allowed));
-        var bool = Arbitraries.oneOf(Arbitraries.just((String) null), Arbitraries.just((String) null), Arbitraries.of("true", "false", "true, false"))
+        var number = oneTimeInThree(interval(ColumnType.NUMBER)).map(allowed -> new Column(ColumnType.NUMBER, List.of(), allowed));
+        var date = oneTimeInThree(interval(ColumnType.DATE)).map(allowed -> new Column(ColumnType.DATE, List.of(), allowed));
+        var bool = oneTimeInThree(Arbitraries.of("true", "false", "true, false"))
                 .map(allowed -> new Column(ColumnType.BOOLEAN, List.of(), allowed));
-        var time = Arbitraries.oneOf(Arbitraries.just((String) null), Arbitraries.just((String) null), interval(ColumnType.TIME))
-                .map(allowed -> new Column(ColumnType.TIME, List.of(), allowed));
-        var dateTime = Arbitraries.oneOf(Arbitraries.just((String) null), Arbitraries.just((String) null), interval(ColumnType.DATE_TIME))
-                .map(allowed -> new Column(ColumnType.DATE_TIME, List.of(), allowed));
+        var time = oneTimeInThree(interval(ColumnType.TIME)).map(allowed -> new Column(ColumnType.TIME, List.of(), allowed));
+        var dateTime = oneTimeInThree(interval(ColumnType.DATE_TIME)).map(allowed -> new Column(ColumnType.DATE_TIME, List.of(), allowed));
         return Arbitraries.frequencyOf(Tuple.of(4, string), Tuple.of(2, number), Tuple.of(2, date),
                 Tuple.of(1, bool), Tuple.of(1, time), Tuple.of(1, dateTime));
+    }
+
+    /** Declared input values one time in three; otherwise none (null). */
+    private static Arbitrary<String> oneTimeInThree(Arbitrary<String> declared) {
+        return Arbitraries.oneOf(Arbitraries.just((String) null), Arbitraries.just((String) null), declared);
     }
 
     private record RuleRow(List<String> cells, String out, int number) {
@@ -230,8 +232,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         }
     }
 
-    public ReferenceMatcher reference(List<Praeceptum> tableRules, io.github.brunopacheco1.praecepta.engine.beans.HitPolicy policy,
-            Map<String, List<String>> outputPriority) {
+    public ReferenceMatcher reference(List<Praeceptum> tableRules, HitPolicy policy, Map<String, List<String>> outputPriority) {
         return new ReferenceMatcher(tableRules, policy, outputPriority, types, allowedValues);
     }
 
@@ -241,6 +242,21 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
 
     public List<String> ruleIds(List<Praeceptum> matches) {
         return ids(matches.stream().map(Praeceptum::output).toList());
+    }
+
+    /**
+     * The rules with {@link #OUT} as their only output. Without the unique {@link #ID}, overlapping
+     * rules can agree, as ANY needs.
+     */
+    public static List<Praeceptum> outOnly(List<Praeceptum> rules) {
+        return rules.stream()
+                .map(rule -> new Praeceptum(rule.priority(), rule.input(), new PraeceptaOutput(Map.of(OUT, rule.output().values().get(OUT)))))
+                .toList();
+    }
+
+    /** The output value lists the hit policy needs: {@code priority} for {@link #OUT} under PRIORITY and OUTPUT ORDER, else none. */
+    public static Map<String, List<String>> outputPriority(HitPolicy policy, List<String> priority) {
+        return policy == HitPolicy.PRIORITY || policy == HitPolicy.OUTPUT_ORDER ? Map.of(OUT, priority) : Map.of();
     }
 
     /** The input as text, for map-based binding: numbers in plain notation, dates in ISO format. */

@@ -60,7 +60,6 @@ public class ThroughputBenchmark {
     }
 
     @Setup(Level.Trial)
-    @SuppressWarnings("unchecked")
     public void setUp() {
         var decisionTable = Table.named(table);
         var requests = Workload.generate(decisionTable, EvaluationBenchmark.WORKLOAD_SIZE, 7);

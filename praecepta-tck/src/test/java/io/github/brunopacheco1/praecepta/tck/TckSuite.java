@@ -85,8 +85,7 @@ final class TckSuite {
         var model = models.computeIfAbsent(file.resolveSibling(modelName), TckSuite::model);
         var testFile = file.getFileName().toString();
         for (var test : TckXml.children(root, "testCase")) {
-            var type = test.getAttribute("type");
-            if (!type.isEmpty() && !type.equals("decision")) {
+            if (!isDecision(test)) {
                 continue; // decision services and BKMs
             }
             var inputs = new LinkedHashMap<String, TckValue>();
@@ -95,8 +94,7 @@ final class TckSuite {
             }
             for (var result : TckXml.children(test, "resultNode")) {
                 var decision = result.getAttribute("name");
-                var resultType = result.getAttribute("type");
-                if (!model.tables().contains(decision) || !resultType.isEmpty() && !resultType.equals("decision")) {
+                if (!isDecision(result) || !model.tables().contains(decision)) {
                     continue;
                 }
                 var expected = TckXml.children(result, "expected");
@@ -107,14 +105,19 @@ final class TckSuite {
         }
     }
 
+    /** Whether a test case or result node is about a decision; its {@code type} is then absent or "decision". */
+    private static boolean isDecision(Element node) {
+        var type = node.getAttribute("type");
+        return type.isEmpty() || type.equals("decision");
+    }
+
     private static Model model(Path file) {
-        Element root = TckXml.parse(file);
-        var decisions = TckXml.descendants(root, "decision");
-        return new Model(file,
-                decisions.stream()
-                        .filter(decision -> !TckXml.children(decision, "decisionTable").isEmpty())
-                        .map(decision -> decision.getAttribute("name"))
-                        .collect(Collectors.toUnmodifiableSet()),
-                decisions.stream().map(decision -> decision.getAttribute("name")).collect(Collectors.toUnmodifiableSet()));
+        var decisions = TckXml.descendants(TckXml.parse(file), "decision");
+        var tables = decisions.stream()
+                .filter(decision -> !TckXml.children(decision, "decisionTable").isEmpty())
+                .map(decision -> decision.getAttribute("name"))
+                .collect(Collectors.toUnmodifiableSet());
+        var names = decisions.stream().map(decision -> decision.getAttribute("name")).collect(Collectors.toUnmodifiableSet());
+        return new Model(file, tables, names);
     }
 }

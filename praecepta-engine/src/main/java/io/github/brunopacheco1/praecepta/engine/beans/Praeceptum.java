@@ -8,8 +8,9 @@ package io.github.brunopacheco1.praecepta.engine.beans;
 /**
  * One rule (row) of a decision table.
  *
- * <p>Input cells: a null or blank value matches any input; {@code a,b} matches {@code a} or
- * {@code b}; anything else must match exactly. A null or blank input only matches wildcards.
+ * <p>Input cells are DMN FEEL unary tests of their column's type, such as {@code "PT","ES"} or
+ * {@code >= 18} (see {@code CellParser}). A null, blank or {@code -} cell matches any value, including
+ * a missing one.
  *
  * @param priority the rule's identifier, used in validation reports and violation messages
  *                 (loaders set it to the source row number). It does not affect evaluation:

@@ -52,6 +52,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 @Fork(value = 10, jvmArgsAppend = {"-Xms2g", "-Xmx6g"})
 public class FirstDecisionBenchmark {
 
+    /** How {@link FirstDecisionFixtures} writes a missing value. */
     static final String NULL = "\\N";
 
     @Param({"praecepta", "camunda", "drools"})
@@ -79,22 +80,31 @@ public class FirstDecisionBenchmark {
         input = new HashMap<>();
         for (var line : Files.readAllLines(directory.resolve(table + ".input"))) {
             var fields = line.split("\t", 3);
+            var column = fields[0];
             var type = ColumnType.valueOf(fields[1]);
-            inputs.add(fields[0]);
+            inputs.add(column);
             types.add(type);
-            input.put(fields[0], fields[2].equals(NULL) ? null : switch (type) {
-                case STRING -> fields[2];
-                case NUMBER -> new BigDecimal(fields[2]);
-                case DATE -> LocalDate.parse(fields[2]);
-                case BOOLEAN -> Boolean.valueOf(fields[2]);
-                case TIME -> LocalTime.parse(fields[2]);
-                case DATE_TIME -> LocalDateTime.parse(fields[2]);
-            });
+            input.put(column, value(type, fields[2]));
         }
     }
 
     @Benchmark
     public List<String> firstDecision() {
         return Contender.create(engine, dmn, inputs, types).evaluate(input);
+    }
+
+    /** A value as {@link FirstDecisionFixtures} wrote it, read back as the Java type its column takes. */
+    private static Object value(ColumnType type, String text) {
+        if (text.equals(NULL)) {
+            return null;
+        }
+        return switch (type) {
+            case STRING -> text;
+            case NUMBER -> new BigDecimal(text);
+            case DATE -> LocalDate.parse(text);
+            case BOOLEAN -> Boolean.valueOf(text);
+            case TIME -> LocalTime.parse(text);
+            case DATE_TIME -> LocalDateTime.parse(text);
+        };
     }
 }

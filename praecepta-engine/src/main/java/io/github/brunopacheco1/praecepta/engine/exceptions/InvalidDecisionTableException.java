@@ -19,11 +19,13 @@ public class InvalidDecisionTableException extends RuntimeException {
 
     private final transient ValidationReport report;
 
+    /** The definition is inconsistent, as the message explains; there is no report. */
     public InvalidDecisionTableException(String message) {
         super(message);
         this.report = null;
     }
 
+    /** The report has an issue at or above the {@code failOn} severity; the message lists the report. */
     public InvalidDecisionTableException(ValidationReport report) {
         super("Decision table failed validation:\n" + report);
         this.report = report;

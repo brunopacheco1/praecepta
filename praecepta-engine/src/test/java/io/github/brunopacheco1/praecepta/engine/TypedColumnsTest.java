@@ -5,6 +5,7 @@
  */
 package io.github.brunopacheco1.praecepta.engine;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -68,7 +69,7 @@ class TypedColumnsTest {
                 .output(output -> output.values().get("tier"))
                 .rules(List.of(new Praeceptum(1, new PraeceptaInput(Map.of("x", "[1..2]")), new PraeceptaOutput(Map.of("tier", "in")))))
                 .build();
-        for (Number x : List.<Number>of(1, 2L, 1.5d, new java.math.BigDecimal("2.000"))) {
+        for (Number x : List.<Number>of(1, 2L, 1.5d, new BigDecimal("2.000"))) {
             Assertions.assertThat(engine.evaluate(Map.of("x", x))).as("%s", x).containsExactly("in");
         }
         Assertions.assertThat(engine.evaluate(Map.of("x", 2.0001))).isEmpty();
@@ -152,14 +153,7 @@ class TypedColumnsTest {
 
     @Test
     void booleans_times_and_date_times() {
-        var engine = PraeceptaEngine.<Shift, String>builder()
-                .hitPolicy(HitPolicy.FIRST)
-                .booleanInput("overtime", Shift::overtime)
-                .timeInput("start", Shift::start)
-                .dateTimeInput("at", Shift::at)
-                .output(output -> output.values().get("rate"))
-                .rules(SHIFTS)
-                .build();
+        var engine = shiftEngine(SHIFTS);
         var weekday = LocalDateTime.of(2025, 3, 4, 9, 0);
         Assertions.assertThat(engine.evaluate(new Shift(true, LocalTime.of(9, 0), weekday))).containsExactly("double");
         Assertions.assertThat(engine.evaluate(new Shift(false, LocalTime.of(22, 0), weekday))).containsExactly("night");
@@ -201,17 +195,10 @@ class TypedColumnsTest {
 
     @Test
     void boolean_and_time_gaps_are_reported_as_feel_literals() {
-        var engine = PraeceptaEngine.<Shift, String>builder()
-                .hitPolicy(HitPolicy.FIRST)
-                .booleanInput("overtime", Shift::overtime)
-                .timeInput("start", Shift::start)
-                .dateTimeInput("at", Shift::at)
-                .output(output -> output.values().get("rate"))
-                .rules(List.of(
-                        shift(1, "true", "-", "-", "double"),
-                        shift(2, "false", "< time(\"12:00:00\")", "-", "morning"),
-                        shift(3, "-", "< time(\"00:00:00\")", "-", "never")))
-                .build();
+        var engine = shiftEngine(List.of(
+                shift(1, "true", "-", "-", "double"),
+                shift(2, "false", "< time(\"12:00:00\")", "-", "morning"),
+                shift(3, "-", "< time(\"00:00:00\")", "-", "never")));
         Assertions.assertThat(engine.validationReport().issues(Kind.GAP)).singleElement().satisfies(gap -> {
             Assertions.assertThat(gap.detail()).isEqualTo("overtime = false, start in [time(\"12:00:00\")..+inf)");
             Assertions.assertThat(gap.example()).containsEntry("overtime", false).containsEntry("start", LocalTime.NOON);
@@ -220,6 +207,18 @@ class TypedColumnsTest {
         Assertions.assertThat(engine.validationReport().issues(Kind.UNREACHABLE_RULE))
                 .extracting(issue -> issue.ruleIds().getFirst())
                 .containsExactly(3);
+    }
+
+    /** A FIRST engine over shifts, bound with the boolean, time and date-time getters. */
+    private static PraeceptaEngine<Shift, String> shiftEngine(List<Praeceptum> rules) {
+        return PraeceptaEngine.<Shift, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .booleanInput("overtime", Shift::overtime)
+                .timeInput("start", Shift::start)
+                .dateTimeInput("at", Shift::at)
+                .output(output -> output.values().get("rate"))
+                .rules(rules)
+                .build();
     }
 
     private static Praeceptum shift(int id, String overtime, String start, String at, String rate) {

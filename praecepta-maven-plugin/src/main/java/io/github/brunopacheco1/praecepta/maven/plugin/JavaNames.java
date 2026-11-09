@@ -36,7 +36,9 @@ final class JavaNames {
             return "value";
         }
         var name = new StringBuilder(lowerFirst(words.getFirst()));
-        words.stream().skip(1).forEach(word -> name.append(upperFirst(word)));
+        for (var word : words.subList(1, words.size())) {
+            name.append(upperFirst(word));
+        }
         return safe(name.toString());
     }
 

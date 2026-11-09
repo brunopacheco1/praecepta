@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -83,14 +84,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     public List<Praeceptum> matches(Map<String, ?> input) {
         var matches = new ArrayList<Praeceptum>();
         for (var rule : rules) {
-            boolean accepted = true;
-            for (var cell : rule.input().values().entrySet()) {
-                if (!accepts(parse(cell.getValue(), cell.getKey()), value(input, cell.getKey()))) {
-                    accepted = false;
-                    break;
-                }
-            }
-            if (accepted) {
+            if (ruleAccepts(rule, input)) {
                 matches.add(rule);
             }
         }
@@ -233,71 +227,17 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * missing value.
      */
     public List<Object> representativeValues(String column, boolean withMissing) {
-        var values = new ArrayList<Object>();
         var type = type(column);
         var cells = new ArrayList<UnaryTests>();
         rules.forEach(rule -> cells.add(parse(rule.input().values().get(column), column)));
         if (allowedValues.containsKey(column)) {
             cells.add(parse(allowedValues.get(column), column));
         }
-        if (type == ColumnType.BOOLEAN) {
-            values.addAll(List.of(false, true)); // the whole domain
-        } else if (type == ColumnType.STRING) {
-            var written = new TreeSet<String>();
-            cells.forEach(cell -> literals(cell).forEach(v -> written.add((String) v)));
-            values.addAll(written);
-            values.add("other-value");
-        } else {
-            var points = new TreeSet<Object>(ReferenceMatcher::compare);
-            cells.forEach(cell -> points.addAll(literals(cell)));
-            var sorted = new ArrayList<>(points);
-            var around = new TreeSet<Object>(ReferenceMatcher::compare);
-            around.addAll(sorted);
-            if (sorted.isEmpty()) {
-                around.add(switch (type) {
-                    case NUMBER -> BigDecimal.ZERO;
-                    case TIME -> LocalTime.NOON;
-                    case DATE_TIME -> LocalDateTime.of(2025, 1, 1, 0, 0);
-                    default -> LocalDate.of(2025, 1, 1);
-                });
-            }
-            for (int i = 0; i < sorted.size(); i++) {
-                var point = sorted.get(i);
-                var next = i + 1 < sorted.size() ? sorted.get(i + 1) : null;
-                switch (point) {
-                    case BigDecimal number -> {
-                        around.add(number.subtract(BigDecimal.ONE));
-                        around.add(number.add(BigDecimal.ONE));
-                        if (next != null) {
-                            around.add(number.add((BigDecimal) next).divide(BigDecimal.TWO));
-                        }
-                    }
-                    case LocalDate date -> {
-                        // no date lies between consecutive days
-                        around.add(date.minusDays(1));
-                        around.add(date.plusDays(1));
-                    }
-                    case LocalTime time -> {
-                        around.add(time.minusMinutes(1));
-                        around.add(time.plusMinutes(1));
-                        if (next != null) {
-                            around.add(LocalTime.ofNanoOfDay((time.toNanoOfDay() + ((LocalTime) next).toNanoOfDay()) / 2));
-                        }
-                    }
-                    case LocalDateTime moment -> {
-                        around.add(moment.minusHours(1));
-                        around.add(moment.plusHours(1));
-                        if (next != null) {
-                            // no zone: measure on the UTC timeline
-                            var start = moment.toInstant(ZoneOffset.UTC);
-                            var end = ((LocalDateTime) next).toInstant(ZoneOffset.UTC);
-                            around.add(LocalDateTime.ofInstant(start.plus(Duration.between(start, end).dividedBy(2)), ZoneOffset.UTC));
-                        }
-                    }
-                    default -> throw new IllegalStateException("not an ordered value: " + point);
-                }
-            }
-            values.addAll(around);
+        var values = new ArrayList<Object>();
+        switch (type) {
+            case BOOLEAN -> values.addAll(List.of(false, true)); // the whole domain
+            case STRING -> values.addAll(stringRepresentatives(cells));
+            default -> values.addAll(orderedRepresentatives(type, cells));
         }
         if (withMissing) {
             values.add(null);
@@ -305,14 +245,18 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return values;
     }
 
-    private List<Map<String, Object>> representativeInputs(List<String> columns, boolean withMissing) {
+    /**
+     * Every input that extends {@code partial} with a representative value for each of {@code columns}:
+     * the cartesian product of their {@link #representativeValues representative values}.
+     */
+    public List<Map<String, Object>> representativeInputs(Map<String, Object> partial, List<String> columns, boolean withMissing) {
         List<Map<String, Object>> inputs = new ArrayList<>();
-        inputs.add(new HashMap<>());
+        inputs.add(new HashMap<>(partial));
         for (var column : columns) {
             var next = new ArrayList<Map<String, Object>>();
-            for (var partial : inputs) {
+            for (var shorter : inputs) {
                 for (var option : representativeValues(column, withMissing)) {
-                    var input = new HashMap<>(partial);
+                    var input = new HashMap<>(shorter);
                     input.put(column, option);
                     next.add(input);
                 }
@@ -322,7 +266,87 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return inputs;
     }
 
+    private List<Map<String, Object>> representativeInputs(List<String> columns, boolean withMissing) {
+        return representativeInputs(Map.of(), columns, withMissing);
+    }
+
+    /** Every string the cells mention, sorted, and one they do not. */
+    private static List<Object> stringRepresentatives(List<UnaryTests> cells) {
+        var written = new TreeSet<String>();
+        cells.forEach(cell -> literals(cell).forEach(v -> written.add((String) v)));
+        var values = new ArrayList<Object>(written);
+        values.add("other-value");
+        return values;
+    }
+
+    /** The values the cells mention, the points around each and between neighbours, in order. */
+    private static Collection<Object> orderedRepresentatives(ColumnType type, List<UnaryTests> cells) {
+        var points = new TreeSet<Object>(ReferenceMatcher::compare);
+        cells.forEach(cell -> points.addAll(literals(cell)));
+        var sorted = new ArrayList<>(points);
+        var around = new TreeSet<Object>(ReferenceMatcher::compare);
+        around.addAll(sorted);
+        if (sorted.isEmpty()) {
+            around.add(switch (type) {
+                case NUMBER -> BigDecimal.ZERO;
+                case TIME -> LocalTime.NOON;
+                case DATE_TIME -> LocalDateTime.of(2025, 1, 1, 0, 0);
+                default -> LocalDate.of(2025, 1, 1);
+            });
+        }
+        for (int i = 0; i < sorted.size(); i++) {
+            var next = i + 1 < sorted.size() ? sorted.get(i + 1) : null;
+            addNeighbours(around, sorted.get(i), next);
+        }
+        return around;
+    }
+
+    /** The values just below and above {@code point}, and halfway to {@code next} (null after the last point). */
+    private static void addNeighbours(Set<Object> around, Object point, Object next) {
+        switch (point) {
+            case BigDecimal number -> {
+                around.add(number.subtract(BigDecimal.ONE));
+                around.add(number.add(BigDecimal.ONE));
+                if (next != null) {
+                    around.add(number.add((BigDecimal) next).divide(BigDecimal.TWO));
+                }
+            }
+            case LocalDate date -> {
+                // no date lies between consecutive days
+                around.add(date.minusDays(1));
+                around.add(date.plusDays(1));
+            }
+            case LocalTime time -> {
+                around.add(time.minusMinutes(1));
+                around.add(time.plusMinutes(1));
+                if (next != null) {
+                    around.add(LocalTime.ofNanoOfDay((time.toNanoOfDay() + ((LocalTime) next).toNanoOfDay()) / 2));
+                }
+            }
+            case LocalDateTime moment -> {
+                around.add(moment.minusHours(1));
+                around.add(moment.plusHours(1));
+                if (next != null) {
+                    // no zone: measure on the UTC timeline
+                    var start = moment.toInstant(ZoneOffset.UTC);
+                    var end = ((LocalDateTime) next).toInstant(ZoneOffset.UTC);
+                    around.add(LocalDateTime.ofInstant(start.plus(Duration.between(start, end).dividedBy(2)), ZoneOffset.UTC));
+                }
+            }
+            default -> throw new IllegalStateException("not an ordered value: " + point);
+        }
+    }
+
     // ---- FEEL semantics on concrete values ------------------------------------------------------
+
+    private boolean ruleAccepts(Praeceptum rule, Map<String, ?> input) {
+        for (var cell : rule.input().values().entrySet()) {
+            if (!accepts(parse(cell.getValue(), cell.getKey()), value(input, cell.getKey()))) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     private static boolean accepts(UnaryTests cell, Object value) {
         return switch (cell) {

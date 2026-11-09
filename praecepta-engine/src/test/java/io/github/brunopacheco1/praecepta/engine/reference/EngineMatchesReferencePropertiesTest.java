@@ -6,8 +6,6 @@
 package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -100,7 +98,7 @@ class EngineMatchesReferencePropertiesTest {
     @Property(tries = TRIES, edgeCases = EdgeCasesMode.NONE)
     void any_returns_the_shared_output_or_signals_disagreement(@ForAll("scenarios") DecisionTableScenario s, @ForAll boolean perColumn) {
         // without the unique id output, overlapping rules can genuinely agree
-        assertSameHits(s, withoutIds(s.rules()), HitPolicy.ANY, List.of(), perColumn);
+        assertSameHits(s, DecisionTableScenario.outOnly(s.rules()), HitPolicy.ANY, List.of(), perColumn);
     }
 
     @Property(tries = TRIES, edgeCases = EdgeCasesMode.NONE)
@@ -142,9 +140,9 @@ class EngineMatchesReferencePropertiesTest {
     void validation_report_matches_the_reference(@ForAll("scenarios") DecisionTableScenario s,
             @ForAll("priorities") List<String> priority) {
         for (var policy : List.of(HitPolicy.UNIQUE, HitPolicy.ANY, HitPolicy.FIRST, HitPolicy.PRIORITY)) {
-            var rules = policy == HitPolicy.ANY ? withoutIds(s.rules()) : s.rules();
+            var rules = policy == HitPolicy.ANY ? DecisionTableScenario.outOnly(s.rules()) : s.rules();
             var engine = engine(s, rules, policy, priority, true);
-            var reference = s.reference(rules, policy, priorityMap(policy, priority));
+            var reference = s.reference(rules, policy, DecisionTableScenario.outputPriority(policy, priority));
             var actual = engine.validationReport().issues().stream()
                     .filter(issue -> issue.kind() != Kind.GAP)
                     .map(issue -> new Finding(issue.kind().name(), issue.ruleIds()))
@@ -185,7 +183,7 @@ class EngineMatchesReferencePropertiesTest {
     private static void assertSameHits(DecisionTableScenario s, List<Praeceptum> rules, HitPolicy policy,
             List<String> priority, boolean perColumn) {
         var engine = engine(s, rules, policy, priority, perColumn);
-        var reference = s.reference(rules, policy, priorityMap(policy, priority));
+        var reference = s.reference(rules, policy, DecisionTableScenario.outputPriority(policy, priority));
         for (var input : s.inputs()) {
             switch (reference.evaluate(input)) {
                 case Outcome.Hits hits -> Assertions.assertThat(engine.evaluate(input))
@@ -228,35 +226,9 @@ class EngineMatchesReferencePropertiesTest {
 
     /** Every valid completion of a gap example: missing columns take each representative valid value. */
     private static List<Map<String, Object>> completions(Map<String, Object> example, DecisionTableScenario s, ReferenceMatcher reference) {
-        List<Map<String, Object>> inputs = new ArrayList<>();
-        inputs.add(new HashMap<>(example));
-        for (var column : s.columns()) {
-            if (example.containsKey(column)) {
-                continue;
-            }
-            var next = new ArrayList<Map<String, Object>>();
-            for (var partial : inputs) {
-                for (var value : reference.representativeValues(column, false)) {
-                    var input = new HashMap<>(partial);
-                    input.put(column, value);
-                    next.add(input);
-                }
-            }
-            inputs = next;
-        }
-        return inputs.stream().filter(input -> reference.invalidColumn(input) == null).toList();
-    }
-
-    private static Map<String, List<String>> priorityMap(HitPolicy policy, List<String> priority) {
-        return policy == HitPolicy.PRIORITY || policy == HitPolicy.OUTPUT_ORDER
-                ? Map.of(DecisionTableScenario.OUT, priority)
-                : Map.of();
-    }
-
-    private static List<Praeceptum> withoutIds(List<Praeceptum> rules) {
-        return rules.stream()
-                .map(rule -> new Praeceptum(rule.priority(), rule.input(), new PraeceptaOutput(
-                        Map.of(DecisionTableScenario.OUT, rule.output().values().get(DecisionTableScenario.OUT)))))
+        var missing = s.columns().stream().filter(column -> !example.containsKey(column)).toList();
+        return reference.representativeInputs(example, missing, false).stream()
+                .filter(input -> reference.invalidColumn(input) == null)
                 .toList();
     }
 

@@ -5,10 +5,12 @@
  */
 package io.github.brunopacheco1.praecepta.engine.feel;
 
+import java.io.Serial;
+
 /** A table cell is not a valid unary test for its column type. */
 public class CellSyntaxException extends IllegalArgumentException {
 
-    @java.io.Serial
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private final String cell;
@@ -18,6 +20,7 @@ public class CellSyntaxException extends IllegalArgumentException {
         this.cell = cell;
     }
 
+    /** The cell as it was written. */
     public String getCell() {
         return cell;
     }

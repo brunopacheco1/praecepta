@@ -17,7 +17,6 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
-import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
@@ -42,12 +41,14 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  */
 public final class DmnWriter {
 
-    static final String NAMESPACE = "https://www.omg.org/spec/DMN/20191111/MODEL/";
+    private static final String NAMESPACE = "https://www.omg.org/spec/DMN/20191111/MODEL/";
 
     private DmnWriter() {
     }
 
     /**
+     * The DMN XML of a table.
+     *
      * @throws InvalidDecisionTableException if a cell is not valid for its column type
      */
     public static String write(DecisionTable table) {
@@ -63,6 +64,17 @@ public final class DmnWriter {
         xml.append("</definitions>\n");
         return xml.toString();
     }
+
+    /** Standard FEEL text for parsed unary tests. */
+    public static String render(UnaryTests tests) {
+        return switch (tests) {
+            case UnaryTests.Any() -> "-";
+            case UnaryTests.Positive(var positive) -> join(positive);
+            case UnaryTests.Negated(var negated) -> "not(" + join(negated) + ")";
+        };
+    }
+
+    // ---- elements, one method per DMN element ----------------------------------------------------
 
     /** The {@code inputData} of an input, which Drools needs to bind its value. */
     private static void inputData(StringBuilder xml, int c, InputColumn input) {
@@ -83,7 +95,9 @@ public final class DmnWriter {
     }
 
     private static void decisionTable(StringBuilder xml, DecisionTable table) {
-        xml.append("    <decisionTable").append(id("table")).append(attribute("hitPolicy", hitPolicy(table.hitPolicy())));
+        // DMN spells the hit policies with spaces: RULE ORDER, OUTPUT ORDER
+        var hitPolicy = table.hitPolicy().name().replace('_', ' ');
+        xml.append("    <decisionTable").append(id("table")).append(attribute("hitPolicy", hitPolicy));
         if (table.aggregation() != null) {
             xml.append(attribute("aggregation", table.aggregation().name()));
         }
@@ -107,7 +121,7 @@ public final class DmnWriter {
         xml.append("      <input").append(id("input_" + c)).append(attribute("label", input.name())).append(">\n");
         expression(xml, "inputExpression", id("input_expression_" + c) + typed(input.type()), input.name());
         if (input.allowedValues() != null) {
-            var values = unaryTests(input.allowedValues(), input.type(), "input values of column '" + input.name() + "'");
+            var values = standardFeel(input.allowedValues(), input.type(), "input values of column '" + input.name() + "'");
             expression(xml, "inputValues", id("input_values_" + c), values);
         }
         xml.append("      </input>\n");
@@ -120,7 +134,7 @@ public final class DmnWriter {
             return;
         }
         var values = output.values().stream()
-                .map(value -> literal(value, output.type(), "output values of '" + output.name() + "'"))
+                .map(value -> outputLiteral(value, output.type(), "output values of '" + output.name() + "'"))
                 .collect(Collectors.joining(", "));
         xml.append(">\n");
         expression(xml, "outputValues", id("output_values_" + c), values);
@@ -134,13 +148,13 @@ public final class DmnWriter {
         var inputs = table.inputs();
         for (int c = 0; c < inputs.size(); c++) {
             var input = inputs.get(c);
-            var cell = unaryTests(rule.input().values().get(input.name()), input.type(), where + ", column '" + input.name() + "'");
+            var cell = standardFeel(rule.input().values().get(input.name()), input.type(), where + ", column '" + input.name() + "'");
             expression(xml, "inputEntry", id("input_entry_" + r + "_" + c), cell);
         }
         var outputs = table.outputs();
         for (int c = 0; c < outputs.size(); c++) {
             var output = outputs.get(c);
-            var value = literal(rule.output().values().get(output.name()), output.type(), where + ", output '" + output.name() + "'");
+            var value = outputLiteral(rule.output().values().get(output.name()), output.type(), where + ", output '" + output.name() + "'");
             expression(xml, "outputEntry", id("output_entry_" + r + "_" + c), value);
         }
         xml.append("      </rule>\n");
@@ -152,36 +166,15 @@ public final class DmnWriter {
            .append("</text></").append(tag).append(">\n");
     }
 
-    static String typeRef(ColumnType type) {
-        return switch (type) {
-            case STRING -> "string";
-            case NUMBER -> "number";
-            case DATE -> "date";
-            case BOOLEAN -> "boolean";
-            case TIME -> "time";
-            case DATE_TIME -> "dateTime";
-        };
-    }
+    // ---- cells and values as FEEL ----------------------------------------------------------------
 
-    static String hitPolicy(HitPolicy policy) {
-        return policy.name().replace('_', ' ');
-    }
-
-    private static String unaryTests(String cell, ColumnType type, String where) {
+    /** A cell in Praecepta's syntax, as standard FEEL. */
+    private static String standardFeel(String cell, ColumnType type, String where) {
         try {
             return render(CellParser.parse(cell, type));
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }
-    }
-
-    /** Standard FEEL text for parsed unary tests. */
-    public static String render(UnaryTests tests) {
-        return switch (tests) {
-            case UnaryTests.Any() -> "-";
-            case UnaryTests.Positive(var positive) -> join(positive);
-            case UnaryTests.Negated(var negated) -> "not(" + join(negated) + ")";
-        };
     }
 
     private static String join(List<Test> tests) {
@@ -199,7 +192,7 @@ public final class DmnWriter {
     }
 
     /** An output value (plain text) as a FEEL literal of its column type. */
-    private static String literal(String value, ColumnType type, String where) {
+    private static String outputLiteral(String value, ColumnType type, String where) {
         if (value == null) {
             return "null";
         }
@@ -218,12 +211,15 @@ public final class DmnWriter {
         }
     }
 
+    /** Parses {@code true} or {@code false}; like the parsers of the other types, it throws an {@link IllegalArgumentException} otherwise. */
     private static Boolean bool(String text) {
         if (!text.equals("true") && !text.equals("false")) {
             throw new IllegalArgumentException("not a boolean: " + text);
         }
         return Boolean.valueOf(text);
     }
+
+    // ---- ids and attributes ----------------------------------------------------------------------
 
     /**
      * A DMN id from a name: characters other than ASCII letters, digits and {@code _} become {@code _},
@@ -245,7 +241,14 @@ public final class DmnWriter {
 
     /** The attribute {@code typeRef="..."} of a column type. */
     private static String typed(ColumnType type) {
-        return attribute("typeRef", typeRef(type));
+        return attribute("typeRef", switch (type) {
+            case STRING -> "string";
+            case NUMBER -> "number";
+            case DATE -> "date";
+            case BOOLEAN -> "boolean";
+            case TIME -> "time";
+            case DATE_TIME -> "dateTime";
+        });
     }
 
     /** An attribute, with a leading space and its value escaped: {@code  name="value"}. */

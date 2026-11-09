@@ -57,6 +57,10 @@ public final class DmnReader {
 
     private static final String TYPE_REF = "typeRef";
 
+    /** Literal types an unquoted output entry of an untyped (string) output may hold, kept as their text. */
+    private static final List<ColumnType> UNQUOTED_OUTPUT_TYPES =
+            List.of(ColumnType.NUMBER, ColumnType.BOOLEAN, ColumnType.DATE, ColumnType.TIME, ColumnType.DATE_TIME);
+
     private DmnReader() {
     }
 
@@ -66,17 +70,25 @@ public final class DmnReader {
     }
 
     /**
+     * Reads one decision table of the model.
+     *
      * @param decisionName the decision whose table to read, or null if the model has exactly one
      */
     public static DecisionTable read(InputStream dmn, String decisionName) {
-        var root = parse(dmn);
-        var types = new ItemDefinitions(root);
-        var tables = new ArrayList<Element>();
+        var root = parseModel(dmn);
+        var decision = decisionToRead(root, decisionName);
+        return decisionTable(decision, new ItemDefinitions(root));
+    }
+
+    // ---- the table -------------------------------------------------------------------------------
+
+    /** The named decision, or the model's only decision with a table if no name is given. */
+    private static Element decisionToRead(Element root, String decisionName) {
+        var decisions = new ArrayList<Element>();
         var names = new ArrayList<String>();
         for (var decision : descendants(root, "decision")) {
-            var table = child(decision, "decisionTable");
-            if (table != null) {
-                tables.add(decision);
+            if (child(decision, "decisionTable") != null) {
+                decisions.add(decision);
                 names.add(decision.getAttribute("name"));
             }
         }
@@ -85,14 +97,14 @@ public final class DmnReader {
             if (at < 0) {
                 throw new InvalidDecisionTableException("DMN model has no decision table named '%s'; it has %s".formatted(decisionName, names));
             }
-            return decisionTable(tables.get(at), types);
+            return decisions.get(at);
         }
-        if (tables.size() != 1) {
-            throw new InvalidDecisionTableException(tables.isEmpty()
+        if (decisions.size() != 1) {
+            throw new InvalidDecisionTableException(decisions.isEmpty()
                     ? "DMN model has no decision table"
-                    : "DMN model has %d decision tables %s; name the one to read".formatted(tables.size(), names));
+                    : "DMN model has %d decision tables %s; name the one to read".formatted(decisions.size(), names));
         }
-        return decisionTable(tables.getFirst(), types);
+        return decisions.getFirst();
     }
 
     private static DecisionTable decisionTable(Element decision, ItemDefinitions types) {
@@ -120,215 +132,6 @@ public final class DmnReader {
         return new DecisionTable(name, hitPolicy, aggregation, inputs, outputs, rules);
     }
 
-    private static InputColumn inputColumn(Element input, ItemDefinitions types, String where) {
-        var expression = child(input, "inputExpression");
-        var column = expression == null ? "" : textOf(expression).strip();
-        if (column.isEmpty()) {
-            column = input.getAttribute("label").strip();
-        }
-        if (!isName(column)) {
-            throw new InvalidDecisionTableException("%s: input expression '%s' is not supported; it must name an input variable"
-                    .formatted(where, column));
-        }
-        var type = types.resolve(expression == null ? "" : expression.getAttribute(TYPE_REF), where + ", input '" + column + "'");
-        var values = child(input, "inputValues");
-        if (values == null || textOf(values).isBlank()) {
-            return new InputColumn(column, type.columnType(), type.allowedValues());
-        }
-        var allowed = textOf(values).strip();
-        parse(allowed, type.columnType(), where + ", input values of '" + column + "'");
-        return new InputColumn(column, type.columnType(), allowed);
-    }
-
-    private static OutputColumn outputColumn(Element output, String unnamed, ItemDefinitions types, String where) {
-        var column = nameOr(output, "label");
-        if (column.isBlank()) {
-            column = unnamed;
-        }
-        if (column.isBlank()) {
-            throw new InvalidDecisionTableException(where + ": every output of a multi-output table needs a name");
-        }
-        var outputWhere = where + ", output '" + column + "'";
-        var type = types.resolve(output.getAttribute(TYPE_REF), outputWhere).columnType();
-        var valueList = child(output, "outputValues");
-        if (valueList == null || textOf(valueList).isBlank()) {
-            return new OutputColumn(column, type, List.of());
-        }
-        var valueTests = parse(textOf(valueList), type, outputWhere + " value list");
-        if (!(valueTests instanceof UnaryTests.Positive(var tests))
-                || !tests.stream().allMatch(UnaryTests.Equals.class::isInstance)) {
-            throw new InvalidDecisionTableException(outputWhere + ": the output value list must be a list of values");
-        }
-        var values = tests.stream().map(test -> FeelLiterals.text(((UnaryTests.Equals) test).value())).toList();
-        return new OutputColumn(column, type, values);
-    }
-
-    /** @param number the rule's number, from 1 in table order */
-    private static Praeceptum rule(Element rule, int number, List<InputColumn> inputs, List<OutputColumn> outputs, String where) {
-        var ruleWhere = where + ", rule " + number;
-        var inputEntries = children(rule, "inputEntry");
-        var outputEntries = children(rule, "outputEntry");
-        if (inputEntries.size() != inputs.size() || outputEntries.size() != outputs.size()) {
-            throw new InvalidDecisionTableException("%s: has %d input and %d output entries; the table has %d inputs and %d outputs"
-                    .formatted(ruleWhere, inputEntries.size(), outputEntries.size(), inputs.size(), outputs.size()));
-        }
-        Map<String, String> cells = new HashMap<>();
-        for (int c = 0; c < inputs.size(); c++) {
-            var column = inputs.get(c);
-            var text = textOf(inputEntries.get(c)).strip();
-            parse(text, column.type(), ruleWhere + ", column '" + column.name() + "'");
-            cells.put(column.name(), text);
-        }
-        Map<String, String> values = new HashMap<>();
-        for (int c = 0; c < outputs.size(); c++) {
-            var column = outputs.get(c);
-            values.put(column.name(), outputValue(textOf(outputEntries.get(c)), column.type(), ruleWhere + ", output '" + column.name() + "'"));
-        }
-        return new Praeceptum(number, new PraeceptaInput(cells), new PraeceptaOutput(values));
-    }
-
-    // ---- values ---------------------------------------------------------------------------------
-
-    private static UnaryTests parse(String text, ColumnType type, String where) {
-        try {
-            return CellParser.parseFeel(text, type);
-        } catch (CellSyntaxException e) {
-            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
-        }
-    }
-
-    /** Literal types an unquoted output entry of an untyped (string) output may hold, kept as their text. */
-    private static final List<ColumnType> UNQUOTED_OUTPUT_TYPES =
-            List.of(ColumnType.NUMBER, ColumnType.BOOLEAN, ColumnType.DATE, ColumnType.TIME, ColumnType.DATE_TIME);
-
-    /**
-     * A literal output entry as plain text ({@link FeelLiterals#text}), or null. An unquoted entry of a
-     * string output may still be a number, boolean, date, time or date-time literal.
-     */
-    private static String outputValue(String text, ColumnType type, String where) {
-        var literal = text.strip();
-        if (literal.isEmpty() || literal.equals("null")) {
-            return null;
-        }
-        if (type == ColumnType.STRING && !literal.startsWith("\"")) {
-            return UNQUOTED_OUTPUT_TYPES.stream()
-                    .flatMap(other -> literalValue(literal, other).stream())
-                    .findFirst()
-                    .map(FeelLiterals::text)
-                    .orElseThrow(() -> new InvalidDecisionTableException(
-                            "%s: '%s' is not supported; output entries must be literals (quote text)".formatted(where, literal)));
-        }
-        return literalValue(literal, type)
-                .map(FeelLiterals::text)
-                .orElseThrow(() -> new InvalidDecisionTableException(
-                        "%s: '%s' is not supported; output entries must be literals".formatted(where, literal)));
-    }
-
-    /** The value of an entry that is a single literal of the type (no list, comparison or name). */
-    private static Optional<Object> literalValue(String literal, ColumnType type) {
-        try {
-            if (CellParser.parseFeel(literal, type) instanceof UnaryTests.Positive(var tests)
-                    && tests.size() == 1 && tests.getFirst() instanceof UnaryTests.Equals(var value)) {
-                return Optional.of(value);
-            }
-        } catch (CellSyntaxException e) {
-            // not a literal of this type
-        }
-        return Optional.empty();
-    }
-
-    /**
-     * A column's type: a built-in type, and the allowed values of the item definitions it was reached
-     * through (the most derived one that declares any), or null.
-     */
-    private record Type(ColumnType columnType, String allowedValues) {
-    }
-
-    /**
-     * The model's item definitions, by name. A column may name one whose base type is a built-in type
-     * or another such item definition; structured types (with item components), collections and
-     * function types are rejected.
-     */
-    private static final class ItemDefinitions {
-        private final Map<String, Element> byName = new HashMap<>();
-
-        ItemDefinitions(Element root) {
-            children(root, "itemDefinition").forEach(definition -> byName.putIfAbsent(definition.getAttribute("name"), definition));
-        }
-
-        /** A built-in type, by its FEEL or XML Schema name, with or without a namespace prefix. */
-        private static Optional<ColumnType> builtInType(String typeRef) {
-            return Optional.ofNullable(switch (localName(typeRef).toLowerCase(Locale.ROOT)) {
-                case "", "string" -> ColumnType.STRING;
-                case "number", "integer", "long", "double", "decimal", "int" -> ColumnType.NUMBER;
-                case "date" -> ColumnType.DATE;
-                case "boolean" -> ColumnType.BOOLEAN;
-                case "time" -> ColumnType.TIME;
-                case "datetime", "date and time" -> ColumnType.DATE_TIME;
-                default -> null;
-            });
-        }
-
-        /** A type name without its namespace prefix ({@code feel:string} is {@code string}). */
-        private static String localName(String typeRef) {
-            return typeRef.substring(typeRef.indexOf(':') + 1).strip();
-        }
-
-        /**
-         * Follows the chain of item definitions to a built-in type, one step at a time, so a long chain
-         * costs no stack. The allowed values are those of the most derived definition that has any.
-         */
-        Type resolve(String typeRef, String where) {
-            String allowedValues = null;
-            String allowedBy = null;
-            var seen = new HashSet<String>();
-            var ref = typeRef;
-            var builtIn = builtInType(ref);
-            while (builtIn.isEmpty()) {
-                var name = byName.containsKey(ref.strip()) ? ref.strip() : localName(ref);
-                var definition = itemDefinition(name, ref, where);
-                if (!seen.add(name)) {
-                    throw new InvalidDecisionTableException("%s: item definition '%s' is defined in terms of itself".formatted(where, name));
-                }
-                var allowed = child(definition, "allowedValues");
-                if (allowedValues == null && allowed != null && !textOf(allowed).isBlank()) {
-                    allowedValues = textOf(allowed).strip();
-                    allowedBy = name;
-                }
-                ref = child(definition, TYPE_REF).getTextContent();
-                builtIn = builtInType(ref);
-            }
-            var type = builtIn.get();
-            if (allowedValues != null) {
-                parse(allowedValues, type, where + ", allowed values of type '" + allowedBy + "'");
-            }
-            return new Type(type, allowedValues);
-        }
-
-        /** The item definition of that name, if it is a simple type: one with a base type and no components. */
-        private Element itemDefinition(String name, String typeRef, String where) {
-            var definition = byName.get(name);
-            if (definition == null) {
-                throw new InvalidDecisionTableException(
-                        "%s: type '%s' is not supported (string, number, date, boolean, time, dateTime and item definitions of them are)"
-                                .formatted(where, typeRef));
-            }
-            if (Boolean.parseBoolean(definition.getAttribute("isCollection").strip())) {
-                throw new InvalidDecisionTableException("%s: type '%s' is a collection, which is not supported".formatted(where, name));
-            }
-            if (!children(definition, "itemComponent").isEmpty()) {
-                throw new InvalidDecisionTableException(
-                        "%s: type '%s' is a structured item definition (with components), which is not supported".formatted(where, name));
-            }
-            var base = child(definition, TYPE_REF);
-            if (base == null || base.getTextContent().isBlank()) {
-                throw new InvalidDecisionTableException(
-                        "%s: type '%s' is not supported; its item definition has no base type".formatted(where, name));
-            }
-            return definition;
-        }
-    }
-
     private static HitPolicy hitPolicy(String value, String where) {
         if (value.isBlank()) {
             return HitPolicy.UNIQUE; // the DMN default
@@ -351,6 +154,29 @@ public final class DmnReader {
             default -> throw new InvalidDecisionTableException(
                     "%s: aggregation '%s' is not supported (SUM, MIN and MAX are)".formatted(where, value));
         };
+    }
+
+    // ---- columns and rules -----------------------------------------------------------------------
+
+    private static InputColumn inputColumn(Element input, ItemDefinitions types, String where) {
+        var expression = child(input, "inputExpression");
+        var column = expression == null ? "" : textOf(expression).strip();
+        if (column.isEmpty()) {
+            column = input.getAttribute("label").strip();
+        }
+        if (!isName(column)) {
+            throw new InvalidDecisionTableException("%s: input expression '%s' is not supported; it must name an input variable"
+                    .formatted(where, column));
+        }
+        var typeRef = expression == null ? "" : expression.getAttribute(TYPE_REF);
+        var type = types.resolve(typeRef, where + ", input '" + column + "'");
+        var values = nonBlankText(input, "inputValues");
+        if (values == null) {
+            return new InputColumn(column, type.columnType(), type.allowedValues());
+        }
+        var allowed = values.strip();
+        parseCell(allowed, type.columnType(), where + ", input values of '" + column + "'");
+        return new InputColumn(column, type.columnType(), allowed);
     }
 
     /**
@@ -379,9 +205,110 @@ public final class DmnReader {
         return Character.isLetter(c) || c == '_' || c == '?';
     }
 
-    // ---- XML ---------------------------------------------------------------------------------
+    private static OutputColumn outputColumn(Element output, String unnamed, ItemDefinitions types, String where) {
+        var column = nameOr(output, "label");
+        if (column.isBlank()) {
+            column = unnamed;
+        }
+        if (column.isBlank()) {
+            throw new InvalidDecisionTableException(where + ": every output of a multi-output table needs a name");
+        }
+        var outputWhere = where + ", output '" + column + "'";
+        var type = types.resolve(output.getAttribute(TYPE_REF), outputWhere).columnType();
+        var valueList = nonBlankText(output, "outputValues");
+        if (valueList == null) {
+            return new OutputColumn(column, type, List.of());
+        }
+        var valueTests = parseCell(valueList, type, outputWhere + " value list");
+        if (!(valueTests instanceof UnaryTests.Positive(var tests))
+                || !tests.stream().allMatch(UnaryTests.Equals.class::isInstance)) {
+            throw new InvalidDecisionTableException(outputWhere + ": the output value list must be a list of values");
+        }
+        var values = tests.stream().map(test -> FeelLiterals.text(((UnaryTests.Equals) test).value())).toList();
+        return new OutputColumn(column, type, values);
+    }
 
-    private static Element parse(InputStream dmn) {
+    /**
+     * A rule, with its input entries kept as written (once checked) and its output entries as plain text.
+     *
+     * @param number the rule's number, from 1 in table order
+     */
+    private static Praeceptum rule(Element rule, int number, List<InputColumn> inputs, List<OutputColumn> outputs, String where) {
+        var ruleWhere = where + ", rule " + number;
+        var inputEntries = children(rule, "inputEntry");
+        var outputEntries = children(rule, "outputEntry");
+        if (inputEntries.size() != inputs.size() || outputEntries.size() != outputs.size()) {
+            throw new InvalidDecisionTableException("%s: has %d input and %d output entries; the table has %d inputs and %d outputs"
+                    .formatted(ruleWhere, inputEntries.size(), outputEntries.size(), inputs.size(), outputs.size()));
+        }
+        Map<String, String> cells = new HashMap<>();
+        for (int c = 0; c < inputs.size(); c++) {
+            var column = inputs.get(c);
+            var text = textOf(inputEntries.get(c)).strip();
+            parseCell(text, column.type(), ruleWhere + ", column '" + column.name() + "'");
+            cells.put(column.name(), text);
+        }
+        Map<String, String> values = new HashMap<>();
+        for (int c = 0; c < outputs.size(); c++) {
+            var column = outputs.get(c);
+            values.put(column.name(), outputValue(textOf(outputEntries.get(c)), column.type(), ruleWhere + ", output '" + column.name() + "'"));
+        }
+        return new Praeceptum(number, new PraeceptaInput(cells), new PraeceptaOutput(values));
+    }
+
+    // ---- values ----------------------------------------------------------------------------------
+
+    /** Parses strict FEEL unary tests, naming {@code where} they are if they are invalid. */
+    private static UnaryTests parseCell(String text, ColumnType type, String where) {
+        try {
+            return CellParser.parseFeel(text, type);
+        } catch (CellSyntaxException e) {
+            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * A literal output entry as plain text ({@link FeelLiterals#text}), or null. An unquoted entry of a
+     * string output may still be a number, boolean, date, time or date-time literal.
+     */
+    private static String outputValue(String text, ColumnType type, String where) {
+        var literal = text.strip();
+        if (literal.isEmpty() || literal.equals("null")) {
+            return null;
+        }
+        if (type == ColumnType.STRING && !literal.startsWith("\"")) {
+            for (var otherType : UNQUOTED_OUTPUT_TYPES) {
+                var value = literalValue(literal, otherType);
+                if (value.isPresent()) {
+                    return FeelLiterals.text(value.get());
+                }
+            }
+            throw new InvalidDecisionTableException(
+                    "%s: '%s' is not supported; output entries must be literals (quote text)".formatted(where, literal));
+        }
+        return literalValue(literal, type)
+                .map(FeelLiterals::text)
+                .orElseThrow(() -> new InvalidDecisionTableException(
+                        "%s: '%s' is not supported; output entries must be literals".formatted(where, literal)));
+    }
+
+    /** The value of an entry that is a single literal of the type (no list, comparison or name). */
+    private static Optional<Object> literalValue(String literal, ColumnType type) {
+        try {
+            if (CellParser.parseFeel(literal, type) instanceof UnaryTests.Positive(var tests)
+                    && tests.size() == 1 && tests.getFirst() instanceof UnaryTests.Equals(var value)) {
+                return Optional.of(value);
+            }
+        } catch (CellSyntaxException e) {
+            // not a literal of this type
+        }
+        return Optional.empty();
+    }
+
+    // ---- XML -------------------------------------------------------------------------------------
+
+    /** The model's {@code definitions} element, parsed with DTDs and external entities disabled. */
+    private static Element parseModel(InputStream dmn) {
         try {
             var factory = DocumentBuilderFactory.newInstance();
             factory.setNamespaceAware(true);
@@ -420,19 +347,125 @@ public final class DmnReader {
         return elements;
     }
 
-    /** The element's {@code name} attribute, or its {@code fallback} attribute if it has no name. */
-    private static String nameOr(Element element, String fallback) {
-        return element.getAttribute(element.getAttribute("name").isBlank() ? fallback : "name");
-    }
-
     private static Element child(Element parent, String localName) {
         var found = children(parent, localName);
         return found.isEmpty() ? null : found.getFirst();
+    }
+
+    /** The element's {@code name} attribute, or its {@code fallback} attribute if it has no name. */
+    private static String nameOr(Element element, String fallback) {
+        var name = element.getAttribute("name");
+        return name.isBlank() ? element.getAttribute(fallback) : name;
     }
 
     /** The text of an element's {@code <text>} child (DMN expressions), or its own text. */
     private static String textOf(Element element) {
         var text = child(element, "text");
         return (text == null ? element : text).getTextContent();
+    }
+
+    /** The text of a child such as {@code <inputValues>}, or null if there is none or it is blank. */
+    private static String nonBlankText(Element parent, String localName) {
+        var element = child(parent, localName);
+        if (element == null) {
+            return null;
+        }
+        var text = textOf(element);
+        return text.isBlank() ? null : text;
+    }
+
+    // ---- types -----------------------------------------------------------------------------------
+
+    /**
+     * A column's type: a built-in type, and the allowed values of the item definitions it was reached
+     * through (the most derived one that declares any), or null.
+     */
+    private record Type(ColumnType columnType, String allowedValues) {
+    }
+
+    /**
+     * The model's item definitions, by name. A column may name one whose base type is a built-in type
+     * or another such item definition; structured types (with item components), collections and
+     * function types are rejected.
+     */
+    private static final class ItemDefinitions {
+        private final Map<String, Element> byName = new HashMap<>();
+
+        ItemDefinitions(Element root) {
+            children(root, "itemDefinition").forEach(definition -> byName.putIfAbsent(definition.getAttribute("name"), definition));
+        }
+
+        /**
+         * Follows the chain of item definitions to a built-in type, one step at a time, so a long chain
+         * costs no stack. The allowed values are those of the most derived definition that has any.
+         */
+        Type resolve(String typeRef, String where) {
+            String allowedValues = null;
+            String allowedBy = null;
+            var seen = new HashSet<String>();
+            var ref = typeRef;
+            var builtIn = builtInType(ref);
+            while (builtIn.isEmpty()) {
+                // the definition's name as written, or without a namespace prefix (tns:tAge)
+                var name = byName.containsKey(ref.strip()) ? ref.strip() : localName(ref);
+                var definition = itemDefinition(name, ref, where);
+                if (!seen.add(name)) {
+                    throw new InvalidDecisionTableException("%s: item definition '%s' is defined in terms of itself".formatted(where, name));
+                }
+                var allowed = nonBlankText(definition, "allowedValues");
+                if (allowedValues == null && allowed != null) {
+                    allowedValues = allowed.strip();
+                    allowedBy = name;
+                }
+                ref = child(definition, TYPE_REF).getTextContent();
+                builtIn = builtInType(ref);
+            }
+            var type = builtIn.get();
+            if (allowedValues != null) {
+                parseCell(allowedValues, type, where + ", allowed values of type '" + allowedBy + "'");
+            }
+            return new Type(type, allowedValues);
+        }
+
+        /** The item definition of that name, if it is a simple type: one with a base type and no components. */
+        private Element itemDefinition(String name, String typeRef, String where) {
+            var definition = byName.get(name);
+            if (definition == null) {
+                throw new InvalidDecisionTableException(
+                        "%s: type '%s' is not supported (string, number, date, boolean, time, dateTime and item definitions of them are)"
+                                .formatted(where, typeRef));
+            }
+            if (Boolean.parseBoolean(definition.getAttribute("isCollection").strip())) {
+                throw new InvalidDecisionTableException("%s: type '%s' is a collection, which is not supported".formatted(where, name));
+            }
+            if (!children(definition, "itemComponent").isEmpty()) {
+                throw new InvalidDecisionTableException(
+                        "%s: type '%s' is a structured item definition (with components), which is not supported".formatted(where, name));
+            }
+            var base = child(definition, TYPE_REF);
+            if (base == null || base.getTextContent().isBlank()) {
+                throw new InvalidDecisionTableException(
+                        "%s: type '%s' is not supported; its item definition has no base type".formatted(where, name));
+            }
+            return definition;
+        }
+
+        /** A built-in type, by its FEEL or XML Schema name, with or without a namespace prefix. */
+        private static Optional<ColumnType> builtInType(String typeRef) {
+            return Optional.ofNullable(switch (localName(typeRef).toLowerCase(Locale.ROOT)) {
+                case "", "string" -> ColumnType.STRING;
+                case "number", "integer", "long", "double", "decimal", "int" -> ColumnType.NUMBER;
+                case "date" -> ColumnType.DATE;
+                case "boolean" -> ColumnType.BOOLEAN;
+                case "time" -> ColumnType.TIME;
+                case "datetime", "date and time" -> ColumnType.DATE_TIME;
+                default -> null;
+            });
+        }
+
+        /** A type name without its namespace prefix ({@code feel:string} is {@code string}). */
+        private static String localName(String typeRef) {
+            return typeRef.substring(typeRef.indexOf(':') + 1).strip();
+        }
     }
 }

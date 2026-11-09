@@ -22,6 +22,7 @@ import io.github.brunopacheco1.praecepta.engine.OutputStrategy;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
@@ -31,6 +32,13 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableE
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 
 class DmnReaderTest {
+
+    /** A decision 't' with one input column 'a' of the given type, and no rules. */
+    private static final String DECISION_ON_TYPE = """
+            <decision id="t" name="t"><decisionTable>
+              <input><inputExpression typeRef="%s"><text>a</text></inputExpression></input>
+              <output name="result" typeRef="string"/>
+            </decisionTable></decision>""";
 
     record Customer(String country, Integer age, LocalDate since) {
     }
@@ -71,12 +79,15 @@ class DmnReaderTest {
     }
 
     @Test
-    void reads_dmn_1_1_and_picks_a_decision_by_name() {
+    void a_model_with_several_decision_tables_needs_a_decision_name() {
         var twoDecisions = resource("dmn11-two-decisions.dmn");
         Assertions.assertThatThrownBy(() -> DmnReader.read(twoDecisions))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("2 decision tables [Carrier, Fee]");
+    }
 
+    @Test
+    void reads_dmn_1_1_and_picks_a_decision_by_name() {
         var carrier = DmnReader.read(resource("dmn11-two-decisions.dmn"), "Carrier");
         Assertions.assertThat(carrier.inputs()).containsExactly(new InputColumn("weight", ColumnType.NUMBER));
         // a single unnamed output is named after the decision
@@ -113,6 +124,11 @@ class DmnReaderTest {
                         .output(output -> output.values().get("tier"))
                         .build())
                 .hasMessageContaining("column 'customer.age' is a NUMBER column in the table but is bound as STRING");
+    }
+
+    @Test
+    void every_column_of_the_table_must_be_bound() {
+        var table = DmnReader.read(resource("camunda-modeler-discount.dmn"));
         Assertions.assertThatThrownBy(() -> PraeceptaEngine.<Customer, String>builder()
                         .table(table)
                         .input("country", Customer::country)
@@ -132,28 +148,29 @@ class DmnReaderTest {
                 .containsExactly("gold", "silver");
     }
 
+    /**
+     * Each case is a decision with one input column and one rule. An empty input entry stands for
+     * {@code -} and an empty output entry for {@code "x"}, which are both supported.
+     */
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
-            "duration column         | <input><inputExpression typeRef=\"dayTimeDuration\"><text>at</text></inputExpression></input> | type 'dayTimeDuration' is not supported",
-            "zoned time cell         | <input><inputExpression typeRef=\"time\"><text>at</text></inputExpression></input>#<text>time(\"10:00:00Z\")</text> | rule 1, column 'at': Invalid cell",
-            "variable in a cell      | <input><inputExpression typeRef=\"string\"><text>a</text></inputExpression></input>#<text>not(Complex.aString)</text> | rule 1, column 'a': Invalid cell 'not(Complex.aString)': 'Complex.aString' is a FEEL name",
-            "computed input          | <input><inputExpression typeRef=\"number\"><text>age * 2</text></inputExpression></input> | input expression 'age * 2' is not supported",
-            "unsupported cell        | <input><inputExpression typeRef=\"number\"><text>age</text></inputExpression></input>#<text>&gt; abs(x)</text> | rule 1, column 'age'",
-            "computed output         | <input><inputExpression typeRef=\"string\"><text>a</text></inputExpression></input>#-#<text>a + \"x\"</text> | rule 1, output 'result': 'a + \"x\"' is not supported",
+            "duration column    | dayTimeDuration | at      |                      |         | type 'dayTimeDuration' is not supported",
+            "zoned time cell    | time            | at      | time(\"10:00:00Z\")  |         | rule 1, column 'at': Invalid cell",
+            "variable in a cell | string          | a       | not(Complex.aString) |         "
+                    + "| rule 1, column 'a': Invalid cell 'not(Complex.aString)': 'Complex.aString' is a FEEL name",
+            "computed input     | number          | age * 2 |                      |         | input expression 'age * 2' is not supported",
+            "unsupported cell   | number          | age     | &gt; abs(x)          |         | rule 1, column 'age'",
+            "computed output    | string          | a       |                      | a + \"x\" | rule 1, output 'result': 'a + \"x\"' is not supported",
     })
-    void unsupported_dmn_is_rejected_with_its_location(String description, String fragment, String message) {
-        var parts = fragment.split("#");
-        var input = parts[0];
-        var inputEntry = parts.length > 1 && !parts[1].equals("-") ? parts[1] : "<text>-</text>";
-        var outputEntry = parts.length > 2 ? parts[2] : "<text>\"x\"</text>";
-        var xml = """
-                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+    void unsupported_dmn_is_rejected_with_its_location(String description, String typeRef, String inputExpression,
+            String inputEntry, String outputEntry, String message) {
+        var xml = model("""
                   <decision id="t" name="t"><decisionTable>
-                    %s
+                    <input><inputExpression typeRef="%s"><text>%s</text></inputExpression></input>
                     <output name="result" typeRef="string"/>
-                    <rule><inputEntry>%s</inputEntry><outputEntry>%s</outputEntry></rule>
-                  </decisionTable></decision>
-                </definitions>""".formatted(input, inputEntry, outputEntry);
+                    <rule><inputEntry><text>%s</text></inputEntry><outputEntry><text>%s</text></outputEntry></rule>
+                  </decisionTable></decision>""".formatted(typeRef, inputExpression,
+                inputEntry == null ? "-" : inputEntry, outputEntry == null ? "\"x\"" : outputEntry));
         var dmn = stream(xml);
         Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
                 .isInstanceOf(InvalidDecisionTableException.class)
@@ -163,21 +180,18 @@ class DmnReaderTest {
 
     @Test
     void count_aggregation_is_not_supported() {
-        var xml = """
-                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+        var xml = model("""
                   <decision id="t" name="t"><decisionTable hitPolicy="COLLECT" aggregation="COUNT">
                     <input><inputExpression typeRef="string"><text>a</text></inputExpression></input>
                     <output name="result" typeRef="number"/>
-                  </decisionTable></decision>
-                </definitions>""";
+                  </decisionTable></decision>""");
         var dmn = stream(xml);
         Assertions.assertThatThrownBy(() -> DmnReader.read(dmn)).hasMessageContaining("aggregation 'COUNT' is not supported");
     }
 
     @Test
     void input_names_may_contain_spaces() {
-        var xml = """
-                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+        var xml = model("""
                   <decision id="t" name="Approval"><decisionTable hitPolicy="FIRST">
                     <input><inputExpression typeRef="number"><text>Credit Score</text></inputExpression></input>
                     <input><inputExpression typeRef="string"><text>Applicant data.Employment status</text></inputExpression></input>
@@ -186,8 +200,7 @@ class DmnReaderTest {
                       <outputEntry><text>"approved"</text></outputEntry></rule>
                     <rule><inputEntry><text>-</text></inputEntry><inputEntry><text>-</text></inputEntry>
                       <outputEntry><text>"referred"</text></outputEntry></rule>
-                  </decisionTable></decision>
-                </definitions>""";
+                  </decisionTable></decision>""");
         var table = DmnReader.read(stream(xml));
         Assertions.assertThat(table.inputs()).extracting(InputColumn::name)
                 .containsExactly("Credit Score", "Applicant data.Employment status");
@@ -203,8 +216,7 @@ class DmnReaderTest {
 
     @Test
     void columns_typed_by_an_item_definition_take_its_base_type_and_allowed_values() {
-        var xml = """
-                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+        var xml = model("""
                   <itemDefinition name="tBureauCallType">
                     <typeRef>string</typeRef>
                     <allowedValues><text>"FULL","MINI","NONE"</text></allowedValues>
@@ -227,8 +239,7 @@ class DmnReaderTest {
                     <output name="Strategy" typeRef="tStrategy"/>
                     <rule><inputEntry><text>"FULL","MINI"</text></inputEntry><inputEntry><text>-</text></inputEntry>
                       <inputEntry><text>&gt;= 600</text></inputEntry><outputEntry><text>"BUREAU"</text></outputEntry></rule>
-                  </decisionTable></decision>
-                </definitions>""";
+                  </decisionTable></decision>""");
         var table = DmnReader.read(stream(xml));
 
         Assertions.assertThat(table.inputs()).containsExactly(
@@ -266,15 +277,7 @@ class DmnReaderTest {
             "undefined type       | <itemDefinition name=\"tU\"><typeRef>string</typeRef></itemDefinition> | type 'tT' is not supported",
     })
     void unsupported_item_definitions_are_rejected(String description, String itemDefinitions, String message) {
-        var xml = """
-                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
-                  %s
-                  <decision id="t" name="t"><decisionTable>
-                    <input><inputExpression typeRef="tT"><text>a</text></inputExpression></input>
-                    <output name="result" typeRef="string"/>
-                  </decisionTable></decision>
-                </definitions>""".formatted(itemDefinitions);
-        var dmn = stream(xml);
+        var dmn = stream(model(itemDefinitions + DECISION_ON_TYPE.formatted("tT")));
         Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("Decision 't', input 'a'")
@@ -287,14 +290,7 @@ class DmnReaderTest {
         for (int i = 1; i <= 100_000; i++) {
             chain.append("<itemDefinition name=\"t%d\"><typeRef>t%d</typeRef></itemDefinition>".formatted(i, i - 1));
         }
-        var xml = """
-                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
-                  %s
-                  <decision id="t" name="t"><decisionTable>
-                    <input><inputExpression typeRef="t100000"><text>a</text></inputExpression></input>
-                    <output name="result" typeRef="string"/>
-                  </decisionTable></decision>
-                </definitions>""".formatted(chain);
+        var xml = model(chain + DECISION_ON_TYPE.formatted("t100000"));
         Assertions.assertThat(DmnReader.read(stream(xml)).inputs()).containsExactly(new InputColumn("a", ColumnType.NUMBER));
     }
 
@@ -341,15 +337,22 @@ class DmnReaderTest {
     void writer_output_is_read_back_with_hit_policy_value_lists_and_aggregation() {
         var fee = DmnReader.read(resource("dmn11-two-decisions.dmn"), "Fee");
         var again = DmnReader.read(stream(DmnWriter.write(fee)));
-        Assertions.assertThat(again).isEqualTo(new io.github.brunopacheco1.praecepta.engine.beans.DecisionTable(
-                "Fee", HitPolicy.COLLECT, AggregationOperator.SUM, fee.inputs(), fee.outputs(),
-                again.rules()));
+        Assertions.assertThat(again).isEqualTo(new DecisionTable(
+                "Fee", HitPolicy.COLLECT, AggregationOperator.SUM, fee.inputs(), fee.outputs(), again.rules()));
         Assertions.assertThat(again.rules()).extracting(rule -> rule.output().values().get("fee")).containsExactly("5", "12.5");
 
         var discount = DmnReader.read(resource("camunda-modeler-discount.dmn"));
         var written = DmnWriter.write(discount);
         Assertions.assertThat(written).contains("hitPolicy=\"RULE ORDER\"", "<outputValues", "<inputValues");
         Assertions.assertThat(DmnReader.read(stream(written)).outputs()).isEqualTo(discount.outputs());
+    }
+
+    /** A DMN 1.3 model holding these elements: item definitions and decisions. */
+    private static String model(String elements) {
+        return """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                %s
+                </definitions>""".formatted(elements);
     }
 
     private static InputStream resource(String name) {

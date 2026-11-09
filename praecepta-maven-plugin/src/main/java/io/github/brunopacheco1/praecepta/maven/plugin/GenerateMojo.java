@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 
 import org.apache.maven.model.Resource;
 import org.apache.maven.plugin.AbstractMojo;
@@ -111,18 +112,13 @@ public class GenerateMojo extends AbstractMojo {
         var classNames = new HashSet<String>();
         try {
             for (var table : tables) {
-                if (table.source != null && !table.source.isAbsolute()) {
-                    table.source = new File(project.getBasedir(), table.source.getPath());
-                }
+                resolveSource(table);
                 var result = compile(table, severity);
                 if (!classNames.add(result.className())) {
                     throw new MojoFailureException("Two tables generate the class " + result.className() + "; set <name> on one");
                 }
                 result.report().issues().forEach(issue -> getLog().warn(result.className() + ": " + issue));
-                write(resourceDirectory.toPath().resolve(packagePath).resolve(result.className() + ".dmn"), result.dmn());
-                for (var source : result.sources().entrySet()) {
-                    write(outputDirectory.toPath().resolve(packagePath).resolve(source.getKey() + ".java"), source.getValue());
-                }
+                writeFiles(result, packagePath);
                 getLog().info("Compiled table %s (%d rules, %s) into %s.%s".formatted(table.source.getName(),
                         result.table().rules().size(), result.table().hitPolicy(), packageName, result.className()));
             }
@@ -133,6 +129,13 @@ public class GenerateMojo extends AbstractMojo {
         var resource = new Resource();
         resource.setDirectory(resourceDirectory.getPath());
         project.addResource(resource);
+    }
+
+    /** Resolves a table's relative source against the project directory. */
+    private void resolveSource(TableConfig table) {
+        if (table.source != null && !table.source.isAbsolute()) {
+            table.source = new File(project.getBasedir(), table.source.getPath());
+        }
     }
 
     /** Compiles one table; a configuration or table mistake fails the build with its message. */
@@ -149,13 +152,21 @@ public class GenerateMojo extends AbstractMojo {
             return null;
         }
         try {
-            return Severity.valueOf(value.toUpperCase(java.util.Locale.ROOT));
+            return Severity.valueOf(value.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             throw new MojoFailureException("<failOn> must be ERROR, WARNING or NONE, not " + value);
         }
     }
 
-    private static void write(Path file, String content) throws IOException {
+    /** Writes the table's DMN resource and Java sources into the package's directory under each root. */
+    private void writeFiles(TableCompiler.Result result, String packagePath) throws IOException {
+        writeFile(resourceDirectory.toPath().resolve(packagePath).resolve(result.className() + ".dmn"), result.dmn());
+        for (var source : result.sources().entrySet()) {
+            writeFile(outputDirectory.toPath().resolve(packagePath).resolve(source.getKey() + ".java"), source.getValue());
+        }
+    }
+
+    private static void writeFile(Path file, String content) throws IOException {
         Files.createDirectories(file.getParent());
         Files.writeString(file, content, StandardCharsets.UTF_8);
     }

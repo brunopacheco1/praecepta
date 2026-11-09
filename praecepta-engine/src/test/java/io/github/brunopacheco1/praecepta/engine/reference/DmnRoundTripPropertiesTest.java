@@ -52,7 +52,7 @@ class DmnRoundTripPropertiesTest {
     @Property(tries = 500, edgeCases = EdgeCasesMode.NONE)
     void tables_read_back_from_dmn_evaluate_like_the_originals(@ForAll("scenarios") DecisionTableScenario s,
             @ForAll HitPolicy policy, @ForAll("priorities") List<String> priority) {
-        var rules = policy == HitPolicy.ANY ? outOnly(s.rules()) : s.rules();
+        var rules = policy == HitPolicy.ANY ? DecisionTableScenario.outOnly(s.rules()) : s.rules();
         var original = table(s, rules, policy, priority);
 
         var xml = DmnWriter.write(original);
@@ -70,8 +70,7 @@ class DmnRoundTripPropertiesTest {
         s.bindColumns(builder);
         var engine = builder.build();
 
-        var needsPriority = policy == HitPolicy.PRIORITY || policy == HitPolicy.OUTPUT_ORDER;
-        var reference = s.reference(rules, policy, needsPriority ? Map.of(DecisionTableScenario.OUT, priority) : Map.of());
+        var reference = s.reference(rules, policy, DecisionTableScenario.outputPriority(policy, priority));
         for (var input : s.inputs()) {
             switch (reference.evaluate(input)) {
                 case Outcome.Hits hits -> Assertions.assertThat(engine.evaluate(input))
@@ -100,12 +99,5 @@ class DmnRoundTripPropertiesTest {
             outputs.add(new DecisionTable.OutputColumn(DecisionTableScenario.NUMBER, ColumnType.NUMBER));
         }
         return new DecisionTable("round_trip", policy, null, inputs, outputs, rules);
-    }
-
-    private static List<Praeceptum> outOnly(List<Praeceptum> rules) {
-        return rules.stream()
-                .map(rule -> new Praeceptum(rule.priority(), rule.input(), new PraeceptaOutput(
-                        Map.of(DecisionTableScenario.OUT, rule.output().values().get(DecisionTableScenario.OUT)))))
-                .toList();
     }
 }

@@ -38,7 +38,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *                            date-time literal (DATE_TIME columns; a bare 2025-01-31T08:30:00 too)
  *   true, false              boolean literals (BOOLEAN columns)
  *   &lt; 18, &gt;= 2.5            comparisons (NUMBER, DATE, TIME and DATE_TIME columns)
- *   [18..65), (0..1], ]a..b[  intervals; [ and ] close, ( ) and outward-facing brackets open
+ *   [18..65), (0..1], ]a..b[  intervals; [ and ] include their end, ( ) and outward-facing brackets exclude it
  *   null                     only a missing value
  *   not(t1, t2)              anything but these tests
  * </pre>
@@ -49,6 +49,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  */
 public final class CellParser {
 
+    /** Two-character operators come first, so that {@code <= 5} is not read as {@code <} and {@code = 5}. */
+    private static final List<Operator> OPERATORS = List.of(Operator.LE, Operator.GE, Operator.LT, Operator.GT);
     private static final Pattern NUMBER = Pattern.compile("-?\\d+(\\.\\d+)?");
     private static final Pattern DATE_CALL = Pattern.compile("date\\(\\s*\"([^\"]*)\"\\s*\\)");
     private static final Pattern BARE_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
@@ -84,7 +86,12 @@ public final class CellParser {
         return new Parser(type, cell, true).parse();
     }
 
-    /** One cell being parsed for a column type; {@code strictFeel} turns off Praecepta's shorter forms. */
+    /**
+     * One cell being parsed for a column type; {@code strictFeel} turns off Praecepta's shorter forms.
+     * The cell is split into tests, each test is read as {@code null}, a comparison, an interval or a
+     * literal, and each literal as a value of the column type. The scanners that find where a test
+     * ends come last.
+     */
     private record Parser(ColumnType type, String cell, boolean strictFeel) {
 
         UnaryTests parse() {
@@ -92,20 +99,20 @@ public final class CellParser {
             if (text.isEmpty() || text.equals("-")) {
                 return new UnaryTests.Any();
             }
-            // FEEL only allows not(...) around the whole cell; its contents may hold intervals like [1..2)
+            // FEEL allows not(...) only around the whole cell, so it is found by the cell's first and last
+            // characters: matching its parentheses would trip over an interval inside, as in not([1..2))
             if (text.startsWith("not(") && text.endsWith(")")) {
-                return new UnaryTests.Negated(tests(text.substring(4, text.length() - 1)));
+                return new UnaryTests.Negated(tests(text.substring("not(".length(), text.length() - 1)));
             }
             return new UnaryTests.Positive(tests(text));
         }
 
+        // ---- tests and literals ------------------------------------------------------------------
+
         private List<Test> tests(String text) {
             var tests = new ArrayList<Test>();
-            for (var part : splitTopLevel(text)) {
+            for (var part : splitTests(text)) {
                 tests.add(test(part.strip()));
-            }
-            if (tests.isEmpty()) {
-                throw new CellSyntaxException(cell, "no tests");
             }
             return tests;
         }
@@ -117,29 +124,47 @@ public final class CellParser {
             if (text.equals("null")) {
                 return new NullTest();
             }
-            for (var operator : List.of(Operator.LE, Operator.GE, Operator.LT, Operator.GT)) {
+            for (var operator : OPERATORS) {
                 if (text.startsWith(operator.symbol())) {
                     requireComparisons("comparisons");
                     return new Compare(operator, literal(text.substring(operator.symbol().length()).strip()));
                 }
             }
-            char first = text.charAt(0);
-            char last = text.charAt(text.length() - 1);
-            if ((first == '[' || first == '(' || first == ']') && (last == ']' || last == ')' || last == '[')) {
+            if (isBracketed(text)) {
                 int dots = topLevelDots(text);
                 if (dots > 0) {
-                    requireComparisons("intervals");
-                    var low = literal(text.substring(1, dots).strip());
-                    var high = literal(text.substring(dots + 2, text.length() - 1).strip());
-                    if (compare(low, high) > 0) {
-                        throw new CellSyntaxException(cell, "interval starts after it ends");
-                    }
-                    return new Range(low, first == '[', high, last == ']');
+                    return interval(text, dots);
                 }
             }
             return new Equals(literal(text));
         }
 
+        /** Whether a test opens with {@code [}, {@code (} or {@code ]} and closes with {@code ]}, {@code )} or {@code [}. */
+        private static boolean isBracketed(String text) {
+            return "[(]".indexOf(text.charAt(0)) >= 0 && "])[".indexOf(text.charAt(text.length() - 1)) >= 0;
+        }
+
+        /**
+         * An interval {@code low..high} whose {@code ..} is at {@code dots}. Only {@code [} at the start and
+         * {@code ]} at the end include their end; {@code (}, {@code )} and outward-facing brackets exclude it.
+         */
+        private Range interval(String text, int dots) {
+            requireComparisons("intervals");
+            var low = literal(text.substring(1, dots).strip());
+            var high = literal(text.substring(dots + 2, text.length() - 1).strip());
+            if (compare(low, high) > 0) {
+                throw new CellSyntaxException(cell, "interval starts after it ends");
+            }
+            return new Range(low, text.charAt(0) == '[', high, text.charAt(text.length() - 1) == ']');
+        }
+
+        private void requireComparisons(String what) {
+            if (!type.supportsComparisons()) {
+                throw new CellSyntaxException(cell, what + " are only supported on NUMBER, DATE, TIME and DATE_TIME columns");
+            }
+        }
+
+        /** A single value of the column's type. */
         private Comparable<?> literal(String text) {
             if (text.isEmpty()) {
                 throw new CellSyntaxException(cell, "missing value");
@@ -168,6 +193,44 @@ public final class CellParser {
             return text; // Praecepta's original unquoted syntax
         }
 
+        /** The contents of a quoted string, in which a backslash escapes the character after it. */
+        private String quoted(String text) {
+            if (text.length() < 2 || !text.endsWith("\"")) {
+                throw new CellSyntaxException(cell, "unterminated string " + text);
+            }
+            var value = new StringBuilder();
+            int end = text.length() - 1; // the closing quote
+            int i = 1;
+            while (i < end) {
+                char c = text.charAt(i);
+                if (c == '"') {
+                    throw new CellSyntaxException(cell, "unexpected quote in " + text);
+                }
+                if (c == '\\' && i + 1 < end) {
+                    value.append(text.charAt(i + 1));
+                    i += 2;
+                } else {
+                    value.append(c);
+                    i++;
+                }
+            }
+            return value.toString();
+        }
+
+        /**
+         * Whether unquoted text holds a quote, a parenthesis or a bracket, which belong to FEEL syntax.
+         * Text over several lines is a legacy exception: it is accepted unchecked, as Praecepta always has
+         * (tests pin it).
+         */
+        private static boolean hasFeelSyntax(String text) {
+            return text.chars().anyMatch(c -> "\"()[]".indexOf(c) >= 0) && text.chars().noneMatch(Parser::isLineTerminator);
+        }
+
+        /** A line terminator, as Java's regular expressions define it. */
+        private static boolean isLineTerminator(int c) {
+            return c == '\n' || c == '\r' || c == '\u0085' || c == '\u2028' || c == '\u2029';
+        }
+
         private BigDecimal number(String text) {
             if (!NUMBER.matcher(text).matches()) {
                 throw new CellSyntaxException(cell, "'" + text + "' is not a number");
@@ -183,7 +246,10 @@ public final class CellParser {
             };
         }
 
-        /** A date, time or date-time: its FEEL function, or (outside strict FEEL) the bare ISO text. */
+        /**
+         * A date, time or date-time: its FEEL function call, or, outside strict FEEL, the bare ISO text.
+         * Strict FEEL cannot take the bare form, as it reads {@code 2025-01-31} as {@code 2025 - 1 - 31}.
+         */
         private Comparable<?> temporal(String text, Pattern call, Pattern bare, Function<String, Comparable<?>> parse, String hint) {
             var matcher = call.matcher(text);
             String iso;
@@ -204,42 +270,10 @@ public final class CellParser {
             }
         }
 
-        private String quoted(String text) {
-            if (text.length() < 2 || !text.endsWith("\"")) {
-                throw new CellSyntaxException(cell, "unterminated string " + text);
-            }
-            var value = new StringBuilder();
-            int end = text.length() - 1; // the closing quote
-            int i = 1;
-            while (i < end) {
-                char c = text.charAt(i);
-                if (c == '"') {
-                    throw new CellSyntaxException(cell, "unexpected quote in " + text);
-                }
-                boolean escape = c == '\\' && i + 1 < end;
-                value.append(escape ? text.charAt(i + 1) : c);
-                i += escape ? 2 : 1;
-            }
-            return value.toString();
-        }
-
-        private void requireComparisons(String what) {
-            if (!type.supportsComparisons()) {
-                throw new CellSyntaxException(cell, what + " are only supported on NUMBER, DATE, TIME and DATE_TIME columns");
-            }
-        }
-
-        /**
-         * Whether unquoted text holds a quote, a parenthesis or a bracket, which belong to FEEL syntax.
-         * Text over several lines is let through, as it always has been.
-         */
-        private static boolean hasFeelSyntax(String text) {
-            return text.chars().anyMatch(c -> "\"()[]".indexOf(c) >= 0) && text.chars().noneMatch(Parser::isLineTerminator);
-        }
-
-        /** A line terminator, as Java's regular expressions define it. */
-        private static boolean isLineTerminator(int c) {
-            return c == '\n' || c == '\r' || c == '\u0085' || c == '\u2028' || c == '\u2029';
+        /** Compares two values of the same column type. */
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        private static int compare(Comparable<?> a, Comparable<?> b) {
+            return ((Comparable) a).compareTo(b);
         }
 
         /**
@@ -255,11 +289,14 @@ public final class CellParser {
             return sign > 0 && iso.lastIndexOf(':', sign) >= 0 && OFFSET_DIGITS.matcher(iso.substring(sign + 1)).matches();
         }
 
+        // ---- scanners: where tests, strings and intervals end ------------------------------------
+
         /**
-         * Splits on commas outside quotes, parentheses and intervals. An interval may use outward-facing
-         * brackets ({@code ]1..2[}), so it is skipped as a unit rather than by bracket depth.
+         * Splits a cell into its tests at the commas outside strings, parentheses and intervals. An
+         * interval is skipped as a unit, not by counting brackets, because its brackets need not pair
+         * up: {@code [1..2)} and {@code ]1..2[} are both intervals.
          */
-        private List<String> splitTopLevel(String text) {
+        private List<String> splitTests(String text) {
             var parts = new ArrayList<String>();
             int end = -1;
             do {
@@ -273,7 +310,8 @@ public final class CellParser {
         /**
          * Index of the comma that ends the test starting at {@code start}, or the text's length if it is
          * the last test. A leading interval is skipped whole; after it, commas inside strings or
-         * parentheses do not count.
+         * parentheses do not count. A {@code )} with no {@code (} open takes the depth below zero, so
+         * commas stop ending tests until a later {@code (} brings it back: {@code 1), 2} is one test.
          */
         private int endOfTest(String text, int start) {
             int i = afterLeadingInterval(text, start);
@@ -308,7 +346,10 @@ public final class CellParser {
             return interval ? endOfInterval(text, i) + 1 : i;
         }
 
-        /** Index of the bracket closing the interval that starts at {@code open}: the first one after its {@code ..}. */
+        /**
+         * Index of the bracket closing the interval that opens at {@code open}: the first {@code ]},
+         * {@code )} or {@code [} after its {@code ..}, outside strings and parentheses.
+         */
         private int endOfInterval(String text, int open) {
             int dots = nextOutsideStringsAndParentheses(text, open + 1, i -> text.startsWith("..", i));
             int close = nextOutsideStringsAndParentheses(text, dots + 2, i -> "])[".indexOf(text.charAt(i)) >= 0);
@@ -320,7 +361,8 @@ public final class CellParser {
 
         /**
          * The first index from {@code from} that is outside strings and parentheses and is {@code wanted},
-         * or the text's length if there is none. A closing parenthesis with none open is skipped.
+         * or the text's length if there is none. Unlike {@link #endOfTest}, a {@code )} with none open is
+         * skipped here, since it may be the closing bracket being looked for.
          */
         private static int nextOutsideStringsAndParentheses(String text, int from, IntPredicate wanted) {
             int depth = 0;
@@ -351,7 +393,11 @@ public final class CellParser {
             return Math.min(i, text.length());
         }
 
-        /** Index of the first {@code ..} outside quotes, after the opening bracket, or -1 if there is none. */
+        /**
+         * Index of the first {@code ..} outside quotes, after the opening bracket and before the closing
+         * one, or -1 if there is none. Unlike {@link #closingQuote}, a backslash escapes nothing here:
+         * every quote opens or closes a string, as it always has.
+         */
         private static int topLevelDots(String text) {
             boolean quoted = false;
             for (int i = 1; i < text.length() - 2; i++) {
@@ -364,10 +410,5 @@ public final class CellParser {
             }
             return -1;
         }
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    static int compare(Comparable<?> a, Comparable<?> b) {
-        return ((Comparable) a).compareTo(b);
     }
 }

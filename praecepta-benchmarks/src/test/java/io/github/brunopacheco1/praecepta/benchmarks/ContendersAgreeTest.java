@@ -153,9 +153,9 @@ class ContendersAgreeTest {
         var generated = GeneratedInputs.variant(variant, workload);
         var map = GeneratedInputs.variant("map", workload);
         for (int i = 0; i < workload.size(); i++) {
-            Assertions.assertThat(generated.ruleIds().apply(generated.evaluate().apply(generated.inputs().get(i))))
+            Assertions.assertThat(generated.ruleIdsOf(i))
                     .as("input %s", workload.get(i))
-                    .isEqualTo(map.ruleIds().apply(map.evaluate().apply(map.inputs().get(i))))
+                    .isEqualTo(map.ruleIdsOf(i))
                     .isNotEmpty();
         }
     }

@@ -8,9 +8,7 @@ package io.github.brunopacheco1.praecepta.maven.plugin;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -25,8 +23,6 @@ import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
-import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
-import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.loader.csv.CsvLoader;
 import io.github.brunopacheco1.praecepta.loader.excel.ExcelLoader;
 
@@ -73,7 +69,7 @@ final class TableCompiler {
 
     // ---- loading ----------------------------------------------------------------------------------
 
-    static DecisionTable load(TableConfig config) {
+    private static DecisionTable load(TableConfig config) {
         var file = config.source;
         if (!file.isFile()) {
             throw new IllegalArgumentException("Table source " + file + " does not exist");
@@ -81,28 +77,46 @@ final class TableCompiler {
         var fileName = file.getName();
         var extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
         try (var stream = Files.newInputStream(file.toPath())) {
-            if (extension.equals("dmn")) {
-                rejectForDmn(config);
-                return DmnReader.read(stream, config.decision);
-            }
-            if (!extension.equals("xlsx") && !extension.equals("xls") && !extension.equals("csv")) {
-                throw new IllegalArgumentException("Table source %s: expected a .xlsx, .csv or .dmn file".formatted(file));
-            }
-            return spreadsheet(config, stream, extension.equals("csv"));
+            return switch (extension) {
+                case "dmn" -> dmn(config, stream);
+                case "xlsx", "xls" -> spreadsheet(config, stream, false);
+                case "csv" -> spreadsheet(config, stream, true);
+                default -> throw new IllegalArgumentException("Table source %s: expected a .xlsx, .csv or .dmn file".formatted(file));
+            };
         } catch (IOException e) {
             throw new IllegalArgumentException("Cannot read table source " + file + ": " + e.getMessage(), e);
         }
     }
 
-    private static void rejectForDmn(TableConfig config) {
+    private static DecisionTable dmn(TableConfig config, InputStream stream) {
         if (config.hitPolicy != null || config.aggregation != null || !config.inputs.isEmpty() || !config.outputs.isEmpty()) {
-            throw new IllegalArgumentException("Table source %s: a DMN model declares its own hit policy and columns; remove "
-                    .formatted(config.source) + "<hitPolicy>, <aggregation>, <inputs> and <outputs>");
+            throw new IllegalArgumentException(("Table source %s: a DMN model declares its own hit policy and columns; "
+                    + "remove <hitPolicy>, <aggregation>, <inputs> and <outputs>").formatted(config.source));
         }
+        return DmnReader.read(stream, config.decision);
     }
 
+    /** An Excel or CSV table: the pom declares its hit policy and columns, the file holds its rules. */
     private static DecisionTable spreadsheet(TableConfig config, InputStream stream, boolean csv) {
         var where = "Table source " + config.source;
+        checkSpreadsheetConfig(config, where);
+        var inputs = config.inputs.stream()
+                .map(column -> new InputColumn(requiredName(column, where), column.type, column.allowedValues))
+                .toList();
+        var outputs = config.outputs.stream()
+                .map(column -> new OutputColumn(requiredName(column, where), column.type, column.priority))
+                .toList();
+        var inputNames = new LinkedHashSet<>(inputs.stream().map(InputColumn::name).toList());
+        var outputNames = new LinkedHashSet<>(outputs.stream().map(OutputColumn::name).toList());
+        var fileName = config.source.getName();
+        var rules = csv
+                ? new CsvLoader(stream, fileName, inputNames, outputNames).getPraecepta()
+                : new ExcelLoader(stream, fileName, inputNames, outputNames).getPraecepta();
+        var tableName = fileName.substring(0, fileName.lastIndexOf('.'));
+        return new DecisionTable(tableName, config.hitPolicy, config.aggregation, inputs, outputs, rules);
+    }
+
+    private static void checkSpreadsheetConfig(TableConfig config, String where) {
         if (config.decision != null) {
             throw new IllegalArgumentException(where + ": <decision> only applies to DMN sources");
         }
@@ -112,23 +126,9 @@ final class TableCompiler {
         if (config.inputs.isEmpty() || config.outputs.isEmpty()) {
             throw new IllegalArgumentException(where + ": declare the <inputs> and <outputs> columns");
         }
-        var inputs = config.inputs.stream()
-                .map(column -> new InputColumn(required(column, where), column.type, column.allowedValues))
-                .toList();
-        var outputs = config.outputs.stream()
-                .map(column -> new OutputColumn(required(column, where), column.type, column.priority))
-                .toList();
-        var inputNames = new LinkedHashSet<>(inputs.stream().map(InputColumn::name).toList());
-        var outputNames = new LinkedHashSet<>(outputs.stream().map(OutputColumn::name).toList());
-        var source = config.source.getName();
-        var rules = csv
-                ? new CsvLoader(stream, source, inputNames, outputNames).getPraecepta()
-                : new ExcelLoader(stream, source, inputNames, outputNames).getPraecepta();
-        var name = source.substring(0, source.lastIndexOf('.'));
-        return new DecisionTable(name, config.hitPolicy, config.aggregation, inputs, outputs, rules);
     }
 
-    private static String required(ColumnConfig column, String where) {
+    private static String requiredName(ColumnConfig column, String where) {
         if (column.name == null || column.name.isBlank()) {
             throw new IllegalArgumentException(where + ": every column needs a <name>");
         }
@@ -144,7 +144,7 @@ final class TableCompiler {
             throw new IllegalArgumentException("Table '%s': %s aggregation needs exactly one NUMBER output"
                     .formatted(table.name(), table.aggregation()));
         }
-        var builder = PraeceptaEngine.<java.util.Map<String, String>, PraeceptaOutput>builder()
+        var builder = PraeceptaEngine.<Map<String, String>, PraeceptaOutput>builder()
                 .table(table)
                 .inputs(PraeceptaInput::new)
                 .output(output -> output);
@@ -156,25 +156,5 @@ final class TableCompiler {
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("Table '%s': %s".formatted(table.name(), e.getMessage()), e);
         }
-    }
-
-    // ---- shared helpers ---------------------------------------------------------------------------
-
-    /**
-     * The values of a string column's value list, or an empty list if it has none (it then stays a
-     * String). A value list always holds at least one value.
-     */
-    static List<String> enumValues(InputColumn column) {
-        if (column.type() != ColumnType.STRING || column.allowedValues() == null) {
-            return List.of();
-        }
-        var tests = (UnaryTests.Positive) CellParser.parse(column.allowedValues(), ColumnType.STRING);
-        var values = new LinkedHashMap<String, Boolean>();
-        tests.tests().forEach(test -> values.put((String) ((UnaryTests.Equals) test).value(), true));
-        return List.copyOf(values.keySet());
-    }
-
-    static boolean singleResult(DecisionTable table) {
-        return table.hitPolicy().isSingleHit() || table.aggregation() != null;
     }
 }

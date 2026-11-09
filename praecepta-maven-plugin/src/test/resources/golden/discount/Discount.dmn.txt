@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_discount" name="discount" namespace="https://github.com/brunopacheco1/praecepta/discount">
+  <inputData id="input_data_0" name="country">
+    <variable id="input_variable_0" name="country" typeRef="string"/>
+  </inputData>
+  <inputData id="input_data_1" name="age">
+    <variable id="input_variable_1" name="age" typeRef="number"/>
+  </inputData>
+  <inputData id="input_data_2" name="since">
+    <variable id="input_variable_2" name="since" typeRef="date"/>
+  </inputData>
+  <decision id="decision_discount" name="discount">
+    <variable id="decision_variable" name="discount"/>
+    <informationRequirement id="requirement_0"><requiredInput href="#input_data_0"/></informationRequirement>
+    <informationRequirement id="requirement_1"><requiredInput href="#input_data_1"/></informationRequirement>
+    <informationRequirement id="requirement_2"><requiredInput href="#input_data_2"/></informationRequirement>
+    <decisionTable id="table" hitPolicy="FIRST">
+      <input id="input_0" label="country">
+        <inputExpression id="input_expression_0" typeRef="string"><text>country</text></inputExpression>
+        <inputValues id="input_values_0"><text>"PT", "ES", "FR"</text></inputValues>
+      </input>
+      <input id="input_1" label="age">
+        <inputExpression id="input_expression_1" typeRef="number"><text>age</text></inputExpression>
+        <inputValues id="input_values_1"><text>[0..120]</text></inputValues>
+      </input>
+      <input id="input_2" label="since">
+        <inputExpression id="input_expression_2" typeRef="date"><text>since</text></inputExpression>
+      </input>
+      <output id="output_0" name="discount" typeRef="number"/>
+      <output id="output_1" name="tier" typeRef="string"/>
+      <rule id="rule_0">
+        <inputEntry id="input_entry_0_0"><text>"PT", "ES"</text></inputEntry>
+        <inputEntry id="input_entry_0_1"><text>[18..65)</text></inputEntry>
+        <inputEntry id="input_entry_0_2"><text>&lt; date("2020-01-01")</text></inputEntry>
+        <outputEntry id="output_entry_0_0"><text>0.15</text></outputEntry>
+        <outputEntry id="output_entry_0_1"><text>"gold"</text></outputEntry>
+      </rule>
+      <rule id="rule_1">
+        <inputEntry id="input_entry_1_0"><text>not("FR")</text></inputEntry>
+        <inputEntry id="input_entry_1_1"><text>&gt;= 18</text></inputEntry>
+        <inputEntry id="input_entry_1_2"><text>-</text></inputEntry>
+        <outputEntry id="output_entry_1_0"><text>0.05</text></outputEntry>
+        <outputEntry id="output_entry_1_1"><text>"silver"</text></outputEntry>
+      </rule>
+      <rule id="rule_2">
+        <inputEntry id="input_entry_2_0"><text>-</text></inputEntry>
+        <inputEntry id="input_entry_2_1"><text>&lt; 18</text></inputEntry>
+        <inputEntry id="input_entry_2_2"><text>-</text></inputEntry>
+        <outputEntry id="output_entry_2_0"><text>0</text></outputEntry>
+        <outputEntry id="output_entry_2_1"><text>"junior"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

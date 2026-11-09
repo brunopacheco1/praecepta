@@ -12,6 +12,8 @@ import java.util.Map;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Issue;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind;
@@ -98,12 +100,12 @@ class PraeceptaEngineTest {
                     .containsExactly(new Discount("B", 5), new Discount("A", 10), new Discount("A", 1));
         }
 
-        @Test
-        void rule_order_and_collect_return_all_matches_in_rule_order() {
-            for (var policy : List.of(HitPolicy.RULE_ORDER, HitPolicy.COLLECT)) {
-                Assertions.assertThat(engine(policy).build().evaluate(PT_SMB))
-                        .containsExactly(new Discount("A", 10), new Discount("B", 5), new Discount("A", 1));
-            }
+        @ParameterizedTest
+        @EnumSource(names = {"RULE_ORDER", "COLLECT"})
+        void rule_order_and_collect_return_all_matches_in_rule_order(HitPolicy policy) {
+            var engine = engine(policy).build();
+            Assertions.assertThat(engine.evaluate(PT_SMB))
+                    .containsExactly(new Discount("A", 10), new Discount("B", 5), new Discount("A", 1));
         }
 
         @Test
@@ -113,15 +115,14 @@ class PraeceptaEngineTest {
             Assertions.assertThat(engine.evaluate(FR_CORP)).isEmpty();
         }
 
-        @Test
-        void no_match_is_an_empty_result_under_every_policy() {
-            for (var policy : HitPolicy.values()) {
-                var builder = engine(policy);
-                if (policy == HitPolicy.PRIORITY || policy == HitPolicy.OUTPUT_ORDER) {
-                    builder.outputPriority("grade", List.of("A", "B"));
-                }
-                Assertions.assertThat(builder.build().evaluate(FR_CORP)).as("policy %s", policy).isEmpty();
+        @ParameterizedTest
+        @EnumSource(HitPolicy.class)
+        void no_match_is_an_empty_result_under_every_policy(HitPolicy policy) {
+            var builder = engine(policy);
+            if (policy == HitPolicy.PRIORITY || policy == HitPolicy.OUTPUT_ORDER) {
+                builder.outputPriority("grade", List.of("A", "B"));
             }
+            Assertions.assertThat(builder.build().evaluate(FR_CORP)).isEmpty();
         }
     }
 
@@ -137,7 +138,8 @@ class PraeceptaEngineTest {
 
         @Test
         void map_based_inputs_behave_like_per_column_binding() {
-            var engine = PraeceptaEngine.<Order, Discount>builder()
+            var perColumn = engine(HitPolicy.COLLECT).build();
+            var byMap = PraeceptaEngine.<Order, Discount>builder()
                     .hitPolicy(HitPolicy.COLLECT)
                     .inputs(order -> {
                         var values = new HashMap<String, String>();
@@ -149,7 +151,7 @@ class PraeceptaEngineTest {
                     .rules(RULES)
                     .build();
             for (var order : List.of(PT_SMB, ES_SMB, PT_CORP, FR_CORP, MISSING_SMB)) {
-                Assertions.assertThat(engine.evaluate(order)).isEqualTo(engine(HitPolicy.COLLECT).build().evaluate(order));
+                Assertions.assertThat(byMap.evaluate(order)).isEqualTo(perColumn.evaluate(order));
             }
         }
 
@@ -233,10 +235,14 @@ class PraeceptaEngineTest {
         }
 
         @Test
-        void inputs_must_be_bound_exactly_one_way() {
+        void inputs_must_be_bound() {
             var neither = PraeceptaEngine.<Order, Discount>builder()
                     .hitPolicy(HitPolicy.FIRST).output(PraeceptaEngineTest::discount).rules(RULES);
             Assertions.assertThatThrownBy(neither::build).isInstanceOf(IllegalStateException.class);
+        }
+
+        @Test
+        void inputs_cannot_be_bound_both_per_column_and_as_a_map() {
             var both = engine(HitPolicy.FIRST).inputs(order -> new PraeceptaInput(Map.of()));
             Assertions.assertThatThrownBy(both::build).isInstanceOf(IllegalStateException.class);
         }

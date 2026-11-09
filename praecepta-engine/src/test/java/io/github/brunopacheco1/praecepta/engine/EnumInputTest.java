@@ -5,6 +5,7 @@
  */
 package io.github.brunopacheco1.praecepta.engine;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,13 +53,7 @@ class EnumInputTest {
 
     @Test
     void enum_bindings_match_like_string_bindings() {
-        var byEnum = PraeceptaEngine.<Order, String>builder()
-                .hitPolicy(HitPolicy.COLLECT)
-                .enumInput("country", Country.class, Order::country)
-                .enumInput("segment", Segment.class, Segment::value, Order::segment)
-                .output(output -> output.values().get("discount"))
-                .rules(RULES)
-                .build();
+        var byEnum = enumEngine(HitPolicy.COLLECT).build();
         var byString = PraeceptaEngine.<Order, String>builder()
                 .hitPolicy(HitPolicy.COLLECT)
                 .input("country", order -> order.country() == null ? null : order.country().name())
@@ -78,13 +73,7 @@ class EnumInputTest {
 
     @Test
     void the_enum_is_the_columns_value_list_so_gaps_are_reported() {
-        var engine = PraeceptaEngine.<Order, String>builder()
-                .hitPolicy(HitPolicy.FIRST)
-                .enumInput("country", Country.class, Order::country)
-                .enumInput("segment", Segment.class, Segment::value, Order::segment)
-                .output(output -> output.values().get("discount"))
-                .rules(RULES)
-                .build();
+        var engine = enumEngine(HitPolicy.FIRST).build();
         Assertions.assertThat(engine.validationReport().issues(Kind.GAP))
                 .singleElement()
                 .satisfies(gap -> Assertions.assertThat(gap.detail()).startsWith("country = \"FR\""));
@@ -92,21 +81,25 @@ class EnumInputTest {
 
     @Test
     void enum_values_must_be_within_declared_input_values() {
-        var builder = PraeceptaEngine.<Order, String>builder()
-                .hitPolicy(HitPolicy.FIRST)
-                .enumInput("country", Country.class, Order::country)
-                .allowedValues("country", List.of("PT", "ES", "FR"))
-                .enumInput("segment", Segment.class, Segment::value, Order::segment)
-                .output(output -> output.values().get("discount"))
-                .rules(RULES);
+        var builder = enumEngine(HitPolicy.FIRST).allowedValues("country", List.of("PT", "ES", "FR"));
         Assertions.assertThatThrownBy(builder::build)
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("Column 'country': enum value 'DE' is not one of the column's input values");
     }
 
+    private static PraeceptaEngine.Builder<Order, String> enumEngine(HitPolicy policy) {
+        return PraeceptaEngine.<Order, String>builder()
+                .hitPolicy(policy)
+                .enumInput("country", Country.class, Order::country)
+                .enumInput("segment", Segment.class, Segment::value, Order::segment)
+                .output(output -> output.values().get("discount"))
+                .rules(RULES);
+    }
+
+    /** Every value, then null. */
     @SafeVarargs
     private static <E> List<E> withNull(E... values) {
-        var list = new java.util.ArrayList<E>();
+        var list = new ArrayList<E>();
         for (var value : values) {
             list.add(value);
         }

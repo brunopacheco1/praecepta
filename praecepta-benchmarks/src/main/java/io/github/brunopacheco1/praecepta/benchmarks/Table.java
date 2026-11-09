@@ -84,18 +84,12 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
         }
         var kind = matcher.group(1);
         int rules = Integer.parseInt(matcher.group(2));
-        Integer columns = matcher.group(3) == null ? null : Integer.valueOf(matcher.group(3));
-        var policy = matcher.group(4) == null ? null : switch (matcher.group(4)) {
-            case "collect" -> HitPolicy.COLLECT;
-            case "first" -> HitPolicy.FIRST;
-            case "priority" -> HitPolicy.PRIORITY;
-            case "ruleorder" -> HitPolicy.RULE_ORDER;
-            default -> HitPolicy.UNIQUE;
-        };
+        var columns = matcher.group(3);
+        var hitPolicySuffix = matcher.group(4);
         return switch (kind) {
-            case "synthetic" -> synthetic(name, rules, columns == null ? 10 : columns, policy == null ? HitPolicy.COLLECT : policy);
-            case "mixed" -> mixed(name, rules, columns == null ? 9 : columns, policy == null ? HitPolicy.COLLECT : policy);
-            default -> unique(name, rules, columns == null ? 10 : columns, policy == null ? HitPolicy.UNIQUE : policy);
+            case "synthetic" -> synthetic(name, rules, columnsOr(columns, 10), hitPolicyOr(hitPolicySuffix, HitPolicy.COLLECT));
+            case "mixed" -> mixed(name, rules, columnsOr(columns, 9), hitPolicyOr(hitPolicySuffix, HitPolicy.COLLECT));
+            default -> unique(name, rules, columnsOr(columns, 10), hitPolicyOr(hitPolicySuffix, HitPolicy.UNIQUE));
         };
     }
 
@@ -145,7 +139,7 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
         for (int r = 1; r <= ruleCount; r++) {
             var values = new HashMap<String, String>();
             for (int c = 0; c < columns; c++) {
-                values.put(inputs.get(c), wildcard(random, c, columns) ? null : "v" + random.nextInt(STRING_DOMAIN));
+                values.put(inputs.get(c), randomStringCell(random, c, columns));
             }
             cells.add(values);
         }
@@ -173,7 +167,7 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
         for (int r = 1; r <= ruleCount; r++) {
             var values = new HashMap<String, String>();
             for (int c = 0; c < columns; c++) {
-                values.put(inputs.get(c), wildcard(random, c, columns) ? "-" : cell(types.get(c), random));
+                values.put(inputs.get(c), wildcard(random, c, columns) ? "-" : feelCell(types.get(c), random));
             }
             cells.add(values);
         }
@@ -186,10 +180,7 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
      * are random with wildcards. An input built from a rule matches that rule only.
      */
     static Table unique(String name, int ruleCount, int columns, HitPolicy hitPolicy) {
-        int keys = 1;
-        for (long combinations = STRING_DOMAIN; combinations < 4L * ruleCount; combinations *= STRING_DOMAIN) {
-            keys++;
-        }
+        int keys = keyColumns(ruleCount);
         if (keys > columns) {
             throw new IllegalArgumentException("Too few columns for %d distinct rules: %s".formatted(ruleCount, name));
         }
@@ -207,12 +198,21 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
         for (var combination : combinations) {
             var values = new HashMap<String, String>();
             for (int c = 0; c < columns; c++) {
-                values.put(inputs.get(c), c < keys ? "v" + combination.get(c)
-                        : wildcard(random, c, columns) ? null : "v" + random.nextInt(STRING_DOMAIN));
+                var cell = c < keys ? "v" + combination.get(c) : randomStringCell(random, c, columns);
+                values.put(inputs.get(c), cell);
             }
             cells.add(values);
         }
         return build(name, inputs, strings(columns), cells, hitPolicy);
+    }
+
+    /** The number of key columns of a unique table: enough for four times as many value combinations as rules. */
+    private static int keyColumns(int ruleCount) {
+        int keys = 1;
+        for (long combinations = STRING_DOMAIN; combinations < 4L * ruleCount; combinations *= STRING_DOMAIN) {
+            keys++;
+        }
+        return keys;
     }
 
     private static Table build(String name, List<String> inputs, List<ColumnType> types, List<Map<String, String>> cells,
@@ -233,46 +233,86 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
         return new Table(name, List.copyOf(inputs), List.copyOf(types), outputs, List.copyOf(rules), hitPolicy);
     }
 
+    /** Whether a cell is a wildcard. Columns further right are wildcards more often. */
     private static boolean wildcard(Random random, int column, int columns) {
         return random.nextDouble() < WILDCARDS * (0.5 + column / (double) columns);
     }
 
-    private static String cell(ColumnType type, Random random) {
-        int pick = random.nextInt(10);
+    /** A cell of a string table: a wildcard (null) or one unquoted value. */
+    private static String randomStringCell(Random random, int column, int columns) {
+        return wildcard(random, column, columns) ? null : "v" + random.nextInt(STRING_DOMAIN);
+    }
+
+    /** A FEEL cell of a mixed table; {@code form} picks the shape of the cell, from 0 to 9. */
+    private static String feelCell(ColumnType type, Random random) {
+        int form = random.nextInt(10);
         return switch (type) {
-            case STRING -> pick < 6 ? str(random)
-                    : pick < 8 ? str(random) + ", " + str(random)
-                    : "not(" + str(random) + ")";
-            case NUMBER -> {
-                int a = random.nextInt(90);
-                int b = a + 2 + random.nextInt(100 - a - 1);
-                yield switch (pick) {
-                    case 0, 1 -> "< " + a;
-                    case 2, 3 -> ">= " + a;
-                    case 4, 5 -> "[" + a + ".." + b + ")";
-                    case 6, 7 -> "(" + a + ".." + b + "]";
-                    default -> a + ", " + b;
-                };
-            }
-            case DATE -> {
-                int a = random.nextInt(330);
-                int b = a + 2 + random.nextInt(364 - a - 1);
-                yield switch (pick) {
-                    case 0, 1, 2 -> "< " + date(a);
-                    case 3, 4, 5 -> ">= " + date(a);
-                    default -> "[" + date(a) + ".." + date(b) + "]";
-                };
-            }
+            case STRING -> stringCell(form, random);
+            case NUMBER -> numberCell(form, random);
+            case DATE -> dateCell(form, random);
             case BOOLEAN, TIME, DATE_TIME -> throw new IllegalArgumentException("generated tables use STRING, NUMBER and DATE columns");
         };
     }
 
-    private static String str(Random random) {
+    private static String stringCell(int form, Random random) {
+        if (form < 6) {
+            return quotedString(random);
+        }
+        if (form < 8) {
+            return quotedString(random) + ", " + quotedString(random);
+        }
+        return "not(" + quotedString(random) + ")";
+    }
+
+    /** Numbers range over 0..100; {@code low} and {@code high} are at least two apart. */
+    private static String numberCell(int form, Random random) {
+        int low = random.nextInt(90);
+        int high = low + 2 + random.nextInt(100 - low - 1);
+        return switch (form) {
+            case 0, 1 -> "< " + low;
+            case 2, 3 -> ">= " + low;
+            case 4, 5 -> "[" + low + ".." + high + ")";
+            case 6, 7 -> "(" + low + ".." + high + "]";
+            default -> low + ", " + high;
+        };
+    }
+
+    /** Dates range over the days of 2025; {@code low} and {@code high} are at least two days apart. */
+    private static String dateCell(int form, Random random) {
+        int low = random.nextInt(330);
+        int high = low + 2 + random.nextInt(364 - low - 1);
+        return switch (form) {
+            case 0, 1, 2 -> "< " + dateLiteral(low);
+            case 3, 4, 5 -> ">= " + dateLiteral(low);
+            default -> "[" + dateLiteral(low) + ".." + dateLiteral(high) + "]";
+        };
+    }
+
+    private static String quotedString(Random random) {
         return "\"v" + random.nextInt(STRING_DOMAIN) + "\"";
     }
 
-    private static String date(int day) {
+    private static String dateLiteral(int day) {
         return "date(\"" + DAY0.plusDays(day) + "\")";
+    }
+
+    /** The column count of a table name ({@code x<columns>}), or the default when the name has none. */
+    private static int columnsOr(String columns, int defaultColumns) {
+        return columns == null ? defaultColumns : Integer.parseInt(columns);
+    }
+
+    /** The hit policy of a table name's suffix ({@code -first}...), or the default when the name has none. */
+    private static HitPolicy hitPolicyOr(String suffix, HitPolicy defaultPolicy) {
+        if (suffix == null) {
+            return defaultPolicy;
+        }
+        return switch (suffix) {
+            case "collect" -> HitPolicy.COLLECT;
+            case "first" -> HitPolicy.FIRST;
+            case "priority" -> HitPolicy.PRIORITY;
+            case "ruleorder" -> HitPolicy.RULE_ORDER;
+            default -> HitPolicy.UNIQUE;
+        };
     }
 
     private static List<String> columnNames(String prefix, int columns) {

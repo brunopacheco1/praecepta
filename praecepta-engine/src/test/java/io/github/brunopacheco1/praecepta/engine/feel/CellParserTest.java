@@ -15,6 +15,8 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
@@ -25,79 +27,74 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 
 class CellParserTest {
 
-    @Test
-    void blank_and_dash_match_anything() {
-        for (var cell : new String[] {null, "", "   ", "-", " - "}) {
-            Assertions.assertThat(CellParser.parse(cell, ColumnType.STRING)).as("'%s'", cell).isEqualTo(new UnaryTests.Any());
-        }
+    @ParameterizedTest(name = "''{0}''")
+    @NullAndEmptySource
+    @ValueSource(strings = {"   ", "-", " - "})
+    void blank_and_dash_match_anything(String cell) {
+        Assertions.assertThat(CellParser.parse(cell, ColumnType.STRING)).isEqualTo(new UnaryTests.Any());
     }
 
     @Test
     void legacy_unquoted_lists_still_mean_string_literals() {
         Assertions.assertThat(CellParser.parse("PT,ES", ColumnType.STRING))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("PT"), new Equals("ES"))));
+                .isEqualTo(positive(new Equals("PT"), new Equals("ES")));
         Assertions.assertThat(CellParser.parse(" PT , ES ", ColumnType.STRING)) // whitespace is trimmed
-                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("PT"), new Equals("ES"))));
+                .isEqualTo(positive(new Equals("PT"), new Equals("ES")));
         Assertions.assertThat(CellParser.parse("10", ColumnType.STRING)) // a code, not a number
-                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("10"))));
+                .isEqualTo(positive(new Equals("10")));
     }
 
     @Test
     void quoted_strings_may_contain_commas_and_escaped_quotes() {
         Assertions.assertThat(CellParser.parse("\"a,b\", \"say \\\"hi\\\"\"", ColumnType.STRING))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("a,b"), new Equals("say \"hi\""))));
+                .isEqualTo(positive(new Equals("a,b"), new Equals("say \"hi\"")));
     }
 
     @Test
     void not_negates_a_list() {
         Assertions.assertThat(CellParser.parse("not(\"FR\", DE)", ColumnType.STRING))
-                .isEqualTo(new UnaryTests.Negated(List.of(new Equals("FR"), new Equals("DE"))));
+                .isEqualTo(negated(new Equals("FR"), new Equals("DE")));
     }
 
     @Test
     void not_may_wrap_half_open_intervals() {
         Assertions.assertThat(CellParser.parse("not(0, [0..1))", ColumnType.NUMBER))
-                .isEqualTo(new UnaryTests.Negated(List.of(
-                        new Equals(BigDecimal.ZERO),
-                        new Range(BigDecimal.ZERO, true, BigDecimal.ONE, false))));
+                .isEqualTo(negated(new Equals(BigDecimal.ZERO), new Range(BigDecimal.ZERO, true, BigDecimal.ONE, false)));
     }
 
     @Test
     void null_is_the_missing_value_test() {
         Assertions.assertThat(CellParser.parse("null, \"PT\"", ColumnType.STRING))
-                .isEqualTo(new UnaryTests.Positive(List.of(new NullTest(), new Equals("PT"))));
+                .isEqualTo(positive(new NullTest(), new Equals("PT")));
     }
 
     @Test
     void numbers_support_literals_comparisons_and_intervals() {
         Assertions.assertThat(CellParser.parse("< 18, 21, >= 65.5", ColumnType.NUMBER))
-                .isEqualTo(new UnaryTests.Positive(List.of(
+                .isEqualTo(positive(
                         new Compare(Operator.LT, new BigDecimal("18")),
                         new Equals(new BigDecimal("21")),
-                        new Compare(Operator.GE, new BigDecimal("65.5")))));
+                        new Compare(Operator.GE, new BigDecimal("65.5"))));
     }
 
     @Test
     void booleans_are_true_or_false_without_comparisons() {
-        Assertions.assertThat(CellParser.parse("true", ColumnType.BOOLEAN))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Equals(true))));
-        Assertions.assertThat(CellParser.parse("not(false)", ColumnType.BOOLEAN))
-                .isEqualTo(new UnaryTests.Negated(List.of(new Equals(false))));
-        Assertions.assertThat(CellParser.parse("true, null", ColumnType.BOOLEAN))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Equals(true), new NullTest())));
+        Assertions.assertThat(CellParser.parse("true", ColumnType.BOOLEAN)).isEqualTo(positive(new Equals(true)));
+        Assertions.assertThat(CellParser.parse("not(false)", ColumnType.BOOLEAN)).isEqualTo(negated(new Equals(false)));
+        Assertions.assertThat(CellParser.parse("true, null", ColumnType.BOOLEAN)).isEqualTo(positive(new Equals(true), new NullTest()));
         Assertions.assertThat(CellParser.parse("true", ColumnType.STRING))
                 .as("an unquoted word in a STRING column is still text")
-                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("true"))));
+                .isEqualTo(positive(new Equals("true")));
     }
 
     @Test
     void strict_feel_reads_unquoted_words_as_names_not_strings() {
         // Praecepta's own tables (Excel, CSV, code) keep the shorter syntax
         Assertions.assertThat(CellParser.parse("PT, ES", ColumnType.STRING))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("PT"), new Equals("ES"))));
+                .isEqualTo(positive(new Equals("PT"), new Equals("ES")));
         // in DMN an unquoted word refers to another variable, which is not supported
         Assertions.assertThat(CellParser.parseFeel("\"PT\", \"ES\"", ColumnType.STRING))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("PT"), new Equals("ES"))));
+                .isEqualTo(positive(new Equals("PT"), new Equals("ES")));
         Assertions.assertThatThrownBy(() -> CellParser.parseFeel("not(Complex.aString)", ColumnType.STRING))
                 .isInstanceOf(CellSyntaxException.class)
                 .hasMessageContaining("'Complex.aString' is a FEEL name");
@@ -120,12 +117,12 @@ class CellParserTest {
     void times_and_date_times_use_their_functions_or_iso_text() {
         var morning = LocalTime.of(8, 30);
         Assertions.assertThat(CellParser.parse("[time(\"08:30:00\")..12:00)", ColumnType.TIME))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Range(morning, true, LocalTime.NOON, false))));
+                .isEqualTo(positive(new Range(morning, true, LocalTime.NOON, false)));
         Assertions.assertThat(CellParser.parse(">= 08:30", ColumnType.TIME))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Compare(Operator.GE, morning))));
+                .isEqualTo(positive(new Compare(Operator.GE, morning)));
         var moment = LocalDateTime.of(2025, 1, 31, 8, 30, 15, 500_000_000);
         Assertions.assertThat(CellParser.parse("date and time(\"2025-01-31T08:30:15.5\"), 2025-01-31T08:30:15.5", ColumnType.DATE_TIME))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Equals(moment), new Equals(moment))));
+                .isEqualTo(positive(new Equals(moment), new Equals(moment)));
     }
 
     @ParameterizedTest
@@ -139,33 +136,30 @@ class CellParserTest {
     })
     void interval_brackets_set_open_and_closed_ends(String cell, boolean lowClosed, boolean highClosed) {
         Assertions.assertThat(CellParser.parse(cell, ColumnType.NUMBER))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Range(BigDecimal.ONE, lowClosed, new BigDecimal(5), highClosed))));
+                .isEqualTo(positive(new Range(BigDecimal.ONE, lowClosed, new BigDecimal(5), highClosed)));
     }
 
     @Test
     void intervals_with_outward_brackets_split_correctly_from_following_tests() {
         Assertions.assertThat(CellParser.parse("]1..2[, 7", ColumnType.NUMBER))
-                .isEqualTo(new UnaryTests.Positive(List.of(
-                        new Range(BigDecimal.ONE, false, new BigDecimal(2), false),
-                        new Equals(new BigDecimal(7)))));
+                .isEqualTo(positive(new Range(BigDecimal.ONE, false, new BigDecimal(2), false), new Equals(new BigDecimal(7))));
     }
 
     @Test
     void escapes_and_parentheses_decide_where_a_test_ends() {
         // an escaped backslash does not escape the closing quote
         Assertions.assertThat(CellParser.parse("\"a\\\\\", \"b\"", ColumnType.STRING))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("a\\"), new Equals("b"))));
+                .isEqualTo(positive(new Equals("a\\"), new Equals("b")));
         // the parenthesis of a date call does not close an interval; the one after it does
         Assertions.assertThat(CellParser.parse("[date(\"2025-01-01\")..date(\"2025-01-31\")), date(\"2025-03-01\")", ColumnType.DATE))
-                .isEqualTo(new UnaryTests.Positive(List.of(
+                .isEqualTo(positive(
                         new Range(LocalDate.of(2025, 1, 1), true, LocalDate.of(2025, 1, 31), false),
-                        new Equals(LocalDate.of(2025, 3, 1)))));
+                        new Equals(LocalDate.of(2025, 3, 1))));
     }
 
     @Test
     void unquoted_text_over_several_lines_is_not_checked_for_feel_syntax() {
-        Assertions.assertThat(CellParser.parse("a(\nb", ColumnType.STRING))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("a(\nb"))));
+        Assertions.assertThat(CellParser.parse("a(\nb", ColumnType.STRING)).isEqualTo(positive(new Equals("a(\nb")));
     }
 
     @Test
@@ -173,9 +167,9 @@ class CellParserTest {
         var start = LocalDate.of(2025, 1, 1);
         var end = LocalDate.of(2025, 12, 31);
         Assertions.assertThat(CellParser.parse("[date(\"2025-01-01\")..date(\"2025-12-31\")]", ColumnType.DATE))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Range(start, true, end, true))));
+                .isEqualTo(positive(new Range(start, true, end, true)));
         Assertions.assertThat(CellParser.parse("< 2025-01-01", ColumnType.DATE))
-                .isEqualTo(new UnaryTests.Positive(List.of(new Compare(Operator.LT, start))));
+                .isEqualTo(positive(new Compare(Operator.LT, start)));
     }
 
     @ParameterizedTest
@@ -211,5 +205,13 @@ class CellParserTest {
         Assertions.assertThatThrownBy(() -> CellParser.parse(cell, type))
                 .isInstanceOf(CellSyntaxException.class)
                 .hasMessageContaining(reason);
+    }
+
+    private static UnaryTests positive(UnaryTests.Test... tests) {
+        return new UnaryTests.Positive(List.of(tests));
+    }
+
+    private static UnaryTests negated(UnaryTests.Test... tests) {
+        return new UnaryTests.Negated(List.of(tests));
     }
 }

@@ -55,7 +55,6 @@ public class EvaluationBenchmark {
     private int cursor;
 
     @Setup(Level.Trial)
-    @SuppressWarnings("unchecked")
     public void setUp() {
         var decisionTable = Table.named(table);
         var requests = Workload.generate(decisionTable, WORKLOAD_SIZE, 7, workload);
