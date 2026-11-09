@@ -6,12 +6,10 @@
 package io.github.brunopacheco1.praecepta.engine;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.Duration;
+import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,10 +42,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  * <li>NUMBER, DATE, TIME and DATE_TIME: with the boundary values {@code b0 < b1 < ... < bk} mentioned
  * by the rules (and the allowed values), the classes are
  * {@code (-inf, b0), [b0], (b0, b1), [b1], ..., (bk, +inf)} and a missing value. Lookup is a binary
- * search. A gap that holds no value (between consecutive days, or consecutive nanoseconds; before
- * midnight or after the last nanosecond of a day for times) is marked empty.</li>
+ * search. An interval that holds no value (between consecutive days, or consecutive nanoseconds;
+ * before midnight or after the last nanosecond of a day for times) is marked empty.</li>
  * <li>BOOLEAN: ordered like the others with {@code false < true}, both always boundaries, so the
- * classes are {@code [false]}, {@code [true]} and a missing value (the gaps are all empty).</li>
+ * classes are {@code [false]}, {@code [true]} and a missing value (the intervals are all empty).</li>
  * </ul>
  *
  * Membership is decided per class with FEEL's three-valued logic: a missing value fails comparisons
@@ -61,22 +59,20 @@ final class ColumnIndex {
     final String name;
     final ColumnType type;
     private final boolean isString;
-    /** STRING: written/allowed value -> class. */
-    private final Map<String, Integer> stringClasses;
     /** STRING fast path: written value -> mask, plus the masks of other and missing values. */
     private final Map<String, long[]> stringMasks;
     private final long[] otherMask;
     private final long[] nullMask;
     /** STRING values written in the rules but outside the declared input values (null if none declared). */
     private final Set<String> disallowedStrings;
-    /** NUMBER/DATE: sorted distinct boundaries. */
+    /** Ordered columns (all but STRING): the sorted distinct boundaries. */
     private final Comparable<?>[] boundaries;
     /** The value classes, by class number. */
     private final List<ValueClass> classes;
-    private final int otherClass;
     final int nullClass;
+    /** Per class, the rules (bits) accepting it. */
     final long[][] masks;
-    /** Classes containing no possible value (date gaps between consecutive days). */
+    /** Classes holding no value at all (see {@link OpenIntervals#isEmpty}). */
     final boolean[] empty;
     /** Classes allowed by the declared input values (all, if none declared). Null is always allowed. */
     final boolean[] allowed;
@@ -93,7 +89,10 @@ final class ColumnIndex {
         this.type = type;
         this.isString = type == ColumnType.STRING;
         this.hasAllowedValues = allowedValues != null;
+
         var partition = new ArrayList<ValueClass>();
+        Map<String, Integer> stringClasses;
+        int otherClass;
         if (isString) {
             stringClasses = addStringClasses(cellsByBit, allowedValues, partition);
             otherClass = partition.size();
@@ -114,7 +113,7 @@ final class ColumnIndex {
         allowed = new boolean[classes.size()];
         for (int k = 0; k < classes.size(); k++) {
             var valueClass = classes.get(k);
-            empty[k] = isEmpty(valueClass);
+            empty[k] = valueClass instanceof ValueClass.Between(var low, var high) && OpenIntervals.isEmpty(type, low, high);
             allowed[k] = allowedValues == null || valueClass instanceof ValueClass.Missing || accepts(allowedValues, valueClass);
             if (!empty[k]) {
                 markAcceptingRules(masks[k], cellsByBit, valueClass);
@@ -122,9 +121,9 @@ final class ColumnIndex {
         }
 
         if (isString) {
-            stringMasks = masksByString();
+            stringMasks = masksByString(stringClasses);
             otherMask = masks[otherClass];
-            disallowedStrings = hasAllowedValues ? writtenButNotAllowed() : null;
+            disallowedStrings = hasAllowedValues ? writtenButNotAllowed(stringClasses) : null;
         } else {
             stringMasks = null;
             otherMask = null;
@@ -169,7 +168,39 @@ final class ColumnIndex {
         return points.toArray(Comparable<?>[]::new);
     }
 
-    /** Ordered columns: the gap before each boundary, the boundary itself, and the gap after the last one. */
+    private static void collectStrings(UnaryTests cell, Set<String> into) {
+        for (var test : tests(cell)) {
+            if (test instanceof Equals(var value)) {
+                into.add((String) value);
+            }
+        }
+    }
+
+    private static void collectBoundaries(UnaryTests cell, Set<Comparable<?>> into) {
+        for (var test : tests(cell)) {
+            switch (test) {
+                case Equals(var value) -> into.add(value);
+                case Compare c -> into.add(c.value());
+                case Range r -> {
+                    into.add(r.low());
+                    into.add(r.high());
+                }
+                case NullTest n -> {
+                    // no boundary
+                }
+            }
+        }
+    }
+
+    private static List<Test> tests(UnaryTests cell) {
+        return switch (cell) {
+            case UnaryTests.Any any -> List.of();
+            case UnaryTests.Positive(var tests) -> tests;
+            case UnaryTests.Negated(var tests) -> tests;
+        };
+    }
+
+    /** Ordered columns: the interval before each boundary, the boundary itself, and the interval after the last one. */
     private static void addOrderedClasses(Comparable<?>[] boundaries, List<ValueClass> into) {
         Comparable<?> low = null;
         for (var boundary : boundaries) {
@@ -190,14 +221,14 @@ final class ColumnIndex {
     }
 
     /** STRING fast path: the mask of each written or allowed value. */
-    private Map<String, long[]> masksByString() {
+    private Map<String, long[]> masksByString(Map<String, Integer> stringClasses) {
         var byValue = new HashMap<String, long[]>();
         stringClasses.forEach((value, k) -> byValue.put(value, masks[k]));
         return Map.copyOf(byValue);
     }
 
     /** STRING: the values written in the rules that the declared input values do not allow. */
-    private Set<String> writtenButNotAllowed() {
+    private Set<String> writtenButNotAllowed(Map<String, Integer> stringClasses) {
         var disallowed = new HashSet<String>();
         stringClasses.forEach((value, k) -> {
             if (!allowed[k]) {
@@ -228,10 +259,9 @@ final class ColumnIndex {
     // ---- lookup -----------------------------------------------------------------------------------
 
     /**
-     * The mask of rules accepting a raw input value: a String (typed getter or text map) or, if the
-     * column is enum-bound, an enum constant for STRING columns; for the other types, the typed value
-     * (a Number, LocalDate, Boolean, LocalTime or LocalDateTime) or its text. Blank text counts as
-     * missing.
+     * The mask of rules accepting a raw input value. For a STRING column the value is a String, or an
+     * enum constant if the column is enum-bound; for the other types it is the typed value (a Number,
+     * LocalDate, Boolean, LocalTime or LocalDateTime) or its text. Blank text counts as missing.
      *
      * @throws InvalidInputException if the value is outside the declared input values, or text that
      *                               is not a valid value of the column's type
@@ -283,6 +313,20 @@ final class ColumnIndex {
         return masks[valueClass];
     }
 
+    /**
+     * The class of a converted value of an ordered column, or the missing class for null. Boundary
+     * {@code i} is class {@code 2i + 1}; the interval just below it is class {@code 2i}.
+     */
+    private int classOf(Object value) {
+        if (value == null) {
+            return nullClass;
+        }
+        int found = Arrays.binarySearch(boundaries, value, ColumnIndex::compare);
+        return found >= 0 ? 2 * found + 1 : 2 * (-found - 1);
+    }
+
+    // ---- converting raw values --------------------------------------------------------------------
+
     /** Converts a raw input of an ordered column to the column's Java type; null if missing. */
     private Object convert(Object raw) {
         if (raw == null) {
@@ -319,10 +363,6 @@ final class ColumnIndex {
         throw notValid(text);
     }
 
-    private InvalidInputException notValid(String text) {
-        return new InvalidInputException(name, text, "is not a valid " + type.feelName());
-    }
-
     private BigDecimal number(Number raw) {
         return switch (raw) {
             case BigDecimal decimal -> decimal;
@@ -330,7 +370,7 @@ final class ColumnIndex {
             case Long l -> BigDecimal.valueOf(l);
             case Short sh -> BigDecimal.valueOf(sh);
             case Byte b -> BigDecimal.valueOf(b);
-            case java.math.BigInteger big -> new BigDecimal(big);
+            case BigInteger big -> new BigDecimal(big);
             case Number number -> {
                 double d = number.doubleValue();
                 if (Double.isNaN(d) || Double.isInfinite(d)) {
@@ -341,31 +381,35 @@ final class ColumnIndex {
         };
     }
 
-    /** Class of a value already converted to the column's Java type (or null). */
-    int classOf(Object value) {
-        if (value == null) {
-            return nullClass;
-        }
-        if (type == ColumnType.STRING) {
-            return stringClasses.getOrDefault(value, otherClass);
-        }
-        int found = Arrays.binarySearch(boundaries, value, ColumnIndex::compare);
-        return found >= 0 ? 2 * found + 1 : 2 * (-found - 1);
+    private InvalidInputException notValid(String text) {
+        return new InvalidInputException(name, text, "is not a valid " + type.feelName());
     }
+
+    // ---- classes, for the validation report -------------------------------------------------------
 
     int classCount() {
         return masks.length;
     }
 
+    /** Whether a valid input can fall in the class: it holds some value and the declared input values allow it. */
+    boolean canOccur(int valueClass) {
+        return !empty[valueClass] && allowed[valueClass];
+    }
+
     /** A human-readable description of a class, for validation reports. */
     String describe(int valueClass) {
-        return classes.get(valueClass).describe();
+        return switch (classes.get(valueClass)) {
+            case ValueClass.Point(var value) -> FeelLiterals.literal(value);
+            case ValueClass.Between between -> lowEnd(between) + ".." + highEnd(between);
+            case ValueClass.OtherString other -> "any other value";
+            case ValueClass.Missing missing -> "null";
+        };
     }
 
     /**
-     * Describes a set of classes for a report. For NUMBER and DATE, adjacent classes merge into
-     * intervals, e.g. {@code [18], (18..65), [65]} becomes {@code [18..65]}. Empty classes (date gaps)
-     * do not break a run.
+     * Describes a set of distinct classes for a report. For types with comparisons (numbers, dates and
+     * times), adjacent classes merge into intervals, e.g. {@code [18], (18..65), [65]} becomes
+     * {@code [18..65]}. Empty classes do not break a run.
      */
     List<String> describe(List<Integer> valueClasses) {
         if (!type.supportsComparisons()) { // no intervals to merge
@@ -375,160 +419,64 @@ final class ColumnIndex {
         var runs = new ArrayList<String>();
         int start = sorted.getFirst();
         int end = start;
-        for (int i = 1; i <= sorted.size(); i++) {
-            int next = i < sorted.size() ? sorted.get(i) : -1;
-            boolean adjacent = next > end && java.util.stream.IntStream.range(end + 1, next).allMatch(k -> empty[k]);
-            if (i < sorted.size() && adjacent) {
-                end = next;
-                continue;
+        for (int next : sorted.subList(1, sorted.size())) {
+            if (!adjacent(end, next)) {
+                runs.add(run(start, end));
+                start = next;
             }
-            runs.add(run(start, end));
-            start = next;
             end = next;
         }
+        runs.add(run(start, end));
         return runs;
     }
 
-    private String run(int from, int to) {
-        if (from == to) {
-            return describe(from);
+    /** Whether class {@code to} comes after class {@code from} with only empty classes between them. */
+    private boolean adjacent(int from, int to) {
+        if (to <= from) {
+            return false;
         }
-        var first = classes.get(from);
-        var last = classes.get(to);
-        var low = switch (first) {
+        for (int k = from + 1; k < to; k++) {
+            if (!empty[k]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The classes {@code first} to {@code last}: one class as {@link #describe(int)}, a run as one interval. */
+    private String run(int first, int last) {
+        if (first == last) {
+            return describe(first);
+        }
+        return lowEnd(classes.get(first)) + ".." + highEnd(classes.get(last));
+    }
+
+    /** How an interval starting with the class opens: {@code [18} at a value, {@code (18} or {@code (-inf} after one. */
+    private static String lowEnd(ValueClass first) {
+        return switch (first) {
             case ValueClass.Point(var value) -> "[" + FeelLiterals.literal(value);
-            case ValueClass.Between b -> b.low() == null ? "(-inf" : "(" + FeelLiterals.literal(b.low());
+            case ValueClass.Between between -> between.low() == null ? "(-inf" : "(" + FeelLiterals.literal(between.low());
             default -> throw new IllegalStateException("not an ordered class");
         };
-        var high = switch (last) {
+    }
+
+    /** How an interval ending with the class closes: {@code 65]} at a value, {@code 65)} or {@code +inf)} before one. */
+    private static String highEnd(ValueClass last) {
+        return switch (last) {
             case ValueClass.Point(var value) -> FeelLiterals.literal(value) + "]";
-            case ValueClass.Between b -> b.high() == null ? "+inf)" : FeelLiterals.literal(b.high()) + ")";
+            case ValueClass.Between between -> between.high() == null ? "+inf)" : FeelLiterals.literal(between.high()) + ")";
             default -> throw new IllegalStateException("not an ordered class");
         };
-        return low + ".." + high;
     }
 
     /** A concrete value inside a non-empty class, or null for the missing class / any other string. */
     Object representative(int valueClass) {
         return switch (classes.get(valueClass)) {
             case ValueClass.Point(var value) -> value;
-            case ValueClass.Between gap -> valueInside(gap);
-            case ValueClass.OtherString o -> null;
-            case ValueClass.Missing m -> null;
+            case ValueClass.Between(var low, var high) -> OpenIntervals.valueInside(type, low, high);
+            case ValueClass.OtherString other -> null;
+            case ValueClass.Missing missing -> null;
         };
-    }
-
-    /** Whether the class stands for every string not written in the rules (no concrete example). */
-    boolean isOtherStrings(int valueClass) {
-        return valueClass == otherClass;
-    }
-
-    // ---- value classes ------------------------------------------------------------------------
-
-    private sealed interface ValueClass {
-        record Point(Comparable<?> value) implements ValueClass {
-        }
-
-        /** Open interval between two boundaries; null means unbounded. */
-        record Between(Comparable<?> low, Comparable<?> high) implements ValueClass {
-        }
-
-        record OtherString() implements ValueClass {
-        }
-
-        record Missing() implements ValueClass {
-        }
-
-        default String describe() {
-            return switch (this) {
-                case Point(var value) -> FeelLiterals.literal(value);
-                case Between(var low, var high) -> "(" + (low == null ? "-inf" : FeelLiterals.literal(low)) + ".."
-                        + (high == null ? "+inf" : FeelLiterals.literal(high)) + ")";
-                case OtherString o -> "any other value";
-                case Missing m -> "null";
-            };
-        }
-    }
-
-    /** A value inside a non-empty open interval: a round step beyond an open end, else the midpoint. */
-    private Object valueInside(ValueClass.Between gap) {
-        return switch (type) {
-            case DATE -> betweenDates((LocalDate) gap.low(), (LocalDate) gap.high());
-            case TIME -> betweenTimes((LocalTime) gap.low(), (LocalTime) gap.high());
-            case DATE_TIME -> betweenDateTimes((LocalDateTime) gap.low(), (LocalDateTime) gap.high());
-            case NUMBER -> betweenNumbers((BigDecimal) gap.low(), (BigDecimal) gap.high());
-            // BOOLEAN gaps are always empty, and STRING has no intervals
-            case BOOLEAN, STRING -> throw new IllegalStateException("no value between " + gap);
-        };
-    }
-
-    private static LocalDate betweenDates(LocalDate low, LocalDate high) {
-        if (low != null) {
-            return low.plusDays(1);
-        }
-        return high == null ? LocalDate.EPOCH : high.minusDays(1);
-    }
-
-    private static LocalTime betweenTimes(LocalTime low, LocalTime high) {
-        if (low == null && high == null) {
-            return LocalTime.NOON;
-        }
-        if (low == null) {
-            // the gap is not empty, so high is after midnight: step back an hour unless that wraps around
-            return high.getHour() >= 1 ? high.minusHours(1) : LocalTime.MIDNIGHT;
-        }
-        if (high == null) {
-            return low.getHour() <= 22 ? low.plusHours(1) : LocalTime.MAX;
-        }
-        // at least two nanoseconds apart (the gap is not empty), so the midpoint lies strictly inside
-        return LocalTime.ofNanoOfDay((low.toNanoOfDay() + high.toNanoOfDay()) / 2);
-    }
-
-    private static LocalDateTime betweenDateTimes(LocalDateTime low, LocalDateTime high) {
-        if (low == null) {
-            return high == null ? LocalDate.EPOCH.atStartOfDay() : high.minusDays(1);
-        }
-        if (high == null) {
-            return low.plusDays(1);
-        }
-        // date-times have no zone: measure on the UTC timeline, which has no daylight-saving gaps or overlaps
-        var start = low.toInstant(ZoneOffset.UTC);
-        var middle = start.plus(Duration.between(start, high.toInstant(ZoneOffset.UTC)).dividedBy(2));
-        return LocalDateTime.ofInstant(middle, ZoneOffset.UTC);
-    }
-
-    private static BigDecimal betweenNumbers(BigDecimal low, BigDecimal high) {
-        if (low == null) {
-            return high == null ? BigDecimal.ZERO : high.subtract(BigDecimal.ONE);
-        }
-        if (high == null) {
-            return low.add(BigDecimal.ONE);
-        }
-        return low.add(high).divide(BigDecimal.TWO, low.scale() + high.scale() + 1, RoundingMode.HALF_EVEN);
-    }
-
-    private boolean isEmpty(ValueClass valueClass) {
-        if (!(valueClass instanceof ValueClass.Between(var low, var high))) {
-            return false;
-        }
-        return switch (type) {
-            case BOOLEAN -> true; // false and true are both boundaries: nothing lies outside or between them
-            case DATE -> low != null && high != null && !((LocalDate) low).plusDays(1).isBefore((LocalDate) high);
-            case TIME -> emptyTimes((LocalTime) low, (LocalTime) high);
-            case DATE_TIME -> low != null && high != null && !((LocalDateTime) low).plusNanos(1).isBefore((LocalDateTime) high);
-            case NUMBER, STRING -> false;
-        };
-    }
-
-    /** No time of day lies before midnight, after the last nanosecond, or between consecutive nanoseconds. */
-    private static boolean emptyTimes(LocalTime low, LocalTime high) {
-        if (low == null) {
-            return LocalTime.MIDNIGHT.equals(high);
-        }
-        if (high == null) {
-            return LocalTime.MAX.equals(low);
-        }
-        return !low.plusNanos(1).isBefore(high);
     }
 
     // ---- FEEL semantics per class ---------------------------------------------------------------
@@ -607,42 +555,27 @@ final class ColumnIndex {
         return (low > 0 || (low == 0 && r.lowClosed())) && (high < 0 || (high == 0 && r.highClosed()));
     }
 
-    // ---- collecting values ------------------------------------------------------------------------
-
-    private static void collectStrings(UnaryTests cell, Set<String> into) {
-        for (var test : tests(cell)) {
-            if (test instanceof Equals(var value)) {
-                into.add((String) value);
-            }
-        }
-    }
-
-    private static void collectBoundaries(UnaryTests cell, Set<Comparable<?>> into) {
-        for (var test : tests(cell)) {
-            switch (test) {
-                case Equals(var value) -> into.add(value);
-                case Compare c -> into.add(c.value());
-                case Range r -> {
-                    into.add(r.low());
-                    into.add(r.high());
-                }
-                case NullTest n -> {
-                    // no boundary
-                }
-            }
-        }
-    }
-
-    private static List<Test> tests(UnaryTests cell) {
-        return switch (cell) {
-            case UnaryTests.Any any -> List.of();
-            case UnaryTests.Positive(var tests) -> tests;
-            case UnaryTests.Negated(var tests) -> tests;
-        };
-    }
-
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static int compare(Object a, Object b) {
         return ((Comparable) a).compareTo(b);
+    }
+
+    // ---- value classes ------------------------------------------------------------------------
+
+    private sealed interface ValueClass {
+        /** One value: a boundary of an ordered column, or a string written in the rules or declared. */
+        record Point(Comparable<?> value) implements ValueClass {
+        }
+
+        /** Open interval between two boundaries; null means unbounded. */
+        record Between(Comparable<?> low, Comparable<?> high) implements ValueClass {
+        }
+
+        /** STRING: every value not written in the rules or declared. */
+        record OtherString() implements ValueClass {
+        }
+
+        record Missing() implements ValueClass {
+        }
     }
 }

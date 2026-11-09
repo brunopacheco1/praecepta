@@ -35,6 +35,11 @@ final class GeneratedInputs {
      * as is (what is timed); {@code ruleIds} turns it into rule ids for cross-checking.
      */
     record Variant(List<Object> inputs, Function<Object, List<?>> evaluate, Function<List<?>, List<String>> ruleIds) {
+
+        /** The ids of the rules the {@code index}-th input matches. */
+        List<String> ruleIdsOf(int index) {
+            return ruleIds.apply(evaluate.apply(inputs.get(index)));
+        }
     }
 
     private GeneratedInputs() {
@@ -69,28 +74,28 @@ final class GeneratedInputs {
     }
 
     static RealStringsInput strings(Map<String, Object> input) {
-        return new RealStringsInput(s(input, "inputA"), s(input, "inputB"), s(input, "inputC"), s(input, "inputD"),
-                s(input, "inputE"), s(input, "inputF"), s(input, "inputG"), s(input, "inputH"), s(input, "inputI"),
-                s(input, "inputJ"), s(input, "inputK"), s(input, "inputL"), s(input, "inputM"));
+        return new RealStringsInput(text(input, "inputA"), text(input, "inputB"), text(input, "inputC"), text(input, "inputD"),
+                text(input, "inputE"), text(input, "inputF"), text(input, "inputG"), text(input, "inputH"), text(input, "inputI"),
+                text(input, "inputJ"), text(input, "inputK"), text(input, "inputL"), text(input, "inputM"));
     }
 
     static RealEnumsInput enums(Map<String, Object> input) {
         return new RealEnumsInput(
-                e(RealEnumsInput.InputA.class, input, "inputA"), e(RealEnumsInput.InputB.class, input, "inputB"),
-                e(RealEnumsInput.InputC.class, input, "inputC"), e(RealEnumsInput.InputD.class, input, "inputD"),
-                e(RealEnumsInput.InputE.class, input, "inputE"), e(RealEnumsInput.InputF.class, input, "inputF"),
-                e(RealEnumsInput.InputG.class, input, "inputG"), e(RealEnumsInput.InputH.class, input, "inputH"),
-                e(RealEnumsInput.InputI.class, input, "inputI"), e(RealEnumsInput.InputJ.class, input, "inputJ"),
-                e(RealEnumsInput.InputK.class, input, "inputK"), e(RealEnumsInput.InputL.class, input, "inputL"),
-                e(RealEnumsInput.InputM.class, input, "inputM"));
+                constant(RealEnumsInput.InputA.class, input, "inputA"), constant(RealEnumsInput.InputB.class, input, "inputB"),
+                constant(RealEnumsInput.InputC.class, input, "inputC"), constant(RealEnumsInput.InputD.class, input, "inputD"),
+                constant(RealEnumsInput.InputE.class, input, "inputE"), constant(RealEnumsInput.InputF.class, input, "inputF"),
+                constant(RealEnumsInput.InputG.class, input, "inputG"), constant(RealEnumsInput.InputH.class, input, "inputH"),
+                constant(RealEnumsInput.InputI.class, input, "inputI"), constant(RealEnumsInput.InputJ.class, input, "inputJ"),
+                constant(RealEnumsInput.InputK.class, input, "inputK"), constant(RealEnumsInput.InputL.class, input, "inputL"),
+                constant(RealEnumsInput.InputM.class, input, "inputM"));
     }
 
-    private static String s(Map<String, Object> input, String column) {
+    private static String text(Map<String, Object> input, String column) {
         return (String) input.get(column);
     }
 
     /** The table's values are plain letters and YES/NO, so each constant is named like its value. */
-    private static <E extends Enum<E>> E e(Class<E> type, Map<String, Object> input, String column) {
+    private static <E extends Enum<E>> E constant(Class<E> type, Map<String, Object> input, String column) {
         var value = (String) input.get(column);
         return value == null ? null : Enum.valueOf(type, value);
     }

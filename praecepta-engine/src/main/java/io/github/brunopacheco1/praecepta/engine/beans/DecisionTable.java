@@ -19,7 +19,8 @@ import java.util.Objects;
  * @param inputs      input columns, in table order
  * @param outputs     output columns, in table order
  * @param rules       rules in rule order; input cells are unary tests of their column's type, outputs
- *                    are plain values (text, a decimal number or an ISO date), null when empty
+ *                    are plain values as text (a string, or a number, boolean, date or time such as
+ *                    {@code 2025-01-31}), null when empty
  */
 public record DecisionTable(
         String name,

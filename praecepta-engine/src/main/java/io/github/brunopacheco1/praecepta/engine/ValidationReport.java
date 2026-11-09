@@ -38,8 +38,8 @@ public record ValidationReport(List<Issue> issues) {
         CONFLICTING_OUTPUTS(Severity.ERROR),
         /**
          * Declared input values that no rule matches (evaluation returns an empty result). Only reported
-         * when every string column the rules constrain declares its input values; at most
-         * 100 gaps are listed.
+         * when every string column the rules constrain declares its input values; at most 100 gaps are
+         * listed.
          */
         GAP(Severity.WARNING);
 

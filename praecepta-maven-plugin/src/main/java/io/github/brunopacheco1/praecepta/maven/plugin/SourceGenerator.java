@@ -5,14 +5,22 @@
  */
 package io.github.brunopacheco1.praecepta.maven.plugin;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.StringJoiner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
+import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
 /**
  * Generates, for a table {@code Discount}:
@@ -25,13 +33,165 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
  * <li>{@code Discount}: loads {@code Discount.dmn} from the classpath once and evaluates it.</li>
  * </ul>
  * Every type outside the package is fully qualified, so table and column names cannot clash with imports.
+ *
+ * <p>Each file is written from the templates below: {@code ${Decision}}, {@code ${Input}} and
+ * {@code ${Output}} stand for the generated class names, and every other {@code ${slot}} for the code
+ * that depends on the table's columns.
  */
 final class SourceGenerator {
 
-    private static final String ENGINE = "io.github.brunopacheco1.praecepta.engine.";
+    /** A {@code ${name}} slot in a template. */
+    private static final Pattern SLOT = Pattern.compile("\\$\\{(\\w+)}");
 
-    /** The Javadoc line of {@code evaluate} for a value outside its column's value list. */
-    private static final String THROWS_INVALID_INPUT = throwsTag("InvalidInputException", "a value is outside its column's value list");
+    // ---- templates ------------------------------------------------------------------------------
+
+    private static final String INPUT_RECORD = """
+            /**
+             * Input of the {@link ${Decision}} decision.
+             */
+            public record ${Input}(${components}) {
+            ${enums}}
+            """;
+
+    /** Nested in the input record for each string column with a value list. */
+    private static final String VALUE_ENUM = """
+
+                /** Values of column {@code ${column}}. */
+                public enum ${Enum} {
+            ${constants}
+
+                    private final String value;
+
+                    ${Enum}(String value) {
+                        this.value = value;
+                    }
+
+                    /** The value as written in the table. */
+                    public String value() {
+                        return value;
+                    }
+                }
+            """;
+
+    private static final String OUTPUT_RECORD = """
+            /**
+             * Output of a rule of the {@link ${Decision}} decision.
+             */
+            public record ${Output}(${components}) {
+
+                static ${Output} of(io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput output) {
+                    var values = output.values();
+                    return new ${Output}(${arguments});
+                }
+            ${parsers}}
+            """;
+
+    /** Parses the output values of one column type in the output record. */
+    private static final String OUTPUT_PARSER = """
+
+                private static ${Type} ${method}(String value) {
+                    return value == null ? null : ${parser}(value);
+                }
+            """;
+
+    private static final String DECISION_CLASS = """
+            /**
+             * The {@code ${table}} decision table (hit policy ${hitPolicy}).
+             *
+             * <p>Rules are read once from {@code ${Decision}.dmn} on the classpath, written by
+             * praecepta-maven-plugin from {@code ${source}} and validated at build time.
+             * Instances are not needed: all methods are static and thread-safe.
+             */
+            public final class ${Decision} {
+
+                /** The DMN resource, relative to this class. */
+                public static final String RESOURCE = ${resource};
+
+                private static final io.github.brunopacheco1.praecepta.engine.PraeceptaEngine<${Input}, ${Output}> ENGINE = build();
+
+                private ${Decision}() {
+                }
+
+            ${evaluate}
+                /** The underlying engine, e.g. to pass around as a function. */
+                public static io.github.brunopacheco1.praecepta.engine.PraeceptaEngine<${Input}, ${Output}> engine() {
+                    return ENGINE;
+                }
+
+                /** Findings of the static analysis (overlaps, unreachable rules, gaps). */
+                public static io.github.brunopacheco1.praecepta.engine.ValidationReport validationReport() {
+                    return ENGINE.validationReport();
+                }
+
+                private static io.github.brunopacheco1.praecepta.engine.PraeceptaEngine<${Input}, ${Output}> build() {
+                    try (var dmn = ${Decision}.class.getResourceAsStream(RESOURCE)) {
+                        if (dmn == null) {
+                            throw new IllegalStateException("Missing resource " + RESOURCE + " next to " + ${Decision}.class.getName());
+                        }
+                        return io.github.brunopacheco1.praecepta.engine.PraeceptaEngine.<${Input}, ${Output}>builder()
+                                .table(io.github.brunopacheco1.praecepta.engine.dmn.DmnReader.read(dmn))${bindings}
+                                .output(${outputStrategy})
+                                .build();
+                    } catch (java.io.IOException e) {
+                        throw new java.io.UncheckedIOException(e);
+                    }
+                }
+            }
+            """;
+
+    /** {@code evaluate} of a table that selects one output: a single-hit policy, or an aggregation. */
+    private static final String EVALUATE_ONE = """
+                /**
+                 * @return the selected output, or empty if no rule matches
+                 * @throws io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException if the hit policy is violated
+                 * @throws io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException if a value is outside its column's value list
+                 */
+                public static java.util.Optional<${Output}> evaluate(${Input} input) {
+                    var outputs = ENGINE.evaluate(input);
+                    return outputs.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(outputs.getFirst());
+                }
+            """;
+
+    /** {@code evaluate} of a table that returns the outputs of every matching rule. */
+    private static final String EVALUATE_ALL = """
+                /**
+                 * @return the outputs of every matching rule, in hit-policy order; empty if no rule matches
+                 * @throws io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException if a value is outside its column's value list
+                 */
+                public static java.util.List<${Output}> evaluate(${Input} input) {
+                    return ENGINE.evaluate(input);
+                }
+            """;
+
+    /**
+     * The output strategy of an aggregating table, whose one NUMBER output is checked when compiling;
+     * missing values are skipped, as in DMN. It is pasted mid-line after {@code .output(} in the decision
+     * class, so its first line has no indentation and the others carry the generated file's own.
+     */
+    private static final String AGGREGATING_OUTPUT = """
+            new io.github.brunopacheco1.praecepta.engine.OutputStrategy<${Output}>() {
+                                    @Override
+                                    public ${Output} transform(io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput output) {
+                                        return ${Output}.of(output);
+                                    }
+
+                                    @Override
+                                    public ${Output} sum(${Output} a, ${Output} b) {
+                                        return a.${field}() == null ? b : b.${field}() == null ? a : new ${Output}(a.${field}().add(b.${field}()));
+                                    }
+
+                                    @Override
+                                    public ${Output} min(${Output} a, ${Output} b) {
+                                        return a.${field}() == null ? b : b.${field}() == null || a.${field}().compareTo(b.${field}()) <= 0 ? a : b;
+                                    }
+
+                                    @Override
+                                    public ${Output} max(${Output} a, ${Output} b) {
+                                        return a.${field}() == null ? b : b.${field}() == null || a.${field}().compareTo(b.${field}()) >= 0 ? a : b;
+                                    }
+                                }""";
+
+    // ---- generator ------------------------------------------------------------------------------
 
     private final String packageName;
     private final String className;
@@ -39,11 +199,11 @@ final class SourceGenerator {
     private final String sourceFile;
     private final String inputType;
     private final String outputType;
-    private final List<String> inputMembers;
+    private final List<InputField> inputs;
     private final List<String> outputMembers;
 
     /** Lines put first in every generated file as {@code //} comments, e.g. an SPDX header; empty for none. */
-    private final java.util.List<String> fileHeader;
+    private final List<String> fileHeader;
 
     /**
      * @param fileHeader text put first in every generated file as {@code //} comments (each line
@@ -58,216 +218,130 @@ final class SourceGenerator {
         this.inputType = className + "Input";
         this.outputType = className + "Output";
         var where = "Table '" + table.name() + "'";
-        this.inputMembers = JavaNames.distinct(table.inputs().stream().map(InputColumn::name).toList(),
+        var inputMembers = JavaNames.distinct(table.inputs().stream().map(InputColumn::name).toList(),
                 JavaNames::member, where + " inputs");
         this.outputMembers = JavaNames.distinct(table.outputs().stream().map(DecisionTable.OutputColumn::name).toList(),
                 JavaNames::member, where + " outputs");
+        this.inputs = new ArrayList<>();
+        for (int c = 0; c < table.inputs().size(); c++) {
+            inputs.add(InputField.of(table.inputs().get(c), inputMembers.get(c)));
+        }
     }
 
     Map<String, String> generate() {
         var sources = new LinkedHashMap<String, String>();
-        sources.put(inputType, input());
-        sources.put(outputType, output());
-        sources.put(className, decision());
+        sources.put(inputType, header() + inputRecord());
+        sources.put(outputType, header() + outputRecord());
+        sources.put(className, header() + decisionClass());
         return sources;
     }
 
     // ---- input record ---------------------------------------------------------------------------
 
-    private String input() {
-        var java = header();
-        java.append("/**\n * Input of the {@link ").append(className).append("} decision.\n */\n")
-            .append("public record ").append(inputType).append('(');
-        for (int c = 0; c < table.inputs().size(); c++) {
-            if (c > 0) {
-                java.append(", ");
+    private String inputRecord() {
+        var components = new StringJoiner(", ");
+        var enums = new StringBuilder();
+        for (var input : inputs) {
+            components.add(input.javaType() + " " + input.member());
+            if (input.isEnum()) {
+                enums.append(valueEnum(input));
             }
-            java.append(inputJavaType(c)).append(' ').append(inputMembers.get(c));
         }
-        java.append(") {\n");
-        for (int c = 0; c < table.inputs().size(); c++) {
-            var column = table.inputs().get(c);
-            var values = TableCompiler.enumValues(column);
-            if (values.isEmpty()) {
-                continue;
-            }
-            var constants = JavaNames.distinct(values, JavaNames::constant, "Values of column '" + column.name() + "'");
-            java.append("\n    /** Values of column {@code ").append(javadoc(column.name())).append("}. */\n")
-                .append("    public enum ").append(enumName(c)).append(" {\n");
-            for (int v = 0; v < values.size(); v++) {
-                java.append("        ").append(constants.get(v)).append('(').append(stringLiteral(values.get(v))).append(')')
-                    .append(v == values.size() - 1 ? ";\n" : ",\n");
-            }
-            java.append("\n        private final String value;\n\n")
-                .append("        ").append(enumName(c)).append("(String value) {\n")
-                .append("            this.value = value;\n        }\n\n")
-                .append("        /** The value as written in the table. */\n")
-                .append("        public String value() {\n            return value;\n        }\n    }\n");
-        }
-        return java.append("}\n").toString();
+        return fill(INPUT_RECORD, Map.of("components", components.toString(), "enums", enums.toString()));
     }
 
-    private String inputJavaType(int c) {
-        var column = table.inputs().get(c);
-        if (!TableCompiler.enumValues(column).isEmpty()) {
-            return enumName(c);
+    private String valueEnum(InputField input) {
+        var values = input.enumValues();
+        var names = JavaNames.distinct(values, JavaNames::constant, "Values of column '" + input.column().name() + "'");
+        var constants = new StringJoiner(",\n", "", ";");
+        for (int v = 0; v < values.size(); v++) {
+            constants.add("        " + names.get(v) + "(" + stringLiteral(values.get(v)) + ")");
         }
-        return javaType(column.type());
-    }
-
-    private String enumName(int c) {
-        return JavaNames.type(table.inputs().get(c).name());
+        return fill(VALUE_ENUM, Map.of(
+                "column", javadoc(input.column().name()),
+                "Enum", input.enumName(),
+                "constants", constants.toString()));
     }
 
     // ---- output record --------------------------------------------------------------------------
 
-    private String output() {
-        var java = header();
-        java.append("/**\n * Output of a rule of the {@link ").append(className).append("} decision.\n */\n")
-            .append("public record ").append(outputType).append('(');
-        for (int c = 0; c < table.outputs().size(); c++) {
-            if (c > 0) {
-                java.append(", ");
-            }
-            java.append(javaType(table.outputs().get(c).type())).append(' ').append(outputMembers.get(c));
-        }
-        java.append(") {\n\n")
-            .append("    static ").append(outputType).append(" of(").append(ENGINE).append("beans.PraeceptaOutput output) {\n")
-            .append("        var values = output.values();\n")
-            .append("        return new ").append(outputType).append('(');
+    private String outputRecord() {
+        var components = new StringJoiner(", ");
+        var arguments = new StringJoiner(",\n                ");
         for (int c = 0; c < table.outputs().size(); c++) {
             var column = table.outputs().get(c);
-            if (c > 0) {
-                java.append(",\n                ");
-            }
-            var value = "values.get(" + stringLiteral(column.name()) + ")";
             var converter = Converter.of(column.type());
-            java.append(converter.parser() == null ? value : converter.method() + "(" + value + ")");
+            components.add(converter.javaType() + " " + outputMembers.get(c));
+            var value = "values.get(" + stringLiteral(column.name()) + ")";
+            arguments.add(converter.parser() == null ? value : converter.method() + "(" + value + ")");
         }
-        java.append(");\n    }\n");
-        // one parsing helper per output type that needs it, sorted by name so the source is stable
+        return fill(OUTPUT_RECORD, Map.of(
+                "components", components.toString(),
+                "arguments", arguments.toString(),
+                "parsers", outputParsers()));
+    }
+
+    /** One parsing helper per output type that needs it, sorted by name so the source is stable. */
+    private String outputParsers() {
+        var parsers = new StringBuilder();
         table.outputs().stream()
                 .map(column -> Converter.of(column.type()))
                 .filter(converter -> converter.parser() != null)
                 .distinct()
                 .sorted(Comparator.comparing(Converter::method))
-                .forEach(converter -> java
-                        .append("\n    private static ").append(converter.javaType()).append(' ').append(converter.method())
-                        .append("(String value) {\n")
-                        .append("        return value == null ? null : ").append(converter.parser()).append("(value);\n    }\n"));
-        return java.append("}\n").toString();
+                .forEach(converter -> parsers.append(fill(OUTPUT_PARSER, Map.of(
+                        "Type", converter.javaType(),
+                        "method", converter.method(),
+                        "parser", converter.parser()))));
+        return parsers.toString();
     }
 
-    // ---- decision class -----------------------------------------------------------------------
+    // ---- decision class -------------------------------------------------------------------------
 
-    private String decision() {
-        var engineType = ENGINE + "PraeceptaEngine<" + inputType + ", " + outputType + ">";
-        var single = TableCompiler.singleResult(table);
-        var java = header();
-        java.append("/**\n")
-            .append(" * The {@code ").append(javadoc(table.name())).append("} decision table (hit policy ").append(table.hitPolicy());
-        if (table.aggregation() != null) {
-            java.append(", ").append(table.aggregation());
+    private String decisionClass() {
+        var singleResult = table.hitPolicy().isSingleHit() || table.aggregation() != null;
+        var hitPolicy = table.aggregation() == null ? String.valueOf(table.hitPolicy()) : table.hitPolicy() + ", " + table.aggregation();
+        var bindings = new StringBuilder();
+        for (var input : inputs) {
+            bindings.append(inputBinding(input));
         }
-        java.append(").\n *\n")
-            .append(" * <p>Rules are read once from {@code ").append(className).append(".dmn} on the classpath, written by\n")
-            .append(" * praecepta-maven-plugin from {@code ").append(javadoc(sourceFile)).append("} and validated at build time.\n")
-            .append(" * Instances are not needed: all methods are static and thread-safe.\n */\n")
-            .append("public final class ").append(className).append(" {\n\n")
-            .append("    /** The DMN resource, relative to this class. */\n")
-            .append("    public static final String RESOURCE = ").append(stringLiteral(className + ".dmn")).append(";\n\n")
-            .append("    private static final ").append(engineType).append(" ENGINE = build();\n\n")
-            .append("    private ").append(className).append("() {\n    }\n\n");
-        if (single) {
-            java.append("    /**\n     * @return the selected output, or empty if no rule matches\n")
-                .append(throwsTag("HitPolicyViolationException", "the hit policy is violated"))
-                .append(THROWS_INVALID_INPUT)
-                .append("     */\n")
-                .append("    public static java.util.Optional<").append(outputType).append("> evaluate(").append(inputType).append(" input) {\n")
-                .append("        var outputs = ENGINE.evaluate(input);\n")
-                .append("        return outputs.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(outputs.getFirst());\n")
-                .append("    }\n\n");
-        } else {
-            java.append("    /**\n     * @return the outputs of every matching rule, in hit-policy order; empty if no rule matches\n")
-                .append(THROWS_INVALID_INPUT)
-                .append("     */\n")
-                .append("    public static java.util.List<").append(outputType).append("> evaluate(").append(inputType).append(" input) {\n")
-                .append("        return ENGINE.evaluate(input);\n    }\n\n");
+        return fill(DECISION_CLASS, Map.of(
+                "table", javadoc(table.name()),
+                "hitPolicy", hitPolicy,
+                "source", javadoc(sourceFile),
+                "resource", stringLiteral(className + ".dmn"),
+                "evaluate", fill(singleResult ? EVALUATE_ONE : EVALUATE_ALL, Map.of()),
+                "bindings", bindings.toString(),
+                "outputStrategy", outputStrategy()));
+    }
+
+    /**
+     * The engine builder call that reads an input column from the input record. It starts with a newline
+     * and the call's indentation, so the bindings follow {@code .table(...)} directly in the template and a
+     * table without inputs adds nothing there.
+     */
+    private String inputBinding(InputField input) {
+        var column = stringLiteral(input.column().name());
+        var getter = inputType + "::" + input.member();
+        if (!input.isEnum()) {
+            return "\n                    .%s(%s, %s)".formatted(Converter.of(input.column().type()).binding(), column, getter);
         }
-        java.append("    /** The underlying engine, e.g. to pass around as a function. */\n")
-            .append("    public static ").append(engineType).append(" engine() {\n        return ENGINE;\n    }\n\n")
-            .append("    /** Findings of the static analysis (overlaps, unreachable rules, gaps). */\n")
-            .append("    public static ").append(ENGINE).append("ValidationReport validationReport() {\n")
-            .append("        return ENGINE.validationReport();\n    }\n\n")
-            .append("    private static ").append(engineType).append(" build() {\n")
-            .append("        try (var dmn = ").append(className).append(".class.getResourceAsStream(RESOURCE)) {\n")
-            .append("            if (dmn == null) {\n")
-            .append("                throw new IllegalStateException(\"Missing resource \" + RESOURCE + \" next to \" + ")
-            .append(className).append(".class.getName());\n            }\n")
-            .append("            return ").append(ENGINE).append("PraeceptaEngine.<").append(inputType).append(", ").append(outputType)
-            .append(">builder()\n")
-            .append("                    .table(").append(ENGINE).append("dmn.DmnReader.read(dmn))\n");
-        for (int c = 0; c < table.inputs().size(); c++) {
-            var column = table.inputs().get(c);
-            var name = stringLiteral(column.name());
-            var getter = inputType + "::" + inputMembers.get(c);
-            if (!TableCompiler.enumValues(column).isEmpty()) {
-                var enumType = inputType + "." + enumName(c);
-                java.append("                    .enumInput(").append(name).append(", ").append(enumType).append(".class, ")
-                    .append(enumType).append("::value, ").append(getter).append(")\n");
-            } else {
-                java.append("                    .").append(Converter.of(column.type()).binding())
-                    .append('(').append(name).append(", ").append(getter).append(")\n");
-            }
-        }
-        java.append("                    .output(").append(outputStrategy()).append(")\n")
-            .append("                    .build();\n")
-            .append("        } catch (java.io.IOException e) {\n")
-            .append("            throw new java.io.UncheckedIOException(e);\n        }\n    }\n}\n");
-        return java.toString();
+        var enumType = inputType + "." + input.enumName();
+        return "\n                    .enumInput(%s, %s.class, %s::value, %s)".formatted(column, enumType, enumType, getter);
     }
 
     private String outputStrategy() {
         if (table.aggregation() == null) {
             return outputType + "::of";
         }
-        // one NUMBER output (checked when compiling); missing values are skipped, as in DMN
-        var field = outputMembers.getFirst();
-        var strategy = ENGINE + "OutputStrategy<" + outputType + ">";
-        var aComparedToB = " || a." + field + "().compareTo(b." + field + "()) ";
-        return "new " + strategy + "() {\n"
-               + "                        @Override\n"
-               + "                        public " + outputType + " transform(" + ENGINE + "beans.PraeceptaOutput output) {\n"
-               + "                            return " + outputType + ".of(output);\n                        }\n\n"
-               + aggregate("sum", field, " ? a : new " + outputType + "(a." + field + "().add(b." + field + "()))") + "\n"
-               + aggregate("min", field, aComparedToB + "<= 0 ? a : b") + "\n"
-               + aggregate("max", field, aComparedToB + ">= 0 ? a : b")
-               + "                    }";
+        return fill(AGGREGATING_OUTPUT, Map.of("field", outputMembers.getFirst()));
     }
 
-    /**
-     * One method of the output strategy that combines two outputs {@code a} and {@code b}. It returns
-     * {@code b} if {@code a}'s value is missing; {@code rest} handles a missing value in {@code b}.
-     *
-     * @param rest the end of the returned expression, after {@code b.<field>() == null}
-     */
-    private String aggregate(String method, String field, String rest) {
-        return "                        @Override\n"
-               + "                        public " + outputType + " " + method + "(" + outputType + " a, " + outputType + " b) {\n"
-               + "                            return a." + field + "() == null ? b : b." + field + "() == null" + rest + ";\n"
-               + "                        }\n";
-    }
+    // ---- helpers --------------------------------------------------------------------------------
 
-    // ---- helpers ---------------------------------------------------------------------------------
-
-    /** A {@code @throws} line of the generated Javadoc, for an exception of the engine. */
-    private static String throwsTag(String exception, String condition) {
-        return "     * @throws " + ENGINE + "exceptions." + exception + " if " + condition + "\n";
-    }
-
-    private static java.util.List<String> headerLines(String text) {
+    private static List<String> headerLines(String text) {
         if (text == null || text.isBlank()) {
-            return java.util.List.of();
+            return List.of();
         }
         var lines = text.strip().lines().map(String::strip).toList();
         for (var line : lines) {
@@ -279,7 +353,7 @@ final class SourceGenerator {
         return lines;
     }
 
-    private StringBuilder header() {
+    private String header() {
         var java = new StringBuilder();
         for (var line : fileHeader) {
             java.append(line.isEmpty() ? "//" : "// " + line).append('\n');
@@ -288,36 +362,40 @@ final class SourceGenerator {
         if (!packageName.isEmpty()) {
             java.append("package ").append(packageName).append(";\n");
         }
-        return java.append('\n');
-    }
-
-    private static String javaType(ColumnType type) {
-        return Converter.of(type).javaType();
+        return java.append('\n').toString();
     }
 
     /**
-     * How generated code handles a column type.
-     *
-     * @param javaType the Java type of its record components
-     * @param binding  the engine builder method that binds an input column of the type
-     * @param method   the name of the generated helper that parses an output value
-     * @param parser   the expression that parses a non-null output value, or null for strings
+     * The template with every slot replaced by its value. One pass over the template: a value is
+     * never searched for slots, so a column named {@code ${Output}} stays as it is.
      */
-    private record Converter(String javaType, String binding, String method, String parser) {
-
-        static Converter of(ColumnType type) {
-            return switch (type) {
-                case STRING -> new Converter("String", "input", null, null);
-                case NUMBER -> new Converter("java.math.BigDecimal", "numberInput", "number", "new java.math.BigDecimal");
-                case DATE -> new Converter("java.time.LocalDate", "dateInput", "date", "java.time.LocalDate.parse");
-                case BOOLEAN -> new Converter("Boolean", "booleanInput", "bool", "Boolean.valueOf");
-                case TIME -> new Converter("java.time.LocalTime", "timeInput", "time", "java.time.LocalTime.parse");
-                case DATE_TIME -> new Converter("java.time.LocalDateTime", "dateTimeInput", "dateTime", "java.time.LocalDateTime.parse");
-            };
-        }
+    private String fill(String template, Map<String, String> slots) {
+        return SLOT.matcher(template).replaceAll(slot -> Matcher.quoteReplacement(switch (slot.group(1)) {
+            case "Decision" -> className;
+            case "Input" -> inputType;
+            case "Output" -> outputType;
+            default -> Objects.requireNonNull(slots.get(slot.group(1)), slot.group());
+        }));
     }
 
-    static String stringLiteral(String value) {
+    /**
+     * The values of a string column's value list, or an empty list if it has none (it then stays a
+     * String). A value list always holds at least one value.
+     */
+    private static List<String> valueListOf(InputColumn column) {
+        if (column.type() != ColumnType.STRING || column.allowedValues() == null) {
+            return List.of();
+        }
+        // the engine has already checked that a string column's value list is a list of values
+        var tests = (UnaryTests.Positive) CellParser.parse(column.allowedValues(), ColumnType.STRING);
+        var values = new LinkedHashSet<String>();
+        for (var test : tests.tests()) {
+            values.add((String) ((UnaryTests.Equals) test).value());
+        }
+        return List.copyOf(values);
+    }
+
+    private static String stringLiteral(String value) {
         var java = new StringBuilder("\"");
         for (char c : value.toCharArray()) {
             switch (c) {
@@ -342,5 +420,52 @@ final class SourceGenerator {
         // backslashes too: javac decodes unicode escapes (backslash, 'u', hex digits) even inside comments
         return text.replace("\\", "&#92;").replace("*/", "*&#47;").replace("@", "&#64;").replace("{", "&#123;").replace("}", "&#125;")
                 .replaceAll("[\\r\\n]", " ");
+    }
+
+    // ---- nested types ---------------------------------------------------------------------------
+
+    /**
+     * An input column as the generated code sees it.
+     *
+     * @param member     its component in the input record
+     * @param enumName   for a string column with a value list, its nested enum; else null
+     * @param enumValues the values of that enum's constants, in order; else empty
+     */
+    private record InputField(InputColumn column, String member, String enumName, List<String> enumValues) {
+
+        static InputField of(InputColumn column, String member) {
+            var values = valueListOf(column);
+            return new InputField(column, member, values.isEmpty() ? null : JavaNames.type(column.name()), values);
+        }
+
+        boolean isEnum() {
+            return !enumValues.isEmpty();
+        }
+
+        String javaType() {
+            return isEnum() ? enumName : Converter.of(column.type()).javaType();
+        }
+    }
+
+    /**
+     * How generated code handles a column type.
+     *
+     * @param javaType the Java type of its record components
+     * @param binding  the engine builder method that binds an input column of the type
+     * @param method   the name of the generated helper that parses an output value
+     * @param parser   the expression that parses a non-null output value, or null for strings
+     */
+    private record Converter(String javaType, String binding, String method, String parser) {
+
+        static Converter of(ColumnType type) {
+            return switch (type) {
+                case STRING -> new Converter("String", "input", null, null);
+                case NUMBER -> new Converter("java.math.BigDecimal", "numberInput", "number", "new java.math.BigDecimal");
+                case DATE -> new Converter("java.time.LocalDate", "dateInput", "date", "java.time.LocalDate.parse");
+                case BOOLEAN -> new Converter("Boolean", "booleanInput", "bool", "Boolean.valueOf");
+                case TIME -> new Converter("java.time.LocalTime", "timeInput", "time", "java.time.LocalTime.parse");
+                case DATE_TIME -> new Converter("java.time.LocalDateTime", "dateTimeInput", "dateTime", "java.time.LocalDateTime.parse");
+            };
+        }
     }
 }

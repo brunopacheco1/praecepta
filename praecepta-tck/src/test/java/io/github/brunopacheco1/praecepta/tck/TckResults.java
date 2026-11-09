@@ -29,13 +29,21 @@ final class TckResults {
     /** @param byCase every check's result, by TCK test case in name order */
     static String render(Map<String, List<Result>> byCase) {
         var results = byCase.values().stream().flatMap(List::stream).toList();
+        var md = new StringBuilder();
+        appendSummary(md, results);
+        appendTestCases(md, byCase);
+        appendNotSupported(md, results);
+        appendFailures(md, results);
+        return md.toString();
+    }
+
+    /** The introduction, the pass rate and the header of the per-test-case table. */
+    private static void appendSummary(StringBuilder md, List<Result> results) {
         var total = results.size();
         var counts = count(results, result -> result.outcome().status());
         int passed = counts.getOrDefault(Status.PASSED, 0);
         int failed = counts.getOrDefault(Status.FAILED, 0);
         int unsupported = counts.getOrDefault(Status.UNSUPPORTED, 0);
-
-        var md = new StringBuilder();
         md.append("""
                 <!--
                 SPDX-FileCopyrightText: Bruno Pacheco
@@ -75,7 +83,10 @@ final class TckResults {
                 """.formatted(TckSuite.TCK_COMMIT.substring(0, 7), TckSuite.TCK_COMMIT,
                 passed, total, percent(passed, total), passed + failed, passed, percent(passed, passed + failed),
                 passed, failed, unsupported));
+    }
 
+    /** One row per TCK test case: its counts and why its unsupported checks are not supported. */
+    private static void appendTestCases(StringBuilder md, Map<String, List<Result>> byCase) {
         byCase.forEach((testCase, caseResults) -> {
             var caseCounts = count(caseResults, result -> result.outcome().status());
             var reasons = caseResults.stream()
@@ -89,39 +100,46 @@ final class TckResults {
                     caseCounts.getOrDefault(Status.PASSED, 0), caseCounts.getOrDefault(Status.FAILED, 0),
                     caseCounts.getOrDefault(Status.UNSUPPORTED, 0), escape(reasons)));
         });
+    }
 
+    /** The missing features, most needed first. */
+    private static void appendNotSupported(StringBuilder md, List<Result> results) {
         var missing = results.stream()
                 .filter(result -> result.outcome().status() == Status.UNSUPPORTED)
                 .toList();
-        if (!missing.isEmpty()) {
-            md.append("""
-
-                    ## Not supported
-
-                    What the unsupported checks need, by number of checks:
-
-                    | Feature | Checks |
-                    |---|---:|
-                    """);
-            count(missing, result -> result.outcome().detail()).entrySet().stream()
-                    .sorted(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
-                    .forEach(entry -> line(md, "| %s | %d |".formatted(escape(entry.getKey()), entry.getValue())));
+        if (missing.isEmpty()) {
+            return;
         }
+        md.append("""
 
+                ## Not supported
+
+                What the unsupported checks need, by number of checks:
+
+                | Feature | Checks |
+                |---|---:|
+                """);
+        count(missing, result -> result.outcome().detail()).entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
+                .forEach(entry -> line(md, "| %s | %d |".formatted(escape(entry.getKey()), entry.getValue())));
+    }
+
+    /** The failed checks, by test case and label, with what differed. */
+    private static void appendFailures(StringBuilder md, List<Result> results) {
         var failures = results.stream()
                 .filter(result -> result.outcome().status() == Status.FAILED)
                 .sorted(Comparator.comparing((Result result) -> result.check().testCase()).thenComparing(result -> result.check().label()))
                 .toList();
-        if (!failures.isEmpty()) {
-            md.append("""
-
-                    ## Failures
-
-                    """);
-            failures.forEach(result -> line(md, "- `%s/%s`: %s".formatted(
-                    result.check().testCase(), result.check().label(), escape(result.outcome().detail()))));
+        if (failures.isEmpty()) {
+            return;
         }
-        return md.toString();
+        md.append("""
+
+                ## Failures
+
+                """);
+        failures.forEach(result -> line(md, "- `%s/%s`: %s".formatted(
+                result.check().testCase(), result.check().label(), escape(result.outcome().detail()))));
     }
 
     /** Appends a line ending in {@code \n} on every platform, so RESULTS.md is the same everywhere. */

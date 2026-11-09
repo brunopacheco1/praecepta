@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_fees" name="fees" namespace="https://github.com/brunopacheco1/praecepta/fees">
+  <inputData id="input_data_0" name="zone">
+    <variable id="input_variable_0" name="zone" typeRef="string"/>
+  </inputData>
+  <decision id="decision_fees" name="fees">
+    <variable id="decision_variable" name="fees"/>
+    <informationRequirement id="requirement_0"><requiredInput href="#input_data_0"/></informationRequirement>
+    <decisionTable id="table" hitPolicy="COLLECT" aggregation="SUM">
+      <input id="input_0" label="zone">
+        <inputExpression id="input_expression_0" typeRef="string"><text>zone</text></inputExpression>
+        <inputValues id="input_values_0"><text>"islands", "mainland"</text></inputValues>
+      </input>
+      <output id="output_0" name="fee" typeRef="number"/>
+      <rule id="rule_0">
+        <inputEntry id="input_entry_0_0"><text>-</text></inputEntry>
+        <outputEntry id="output_entry_0_0"><text>5</text></outputEntry>
+      </rule>
+      <rule id="rule_1">
+        <inputEntry id="input_entry_1_0"><text>"islands"</text></inputEntry>
+        <outputEntry id="output_entry_1_0"><text>12.5</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

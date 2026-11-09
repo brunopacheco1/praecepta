@@ -27,14 +27,21 @@ import io.github.brunopacheco1.praecepta.loader.beans.FileRow;
 import io.github.brunopacheco1.praecepta.loader.exceptions.InvalidMatrixException;
 import io.github.brunopacheco1.praecepta.loader.exceptions.MissingFileException;
 
+/**
+ * Reads rules from the first sheet of an Excel workbook: a header row naming the columns, then one
+ * rule per row, numbered by its row in the sheet (the first rule is 1). Missing and empty cells are
+ * null; rows without a value are skipped.
+ */
 public final class ExcelLoader extends BaseLoader {
 
-    private final List<Praeceptum> praecepta = new ArrayList<>();
+    private static final int HEADER_ROW = 0;
+
+    private final List<Praeceptum> praecepta;
 
     /** Reads the first sheet of an Excel file from the classpath. */
     public ExcelLoader(String excelPath, Set<String> inputs, Set<String> outputs) {
         super(inputs, outputs);
-        readExcel(excelPath, null);
+        praecepta = read(excelPath, null);
     }
 
     /**
@@ -44,92 +51,15 @@ public final class ExcelLoader extends BaseLoader {
      */
     public ExcelLoader(InputStream excel, String source, Set<String> inputs, Set<String> outputs) {
         super(inputs, outputs);
-        readExcel(source, excel);
+        praecepta = read(source, excel);
     }
 
     /**
-     * Translate the excel file into a collection of praecepta.
-     *
-     * @param excelPath the path to look after the Excel file
+     * {@inheritDoc}
      */
-    private void readExcel(String excelPath, InputStream stream) {
-        try (
-            var workbook = readFile(excelPath, stream);
-        ) {
-            var sheet = workbook.getSheetAt(0);
-            var headers = readHeadersPositioning(sheet);
-            var fileRows = readRows(headers, sheet);
-            praecepta.addAll(parseRowsToPraecepta(fileRows));
-        } catch (Exception e) {
-            throw new InvalidMatrixException(excelPath, e);
-        }
-    }
-
-    /**
-     * Opens the Excel file.
-     *
-     * @param excelPath the file path
-     * @return the Excel POI object
-     */
-    private Workbook readFile(String excelPath, InputStream stream) {
-        try (var inputStream = stream != null ? stream : getClass().getClassLoader().getResourceAsStream(excelPath)) {
-            return WorkbookFactory.create(inputStream);
-        } catch (Exception e) {
-            throw new MissingFileException(excelPath, e);
-        }
-    }
-
-    /**
-     * Takes a look into the headers and validates the INPUT and OUTPUT classes.
-     *
-     * @param sheet the workbook sheet to retrieve the header positioning
-     * @return the mapping the headers (fields) and their position in the Excel file.
-     */
-    private Map<Integer, String> readHeadersPositioning(Sheet sheet) {
-        var headers = sheet.getRow(0);
-        var positioning = new HashMap<Integer, String>();
-        headers.forEach(cell -> positioning.put(cell.getColumnIndex(), cell.getStringCellValue()));
-        validateFields(positioning);
-        sheet.removeRow(headers);
-        return positioning;
-    }
-
-    /**
-     * Translates the Excel rows into instances of Recards, for easier further conversion.
-     *
-     * @param headers the header positioning
-     * @param sheet   the working Excel sheet
-     * @return collection of fileRows
-     */
-    private Iterable<FileRow> readRows(Map<Integer, String> headers, Sheet sheet) {
-        var fileRows = new ArrayList<FileRow>();
-        var rowIterator = sheet.rowIterator();
-        while (rowIterator.hasNext()) {
-            var fileRow = readCells(headers, rowIterator.next());
-            if (fileRow.isNotEmpty()) {
-                fileRows.add(fileRow);
-            }
-        }
-        return fileRows;
-    }
-
-    private FileRow readCells(Map<Integer, String> headers, Row row) {
-        var fileRow = new FileRow(row.getRowNum());
-
-        headers.forEach((var colIndex, var header) -> {
-            var cell = row.getCell(colIndex);
-            if (cell != null) {
-                fileRow.set(header, getCellValue(cell));
-            } else {
-                fileRow.set(header, null);
-            }
-        });
-
-        return fileRow;
-    }
-
-    private String getCellValue(Cell cell) {
-        return cellText(cell);
+    @Override
+    public List<Praeceptum> getPraecepta() {
+        return praecepta;
     }
 
     /**
@@ -140,9 +70,7 @@ public final class ExcelLoader extends BaseLoader {
     static String cellText(Cell cell) {
         var type = cell.getCellType() == CellType.FORMULA ? cell.getCachedFormulaResultType() : cell.getCellType();
         return switch (type) {
-            case NUMERIC -> DateUtil.isCellDateFormatted(cell)
-                    ? cell.getLocalDateTimeCellValue().toLocalDate().toString()
-                    : BigDecimal.valueOf(cell.getNumericCellValue()).stripTrailingZeros().toPlainString();
+            case NUMERIC -> DateUtil.isCellDateFormatted(cell) ? isoDate(cell) : exactNumber(cell);
             case STRING -> cell.getStringCellValue();
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
             default -> null;
@@ -150,10 +78,67 @@ public final class ExcelLoader extends BaseLoader {
     }
 
     /**
-     * {@inheritDoc}
+     * @param source the classpath resource to read if {@code stream} is null; else names the stream in error messages
      */
-    @Override
-    public List<Praeceptum> getPraecepta() {
-        return praecepta;
+    private List<Praeceptum> read(String source, InputStream stream) {
+        try (var workbook = openWorkbook(source, stream)) {
+            var sheet = workbook.getSheetAt(0);
+            var headers = readHeaders(sheet.getRow(HEADER_ROW));
+            validateFields(headers);
+            return parseRowsToPraecepta(readRows(headers, sheet));
+        } catch (Exception e) {
+            throw new InvalidMatrixException(source, e);
+        }
+    }
+
+    private Workbook openWorkbook(String source, InputStream stream) {
+        try (var inputStream = stream != null ? stream : getClass().getClassLoader().getResourceAsStream(source)) {
+            return WorkbookFactory.create(inputStream);
+        } catch (Exception e) {
+            throw new MissingFileException(source, e);
+        }
+    }
+
+    /** Each column's name by its position. */
+    private static Map<Integer, String> readHeaders(Row headers) {
+        var positioning = new HashMap<Integer, String>();
+        headers.forEach(cell -> positioning.put(cell.getColumnIndex(), cell.getStringCellValue()));
+        return positioning;
+    }
+
+    /** The rows below the header that have a value. */
+    private static List<FileRow> readRows(Map<Integer, String> headers, Sheet sheet) {
+        var rows = new ArrayList<FileRow>();
+        for (var sheetRow : sheet) {
+            if (sheetRow.getRowNum() == HEADER_ROW) {
+                continue;
+            }
+            var row = readRow(headers, sheetRow);
+            if (row.isNotEmpty()) {
+                rows.add(row);
+            }
+        }
+        return rows;
+    }
+
+    private static FileRow readRow(Map<Integer, String> headers, Row sheetRow) {
+        var row = new FileRow(sheetRow.getRowNum());
+        for (var header : headers.entrySet()) {
+            var cell = sheetRow.getCell(header.getKey());
+            row.set(header.getValue(), cell == null ? null : cellText(cell));
+        }
+        return row;
+    }
+
+    private static String isoDate(Cell cell) {
+        return cell.getLocalDateTimeCellValue().toLocalDate().toString();
+    }
+
+    /**
+     * {@code BigDecimal.valueOf} takes the shortest decimal that reads back as the same double, so
+     * {@code 18.5} stays {@code 18.5}; trailing zeros are stripped, and plain notation avoids {@code 1E+21}.
+     */
+    private static String exactNumber(Cell cell) {
+        return BigDecimal.valueOf(cell.getNumericCellValue()).stripTrailingZeros().toPlainString();
     }
 }

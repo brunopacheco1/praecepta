@@ -241,7 +241,20 @@ final class TckRunner {
     private static final Pattern REFERENCE = Pattern.compile(
             "'[\\p{L}_?][\\p{L}\\p{N}_?. ]*' (is a FEEL name|is not a (number|date|boolean|time|date and time))");
 
-    /** A short, stable name for what {@link DmnReader} rejected, used to group results. */
+    /**
+     * Reader messages recognised by a fixed phrase, and the feature each one names. They are tried in
+     * this order, after the patterns above.
+     */
+    private static final List<Map.Entry<String, String>> PHRASES = List.of(
+            Map.entry("is a structured item definition", "columns of a structured type"),
+            Map.entry("is a collection", "list inputs (#25)"),
+            Map.entry("has a time zone", "times and date-times with a time zone"),
+            Map.entry("output entries must be literals", "output entries that are expressions (#53)"));
+
+    /**
+     * A short, stable name for what {@link DmnReader} rejected, used to group results. A message that
+     * matches nothing else is about a cell.
+     */
     static String unsupportedFeature(String message) {
         var type = TYPE.matcher(message);
         if (type.find()) {
@@ -249,7 +262,8 @@ final class TckRunner {
         }
         var aggregation = AGGREGATION.matcher(message);
         if (aggregation.find()) {
-            return aggregation.group(1) + " aggregation" + (aggregation.group(1).equals("COUNT") ? " (#15)" : "");
+            var operator = aggregation.group(1);
+            return operator + " aggregation" + (operator.equals("COUNT") ? " (#15)" : "");
         }
         if (EXPRESSION.matcher(message).find()) {
             return "input expressions other than a variable name";
@@ -257,17 +271,10 @@ final class TckRunner {
         if (REFERENCE.matcher(message).find()) {
             return "cells that compare with another input (#51)";
         }
-        if (message.contains("is a structured item definition")) {
-            return "columns of a structured type";
-        }
-        if (message.contains("is a collection")) {
-            return "list inputs (#25)";
-        }
-        if (message.contains("has a time zone")) {
-            return "times and date-times with a time zone";
-        }
-        if (message.contains("output entries must be literals")) {
-            return "output entries that are expressions (#53)";
+        for (var phrase : PHRASES) {
+            if (message.contains(phrase.getKey())) {
+                return phrase.getValue();
+            }
         }
         return "input entries outside the supported FEEL subset";
     }

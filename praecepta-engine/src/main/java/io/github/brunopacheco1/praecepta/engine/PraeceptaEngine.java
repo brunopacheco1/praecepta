@@ -11,7 +11,6 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -23,6 +22,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Issue;
@@ -34,6 +34,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
@@ -84,15 +85,22 @@ public final class PraeceptaEngine<I, O> {
     private final List<String> inputs;
     private final BitsetIndex index;
     private final InputStrategy<I> inputStrategy;
+    /** Reads a column with its bound getter; null with an {@link InputStrategy}. */
     private final BitsetIndex.ColumnReader<I> extractorReader;
+    /** Reads a column from the input strategy's map; null with per-column bindings. */
     private final BitsetIndex.ColumnReader<Map<String, String>> mapReader;
-    /** Per bit: the rule's output, and the same as a singleton result. */
+
+    // Indexed by bit, i.e. by rule in the index's bit order (see bitToRule):
+    /** The rule's converted output. */
     private final Object[] outputByBit;
+    /** The rule's output as a ready-made single-hit result, so that evaluation does not allocate one. */
     private final List<O>[] singleByBit;
-    /** Per bit: the rule's identifier, for violation messages. */
+    /** The rule's identifier, for violation messages. */
     private final Integer[] idByBit;
-    /** ANY: per bit, the mask of rules whose outputs equal this rule's. */
+    /** ANY only: the mask of the rules whose outputs equal this rule's. */
     private final long[][] sameOutputsByBit;
+
+    /** The COLLECT aggregation, or null. */
     private final BinaryOperator<O> reduce;
     private final ValidationReport report;
 
@@ -108,25 +116,25 @@ public final class PraeceptaEngine<I, O> {
 
         int[] bitToRule = bitToRule(rules, builder.outputPriority);
         int words = BitsetIndex.wordsFor(rules.size());
-        var enumValues = enumValuesByColumn(builder.extractors);
+        var enumValues = enumValuesByColumn(builder.bindings);
         var columnIndexes = evaluationOrder.stream()
                 .map(column -> new ColumnIndex(column, types.get(column), inBitOrder(cells.get(column), bitToRule),
-                        allowedTests(column, types.get(column), allowedValues.get(column)), words, enumValues.get(column)))
+                        parseAllowedValues(column, types.get(column), allowedValues.get(column)), words, enumValues.get(column)))
                 .toList();
         index = new BitsetIndex(columnIndexes, bitToRule);
 
         inputStrategy = builder.inputStrategy;
         // readers return raw values; each column converts them (see ColumnIndex#maskFor)
-        extractorReader = inputStrategy == null ? extractorReader(builder.extractors, evaluationOrder) : null;
+        extractorReader = inputStrategy == null ? extractorReader(builder.bindings, evaluationOrder) : null;
         mapReader = inputStrategy == null ? null : mapReader(evaluationOrder);
 
-        int n = rules.size();
-        outputByBit = new Object[n];
+        int ruleCount = rules.size();
+        outputByBit = new Object[ruleCount];
         @SuppressWarnings({"rawtypes", "unchecked"}) // a generic array cannot be created otherwise
-        List<O>[] singles = new List[n];
+        List<O>[] singles = new List[ruleCount];
         singleByBit = singles;
-        idByBit = new Integer[n];
-        for (int bit = 0; bit < n; bit++) {
+        idByBit = new Integer[ruleCount];
+        for (int bit = 0; bit < ruleCount; bit++) {
             var rule = rules.get(bitToRule[bit]);
             var output = builder.outputStrategy.transform(rule.output());
             outputByBit[bit] = output;
@@ -138,23 +146,7 @@ public final class PraeceptaEngine<I, O> {
         report = validate(index, rules, hitPolicy, builder.failOn);
     }
 
-    /**
-     * Runs the static analysis, most severe findings first. Fails if a finding is at least as severe
-     * as {@code failOn}; otherwise logs the findings as a warning.
-     */
-    private static ValidationReport validate(BitsetIndex index, List<Praeceptum> rules, HitPolicy hitPolicy, Severity failOn) {
-        var report = new ValidationReport(TableAnalysis.analyse(index, rules, hitPolicy).stream()
-                .sorted(Comparator.comparing(Issue::severity).reversed())
-                .toList());
-        if (failOn != null && report.hasIssuesAtLeast(failOn)) {
-            throw new InvalidDecisionTableException(report);
-        }
-        if (!report.isEmpty()) {
-            LOG.log(Level.WARNING, "Decision table has {0} validation issue(s):\n{1}", report.issues().size(), report);
-        }
-        return report;
-    }
-
+    /** Starts configuring an engine. */
     public static <I, O> Builder<I, O> builder() {
         return new Builder<>();
     }
@@ -166,8 +158,8 @@ public final class PraeceptaEngine<I, O> {
      *         aggregations), several for multi-hit ones; empty if no rule matches
      * @throws HitPolicyViolationException if the input matches several rules under UNIQUE, or rules
      *                                     with different outputs under ANY
-     * @throws io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException if a value is
-     *         outside its column's declared input values, or (map-based inputs) not a valid value of the column's type
+     * @throws InvalidInputException       if a value is outside its column's declared input values, or
+     *                                     not a valid value of the column's type
      */
     @SuppressWarnings("unchecked")
     public List<O> evaluate(I input) {
@@ -177,6 +169,7 @@ public final class PraeceptaEngine<I, O> {
         if (matches.length == 0) {
             return List.of();
         }
+        // the lowest set bit is the first matching rule in rule order, or the highest-priority one
         return switch (hitPolicy) {
             case FIRST, PRIORITY -> singleByBit[BitsetIndex.first(matches)];
             case UNIQUE -> {
@@ -188,9 +181,9 @@ public final class PraeceptaEngine<I, O> {
             }
             case ANY -> {
                 int bit = BitsetIndex.first(matches);
-                var same = sameOutputsByBit[bit];
-                for (int w = 0; w < matches.length; w++) {
-                    if ((matches[w] & ~same[w]) != 0) {
+                var sameOutputs = sameOutputsByBit[bit];
+                for (int word = 0; word < matches.length; word++) {
+                    if ((matches[word] & ~sameOutputs[word]) != 0) {
                         throw violation(matches);
                     }
                 }
@@ -214,19 +207,16 @@ public final class PraeceptaEngine<I, O> {
         };
     }
 
-    private HitPolicyViolationException violation(long[] matches) {
-        var ids = new ArrayList<Integer>();
-        for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
-            ids.add(idByBit[bit]);
-        }
-        return new HitPolicyViolationException(hitPolicy, ids);
-    }
-
+    /** The hit policy. */
     public HitPolicy hitPolicy() {
         return hitPolicy;
     }
 
-    /** Input column names, as declared (or, with an {@link InputStrategy}, as used by the rules). */
+    /**
+     * Input column names: the bound columns in the order they were bound or, with an {@link InputStrategy},
+     * the table's columns, then the other columns the rules test (in alphabetical order), then any other
+     * columns named by input value lists and column types (in the order they were declared).
+     */
     public List<String> inputs() {
         return inputs;
     }
@@ -246,51 +236,45 @@ public final class PraeceptaEngine<I, O> {
         if (outputPriority.isEmpty()) {
             return IntStream.range(0, rules.size()).toArray();
         }
-        var ranks = priorityRanks(rules, outputPriority);
+        var keys = rules.stream().map(rule -> priorityKey(rule, outputPriority)).toArray(int[][]::new);
+        Comparator<int[]> lexicographic = Arrays::compare;
         return IntStream.range(0, rules.size()).boxed()
-                .sorted(Comparator.comparingInt(rule -> ranks[rule])) // stable: ties keep rule order
+                .sorted(Comparator.comparing(rule -> keys[rule], lexicographic)) // stable: ties keep rule order
                 .mapToInt(Integer::intValue)
                 .toArray();
     }
 
+    /**
+     * The position of each of the rule's outputs in its priority list, in the order the lists were
+     * declared. Compared lexicographically, a smaller key is a higher priority.
+     */
+    private static int[] priorityKey(Praeceptum rule, Map<String, List<String>> outputPriority) {
+        var key = new int[outputPriority.size()];
+        int i = 0;
+        for (var priorityList : outputPriority.entrySet()) {
+            var output = priorityList.getKey();
+            var value = rule.output().values().get(output);
+            int position = priorityList.getValue().indexOf(value);
+            if (position < 0) {
+                throw new InvalidDecisionTableException("Rule %s: output %s=%s is not in its priority list %s"
+                        .formatted(rule.priority(), output, value, priorityList.getValue()));
+            }
+            key[i++] = position;
+        }
+        return key;
+    }
+
+    /** Per bit, the mask of the rules with the same outputs as the bit's rule; equal outputs share one mask. */
     private static long[][] sameOutputMasks(List<Praeceptum> rules, int[] bitToRule, int words) {
-        var byOutput = new HashMap<Object, long[]>();
+        var maskByOutput = new HashMap<Object, long[]>();
         for (int bit = 0; bit < bitToRule.length; bit++) {
-            BitsetIndex.set(byOutput.computeIfAbsent(rules.get(bitToRule[bit]).output(), o -> new long[words]), bit);
+            BitsetIndex.set(maskByOutput.computeIfAbsent(rules.get(bitToRule[bit]).output(), output -> new long[words]), bit);
         }
         var masks = new long[bitToRule.length][];
         for (int bit = 0; bit < bitToRule.length; bit++) {
-            masks[bit] = byOutput.get(rules.get(bitToRule[bit]).output());
+            masks[bit] = maskByOutput.get(rules.get(bitToRule[bit]).output());
         }
         return masks;
-    }
-
-    /** Dense rank per rule: lower means higher priority; equal outputs share a rank. */
-    private static int[] priorityRanks(List<Praeceptum> rules, Map<String, List<String>> priority) {
-        var keys = new int[rules.size()][];
-        for (int r = 0; r < rules.size(); r++) {
-            var key = new int[priority.size()];
-            int c = 0;
-            for (var column : priority.entrySet()) {
-                var value = rules.get(r).output().values().get(column.getKey());
-                int index = column.getValue().indexOf(value);
-                if (index < 0) {
-                    throw new InvalidDecisionTableException("Rule %s: output %s=%s is not in its priority list %s"
-                            .formatted(rules.get(r).priority(), column.getKey(), value, column.getValue()));
-                }
-                key[c++] = index;
-            }
-            keys[r] = key;
-        }
-        Comparator<int[]> lexicographic = java.util.Arrays::compare;
-        var distinct = new TreeSet<>(lexicographic);
-        distinct.addAll(Arrays.asList(keys));
-        var ordered = new ArrayList<>(distinct);
-        var ranks = new int[rules.size()];
-        for (int r = 0; r < rules.size(); r++) {
-            ranks[r] = Collections.binarySearch(ordered, keys[r], lexicographic);
-        }
-        return ranks;
     }
 
     private static <O> BinaryOperator<O> reducer(AggregationOperator aggregation, OutputStrategy<O> strategy) {
@@ -304,6 +288,14 @@ public final class PraeceptaEngine<I, O> {
         };
     }
 
+    private HitPolicyViolationException violation(long[] matches) {
+        var ids = new ArrayList<Integer>();
+        for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
+            ids.add(idByBit[bit]);
+        }
+        return new HitPolicyViolationException(hitPolicy, ids);
+    }
+
     // ---- columns -----------------------------------------------------------------------------
 
     /**
@@ -314,7 +306,7 @@ public final class PraeceptaEngine<I, O> {
     private static Map<String, ColumnType> columnTypes(Builder<?, ?> builder, List<Praeceptum> rules) {
         var types = new LinkedHashMap<String, ColumnType>();
         if (builder.inputStrategy == null) {
-            builder.extractors.forEach((column, binding) -> types.put(column, binding.type()));
+            builder.bindings.forEach((column, binding) -> types.put(column, binding.type()));
             rejectUndeclaredColumns(rules, types.keySet());
             return types;
         }
@@ -333,7 +325,7 @@ public final class PraeceptaEngine<I, O> {
      */
     private static Map<String, String> allowedValues(Builder<?, ?> builder, Set<String> columns) {
         var allowedValues = new LinkedHashMap<>(builder.allowedValues);
-        builder.extractors.forEach((column, binding) -> {
+        builder.bindings.forEach((column, binding) -> {
             if (binding.enumValues() != null) {
                 allowedValues.putIfAbsent(column, quotedList(binding.enumValues()));
             }
@@ -363,12 +355,14 @@ public final class PraeceptaEngine<I, O> {
         return List.copyOf(columns);
     }
 
+    /** A rule may name a column that has no input binding only to leave it blank (a wildcard). */
     private static void rejectUndeclaredColumns(List<Praeceptum> rules, Set<String> declared) {
         for (var rule : rules) {
             for (var cell : rule.input().values().entrySet()) {
-                if (!declared.contains(cell.getKey()) && !(CellParser.parse(cell.getValue(), ColumnType.STRING) instanceof UnaryTests.Any)) {
+                var column = cell.getKey();
+                if (!declared.contains(column) && !(CellParser.parse(cell.getValue(), ColumnType.STRING) instanceof UnaryTests.Any)) {
                     throw new InvalidDecisionTableException("Rule %s tests column '%s', which has no declared input"
-                            .formatted(rule.priority(), cell.getKey()));
+                            .formatted(rule.priority(), column));
                 }
             }
         }
@@ -377,14 +371,16 @@ public final class PraeceptaEngine<I, O> {
     /** Parsed cells per column, in rule order. */
     private static Map<String, List<UnaryTests>> parseCells(List<Praeceptum> rules, Map<String, ColumnType> types) {
         var cells = new LinkedHashMap<String, List<UnaryTests>>();
-        types.forEach((column, type) -> cells.put(column, rules.stream().map(rule -> {
-            try {
-                return CellParser.parse(rule.input().values().get(column), type);
-            } catch (CellSyntaxException e) {
-                throw new InvalidDecisionTableException("Rule %s, column '%s': %s".formatted(rule.priority(), column, e.getMessage()));
-            }
-        }).toList()));
+        types.forEach((column, type) -> cells.put(column, rules.stream().map(rule -> parseCell(rule, column, type)).toList()));
         return cells;
+    }
+
+    private static UnaryTests parseCell(Praeceptum rule, String column, ColumnType type) {
+        try {
+            return CellParser.parse(rule.input().values().get(column), type);
+        } catch (CellSyntaxException e) {
+            throw new InvalidDecisionTableException("Rule %s, column '%s': %s".formatted(rule.priority(), column, e.getMessage()));
+        }
     }
 
     /** A column's cells, from rule order to bit order. */
@@ -392,13 +388,15 @@ public final class PraeceptaEngine<I, O> {
         return Arrays.stream(bitToRule).mapToObj(cellsByRule::get).toList();
     }
 
+    /** The values as a FEEL list of string literals, e.g. {@code "PT", "ES"}. */
     private static String quotedList(List<String> values) {
         return values.stream()
                 .map(value -> "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
-                .collect(java.util.stream.Collectors.joining(", "));
+                .collect(Collectors.joining(", "));
     }
 
-    private static UnaryTests allowedTests(String column, ColumnType type, String declared) {
+    /** A column's declared input values as unary tests of its type, or null if none are declared. */
+    private static UnaryTests parseAllowedValues(String column, ColumnType type, String declared) {
         if (declared == null) {
             return null;
         }
@@ -408,11 +406,15 @@ public final class PraeceptaEngine<I, O> {
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException("Input values of column '%s': %s".formatted(column, e.getMessage()));
         }
-        if (type == ColumnType.STRING && !(tests instanceof UnaryTests.Positive(var alternatives)
-                && alternatives.stream().allMatch(UnaryTests.Equals.class::isInstance))) {
+        if (type == ColumnType.STRING && !isListOfValues(tests)) {
             throw new InvalidDecisionTableException("Input values of string column '%s' must be a list of values".formatted(column));
         }
         return tests;
+    }
+
+    private static boolean isListOfValues(UnaryTests tests) {
+        return tests instanceof UnaryTests.Positive(var alternatives)
+                && alternatives.stream().allMatch(UnaryTests.Equals.class::isInstance);
     }
 
     /**
@@ -448,6 +450,25 @@ public final class PraeceptaEngine<I, O> {
         return (values, column) -> values.get(names[column]);
     }
 
+    // ---- validation ----------------------------------------------------------------------------
+
+    /**
+     * Runs the static analysis, most severe findings first. Fails if a finding is at least as severe
+     * as {@code failOn}; otherwise logs the findings as a warning.
+     */
+    private static ValidationReport validate(BitsetIndex index, List<Praeceptum> rules, HitPolicy hitPolicy, Severity failOn) {
+        var report = new ValidationReport(TableAnalysis.analyse(index, rules, hitPolicy).stream()
+                .sorted(Comparator.comparing(Issue::severity).reversed())
+                .toList());
+        if (failOn != null && report.hasIssuesAtLeast(failOn)) {
+            throw new InvalidDecisionTableException(report);
+        }
+        if (!report.isEmpty()) {
+            LOG.log(Level.WARNING, "Decision table has {0} validation issue(s):\n{1}", report.issues().size(), report);
+        }
+        return report;
+    }
+
     // ---- builder -------------------------------------------------------------------------------
 
     /**
@@ -455,24 +476,23 @@ public final class PraeceptaEngine<I, O> {
      * {@link #input(String, Function)} (fastest) or all at once with {@link #inputs(InputStrategy)}.
      */
     public static final class Builder<I, O> {
-        /** @param enumValues for an enum-bound column, each constant's value by ordinal; else null */
-        private record Binding<I>(ColumnType type, Function<? super I, ?> extractor, List<String> enumValues) {
-        }
 
         private static final String COLUMN = "column";
 
         private HitPolicy hitPolicy;
         private AggregationOperator aggregation;
-        private final Map<String, Binding<I>> extractors = new LinkedHashMap<>();
+        private List<Praeceptum> rules;
+        private Severity failOn;
+
+        private final Map<String, Binding<I>> bindings = new LinkedHashMap<>();
         private InputStrategy<I> inputStrategy;
         private final Map<String, ColumnType> columnTypes = new LinkedHashMap<>();
         private final Map<String, String> allowedValues = new LinkedHashMap<>();
-        private OutputStrategy<O> outputStrategy;
-        private final Map<String, List<String>> outputPriority = new LinkedHashMap<>();
-        private List<Praeceptum> rules;
-        private Severity failOn;
         /** Column types of a {@link #table(DecisionTable)}, checked against the bindings. */
         private Map<String, ColumnType> tableTypes;
+
+        private OutputStrategy<O> outputStrategy;
+        private final Map<String, List<String>> outputPriority = new LinkedHashMap<>();
 
         private Builder() {
         }
@@ -499,7 +519,7 @@ public final class PraeceptaEngine<I, O> {
                 }
             }
             tableTypes = types;
-            if (table.hitPolicy() == HitPolicy.PRIORITY || table.hitPolicy() == HitPolicy.OUTPUT_ORDER) {
+            if (usesOutputPriority(table.hitPolicy())) {
                 for (var output : table.outputs()) {
                     if (!output.values().isEmpty()) {
                         outputPriority(output.name(), output.values());
@@ -509,6 +529,7 @@ public final class PraeceptaEngine<I, O> {
             return this;
         }
 
+        /** The hit policy (required). */
         public Builder<I, O> hitPolicy(HitPolicy hitPolicy) {
             this.hitPolicy = Objects.requireNonNull(hitPolicy, "hitPolicy");
             return this;
@@ -569,19 +590,6 @@ public final class PraeceptaEngine<I, O> {
             return bind(column, ColumnType.STRING, extractor, values);
         }
 
-        private Builder<I, O> bind(String column, ColumnType type, Function<? super I, ?> extractor) {
-            return bind(column, type, extractor, null);
-        }
-
-        private Builder<I, O> bind(String column, ColumnType type, Function<? super I, ?> extractor, List<String> enumValues) {
-            Objects.requireNonNull(column, COLUMN);
-            Objects.requireNonNull(extractor, "extractor");
-            if (extractors.putIfAbsent(column, new Binding<>(type, extractor, enumValues)) != null) {
-                throw new IllegalArgumentException("Input column '%s' is declared twice".formatted(column));
-            }
-            return this;
-        }
-
         /**
          * Converts each input to a map of column values (as text). Simpler than per-column binding, but
          * slower. Columns are STRING unless declared otherwise with {@link #columnType}.
@@ -613,6 +621,7 @@ public final class PraeceptaEngine<I, O> {
             return allowedValues(column, quotedList(values));
         }
 
+        /** Converts each rule's outputs to the output type (required). */
         public Builder<I, O> output(OutputStrategy<O> outputStrategy) {
             this.outputStrategy = Objects.requireNonNull(outputStrategy, "outputStrategy");
             return this;
@@ -634,7 +643,7 @@ public final class PraeceptaEngine<I, O> {
             return this;
         }
 
-        /** The rules, in DMN rule order. */
+        /** The rules, in DMN rule order (required). */
         public Builder<I, O> rules(List<Praeceptum> rules) {
             this.rules = List.copyOf(rules);
             return this;
@@ -646,34 +655,74 @@ public final class PraeceptaEngine<I, O> {
             return this;
         }
 
+        /**
+         * Parses the cells, indexes the rules and validates the table.
+         *
+         * @throws IllegalStateException         if a required setting is missing or two settings conflict
+         * @throws InvalidDecisionTableException if the table is invalid, or validation finds an issue at
+         *                                       the {@link #failOn} severity
+         */
         public PraeceptaEngine<I, O> build() {
             require(hitPolicy != null, "a hit policy is required");
             require(outputStrategy != null, "an output strategy is required");
             require(rules != null, "rules are required");
-            require(extractors.isEmpty() != (inputStrategy == null),
+            checkInputBindings();
+            checkHitPolicyOptions();
+            return new PraeceptaEngine<>(this);
+        }
+
+        private Builder<I, O> bind(String column, ColumnType type, Function<? super I, ?> extractor) {
+            return bind(column, type, extractor, null);
+        }
+
+        private Builder<I, O> bind(String column, ColumnType type, Function<? super I, ?> extractor, List<String> enumValues) {
+            Objects.requireNonNull(column, COLUMN);
+            Objects.requireNonNull(extractor, "extractor");
+            if (bindings.putIfAbsent(column, new Binding<>(type, extractor, enumValues)) != null) {
+                throw new IllegalArgumentException("Input column '%s' is declared twice".formatted(column));
+            }
+            return this;
+        }
+
+        private void checkInputBindings() {
+            require(bindings.isEmpty() != (inputStrategy == null),
                     "bind inputs either per column with input(...) or with inputs(...), not both and not neither");
             require(columnTypes.isEmpty() || inputStrategy != null,
                     "columnType(...) only applies with inputs(...); per-column bindings carry their type");
-            if (tableTypes != null && inputStrategy == null) {
-                tableTypes.forEach((column, type) -> {
-                    var binding = extractors.get(column);
-                    require(binding != null, "column '%s' of the table has no input binding".formatted(column));
-                    require(binding.type() == type, "column '%s' is a %s column in the table but is bound as %s"
-                            .formatted(column, type, binding.type()));
-                });
+            if (tableTypes == null || inputStrategy != null) {
+                return;
             }
-            require(aggregation == null || hitPolicy == HitPolicy.COLLECT,
-                    "aggregation is only allowed with the COLLECT hit policy");
-            boolean needsPriority = hitPolicy == HitPolicy.PRIORITY || hitPolicy == HitPolicy.OUTPUT_ORDER;
-            require(!needsPriority || !outputPriority.isEmpty(), hitPolicy + " requires outputPriority(...) lists");
-            require(needsPriority || outputPriority.isEmpty(), "outputPriority(...) only applies to PRIORITY and OUTPUT_ORDER");
-            return new PraeceptaEngine<>(this);
+            for (var tableColumn : tableTypes.entrySet()) {
+                var column = tableColumn.getKey();
+                var type = tableColumn.getValue();
+                var binding = bindings.get(column);
+                require(binding != null, "column '%s' of the table has no input binding".formatted(column));
+                require(binding.type() == type, "column '%s' is a %s column in the table but is bound as %s"
+                        .formatted(column, type, binding.type()));
+            }
+        }
+
+        private void checkHitPolicyOptions() {
+            require(aggregation == null || hitPolicy == HitPolicy.COLLECT, "aggregation is only allowed with the COLLECT hit policy");
+            if (usesOutputPriority(hitPolicy)) {
+                require(!outputPriority.isEmpty(), "%s requires outputPriority(...) lists".formatted(hitPolicy));
+            } else {
+                require(outputPriority.isEmpty(), "outputPriority(...) only applies to PRIORITY and OUTPUT_ORDER");
+            }
+        }
+
+        private static boolean usesOutputPriority(HitPolicy hitPolicy) {
+            return hitPolicy == HitPolicy.PRIORITY || hitPolicy == HitPolicy.OUTPUT_ORDER;
         }
 
         private static void require(boolean condition, String message) {
             if (!condition) {
                 throw new IllegalStateException(message);
             }
+        }
+
+        /** @param enumValues for an enum-bound column, each constant's value by ordinal; else null */
+        private record Binding<I>(ColumnType type, Function<? super I, ?> extractor, List<String> enumValues) {
         }
     }
 }

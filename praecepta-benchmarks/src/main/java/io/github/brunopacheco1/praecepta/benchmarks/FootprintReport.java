@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.benchmarks;
 
 import java.lang.management.ManagementFactory;
+import java.lang.ref.Reference;
 import java.util.List;
 
 /**
@@ -40,10 +41,8 @@ public final class FootprintReport {
                 long buildMs = (System.nanoTime() - start) / 1_000_000;
                 long retained = usedHeap() - before;
                 System.out.printf("%-10s %-15s %11.1f MB %7d ms%n", engine, table, retained / 1048576.0, buildMs);
-                // keep the contender reachable until after measuring
-                if (contender.hashCode() == 42) {
-                    System.out.print("");
-                }
+                // the contender must stay reachable until its heap is measured
+                Reference.reachabilityFence(contender);
             }
         }
     }

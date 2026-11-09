@@ -1,0 +1,350 @@
+/*
+ * SPDX-FileCopyrightText: Bruno Pacheco
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+package io.github.brunopacheco1.praecepta.engine;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
+import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
+
+/**
+ * Pins how a {@link ColumnIndex} splits each column type into value classes: each class's
+ * description, whether it is empty or allowed, the rules (bits) accepting it and its example value;
+ * how runs of classes are described; and which rules, or which error, each raw input gets.
+ */
+class ColumnIndexBehaviourTest {
+
+    enum Letter { A, B, C }
+
+    @Test
+    void number_classes() {
+        var column = column(ColumnType.NUMBER, null, "< 10", "[10..20]", "> 20", "15", "-", "null", "not(5)", "[1.5..2.25)");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..1.5) rules=[0, 4, 6] example=0.5 (BigDecimal)
+                1 1.5 rules=[0, 4, 6, 7] example=1.5 (BigDecimal)
+                2 (1.5..2.25) rules=[0, 4, 6, 7] example=1.8750 (BigDecimal)
+                3 2.25 rules=[0, 4, 6] example=2.25 (BigDecimal)
+                4 (2.25..5) rules=[0, 4, 6] example=3.625 (BigDecimal)
+                5 5 rules=[0, 4] example=5 (BigDecimal)
+                6 (5..10) rules=[0, 4, 6] example=7.5 (BigDecimal)
+                7 10 rules=[1, 4, 6] example=10 (BigDecimal)
+                8 (10..15) rules=[1, 4, 6] example=12.5 (BigDecimal)
+                9 15 rules=[1, 3, 4, 6] example=15 (BigDecimal)
+                10 (15..20) rules=[1, 4, 6] example=17.5 (BigDecimal)
+                11 20 rules=[1, 4, 6] example=20 (BigDecimal)
+                12 (20..+inf) rules=[2, 4, 6] example=21 (BigDecimal)
+                13 null missing rules=[4, 5, 6] example=-
+                """);
+        Assertions.assertThat(column.describe(List.of(0, 1, 2, 3, 4, 7, 8, 9, 12)))
+                .containsExactly("(-inf..5)", "[10..15]", "(20..+inf)");
+        Assertions.assertThat(column.describe(List.of(12, 2, 5))).containsExactly("(1.5..2.25)", "5", "(20..+inf)");
+        Assertions.assertThat(lookups(column, null, "", "  ", "15", " 15 ", "abc", 15, 15L, 15.0d, 10.5f, (short) 5, (byte) 5,
+                BigInteger.valueOf(20), new BigDecimal("1E+1"), Double.NaN, Double.POSITIVE_INFINITY)).isEqualTo("""
+                null -> [4, 5, 6]
+                '' (String) -> [4, 5, 6]
+                '  ' (String) -> [4, 5, 6]
+                '15' (String) -> [1, 3, 4, 6]
+                ' 15 ' (String) -> [1, 3, 4, 6]
+                'abc' (String) -> Input c=abc is not a valid number
+                '15' (Integer) -> [1, 3, 4, 6]
+                '15' (Long) -> [1, 3, 4, 6]
+                '15.0' (Double) -> [1, 3, 4, 6]
+                '10.5' (Float) -> [1, 4, 6]
+                '5' (Short) -> [0, 4]
+                '5' (Byte) -> [0, 4]
+                '20' (BigInteger) -> [1, 4, 6]
+                '1E+1' (BigDecimal) -> [1, 4, 6]
+                'NaN' (Double) -> Input c=NaN is not a finite number
+                'Infinity' (Double) -> Input c=Infinity is not a finite number
+                """);
+    }
+
+    @Test
+    void number_classes_with_declared_values() {
+        var column = column(ColumnType.NUMBER, "[0..100]", "< 18", ">= 65");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..0) disallowed rules=[0] example=-1 (BigDecimal)
+                1 0 rules=[0] example=0 (BigDecimal)
+                2 (0..18) rules=[0] example=9.0 (BigDecimal)
+                3 18 rules=[] example=18 (BigDecimal)
+                4 (18..65) rules=[] example=41.5 (BigDecimal)
+                5 65 rules=[1] example=65 (BigDecimal)
+                6 (65..100) rules=[1] example=82.5 (BigDecimal)
+                7 100 rules=[1] example=100 (BigDecimal)
+                8 (100..+inf) disallowed rules=[1] example=101 (BigDecimal)
+                9 null missing rules=[] example=-
+                """);
+        Assertions.assertThat(lookups(column, null, -1, 0, 50, 100, 101, "101")).isEqualTo("""
+                null -> []
+                '-1' (Integer) -> Input c=-1 is not one of the column's allowed input values
+                '0' (Integer) -> [0]
+                '50' (Integer) -> []
+                '100' (Integer) -> [1]
+                '101' (Integer) -> Input c=101 is not one of the column's allowed input values
+                '101' (String) -> Input c=101 is not one of the column's allowed input values
+                """);
+    }
+
+    @Test
+    void date_classes() {
+        var column = column(ColumnType.DATE, null, ">= date(\"2024-01-01\")", "[date(\"2024-01-01\")..date(\"2024-01-02\")]",
+                "< date(\"2024-01-03\")", "date(\"2024-03-01\")");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..date("2024-01-01")) rules=[2] example=2023-12-31 (LocalDate)
+                1 date("2024-01-01") rules=[0, 1, 2] example=2024-01-01 (LocalDate)
+                2 (date("2024-01-01")..date("2024-01-02")) empty rules=[]
+                3 date("2024-01-02") rules=[0, 1, 2] example=2024-01-02 (LocalDate)
+                4 (date("2024-01-02")..date("2024-01-03")) empty rules=[]
+                5 date("2024-01-03") rules=[0] example=2024-01-03 (LocalDate)
+                6 (date("2024-01-03")..date("2024-03-01")) rules=[0] example=2024-01-04 (LocalDate)
+                7 date("2024-03-01") rules=[0, 3] example=2024-03-01 (LocalDate)
+                8 (date("2024-03-01")..+inf) rules=[0] example=2024-03-02 (LocalDate)
+                9 null missing rules=[] example=-
+                """);
+        // empty classes do not break a run
+        Assertions.assertThat(column.describe(List.of(1, 3, 5))).containsExactly("[date(\"2024-01-01\")..date(\"2024-01-03\")]");
+        Assertions.assertThat(column.describe(List.of(0, 1, 3, 5, 6, 8)))
+                .containsExactly("(-inf..date(\"2024-03-01\"))", "(date(\"2024-03-01\")..+inf)");
+        Assertions.assertThat(lookups(column, null, LocalDate.of(2024, 1, 2), "2024-01-02", " 2024-02-01 ", "2024-13-01")).isEqualTo("""
+                null -> []
+                '2024-01-02' (LocalDate) -> [0, 1, 2]
+                '2024-01-02' (String) -> [0, 1, 2]
+                ' 2024-02-01 ' (String) -> [0]
+                '2024-13-01' (String) -> Input c=2024-13-01 is not a valid date
+                """);
+    }
+
+    @Test
+    void time_classes() {
+        var column = column(ColumnType.TIME, null, "< time(\"00:00:00\")", "> time(\"23:59:59.999999999\")",
+                "[time(\"08:00:00\")..time(\"08:00:00.000000001\")]", ">= time(\"12:00:00\")", "< time(\"00:30:00\")",
+                "> time(\"23:30:00\")", "[time(\"10:00:00\")..time(\"10:00:00.000000003\")]");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..time("00:00:00")) empty rules=[]
+                1 time("00:00:00") rules=[4] example=00:00 (LocalTime)
+                2 (time("00:00:00")..time("00:30:00")) rules=[4] example=00:15 (LocalTime)
+                3 time("00:30:00") rules=[] example=00:30 (LocalTime)
+                4 (time("00:30:00")..time("08:00:00")) rules=[] example=04:15 (LocalTime)
+                5 time("08:00:00") rules=[2] example=08:00 (LocalTime)
+                6 (time("08:00:00")..time("08:00:00.000000001")) empty rules=[]
+                7 time("08:00:00.000000001") rules=[2] example=08:00:00.000000001 (LocalTime)
+                8 (time("08:00:00.000000001")..time("10:00:00")) rules=[] example=09:00 (LocalTime)
+                9 time("10:00:00") rules=[6] example=10:00 (LocalTime)
+                10 (time("10:00:00")..time("10:00:00.000000003")) rules=[6] example=10:00:00.000000001 (LocalTime)
+                11 time("10:00:00.000000003") rules=[6] example=10:00:00.000000003 (LocalTime)
+                12 (time("10:00:00.000000003")..time("12:00:00")) rules=[] example=11:00:00.000000001 (LocalTime)
+                13 time("12:00:00") rules=[3] example=12:00 (LocalTime)
+                14 (time("12:00:00")..time("23:30:00")) rules=[3] example=17:45 (LocalTime)
+                15 time("23:30:00") rules=[3] example=23:30 (LocalTime)
+                16 (time("23:30:00")..time("23:59:59.999999999")) rules=[3, 5] example=23:44:59.999999999 (LocalTime)
+                17 time("23:59:59.999999999") rules=[3, 5] example=23:59:59.999999999 (LocalTime)
+                18 (time("23:59:59.999999999")..+inf) empty rules=[]
+                19 null missing rules=[] example=-
+                """);
+        Assertions.assertThat(column.describe(List.of(5, 7))).containsExactly("[time(\"08:00:00\")..time(\"08:00:00.000000001\")]");
+        Assertions.assertThat(column.describe(List.of(13, 14, 15, 16, 17)))
+                .containsExactly("[time(\"12:00:00\")..time(\"23:59:59.999999999\")]");
+        Assertions.assertThat(lookups(column, null, LocalTime.MIDNIGHT, LocalTime.MAX, "08:00", "10:00:00Z", "bad")).isEqualTo("""
+                null -> []
+                '00:00' (LocalTime) -> [4]
+                '23:59:59.999999999' (LocalTime) -> [3, 5]
+                '08:00' (String) -> [2]
+                '10:00:00Z' (String) -> Input c=10:00:00Z is not a valid time
+                'bad' (String) -> Input c=bad is not a valid time
+                """);
+    }
+
+    @Test
+    void time_classes_near_the_ends_of_the_day() {
+        var column = column(ColumnType.TIME, null, "< time(\"00:20:00\")", "> time(\"23:10:00\")");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..time("00:20:00")) rules=[0] example=00:00 (LocalTime)
+                1 time("00:20:00") rules=[] example=00:20 (LocalTime)
+                2 (time("00:20:00")..time("23:10:00")) rules=[] example=11:45 (LocalTime)
+                3 time("23:10:00") rules=[] example=23:10 (LocalTime)
+                4 (time("23:10:00")..+inf) rules=[1] example=23:59:59.999999999 (LocalTime)
+                5 null missing rules=[] example=-
+                """);
+        var noBoundaries = column(ColumnType.TIME, null, "-");
+        Assertions.assertThat(dump(noBoundaries)).isEqualTo("""
+                0 (-inf..+inf) rules=[0] example=12:00 (LocalTime)
+                1 null missing rules=[0] example=-
+                """);
+    }
+
+    @Test
+    void date_time_classes() {
+        var column = column(ColumnType.DATE_TIME, null, "< date and time(\"2025-01-01T00:00:00\")",
+                "[date and time(\"2025-01-01T00:00:00\")..date and time(\"2025-03-30T02:30:00\"))",
+                "> date and time(\"2025-03-30T02:30:00.000000001\")");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..date and time("2025-01-01T00:00:00")) rules=[0] example=2024-12-31T00:00 (LocalDateTime)
+                1 date and time("2025-01-01T00:00:00") rules=[1] example=2025-01-01T00:00 (LocalDateTime)
+                2 (date and time("2025-01-01T00:00:00")..date and time("2025-03-30T02:30:00")) rules=[1] example=2025-02-14T01:15 \
+                (LocalDateTime)
+                3 date and time("2025-03-30T02:30:00") rules=[] example=2025-03-30T02:30 (LocalDateTime)
+                4 (date and time("2025-03-30T02:30:00")..date and time("2025-03-30T02:30:00.000000001")) empty rules=[]
+                5 date and time("2025-03-30T02:30:00.000000001") rules=[] example=2025-03-30T02:30:00.000000001 (LocalDateTime)
+                6 (date and time("2025-03-30T02:30:00.000000001")..+inf) rules=[2] example=2025-03-31T02:30:00.000000001 (LocalDateTime)
+                7 null missing rules=[] example=-
+                """);
+        Assertions.assertThat(column.describe(List.of(3, 5))).containsExactly(
+                "[date and time(\"2025-03-30T02:30:00\")..date and time(\"2025-03-30T02:30:00.000000001\")]");
+        Assertions.assertThat(lookups(column, null, LocalDateTime.of(2025, 2, 1, 0, 0), "2025-03-30T02:30", "2025-03-30")).isEqualTo("""
+                null -> []
+                '2025-02-01T00:00' (LocalDateTime) -> [1]
+                '2025-03-30T02:30' (String) -> []
+                '2025-03-30' (String) -> Input c=2025-03-30 is not a valid date and time
+                """);
+    }
+
+    @Test
+    void boolean_classes() {
+        var column = column(ColumnType.BOOLEAN, null, "true", "false", "-", "null", "not(true)");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..false) empty rules=[]
+                1 false rules=[1, 2, 4] example=false (Boolean)
+                2 (false..true) empty rules=[]
+                3 true rules=[0, 2] example=true (Boolean)
+                4 (true..+inf) empty rules=[]
+                5 null missing rules=[2, 3, 4] example=-
+                """);
+        // booleans are not compared, so their classes never merge into intervals
+        Assertions.assertThat(column.describe(List.of(1, 3))).containsExactly("false", "true");
+        Assertions.assertThat(lookups(column, null, true, false, "TRUE", " false ", "yes", "")).isEqualTo("""
+                null -> [2, 3, 4]
+                'true' (Boolean) -> [0, 2]
+                'false' (Boolean) -> [1, 2, 4]
+                'TRUE' (String) -> [0, 2]
+                ' false ' (String) -> [1, 2, 4]
+                'yes' (String) -> Input c=yes is not a valid boolean
+                '' (String) -> [2, 3, 4]
+                """);
+    }
+
+    @Test
+    void string_classes() {
+        var column = column(ColumnType.STRING, null, "\"A\",\"B\"", "not(\"A\")", "-", "null", "\"C\"");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 "A" rules=[0, 2] example=A (String)
+                1 "B" rules=[0, 1, 2] example=B (String)
+                2 "C" rules=[1, 2, 4] example=C (String)
+                3 any other value rules=[1, 2] example=-
+                4 null missing rules=[1, 2, 3] example=-
+                """);
+        Assertions.assertThat(column.describe(List.of(2, 0, 3))).containsExactly("\"C\"", "\"A\"", "any other value");
+        Assertions.assertThat(lookups(column, null, "A", "B", "C", "D", "", "  ")).isEqualTo("""
+                null -> [1, 2, 3]
+                'A' (String) -> [0, 2]
+                'B' (String) -> [0, 1, 2]
+                'C' (String) -> [1, 2, 4]
+                'D' (String) -> [1, 2]
+                '' (String) -> [1, 2, 3]
+                '  ' (String) -> [1, 2, 3]
+                """);
+    }
+
+    @Test
+    void string_classes_with_declared_values() {
+        var column = column(ColumnType.STRING, "\"A\",\"C\"", "\"A\",\"B\"", "not(\"A\")");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 "A" rules=[0] example=A (String)
+                1 "B" disallowed rules=[0, 1] example=B (String)
+                2 "C" rules=[1] example=C (String)
+                3 any other value disallowed rules=[1] example=-
+                4 null missing rules=[1] example=-
+                """);
+        Assertions.assertThat(lookups(column, null, "A", "B", "C", "D", "")).isEqualTo("""
+                null -> [1]
+                'A' (String) -> [0]
+                'B' (String) -> Input c=B is not one of the column's allowed input values
+                'C' (String) -> [1]
+                'D' (String) -> Input c=D is not one of the column's allowed input values
+                '' (String) -> [1]
+                """);
+    }
+
+    @Test
+    void enum_bound_string_classes() {
+        var cells = cells(ColumnType.STRING, "\"A\",\"B\"", "not(\"A\")", "null");
+        var enumValues = new String[] {"A", "B", "C"};
+        var column = new ColumnIndex("letter", ColumnType.STRING, cells, CellParser.parse("\"A\",\"B\",\"C\"", ColumnType.STRING), 1,
+                enumValues);
+        Assertions.assertThat(lookups(column, null, Letter.A, Letter.B, Letter.C)).isEqualTo("""
+                null -> [1, 2]
+                'A' (Letter) -> [0]
+                'B' (Letter) -> [0, 1]
+                'C' (Letter) -> [1]
+                """);
+        var withoutC = CellParser.parse("\"A\",\"B\"", ColumnType.STRING);
+        Assertions.assertThatThrownBy(() -> new ColumnIndex("letter", ColumnType.STRING, cells, withoutC, 1, enumValues))
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Column 'letter': enum value 'C' is not one of the column's input values");
+    }
+
+    private static ColumnIndex column(ColumnType type, String allowed, String... cells) {
+        var allowedTests = allowed == null ? null : CellParser.parse(allowed, type);
+        return new ColumnIndex("c", type, cells(type, cells), allowedTests, BitsetIndex.wordsFor(cells.length), null);
+    }
+
+    private static List<UnaryTests> cells(ColumnType type, String... cells) {
+        return Arrays.stream(cells).map(cell -> CellParser.parse(cell, type)).toList();
+    }
+
+    /** One line per class: number, description, flags, accepting rules (bits) and example value. */
+    private static String dump(ColumnIndex column) {
+        var lines = new StringBuilder();
+        for (int k = 0; k < column.classCount(); k++) {
+            lines.append(k).append(' ').append(column.describe(k))
+                    .append(column.empty[k] ? " empty" : "")
+                    .append(column.allowed[k] ? "" : " disallowed")
+                    .append(k == column.nullClass ? " missing" : "")
+                    .append(" rules=").append(bits(column.masks[k]));
+            if (!column.empty[k]) {
+                var example = column.representative(k);
+                lines.append(" example=").append(example == null ? "-" : example + " (" + example.getClass().getSimpleName() + ")");
+            }
+            lines.append('\n');
+        }
+        return lines.toString();
+    }
+
+    /** One line per raw input: the rules (bits) accepting it, or the error it raises. */
+    private static String lookups(ColumnIndex column, Object... raws) {
+        var lines = new StringBuilder();
+        for (var raw : raws) {
+            lines.append(raw == null ? "null" : "'" + raw + "' (" + raw.getClass().getSimpleName() + ")").append(" -> ");
+            try {
+                lines.append(bits(column.maskFor(raw)));
+            } catch (InvalidInputException e) {
+                lines.append(e.getMessage());
+            }
+            lines.append('\n');
+        }
+        return lines.toString();
+    }
+
+    private static List<Integer> bits(long[] mask) {
+        var bits = new ArrayList<Integer>();
+        for (int bit = BitsetIndex.first(mask); bit >= 0; bit = BitsetIndex.next(mask, bit + 1)) {
+            bits.add(bit);
+        }
+        return bits;
+    }
+}

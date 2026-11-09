@@ -7,6 +7,7 @@ package io.github.brunopacheco1.praecepta.benchmarks;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -38,7 +39,7 @@ public class InputPathBenchmark {
     public String input;
 
     private Object[] inputs;
-    private java.util.function.Function<Object, List<?>> evaluate;
+    private Function<Object, List<?>> evaluate;
     private int cursor;
 
     @Setup(Level.Trial)
@@ -47,8 +48,8 @@ public class InputPathBenchmark {
         var variant = GeneratedInputs.variant(input, workload);
         var reference = GeneratedInputs.variant("map", workload);
         for (int i = 0; i < workload.size(); i++) {
-            var actual = variant.ruleIds().apply(variant.evaluate().apply(variant.inputs().get(i)));
-            var expected = reference.ruleIds().apply(reference.evaluate().apply(reference.inputs().get(i)));
+            var actual = variant.ruleIdsOf(i);
+            var expected = reference.ruleIdsOf(i);
             if (!actual.equals(expected)) {
                 throw new IllegalStateException("%s input disagrees with map input on %s: %s vs %s"
                         .formatted(input, workload.get(i), actual, expected));

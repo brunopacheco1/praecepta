@@ -21,16 +21,21 @@ public class HitPolicyViolationException extends RuntimeException {
     private final transient HitPolicy hitPolicy;
     private final transient List<Integer> ruleIds;
 
+    /**
+     * @param hitPolicy the violated hit policy
+     * @param ruleIds   identifiers of the conflicting rules, in rule order
+     */
     public HitPolicyViolationException(HitPolicy hitPolicy, List<Integer> ruleIds) {
         super(switch (hitPolicy) {
-            case UNIQUE -> "UNIQUE hit policy violated: rules " + ruleIds + " all match";
-            case ANY -> "ANY hit policy violated: matching rules " + ruleIds + " have different outputs";
-            default -> hitPolicy + " hit policy violated by rules " + ruleIds;
+            case UNIQUE -> "UNIQUE hit policy violated: rules %s all match".formatted(ruleIds);
+            case ANY -> "ANY hit policy violated: matching rules %s have different outputs".formatted(ruleIds);
+            default -> "%s hit policy violated by rules %s".formatted(hitPolicy, ruleIds);
         });
         this.hitPolicy = hitPolicy;
         this.ruleIds = List.copyOf(ruleIds);
     }
 
+    /** The hit policy that was violated. */
     public HitPolicy getHitPolicy() {
         return hitPolicy;
     }

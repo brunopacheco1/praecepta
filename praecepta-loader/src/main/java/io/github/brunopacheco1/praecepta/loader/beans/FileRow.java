@@ -27,12 +27,9 @@ public class FileRow {
         return values.get(key);
     }
 
+    /** Sets a cell; an empty cell is stored as null. */
     public void set(String key, String value) {
-        if (value != null && !value.isEmpty()) {
-            values.put(key, value);
-        } else {
-            values.put(key, null);
-        }
+        values.put(key, value == null || value.isEmpty() ? null : value);
     }
 
     public Map<String, String> get(Set<String> keys) {

@@ -7,6 +7,7 @@ package io.github.brunopacheco1.praecepta.engine;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -41,6 +42,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
  */
 final class TableAnalysis {
 
+    /** At most this many gaps are reported. */
     static final int MAX_GAPS = 100;
 
     private final BitsetIndex index;
@@ -69,11 +71,12 @@ final class TableAnalysis {
         var pairs = new ArrayList<int[]>();
         for (int bit = 0; bit < index.ruleCount(); bit++) {
             var overlapping = index.overlapping(bit);
+            // only the bits after this one, so each pair is found once
             for (int other = BitsetIndex.next(overlapping, bit + 1); other >= 0; other = BitsetIndex.next(overlapping, other + 1)) {
-                int a = Math.min(index.ruleAt(bit), index.ruleAt(other));
-                int b = Math.max(index.ruleAt(bit), index.ruleAt(other));
-                if (!onlyConflictingOutputs || !Objects.equals(rules.get(a).output(), rules.get(b).output())) {
-                    pairs.add(new int[] {a, b});
+                int first = Math.min(index.ruleAt(bit), index.ruleAt(other));
+                int second = Math.max(index.ruleAt(bit), index.ruleAt(other));
+                if (!onlyConflictingOutputs || !Objects.equals(rules.get(first).output(), rules.get(second).output())) {
+                    pairs.add(new int[] {first, second});
                 }
             }
         }
@@ -93,6 +96,7 @@ final class TableAnalysis {
                 unreachable.add(index.ruleAt(bit)); // matches no valid input at all
                 continue;
             }
+            // only rules with a lower bit win over this one
             BitsetIndex.and(candidates, BitsetIndex.below(index.words(), bit));
             if (!BitsetIndex.isEmpty(candidates) && new CoverSearch(bit).covered(0, candidates)) {
                 unreachable.add(index.ruleAt(bit));
@@ -137,7 +141,7 @@ final class TableAnalysis {
                 var masks = new ArrayList<long[]>();
                 var rest = coversRest[c + 1].clone();
                 for (int k = 0; k < col.classCount(); k++) {
-                    if (!col.empty[k] && col.allowed[k] && BitsetIndex.get(col.masks[k], bit)) {
+                    if (col.canOccur(k) && BitsetIndex.get(col.masks[k], bit)) {
                         masks.add(col.masks[k]);
                         BitsetIndex.and(rest, col.masks[k]);
                     }
@@ -159,16 +163,16 @@ final class TableAnalysis {
             if (coveredStates.contains(state)) {
                 return true;
             }
-            var nexts = new LinkedHashSet<State>(); // classes leading to the same candidates are searched once
+            var nextStates = new LinkedHashSet<State>(); // classes leading to the same candidates are searched once
             for (var mask : acceptedMasks[column]) {
                 var next = candidates.clone();
                 BitsetIndex.and(next, mask);
                 if (BitsetIndex.isEmpty(next)) {
                     return false; // inputs of this class reach the rule
                 }
-                nexts.add(new State(column + 1, next));
+                nextStates.add(new State(column + 1, next));
             }
-            var fewestCandidatesFirst = nexts.stream()
+            var fewestCandidatesFirst = nextStates.stream()
                     .sorted(Comparator.comparingInt((State next) -> BitsetIndex.count(next.candidates())))
                     .toList();
             for (var next : fewestCandidatesFirst) {
@@ -202,7 +206,12 @@ final class TableAnalysis {
 
     // ---- gaps ------------------------------------------------------------------------------------
 
+    /** One column along a gap's path, and the classes it takes there. */
     private record Step(int column, List<Integer> classes) {
+    }
+
+    /** The classes of a column that leave the same candidates, which behave alike from there on. */
+    private record Branch(long[] candidates, List<Integer> classes) {
     }
 
     private List<Issue> gaps() {
@@ -225,21 +234,7 @@ final class TableAnalysis {
         return true;
     }
 
-    /** A column whose declared input values admit no (non-missing) value: then no input exists at all. */
-    private boolean anyColumnWithoutValidValues() {
-        for (int c = 0; c < index.columnCount(); c++) {
-            var col = index.column(c);
-            boolean any = false;
-            for (int k = 0; k < col.classCount() && !any; k++) {
-                any = !col.empty[k] && k != col.nullClass && col.allowed[k];
-            }
-            if (!any) {
-                return true;
-            }
-        }
-        return false;
-    }
-
+    /** Whether some rule does not accept every value of the column. */
     private boolean isConstrained(ColumnIndex col) {
         var all = index.allRules();
         for (int k = 0; k < col.classCount(); k++) {
@@ -250,41 +245,64 @@ final class TableAnalysis {
         return false;
     }
 
+    /** A column whose declared input values admit no (non-missing) value: then no input exists at all. */
+    private boolean anyColumnWithoutValidValues() {
+        for (int c = 0; c < index.columnCount(); c++) {
+            if (!hasValidValue(index.column(c))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasValidValue(ColumnIndex col) {
+        for (int k = 0; k < col.classCount(); k++) {
+            if (k != col.nullClass && col.canOccur(k)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Fixes the classes of {@code column} and the columns after it, depth first, and reports a gap
+     * wherever no candidate is left. {@code path} holds the classes fixed before {@code column}.
+     */
     private void searchGaps(int column, long[] candidates, List<Step> path, List<Issue> gaps) {
         if (gaps.size() >= MAX_GAPS || column == index.columnCount()) {
             return;
         }
-        var col = index.column(column);
-        // classes leading to the same candidates behave identically from here on
-        var groups = new LinkedHashMap<List<Long>, List<Integer>>();
-        var nexts = new LinkedHashMap<List<Long>, long[]>();
-        for (int k = 0; k < col.classCount(); k++) {
-            if (col.empty[k] || k == col.nullClass || !col.allowed[k]) {
-                continue;
-            }
-            var next = candidates.clone();
-            BitsetIndex.and(next, col.masks[k]);
-            var key = key(next);
-            groups.computeIfAbsent(key, x -> new ArrayList<>()).add(k);
-            nexts.putIfAbsent(key, next);
-        }
-        boolean single = groups.size() == 1;
-        for (var group : groups.entrySet()) {
-            var next = nexts.get(group.getKey());
+        var branches = branches(column, candidates);
+        for (var branch : branches) {
             var nextPath = path;
-            if (!single) { // a column that does not discriminate here is left out ("any value")
+            if (branches.size() > 1) { // a column that does not discriminate here is left out ("any value")
                 nextPath = new ArrayList<>(path);
-                nextPath.add(new Step(column, group.getValue()));
+                nextPath.add(new Step(column, branch.classes()));
             }
-            if (BitsetIndex.isEmpty(next)) {
+            if (BitsetIndex.isEmpty(branch.candidates())) {
                 gaps.add(gapIssue(nextPath));
                 if (gaps.size() >= MAX_GAPS) {
                     return;
                 }
             } else {
-                searchGaps(column + 1, next, nextPath, gaps);
+                searchGaps(column + 1, branch.candidates(), nextPath, gaps);
             }
         }
+    }
+
+    /** The column's valid, non-missing classes, grouped by the candidates each leaves, in class order. */
+    private Collection<Branch> branches(int column, long[] candidates) {
+        var col = index.column(column);
+        var byCandidates = new LinkedHashMap<List<Long>, Branch>();
+        for (int k = 0; k < col.classCount(); k++) {
+            if (k == col.nullClass || !col.canOccur(k)) {
+                continue;
+            }
+            var next = candidates.clone();
+            BitsetIndex.and(next, col.masks[k]);
+            byCandidates.computeIfAbsent(key(next), mask -> new Branch(next, new ArrayList<>())).classes().add(k);
+        }
+        return byCandidates.values();
     }
 
     private Issue gapIssue(List<Step> path) {
@@ -297,6 +315,7 @@ final class TableAnalysis {
         return new Issue(Kind.GAP, List.of(), detail, example);
     }
 
+    /** {@code age = 18}, {@code age in [18..65)} or {@code age in {[0..18), [65..+inf)}}. */
     private String describe(Step step) {
         var col = index.column(step.column());
         var parts = col.describe(step.classes());
@@ -304,9 +323,11 @@ final class TableAnalysis {
             return col.name + " in {" + String.join(", ", parts) + "}";
         }
         var only = parts.getFirst();
-        return only.startsWith("(") || only.startsWith("[") ? col.name + " in " + only : col.name + " = " + only;
+        boolean interval = only.startsWith("(") || only.startsWith("[");
+        return interval ? col.name + " in " + only : col.name + " = " + only;
     }
 
+    /** A mask as a map key: arrays compare by identity. */
     private static List<Long> key(long[] mask) {
         return Arrays.stream(mask).boxed().toList();
     }

@@ -28,6 +28,9 @@ final class BitsetIndex {
         Object read(T input, int column);
     }
 
+    /** The result of {@link #match} when no rule matches: a real result always has a bit set. */
+    static final long[] NO_MATCH = new long[0];
+
     private final int ruleCount;
     private final int words;
     private final int[] bitToRule;
@@ -53,9 +56,6 @@ final class BitsetIndex {
         return (rules + 63) >>> 6;
     }
 
-    /** The result of {@link #match} when no rule matches: a real result always has a bit set. */
-    static final long[] NO_MATCH = new long[0];
-
     /**
      * Rules matching {@code input}, as a bitmask (bit order), or {@link #NO_MATCH} if none match. A
      * match is freshly allocated and owned by the caller.
@@ -67,12 +67,12 @@ final class BitsetIndex {
             validate(input, reader, 0);
             return NO_MATCH;
         }
-        var acc = allRules.clone();
+        var matches = allRules.clone();
         for (int c = 0; c < columns.length; c++) {
             var mask = columns[c].maskFor(reader.read(input, c));
             long any = 0;
             for (int w = 0; w < words; w++) {
-                any |= (acc[w] &= mask[w]);
+                any |= (matches[w] &= mask[w]);
             }
             if (any == 0) {
                 // no rule left, but an invalid value further on must still be rejected
@@ -80,10 +80,13 @@ final class BitsetIndex {
                 return NO_MATCH;
             }
         }
-        return acc;
+        return matches;
     }
 
-    /** Checks declared input values (and parsability) for the columns from {@code from} on. */
+    /**
+     * Checks declared input values (and parsability) for the columns from {@code from} on. A STRING
+     * column without declared input values accepts any value, so it is skipped.
+     */
     private <T> void validate(T input, ColumnReader<T> reader, int from) {
         for (int c = from; c < columns.length; c++) {
             if (columns[c].hasAllowedValues || columns[c].type != ColumnType.STRING) {
@@ -108,6 +111,7 @@ final class BitsetIndex {
         return columns[c];
     }
 
+    /** A new mask with every rule's bit set. */
     long[] allRules() {
         return allRules.clone();
     }
@@ -119,20 +123,20 @@ final class BitsetIndex {
 
     /**
      * Rules sharing at least one valid input with the rule owning {@code bit}: per column, the union of
-     * the masks of the (allowed) classes it accepts, intersected across columns.
+     * the masks of the classes it accepts that a valid input can fall in, intersected across columns.
      */
     long[] overlapping(int bit) {
-        var acc = allRules.clone();
+        var overlapping = allRules.clone();
         for (var column : columns) {
             var union = new long[words];
             for (int k = 0; k < column.classCount(); k++) {
-                if (!column.empty[k] && column.allowed[k] && get(column.masks[k], bit)) {
+                if (column.canOccur(k) && get(column.masks[k], bit)) {
                     or(union, column.masks[k]);
                 }
             }
-            and(acc, union);
+            and(overlapping, union);
         }
-        return acc;
+        return overlapping;
     }
 
     // ---- bit helpers ------------------------------------------------------------------------------

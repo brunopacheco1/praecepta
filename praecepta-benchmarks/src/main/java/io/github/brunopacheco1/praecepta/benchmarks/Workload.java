@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
@@ -62,44 +63,46 @@ public final class Workload {
     private static List<Map<String, Object>> noMatch(Table table, List<Map<String, Object>> matching, long seed) {
         var reference = Contender.reference(table);
         var random = new Random(seed + 1);
-        var strings = new ArrayList<String>();
-        var others = new ArrayList<String>();
+        var stringColumns = new ArrayList<String>();
+        var otherColumns = new ArrayList<String>();
         for (int c = 0; c < table.inputs().size(); c++) {
-            (table.types().get(c) == ColumnType.STRING ? strings : others).add(table.inputs().get(c));
+            (table.types().get(c) == ColumnType.STRING ? stringColumns : otherColumns).add(table.inputs().get(c));
         }
         var inputs = new ArrayList<Map<String, Object>>(matching.size());
         for (var original : matching) {
-            var input = new HashMap<>(original);
-            var columns = new ArrayList<String>();
-            Collections.shuffle(strings, random);
-            Collections.shuffle(others, random);
-            columns.addAll(strings);
-            columns.addAll(others);
-            int next = 0;
-            while (!reference.evaluate(input).isEmpty()) {
-                if (next == columns.size()) {
-                    throw new IllegalStateException("A rule of " + table.name() + " matches any input");
-                }
-                var column = columns.get(next++);
-                input.put(column, strings.contains(column) ? new String("unknown") : null);
-            }
-            inputs.add(input);
+            // string columns first, then the others, each group in a new random order
+            Collections.shuffle(stringColumns, random);
+            Collections.shuffle(otherColumns, random);
+            var columns = new ArrayList<>(stringColumns);
+            columns.addAll(otherColumns);
+            inputs.add(unmatched(table, reference, original, columns, stringColumns));
         }
         return List.copyOf(inputs);
+    }
+
+    /**
+     * The input with the values of {@code columns}, in that order, replaced until no rule matches: an
+     * unknown string in a string column, a missing value in any other.
+     */
+    private static Map<String, Object> unmatched(Table table, Contender reference, Map<String, Object> original,
+                                                 List<String> columns, List<String> stringColumns) {
+        var input = new HashMap<>(original);
+        var next = columns.iterator();
+        while (!reference.evaluate(input).isEmpty()) {
+            if (!next.hasNext()) {
+                throw new IllegalStateException("A rule of " + table.name() + " matches any input");
+            }
+            var column = next.next();
+            input.put(column, stringColumns.contains(column) ? new String("unknown") : null);
+        }
+        return input;
     }
 
     /** String tables, with Praecepta's legacy cells ({@code a,b}); unchanged since Phase 0. */
     private static List<Map<String, Object>> strings(Table table, int size, long seed) {
         var domains = new ArrayList<List<String>>();
         for (var column : table.inputs()) {
-            var values = new TreeSet<String>();
-            for (var rule : table.rules()) {
-                var cell = rule.input().values().get(column);
-                if (cell != null && !cell.isBlank()) {
-                    Collections.addAll(values, cell.split(","));
-                }
-            }
-            domains.add(List.copyOf(values));
+            domains.add(stringDomain(table, column));
         }
 
         var random = new Random(seed);
@@ -112,8 +115,7 @@ public final class Workload {
                 var cell = rule.input().values().get(column);
                 String value;
                 if (cell == null || cell.isBlank()) {
-                    var domain = domains.get(c);
-                    value = domain.isEmpty() || random.nextInt(3) == 0 ? null : domain.get(random.nextInt(domain.size()));
+                    value = anyValueOrNull(domains.get(c), random);
                 } else {
                     var options = cell.split(",");
                     value = options[random.nextInt(options.length)];
@@ -123,6 +125,18 @@ public final class Workload {
             inputs.add(input);
         }
         return List.copyOf(inputs);
+    }
+
+    /** Every value the rules list in a string column, sorted. */
+    private static List<String> stringDomain(Table table, String column) {
+        var values = new TreeSet<String>();
+        for (var rule : table.rules()) {
+            var cell = rule.input().values().get(column);
+            if (cell != null && !cell.isBlank()) {
+                Collections.addAll(values, cell.split(","));
+            }
+        }
+        return List.copyOf(values);
     }
 
     /**
@@ -140,17 +154,7 @@ public final class Workload {
             var values = new TreeSet<Comparable<?>>();
             for (int r = 0; r < cells.length; r++) {
                 cells[r][c] = CellParser.parse(table.rules().get(r).input().values().get(table.inputs().get(c)), type);
-                for (var test : tests(cells[r][c])) {
-                    switch (test) {
-                        case Equals e -> addWithNeighbours(values, e.value());
-                        case Compare k -> addWithNeighbours(values, k.value());
-                        case Range g -> {
-                            addWithNeighbours(values, g.low());
-                            addWithNeighbours(values, g.high());
-                        }
-                        case NullTest n -> { }
-                    }
-                }
+                addLiteralsWithNeighbours(values, cells[r][c]);
             }
             domains.add(List.copyOf(values));
         }
@@ -158,19 +162,20 @@ public final class Workload {
         var random = new Random(seed);
         var inputs = new ArrayList<Map<String, Object>>(size);
         for (int i = 0; i < size; i++) {
-            int r = random.nextInt(cells.length);
+            int rule = random.nextInt(cells.length);
             var input = new HashMap<String, Object>();
             for (int c = 0; c < columns; c++) {
-                input.put(table.inputs().get(c), fresh(pick(cells[r][c], domains.get(c), random)));
+                input.put(table.inputs().get(c), fresh(valueSatisfying(cells[rule][c], domains.get(c), random)));
             }
             inputs.add(input);
         }
         return List.copyOf(inputs);
     }
 
-    private static Object pick(UnaryTests cell, List<Comparable<?>> domain, Random random) {
+    /** A value the cell accepts, taken from the column's candidates; for a wildcard, possibly null. */
+    private static Object valueSatisfying(UnaryTests cell, List<Comparable<?>> domain, Random random) {
         return switch (cell) {
-            case UnaryTests.Any any -> domain.isEmpty() || random.nextInt(3) == 0 ? null : domain.get(random.nextInt(domain.size()));
+            case UnaryTests.Any any -> anyValueOrNull(domain, random);
             case UnaryTests.Negated negated -> sample(domain, random, value -> negated.tests().stream().noneMatch(t -> accepts(t, value)));
             case UnaryTests.Positive positive -> {
                 var test = positive.tests().get(random.nextInt(positive.tests().size()));
@@ -183,7 +188,12 @@ public final class Workload {
         };
     }
 
-    private static Comparable<?> sample(List<Comparable<?>> domain, Random random, java.util.function.Predicate<Comparable<?>> accepted) {
+    /** The value for a wildcard: null one time in three, else a random value of the column (null if it has none). */
+    private static <T> T anyValueOrNull(List<T> domain, Random random) {
+        return domain.isEmpty() || random.nextInt(3) == 0 ? null : domain.get(random.nextInt(domain.size()));
+    }
+
+    private static Comparable<?> sample(List<Comparable<?>> domain, Random random, Predicate<Comparable<?>> accepted) {
         for (int attempt = 0; attempt < 100_000; attempt++) {
             var value = domain.get(random.nextInt(domain.size()));
             if (accepted.test(value)) {
@@ -196,20 +206,20 @@ public final class Workload {
     private static boolean accepts(Test test, Comparable<?> value) {
         return switch (test) {
             case NullTest n -> false;
-            case Equals e -> compare(value, e.value()) == 0;
-            case Compare k -> {
-                int cmp = compare(value, k.value());
-                yield switch (k.operator()) {
+            case Equals equals -> compare(value, equals.value()) == 0;
+            case Compare comparison -> {
+                int cmp = compare(value, comparison.value());
+                yield switch (comparison.operator()) {
                     case LT -> cmp < 0;
                     case LE -> cmp <= 0;
                     case GT -> cmp > 0;
                     case GE -> cmp >= 0;
                 };
             }
-            case Range g -> {
-                int low = compare(value, g.low());
-                int high = compare(value, g.high());
-                yield (g.lowClosed() ? low >= 0 : low > 0) && (g.highClosed() ? high <= 0 : high < 0);
+            case Range range -> {
+                int low = compare(value, range.low());
+                int high = compare(value, range.high());
+                yield (range.lowClosed() ? low >= 0 : low > 0) && (range.highClosed() ? high <= 0 : high < 0);
             }
         };
     }
@@ -220,6 +230,20 @@ public final class Workload {
             case UnaryTests.Positive positive -> positive.tests();
             case UnaryTests.Negated negated -> negated.tests();
         };
+    }
+
+    private static void addLiteralsWithNeighbours(TreeSet<Comparable<?>> values, UnaryTests cell) {
+        for (var test : tests(cell)) {
+            switch (test) {
+                case Equals equals -> addWithNeighbours(values, equals.value());
+                case Compare comparison -> addWithNeighbours(values, comparison.value());
+                case Range range -> {
+                    addWithNeighbours(values, range.low());
+                    addWithNeighbours(values, range.high());
+                }
+                case NullTest nullTest -> { }
+            }
+        }
     }
 
     private static void addWithNeighbours(TreeSet<Comparable<?>> values, Comparable<?> value) {
