@@ -12,6 +12,8 @@ import java.util.Map;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
@@ -160,6 +162,15 @@ class PraeceptaEngineBehaviourTest {
         @Test
         void rules_may_not_test_unbound_columns() {
             var builder = byColumn(HitPolicy.FIRST, rule(7, Map.of("country", "PT", "age", "18"), "A"));
+            Assertions.assertThatThrownBy(builder::build)
+                    .isExactlyInstanceOf(InvalidDecisionTableException.class)
+                    .hasMessage("Rule 7 tests column 'age', which has no declared input");
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @ValueSource(strings = {"18", "\"18\"", "> 18", "<= 18", "[18..65]", "not(> 18)", "\"18"})
+        void rules_may_not_test_unbound_columns_whatever_the_cell(String cell) {
+            var builder = byColumn(HitPolicy.FIRST, rule(7, Map.of("country", "PT", "age", cell), "A"));
             Assertions.assertThatThrownBy(builder::build)
                     .isExactlyInstanceOf(InvalidDecisionTableException.class)
                     .hasMessage("Rule 7 tests column 'age', which has no declared input");

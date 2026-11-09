@@ -360,11 +360,23 @@ public final class PraeceptaEngine<I, O> {
         for (var rule : rules) {
             for (var cell : rule.input().values().entrySet()) {
                 var column = cell.getKey();
-                if (!declared.contains(column) && !(CellParser.parse(cell.getValue(), ColumnType.STRING) instanceof UnaryTests.Any)) {
+                if (!declared.contains(column) && !isWildcard(cell.getValue())) {
                     throw new InvalidDecisionTableException("Rule %s tests column '%s', which has no declared input"
                             .formatted(rule.priority(), column));
                 }
             }
+        }
+    }
+
+    /**
+     * Whether a cell matches any value. The column has no type to parse the cell with, and a cell that is
+     * not even valid as text (a comparison, an interval) still tests the column, so it is no wildcard.
+     */
+    private static boolean isWildcard(String cell) {
+        try {
+            return CellParser.parse(cell, ColumnType.STRING) instanceof UnaryTests.Any;
+        } catch (CellSyntaxException e) {
+            return false;
         }
     }
 
