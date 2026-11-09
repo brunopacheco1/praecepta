@@ -257,6 +257,12 @@ final class TckRunner {
         if (REFERENCE.matcher(message).find()) {
             return "cells that compare with another input (#51)";
         }
+        if (message.contains("is a structured item definition")) {
+            return "columns of a structured type";
+        }
+        if (message.contains("is a collection")) {
+            return "list inputs (#25)";
+        }
         if (message.contains("has a time zone")) {
             return "times and date-times with a time zone";
         }
@@ -271,8 +277,7 @@ final class TckRunner {
         return switch (local) {
             case "dayTimeDuration", "yearMonthDuration", "duration", "days and time duration", "years and months duration" ->
                     "duration columns (#52)";
-            default -> local.length() > 1 && local.startsWith("t") && Character.isUpperCase(local.charAt(1))
-                    ? "columns typed by an item definition (#54)" : local + " columns";
+            default -> local + " columns";
         };
     }
 }

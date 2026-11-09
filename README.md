@@ -182,7 +182,8 @@ var engine = PraeceptaEngine.<Customer, String>builder()
 
 Supported: input expressions that name a variable, including FEEL names with spaces (`age`,
 `customer.age`, `Credit Score`); `string`, `number` (`integer`, `long`, `double`), `date`,
-`boolean`, `time` and `dateTime` columns; input entries in the cell syntax above, as strict FEEL
+`boolean`, `time` and `dateTime` columns, or an item definition of one of them (such as a `string`
+with allowed values, which become the input value list); input entries in the cell syntax above, as strict FEEL
 (strings quoted, since an unquoted word is a reference to another variable, and dates and times
 written with `date(...)`, `time(...)` and `date and time(...)`); literal output
 entries; every hit policy, with SUM, MIN and MAX aggregation. Anything else (durations, times with a

@@ -15,6 +15,11 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 - **Independently verified reproducible builds:** [Reproducible Central](https://github.com/jvm-repo-rebuild/reproducible-central)
   rebuilds Praecepta's releases and checks them against Maven Central; 0.2.0 matches bit for bit (14 of
   14 artifacts). Its badge is in the README and on the website.
+- **Columns typed by an item definition** ([#54](https://github.com/brunopacheco1/praecepta/issues/54)):
+  `DmnReader` reads columns whose `typeRef` names one of the model's item definitions, such as
+  `tBureauCallType`, a `string` with the allowed values `"FULL","MINI","NONE"`. The column takes
+  the base type, and the allowed values become its input value list unless the input declares its
+  own. Item definitions may build on one another; structured types and collections are still rejected.
 
 ### Changed
 - **Releases keep the build timestamp committed in the tag** (`project.build.outputTimestamp`), so

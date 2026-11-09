@@ -197,6 +197,102 @@ class DmnReaderTest {
         Assertions.assertThat(DmnReader.read(stream(DmnWriter.write(table))).inputs()).isEqualTo(table.inputs());
     }
 
+    @Test
+    void columns_typed_by_an_item_definition_take_its_base_type_and_allowed_values() {
+        var xml = """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <itemDefinition name="tBureauCallType">
+                    <typeRef>string</typeRef>
+                    <allowedValues><text>"FULL","MINI","NONE"</text></allowedValues>
+                  </itemDefinition>
+                  <itemDefinition name="tEligibility">
+                    <typeRef>string</typeRef>
+                    <allowedValues><text>"INELIGIBLE","ELIGIBLE"</text></allowedValues>
+                  </itemDefinition>
+                  <itemDefinition name="tScore">
+                    <typeRef>number</typeRef>
+                    <allowedValues><text>[0..999]</text></allowedValues>
+                  </itemDefinition>
+                  <itemDefinition name="tCreditScore"><typeRef>tScore</typeRef></itemDefinition>
+                  <itemDefinition name="tStrategy" isCollection="false"><typeRef>feel:string</typeRef></itemDefinition>
+                  <decision id="s" name="Strategy"><decisionTable>
+                    <input><inputExpression typeRef="tBureauCallType"><text>Bureau call type</text></inputExpression></input>
+                    <input><inputExpression typeRef="tEligibility"><text>Eligibility</text></inputExpression>
+                      <inputValues><text>"ELIGIBLE"</text></inputValues></input>
+                    <input><inputExpression typeRef="tCreditScore"><text>Credit score</text></inputExpression></input>
+                    <output name="Strategy" typeRef="tStrategy"/>
+                    <rule><inputEntry><text>"FULL","MINI"</text></inputEntry><inputEntry><text>-</text></inputEntry>
+                      <inputEntry><text>&gt;= 600</text></inputEntry><outputEntry><text>"BUREAU"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""";
+        var table = DmnReader.read(stream(xml));
+
+        Assertions.assertThat(table.inputs()).containsExactly(
+                new InputColumn("Bureau call type", ColumnType.STRING, "\"FULL\",\"MINI\",\"NONE\""), // the type's allowed values
+                new InputColumn("Eligibility", ColumnType.STRING, "\"ELIGIBLE\""), // the input's own value list wins
+                new InputColumn("Credit score", ColumnType.NUMBER, "[0..999]")); // inherited from the base item definition
+        Assertions.assertThat(table.outputs()).containsExactly(new OutputColumn("Strategy", ColumnType.STRING));
+
+        var engine = PraeceptaEngine.<Map<String, String>, String>builder()
+                .table(table)
+                .inputs(PraeceptaInput::new)
+                .output(output -> output.values().get("Strategy"))
+                .build();
+        Assertions.assertThat(engine.evaluate(Map.of("Bureau call type", "MINI", "Eligibility", "ELIGIBLE", "Credit score", "700")))
+                .containsExactly("BUREAU");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("Bureau call type", "OTHER")))
+                .isInstanceOf(InvalidInputException.class);
+        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("Credit score", "1000")))
+                .isInstanceOf(InvalidInputException.class);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "structured type      | <itemDefinition name=\"tT\"><itemComponent name=\"a\"><typeRef>string</typeRef></itemComponent></itemDefinition> "
+                    + "| type 'tT' is a structured item definition",
+            "collection           | <itemDefinition name=\"tT\" isCollection=\"true\"><typeRef>string</typeRef></itemDefinition> "
+                    + "| type 'tT' is a collection",
+            "no base type         | <itemDefinition name=\"tT\"/> | type 'tT' is not supported; its item definition has no base type",
+            "unsupported base     | <itemDefinition name=\"tT\"><typeRef>dayTimeDuration</typeRef></itemDefinition> "
+                    + "| type 'dayTimeDuration' is not supported",
+            "defined by itself    | <itemDefinition name=\"tT\"><typeRef>tU</typeRef></itemDefinition><itemDefinition name=\"tU\"><typeRef>tT</typeRef></itemDefinition> "
+                    + "| item definition 'tT' is defined in terms of itself",
+            "invalid allowed list | <itemDefinition name=\"tT\"><typeRef>number</typeRef><allowedValues><text>\"high\"</text></allowedValues></itemDefinition> "
+                    + "| input 'a', allowed values of type 'tT'",
+            "undefined type       | <itemDefinition name=\"tU\"><typeRef>string</typeRef></itemDefinition> | type 'tT' is not supported",
+    })
+    void unsupported_item_definitions_are_rejected(String description, String itemDefinitions, String message) {
+        var xml = """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  %s
+                  <decision id="t" name="t"><decisionTable>
+                    <input><inputExpression typeRef="tT"><text>a</text></inputExpression></input>
+                    <output name="result" typeRef="string"/>
+                  </decisionTable></decision>
+                </definitions>""".formatted(itemDefinitions);
+        Assertions.assertThatThrownBy(() -> DmnReader.read(stream(xml)))
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessageContaining("Decision 't', input 'a'")
+                .hasMessageContaining(message);
+    }
+
+    @Test
+    void long_chains_of_item_definitions_are_resolved_without_a_stack_overflow() {
+        var chain = new StringBuilder("<itemDefinition name=\"t0\"><typeRef>number</typeRef></itemDefinition>");
+        for (int i = 1; i <= 100_000; i++) {
+            chain.append("<itemDefinition name=\"t%d\"><typeRef>t%d</typeRef></itemDefinition>".formatted(i, i - 1));
+        }
+        var xml = """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  %s
+                  <decision id="t" name="t"><decisionTable>
+                    <input><inputExpression typeRef="t100000"><text>a</text></inputExpression></input>
+                    <output name="result" typeRef="string"/>
+                  </decisionTable></decision>
+                </definitions>""".formatted(chain);
+        Assertions.assertThat(DmnReader.read(stream(xml)).inputs()).containsExactly(new InputColumn("a", ColumnType.NUMBER));
+    }
+
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
             "age                          | true",
