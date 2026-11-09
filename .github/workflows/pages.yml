@@ -87,6 +87,7 @@ jobs:
           coverage=$(jq -r .coverage site/badges.json)
           codeql=$(jq -r .codeql site/badges.json)
           reuse=$(jq -r .reuse site/badges.json)
+          reproducible=$(jq -r .reproducible site/badges.json)
           sonar=https://sonarcloud.io/api
           if status=$(curl -fsS --max-time 20 "$sonar/qualitygates/project_status?projectKey=brunopacheco1_praecepta"); then
             case "$(jq -r '.projectStatus.status // empty' <<< "$status")" in OK) gate=passed ;; ERROR) gate=failing ;; esac
@@ -104,7 +105,16 @@ jobs:
           if lint=$(curl -fsS --max-time 20 https://api.reuse.software/status/github.com/brunopacheco1/praecepta); then
             case "$(jq -r '.status // empty' <<< "$lint")" in compliant) reuse=compliant ;; non-compliant) reuse=failing ;; esac
           fi
+          # Reproducible Builds: Reproducible Central's independent rebuild, compared with Maven Central
+          if rb=$(curl -fsS --max-time 20 https://raw.githubusercontent.com/jvm-repo-rebuild/reproducible-central/master/content/io/github/brunopacheco1/praecepta/badge.json); then
+            value=$(jq -r '.message // empty' <<< "$rb")
+            [[ "$value" =~ ^[0-9]+/[0-9]+$ ]] && reproducible="$value"
+          fi
           [[ "$coverage" =~ ^[0-9]+(\.[0-9]+)?$ ]] || coverage=0
+          [[ "$reproducible" =~ ^[0-9]+/[0-9]+$ ]] || reproducible=0/0
+          reproducible_ok=${reproducible%/*}
+          reproducible_all=${reproducible#*/}
+          reproducible_state=$(awk -v ok="$reproducible_ok" -v all="$reproducible_all" 'BEGIN { print (all > 0 && ok == all ? "ok" : "failing") }')
           state() { [ "$1" = failing ] && echo failing || echo ok; }
           coverage_state=$(awk -v c="$coverage" 'BEGIN { print (c >= 80 ? "ok" : "failing") }')
           {
@@ -119,6 +129,9 @@ jobs:
             echo "REUSE=${reuse^^}"
             echo "REUSE_NAME=${reuse^}"
             echo "REUSE_STATE=$(state "$reuse")"
+            echo "REPRODUCIBLE_OK=$reproducible_ok"
+            echo "REPRODUCIBLE_ALL=$reproducible_all"
+            echo "REPRODUCIBLE_STATE=$reproducible_state"
           } | tr -cd 'A-Za-z0-9._%=\n' >> "$GITHUB_ENV"
           {
             echo "BP_METAL=$bp_metal"
@@ -141,7 +154,9 @@ jobs:
             -e "s/@GATE_STATE@/${GATE_STATE}/g" -e "s/@GATE_NAME@/${GATE_NAME}/g" -e "s/@GATE@/${GATE}/g" \
             -e "s/@COVERAGE_STATE@/${COVERAGE_STATE}/g" -e "s/@COVERAGE@/${COVERAGE}/g" \
             -e "s/@CODEQL_STATE@/${CODEQL_STATE}/g" -e "s/@CODEQL_NAME@/${CODEQL_NAME}/g" -e "s/@CODEQL@/${CODEQL}/g" \
-            -e "s/@REUSE_STATE@/${REUSE_STATE}/g" -e "s/@REUSE_NAME@/${REUSE_NAME}/g" -e "s/@REUSE@/${REUSE}/g" _site/index.html
+            -e "s/@REUSE_STATE@/${REUSE_STATE}/g" -e "s/@REUSE_NAME@/${REUSE_NAME}/g" -e "s/@REUSE@/${REUSE}/g" \
+            -e "s/@REPRODUCIBLE_STATE@/${REPRODUCIBLE_STATE}/g" -e "s/@REPRODUCIBLE_OK@/${REPRODUCIBLE_OK}/g" \
+            -e "s/@REPRODUCIBLE_ALL@/${REPRODUCIBLE_ALL}/g" _site/index.html
           cp -R ../release/praecepta-engine/target/reports/apidocs _site/api/engine
           cp -R ../release/praecepta-loader/target/reports/apidocs _site/api/loader
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0

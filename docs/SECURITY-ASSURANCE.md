@@ -28,7 +28,9 @@ data and needs no configuration.
   effects and allocates little.
 - **Code the Maven plugin generates is safe to compile:** table, column and value names become
   sanitised Java identifiers, and text copied into string literals or comments cannot break out of them.
-- **Releases are authentic:** signed, with build provenance, an SBOM and reproducible archives.
+- **Releases are authentic:** signed, with SLSA Build Level 2 provenance and an SBOM, and reproducible:
+  [Reproducible Central](https://github.com/jvm-repo-rebuild/reproducible-central/blob/master/content/io/github/brunopacheco1/praecepta/README.md) rebuilds each release independently and checks it is bit-for-bit
+  identical to Maven Central.
 
 **Users cannot expect (out of scope):**
 - **Protection from a malicious table's logic.** A table decides what the application does with
@@ -94,7 +96,7 @@ data and needs no configuration.
 - **Static analysis:** CodeQL and SonarCloud on every pull request, with SonarCloud as a required
   quality gate; compiler warnings fail the build; Checkstyle enforces the code style.
 - **Supply chain:** signed commits and releases, build provenance, CycloneDX SBOMs, reproducible
-  archives, pinned workflow actions, least-privilege workflow tokens, OpenSSF Scorecard.
+  builds verified independently by Reproducible Central, pinned workflow actions, least-privilege workflow tokens, OpenSSF Scorecard.
 - **Process:** the OpenSSF Best Practices badge
   ([project 16426](https://www.bestpractices.dev/projects/16426)), a private vulnerability
   reporting channel, and a security policy with response times ([SECURITY.md](../SECURITY.md)).

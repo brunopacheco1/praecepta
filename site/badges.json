@@ -5,5 +5,6 @@
   "quality_gate": "passed",
   "coverage": 91.9,
   "codeql": "passing",
-  "reuse": "compliant"
+  "reuse": "compliant",
+  "reproducible": "14/14"
 }
