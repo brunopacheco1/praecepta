@@ -8,6 +8,8 @@ package io.github.brunopacheco1.praecepta.engine;
 import java.util.Arrays;
 import java.util.List;
 
+import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 
 /**
  * Matches inputs against all rules at once with bitmasks. Each rule owns one bit; each column
@@ -51,16 +53,19 @@ final class BitsetIndex {
         return (rules + 63) >>> 6;
     }
 
+    /** The result of {@link #match} when no rule matches: a real result always has a bit set. */
+    static final long[] NO_MATCH = new long[0];
+
     /**
-     * Rules matching {@code input}, as a bitmask (bit order), or {@code null} if none match. The
-     * returned array is freshly allocated and owned by the caller.
+     * Rules matching {@code input}, as a bitmask (bit order), or {@link #NO_MATCH} if none match. A
+     * match is freshly allocated and owned by the caller.
      *
      * @throws InvalidInputException if a value is outside its column's declared input values
      */
     <T> long[] match(T input, ColumnReader<T> reader) {
         if (words == 0) {
             validate(input, reader, 0);
-            return null;
+            return NO_MATCH;
         }
         var acc = allRules.clone();
         for (int c = 0; c < columns.length; c++) {
@@ -72,7 +77,7 @@ final class BitsetIndex {
             if (any == 0) {
                 // no rule left, but an invalid value further on must still be rejected
                 validate(input, reader, c + 1);
-                return null;
+                return NO_MATCH;
             }
         }
         return acc;
@@ -81,7 +86,7 @@ final class BitsetIndex {
     /** Checks declared input values (and parsability) for the columns from {@code from} on. */
     private <T> void validate(T input, ColumnReader<T> reader, int from) {
         for (int c = from; c < columns.length; c++) {
-            if (columns[c].hasAllowedValues || columns[c].type != io.github.brunopacheco1.praecepta.engine.beans.ColumnType.STRING) {
+            if (columns[c].hasAllowedValues || columns[c].type != ColumnType.STRING) {
                 columns[c].maskFor(reader.read(input, c));
             }
         }

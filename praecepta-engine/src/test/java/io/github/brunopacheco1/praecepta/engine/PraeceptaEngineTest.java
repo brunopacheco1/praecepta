@@ -210,21 +210,24 @@ class PraeceptaEngineTest {
 
         @Test
         void priority_policies_require_output_value_lists() {
-            Assertions.assertThatThrownBy(() -> engine(HitPolicy.PRIORITY).build())
+            var builder = engine(HitPolicy.PRIORITY);
+            Assertions.assertThatThrownBy(builder::build)
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("outputPriority");
         }
 
         @Test
         void outputs_missing_from_the_priority_list_are_rejected() {
-            Assertions.assertThatThrownBy(() -> engine(HitPolicy.PRIORITY).outputPriority("grade", List.of("A")).build())
+            var builder = engine(HitPolicy.PRIORITY).outputPriority("grade", List.of("A"));
+            Assertions.assertThatThrownBy(builder::build)
                     .isInstanceOf(InvalidDecisionTableException.class)
                     .hasMessageContaining("grade=B");
         }
 
         @Test
         void aggregation_requires_collect() {
-            Assertions.assertThatThrownBy(() -> engine(HitPolicy.FIRST).aggregation(AggregationOperator.SUM).build())
+            var builder = engine(HitPolicy.FIRST).aggregation(AggregationOperator.SUM);
+            Assertions.assertThatThrownBy(builder::build)
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("COLLECT");
         }

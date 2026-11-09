@@ -96,7 +96,7 @@ public final class DmnReader {
     }
 
     private static DecisionTable decisionTable(Element decision, ItemDefinitions types) {
-        var name = decision.getAttribute("name").isBlank() ? decision.getAttribute("id") : decision.getAttribute("name");
+        var name = nameOr(decision, "id");
         var table = child(decision, "decisionTable");
         var where = "Decision '" + name + "'";
 
@@ -141,7 +141,7 @@ public final class DmnReader {
     }
 
     private static OutputColumn outputColumn(Element output, String unnamed, ItemDefinitions types, String where) {
-        var column = output.getAttribute("name").isBlank() ? output.getAttribute("label") : output.getAttribute("name");
+        var column = nameOr(output, "label");
         if (column.isBlank()) {
             column = unnamed;
         }
@@ -154,12 +154,12 @@ public final class DmnReader {
         if (valueList == null || textOf(valueList).isBlank()) {
             return new OutputColumn(column, type, List.of());
         }
-        var tests = parse(textOf(valueList), type, outputWhere + " value list");
-        if (!(tests instanceof UnaryTests.Positive positive)
-                || !positive.tests().stream().allMatch(UnaryTests.Equals.class::isInstance)) {
+        var valueTests = parse(textOf(valueList), type, outputWhere + " value list");
+        if (!(valueTests instanceof UnaryTests.Positive(var tests))
+                || !tests.stream().allMatch(UnaryTests.Equals.class::isInstance)) {
             throw new InvalidDecisionTableException(outputWhere + ": the output value list must be a list of values");
         }
-        var values = positive.tests().stream().map(test -> FeelLiterals.text(((UnaryTests.Equals) test).value())).toList();
+        var values = tests.stream().map(test -> FeelLiterals.text(((UnaryTests.Equals) test).value())).toList();
         return new OutputColumn(column, type, values);
     }
 
@@ -418,6 +418,11 @@ public final class DmnReader {
             }
         }
         return elements;
+    }
+
+    /** The element's {@code name} attribute, or its {@code fallback} attribute if it has no name. */
+    private static String nameOr(Element element, String fallback) {
+        return element.getAttribute(element.getAttribute("name").isBlank() ? fallback : "name");
     }
 
     private static Element child(Element parent, String localName) {

@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Issue;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
@@ -95,68 +96,29 @@ public final class PraeceptaEngine<I, O> {
     private final BinaryOperator<O> reduce;
     private final ValidationReport report;
 
-    @SuppressWarnings("unchecked")
     private PraeceptaEngine(Builder<I, O> builder) {
         hitPolicy = builder.hitPolicy;
         var rules = List.copyOf(builder.rules);
 
-        // columns and their types
-        var types = new LinkedHashMap<String, ColumnType>();
-        var allowedValues = new LinkedHashMap<>(builder.allowedValues);
-        if (builder.inputStrategy == null) {
-            builder.extractors.forEach((column, binding) -> types.put(column, binding.type()));
-            rejectUndeclaredColumns(rules, types.keySet());
-            // an enum is a closed set of values: it is the column's input value list unless one is declared
-            builder.extractors.forEach((column, binding) -> {
-                if (binding.enumValues() != null) {
-                    allowedValues.putIfAbsent(column, quotedList(List.of(binding.enumValues())));
-                }
-            });
-        } else {
-            if (builder.tableTypes != null) {
-                types.putAll(builder.tableTypes);
-            }
-            columnsUsedBy(rules).forEach(column -> types.putIfAbsent(column, ColumnType.STRING));
-            builder.allowedValues.keySet().forEach(column -> types.putIfAbsent(column, ColumnType.STRING));
-            types.putAll(builder.columnTypes);
-        }
-        for (var column : allowedValues.keySet()) {
-            if (!types.containsKey(column)) {
-                throw new InvalidDecisionTableException("Input values declared for unknown column '%s'".formatted(column));
-            }
-        }
+        var types = columnTypes(builder, rules);
+        var allowedValues = allowedValues(builder, types.keySet());
         inputs = List.copyOf(types.keySet());
         var cells = parseCells(rules, types);
         var evaluationOrder = orderByWildcards(inputs, cells);
 
-        // Bit order makes "lowest set bit" the winner: rule order, or priority order (ties keep rule order).
-        var ranks = builder.outputPriority.isEmpty() ? null : priorityRanks(rules, builder.outputPriority);
-        int[] bitToRule = java.util.stream.IntStream.range(0, rules.size()).boxed()
-                .sorted(ranks == null ? Comparator.naturalOrder() : Comparator.comparingInt((Integer r) -> ranks[r]))
-                .mapToInt(Integer::intValue)
-                .toArray();
+        int[] bitToRule = bitToRule(rules, builder.outputPriority);
         int words = BitsetIndex.wordsFor(rules.size());
+        var enumValues = enumValuesByColumn(builder.extractors);
         var columnIndexes = evaluationOrder.stream()
-                .map(column -> new ColumnIndex(column, types.get(column),
-                        Arrays.stream(bitToRule).mapToObj(rule -> cells.get(column).get(rule)).toList(),
-                        allowedTests(column, types.get(column), allowedValues.get(column)), words,
-                        builder.inputStrategy == null ? builder.extractors.get(column).enumValues() : null))
+                .map(column -> new ColumnIndex(column, types.get(column), inBitOrder(cells.get(column), bitToRule),
+                        allowedTests(column, types.get(column), allowedValues.get(column)), words, enumValues.get(column)))
                 .toList();
         index = new BitsetIndex(columnIndexes, bitToRule);
 
         inputStrategy = builder.inputStrategy;
         // readers return raw values; each column converts them (see ColumnIndex#maskFor)
-        var names = evaluationOrder.toArray(String[]::new);
-        if (inputStrategy == null) {
-            Function<? super I, ?>[] byColumn = evaluationOrder.stream()
-                    .map(column -> builder.extractors.get(column).extractor())
-                    .toArray(Function[]::new);
-            extractorReader = (input, column) -> byColumn[column].apply(input);
-            mapReader = null;
-        } else {
-            mapReader = (values, column) -> values.get(names[column]);
-            extractorReader = null;
-        }
+        extractorReader = inputStrategy == null ? extractorReader(builder.extractors, evaluationOrder) : null;
+        mapReader = inputStrategy == null ? null : mapReader(evaluationOrder);
 
         int n = rules.size();
         outputByBit = new Object[n];
@@ -173,16 +135,24 @@ public final class PraeceptaEngine<I, O> {
         }
         sameOutputsByBit = hitPolicy == HitPolicy.ANY ? sameOutputMasks(rules, bitToRule, index.words()) : null;
         reduce = reducer(builder.aggregation, builder.outputStrategy);
+        report = validate(index, rules, hitPolicy, builder.failOn);
+    }
 
-        report = new ValidationReport(TableAnalysis.analyse(index, rules, hitPolicy).stream()
+    /**
+     * Runs the static analysis, most severe findings first. Fails if a finding is at least as severe
+     * as {@code failOn}; otherwise logs the findings as a warning.
+     */
+    private static ValidationReport validate(BitsetIndex index, List<Praeceptum> rules, HitPolicy hitPolicy, Severity failOn) {
+        var report = new ValidationReport(TableAnalysis.analyse(index, rules, hitPolicy).stream()
                 .sorted(Comparator.comparing(Issue::severity).reversed())
                 .toList());
-        if (builder.failOn != null && report.hasIssuesAtLeast(builder.failOn)) {
+        if (failOn != null && report.hasIssuesAtLeast(failOn)) {
             throw new InvalidDecisionTableException(report);
         }
         if (!report.isEmpty()) {
             LOG.log(Level.WARNING, "Decision table has {0} validation issue(s):\n{1}", report.issues().size(), report);
         }
+        return report;
     }
 
     public static <I, O> Builder<I, O> builder() {
@@ -204,7 +174,7 @@ public final class PraeceptaEngine<I, O> {
         long[] matches = inputStrategy == null
                 ? index.match(input, extractorReader)
                 : index.match(inputStrategy.transform(input).values(), mapReader);
-        if (matches == null) {
+        if (matches.length == 0) {
             return List.of();
         }
         return switch (hitPolicy) {
@@ -268,6 +238,21 @@ public final class PraeceptaEngine<I, O> {
 
     // ---- hit policies ----------------------------------------------------------------------
 
+    /**
+     * The rule at each bit. The lowest set bit wins, so bits follow rule order or, with output
+     * priorities, priority order (ties keep rule order).
+     */
+    private static int[] bitToRule(List<Praeceptum> rules, Map<String, List<String>> outputPriority) {
+        if (outputPriority.isEmpty()) {
+            return IntStream.range(0, rules.size()).toArray();
+        }
+        var ranks = priorityRanks(rules, outputPriority);
+        return IntStream.range(0, rules.size()).boxed()
+                .sorted(Comparator.comparingInt(rule -> ranks[rule])) // stable: ties keep rule order
+                .mapToInt(Integer::intValue)
+                .toArray();
+    }
+
     private static long[][] sameOutputMasks(List<Praeceptum> rules, int[] bitToRule, int words) {
         var byOutput = new HashMap<Object, long[]>();
         for (int bit = 0; bit < bitToRule.length; bit++) {
@@ -321,6 +306,57 @@ public final class PraeceptaEngine<I, O> {
 
     // ---- columns -----------------------------------------------------------------------------
 
+    /**
+     * The type of each column. Bound columns carry their own, and rules may test no other column. With
+     * an {@link InputStrategy}, the columns are the table's, those the rules test and those with input
+     * values (STRING unless the table says otherwise), then {@code columnType(...)} overrides.
+     */
+    private static Map<String, ColumnType> columnTypes(Builder<?, ?> builder, List<Praeceptum> rules) {
+        var types = new LinkedHashMap<String, ColumnType>();
+        if (builder.inputStrategy == null) {
+            builder.extractors.forEach((column, binding) -> types.put(column, binding.type()));
+            rejectUndeclaredColumns(rules, types.keySet());
+            return types;
+        }
+        if (builder.tableTypes != null) {
+            types.putAll(builder.tableTypes);
+        }
+        columnsUsedBy(rules).forEach(column -> types.putIfAbsent(column, ColumnType.STRING));
+        builder.allowedValues.keySet().forEach(column -> types.putIfAbsent(column, ColumnType.STRING));
+        types.putAll(builder.columnTypes);
+        return types;
+    }
+
+    /**
+     * The input value list of each column: the declared ones and, for an enum-bound column without
+     * one, its constants. An enum is a closed set of values.
+     */
+    private static Map<String, String> allowedValues(Builder<?, ?> builder, Set<String> columns) {
+        var allowedValues = new LinkedHashMap<>(builder.allowedValues);
+        builder.extractors.forEach((column, binding) -> {
+            if (binding.enumValues() != null) {
+                allowedValues.putIfAbsent(column, quotedList(binding.enumValues()));
+            }
+        });
+        for (var column : allowedValues.keySet()) {
+            if (!columns.contains(column)) {
+                throw new InvalidDecisionTableException("Input values declared for unknown column '%s'".formatted(column));
+            }
+        }
+        return allowedValues;
+    }
+
+    /** For each enum-bound column, each constant's value by ordinal. */
+    private static Map<String, String[]> enumValuesByColumn(Map<String, ? extends Builder.Binding<?>> bindings) {
+        var byColumn = new HashMap<String, String[]>();
+        bindings.forEach((column, binding) -> {
+            if (binding.enumValues() != null) {
+                byColumn.put(column, binding.enumValues().toArray(String[]::new));
+            }
+        });
+        return byColumn;
+    }
+
     private static List<String> columnsUsedBy(List<Praeceptum> rules) {
         var columns = new TreeSet<String>();
         rules.forEach(rule -> columns.addAll(rule.input().values().keySet()));
@@ -351,6 +387,11 @@ public final class PraeceptaEngine<I, O> {
         return cells;
     }
 
+    /** A column's cells, from rule order to bit order. */
+    private static List<UnaryTests> inBitOrder(List<UnaryTests> cellsByRule, int[] bitToRule) {
+        return Arrays.stream(bitToRule).mapToObj(cellsByRule::get).toList();
+    }
+
     private static String quotedList(List<String> values) {
         return values.stream()
                 .map(value -> "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
@@ -367,8 +408,8 @@ public final class PraeceptaEngine<I, O> {
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException("Input values of column '%s': %s".formatted(column, e.getMessage()));
         }
-        if (type == ColumnType.STRING && !(tests instanceof UnaryTests.Positive positive
-                && positive.tests().stream().allMatch(UnaryTests.Equals.class::isInstance))) {
+        if (type == ColumnType.STRING && !(tests instanceof UnaryTests.Positive(var alternatives)
+                && alternatives.stream().allMatch(UnaryTests.Equals.class::isInstance))) {
             throw new InvalidDecisionTableException("Input values of string column '%s' must be a list of values".formatted(column));
         }
         return tests;
@@ -389,6 +430,24 @@ public final class PraeceptaEngine<I, O> {
                 .toList();
     }
 
+    // ---- input readers -------------------------------------------------------------------------
+
+    /** Reads a column, by its position in the evaluation order, with its bound getter. */
+    @SuppressWarnings("unchecked") // a generic array cannot be created otherwise
+    private static <I> BitsetIndex.ColumnReader<I> extractorReader(Map<String, Builder.Binding<I>> bindings,
+                                                                   List<String> evaluationOrder) {
+        Function<? super I, ?>[] byColumn = evaluationOrder.stream()
+                .map(column -> bindings.get(column).extractor())
+                .toArray(Function[]::new);
+        return (input, column) -> byColumn[column].apply(input);
+    }
+
+    /** Reads a column, by its position in the evaluation order, from the input's map of values. */
+    private static BitsetIndex.ColumnReader<Map<String, String>> mapReader(List<String> evaluationOrder) {
+        var names = evaluationOrder.toArray(String[]::new);
+        return (values, column) -> values.get(names[column]);
+    }
+
     // ---- builder -------------------------------------------------------------------------------
 
     /**
@@ -397,8 +456,10 @@ public final class PraeceptaEngine<I, O> {
      */
     public static final class Builder<I, O> {
         /** @param enumValues for an enum-bound column, each constant's value by ordinal; else null */
-        private record Binding<I>(ColumnType type, Function<? super I, ?> extractor, String[] enumValues) {
+        private record Binding<I>(ColumnType type, Function<? super I, ?> extractor, List<String> enumValues) {
         }
+
+        private static final String COLUMN = "column";
 
         private HitPolicy hitPolicy;
         private AggregationOperator aggregation;
@@ -504,7 +565,7 @@ public final class PraeceptaEngine<I, O> {
                                                             Function<? super I, E> extractor) {
             Objects.requireNonNull(type, "type");
             Objects.requireNonNull(value, "value");
-            var values = Arrays.stream(type.getEnumConstants()).map(value).toArray(String[]::new);
+            var values = Arrays.stream(type.getEnumConstants()).map(value).toList();
             return bind(column, ColumnType.STRING, extractor, values);
         }
 
@@ -512,8 +573,8 @@ public final class PraeceptaEngine<I, O> {
             return bind(column, type, extractor, null);
         }
 
-        private Builder<I, O> bind(String column, ColumnType type, Function<? super I, ?> extractor, String[] enumValues) {
-            Objects.requireNonNull(column, "column");
+        private Builder<I, O> bind(String column, ColumnType type, Function<? super I, ?> extractor, List<String> enumValues) {
+            Objects.requireNonNull(column, COLUMN);
             Objects.requireNonNull(extractor, "extractor");
             if (extractors.putIfAbsent(column, new Binding<>(type, extractor, enumValues)) != null) {
                 throw new IllegalArgumentException("Input column '%s' is declared twice".formatted(column));
@@ -532,7 +593,7 @@ public final class PraeceptaEngine<I, O> {
 
         /** With {@link #inputs(InputStrategy)}: the type of a column, parsed from its text value. */
         public Builder<I, O> columnType(String column, ColumnType type) {
-            columnTypes.put(Objects.requireNonNull(column, "column"), Objects.requireNonNull(type, "type"));
+            columnTypes.put(Objects.requireNonNull(column, COLUMN), Objects.requireNonNull(type, "type"));
             return this;
         }
 
@@ -543,7 +604,7 @@ public final class PraeceptaEngine<I, O> {
          * matches. String columns take a plain list of values.
          */
         public Builder<I, O> allowedValues(String column, String unaryTests) {
-            allowedValues.put(Objects.requireNonNull(column, "column"), Objects.requireNonNull(unaryTests, "unaryTests"));
+            allowedValues.put(Objects.requireNonNull(column, COLUMN), Objects.requireNonNull(unaryTests, "unaryTests"));
             return this;
         }
 

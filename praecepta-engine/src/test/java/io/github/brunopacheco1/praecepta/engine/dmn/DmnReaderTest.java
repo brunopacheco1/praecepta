@@ -66,12 +66,14 @@ class DmnReaderTest {
         Assertions.assertThat(engine.evaluate(new Customer("ES", 70, null))).containsExactly("silver");
         Assertions.assertThat(engine.evaluate(new Customer("FR", 30, null))).isEmpty();
         // the table's input value list is enforced
-        Assertions.assertThatThrownBy(() -> engine.evaluate(new Customer("DE", 30, null))).isInstanceOf(InvalidInputException.class);
+        var unlistedCountry = new Customer("DE", 30, null);
+        Assertions.assertThatThrownBy(() -> engine.evaluate(unlistedCountry)).isInstanceOf(InvalidInputException.class);
     }
 
     @Test
     void reads_dmn_1_1_and_picks_a_decision_by_name() {
-        Assertions.assertThatThrownBy(() -> DmnReader.read(resource("dmn11-two-decisions.dmn")))
+        var twoDecisions = resource("dmn11-two-decisions.dmn");
+        Assertions.assertThatThrownBy(() -> DmnReader.read(twoDecisions))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("2 decision tables [Carrier, Fee]");
 
@@ -152,7 +154,8 @@ class DmnReaderTest {
                     <rule><inputEntry>%s</inputEntry><outputEntry>%s</outputEntry></rule>
                   </decisionTable></decision>
                 </definitions>""".formatted(input, inputEntry, outputEntry);
-        Assertions.assertThatThrownBy(() -> DmnReader.read(stream(xml)))
+        var dmn = stream(xml);
+        Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("Decision 't'")
                 .hasMessageContaining(message);
@@ -167,7 +170,8 @@ class DmnReaderTest {
                     <output name="result" typeRef="number"/>
                   </decisionTable></decision>
                 </definitions>""";
-        Assertions.assertThatThrownBy(() -> DmnReader.read(stream(xml))).hasMessageContaining("aggregation 'COUNT' is not supported");
+        var dmn = stream(xml);
+        Assertions.assertThatThrownBy(() -> DmnReader.read(dmn)).hasMessageContaining("aggregation 'COUNT' is not supported");
     }
 
     @Test
@@ -327,7 +331,8 @@ class DmnReaderTest {
                 <?xml version="1.0"?>
                 <!DOCTYPE definitions [<!ENTITY secret SYSTEM "file:///etc/passwd">]>
                 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" name="&secret;"/>""";
-        Assertions.assertThatThrownBy(() -> DmnReader.read(stream(xml)))
+        var dmn = stream(xml);
+        Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("Cannot read DMN model");
     }

@@ -74,7 +74,8 @@ class TableCompilerTest {
             Assertions.assertThat(junior).get().hasToString("DiscountOutput[discount=0, tier=junior]");
 
             // the declared value list of age is enforced by the generated class
-            Assertions.assertThatThrownBy(() -> evaluate.invoke(null, constructor.newInstance(country, new BigDecimal(130), null)))
+            var tooOld = constructor.newInstance(country, new BigDecimal(130), null);
+            Assertions.assertThatThrownBy(() -> evaluate.invoke(null, tooOld))
                     .isInstanceOf(InvocationTargetException.class)
                     .cause().hasMessageContaining("age");
 
