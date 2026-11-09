@@ -219,13 +219,9 @@ public final class DmnReader {
         if (valueList == null) {
             return new OutputColumn(column, type, List.of());
         }
-        var valueTests = parseCell(valueList, type, outputWhere + " value list");
-        if (!(valueTests instanceof UnaryTests.Positive(var tests))
-                || !tests.stream().allMatch(UnaryTests.Equals.class::isInstance)) {
-            throw new InvalidDecisionTableException(outputWhere + ": the output value list must be a list of values");
-        }
-        var values = tests.stream().map(test -> FeelLiterals.text(((UnaryTests.Equals) test).value())).toList();
-        return new OutputColumn(column, type, values);
+        var values = parseCell(valueList, type, outputWhere + " value list").values()
+                .orElseThrow(() -> new InvalidDecisionTableException(outputWhere + ": the output value list must be a list of values"));
+        return new OutputColumn(column, type, values.stream().map(FeelLiterals::text).toList());
     }
 
     /**
@@ -295,9 +291,9 @@ public final class DmnReader {
     /** The value of an entry that is a single literal of the type (no list, comparison or name). */
     private static Optional<Object> literalValue(String literal, ColumnType type) {
         try {
-            if (CellParser.parseFeel(literal, type) instanceof UnaryTests.Positive(var tests)
-                    && tests.size() == 1 && tests.getFirst() instanceof UnaryTests.Equals(var value)) {
-                return Optional.of(value);
+            var values = CellParser.parseFeel(literal, type).values().orElse(List.of());
+            if (values.size() == 1) {
+                return Optional.of(values.getFirst());
             }
         } catch (CellSyntaxException e) {
             // not a literal of this type

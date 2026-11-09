@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine.feel;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * A parsed table cell: the subset of DMN FEEL "simple unary tests" Praecepta supports. Every test
@@ -18,6 +19,18 @@ import java.util.List;
  * false, and a comparison or an interval is unknown, which is neither a match nor a mismatch.
  */
 public sealed interface UnaryTests {
+
+    /**
+     * The values of a plain list of literals, such as {@code "A","B"} or {@code 1, 2}, in the order written
+     * (duplicates included). Empty for any other cell: {@code -}, {@code not(...)}, {@code null}, a
+     * comparison or an interval. Value lists of string columns and output value lists must have this form.
+     */
+    default Optional<List<Comparable<?>>> values() {
+        if (!(this instanceof Positive(var tests)) || !tests.stream().allMatch(Equals.class::isInstance)) {
+            return Optional.empty();
+        }
+        return Optional.of(tests.stream().<Comparable<?>>map(test -> ((Equals) test).value()).toList());
+    }
 
     /** {@code -} or a blank cell: matches every value, including a missing one. */
     record Any() implements UnaryTests {
