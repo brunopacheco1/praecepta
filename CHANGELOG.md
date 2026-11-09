@@ -27,6 +27,12 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   stamped with the time of its release run; its rebuild sets that value explicitly (see
   `docs/RELEASING.md`).
 
+### Fixed
+- **A rule that tests a column with no input binding is rejected with a clear message** whatever its
+  cell. A comparison or interval there (`> 18`, `[18..65]`) used to fail with a raw `CellSyntaxException`
+  ("comparisons are only supported on NUMBER…") instead of the `InvalidDecisionTableException` "Rule 7
+  tests column 'age', which has no declared input". Wildcards on such columns are still allowed.
+
 ## [0.2.0] - 2026-11-08
 
 Boolean, time and date-time columns; the DMN conformance kit (TCK) in every build; fast builds for
