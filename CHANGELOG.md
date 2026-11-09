@@ -20,6 +20,9 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `tBureauCallType`, a `string` with the allowed values `"FULL","MINI","NONE"`. The column takes
   the base type, and the allowed values become its input value list unless the input declares its
   own. Item definitions may build on one another; structured types and collections are still rejected.
+- **`UnaryTests.values()`:** the values of a cell that is a plain list of literals (`"A","B"`), or
+  empty for any other cell. The engine, the DMN reader and the Maven plugin now share this one
+  definition of a value list.
 
 ### Changed
 - **Releases keep the build timestamp committed in the tag** (`project.build.outputTimestamp`), so

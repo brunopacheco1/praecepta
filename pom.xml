@@ -156,6 +156,14 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${maven-surefire-plugin.version}</version>
+                    <configuration>
+                        <systemPropertyVariables>
+                            <!-- keeps the engine's validation warnings, logged for every table a test builds, out of the build log -->
+                            <java.util.logging.config.file>${maven.multiModuleProjectDirectory}/test-logging.properties</java.util.logging.config.file>
+                            <!-- Apache POI, Camunda and Drools log through the Log4j API; without a provider it prints an error -->
+                            <log4j.provider>org.apache.logging.log4j.simple.internal.SimpleProvider</log4j.provider>
+                        </systemPropertyVariables>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>

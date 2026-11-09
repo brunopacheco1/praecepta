@@ -37,6 +37,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableE
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
 /**
@@ -403,7 +404,7 @@ public final class PraeceptaEngine<I, O> {
     /** The values as a FEEL list of string literals, e.g. {@code "PT", "ES"}. */
     private static String quotedList(List<String> values) {
         return values.stream()
-                .map(value -> "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+                .map(value -> FeelLiterals.literal(Objects.requireNonNull(value, "enum value")))
                 .collect(Collectors.joining(", "));
     }
 
@@ -418,15 +419,10 @@ public final class PraeceptaEngine<I, O> {
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException("Input values of column '%s': %s".formatted(column, e.getMessage()));
         }
-        if (type == ColumnType.STRING && !isListOfValues(tests)) {
+        if (type == ColumnType.STRING && tests.values().isEmpty()) {
             throw new InvalidDecisionTableException("Input values of string column '%s' must be a list of values".formatted(column));
         }
         return tests;
-    }
-
-    private static boolean isListOfValues(UnaryTests tests) {
-        return tests instanceof UnaryTests.Positive(var alternatives)
-                && alternatives.stream().allMatch(UnaryTests.Equals.class::isInstance);
     }
 
     /**

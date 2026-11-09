@@ -20,7 +20,6 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
-import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
 /**
  * Generates, for a table {@code Discount}:
@@ -437,10 +436,9 @@ final class SourceGenerator {
                 return List.of();
             }
             // the engine has already checked that a string column's value list is a list of values
-            var tests = (UnaryTests.Positive) CellParser.parse(column.allowedValues(), ColumnType.STRING);
             var values = new LinkedHashSet<String>();
-            for (var test : tests.tests()) {
-                values.add((String) ((UnaryTests.Equals) test).value());
+            for (var value : CellParser.parse(column.allowedValues(), ColumnType.STRING).values().orElseThrow()) {
+                values.add((String) value);
             }
             return List.copyOf(values);
         }

@@ -5,6 +5,8 @@
  */
 package io.github.brunopacheco1.praecepta.engine.exceptions;
 
+import java.io.Serial;
+
 /**
  * An input value cannot be evaluated: it is outside its column's declared input values (DMN input
  * value list), or it is not a valid value of the column's type (text that does not parse, or a number
@@ -12,7 +14,7 @@ package io.github.brunopacheco1.praecepta.engine.exceptions;
  */
 public class InvalidInputException extends IllegalArgumentException {
 
-    @java.io.Serial
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private final String column;
