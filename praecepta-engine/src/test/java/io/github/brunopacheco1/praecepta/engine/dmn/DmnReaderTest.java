@@ -240,10 +240,10 @@ class DmnReaderTest {
                 .build();
         Assertions.assertThat(engine.evaluate(Map.of("Bureau call type", "MINI", "Eligibility", "ELIGIBLE", "Credit score", "700")))
                 .containsExactly("BUREAU");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("Bureau call type", "OTHER")))
-                .isInstanceOf(InvalidInputException.class);
-        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("Credit score", "1000")))
-                .isInstanceOf(InvalidInputException.class);
+        var unknownCallType = Map.of("Bureau call type", "OTHER");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(unknownCallType)).isInstanceOf(InvalidInputException.class);
+        var scoreOutOfRange = Map.of("Credit score", "1000");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(scoreOutOfRange)).isInstanceOf(InvalidInputException.class);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -270,7 +270,8 @@ class DmnReaderTest {
                     <output name="result" typeRef="string"/>
                   </decisionTable></decision>
                 </definitions>""".formatted(itemDefinitions);
-        Assertions.assertThatThrownBy(() -> DmnReader.read(stream(xml)))
+        var dmn = stream(xml);
+        Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("Decision 't', input 'a'")
                 .hasMessageContaining(message);
