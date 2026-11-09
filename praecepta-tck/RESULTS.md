@@ -55,7 +55,7 @@ rejects it), or the inputs are of a kind it does not take.
 | [compliance-level-3/0017-tableTests](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0017-tableTests) | 2 | 0 | 2 | cells that compare with another input (#51) |
 | [compliance-level-3/0036-dt-variable-input](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0036-dt-variable-input) | 0 | 0 | 24 | cells that compare with another input (#51); duration columns (#52) |
 | [compliance-level-3/0039-dt-list-semantics](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0039-dt-list-semantics) | 0 | 0 | 2 | output entries that are expressions (#53) |
-| [compliance-level-3/0087-chapter-11-example](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0087-chapter-11-example) | 0 | 0 | 2 | columns typed by an item definition (#54) |
+| [compliance-level-3/0087-chapter-11-example](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0087-chapter-11-example) | 0 | 0 | 2 | inputs computed by other decisions (decision requirement graphs, #14) |
 
 ## Not supported
 
@@ -66,6 +66,5 @@ What the unsupported checks need, by number of checks:
 | cells that compare with another input (#51) | 20 |
 | duration columns (#52) | 6 |
 | COUNT aggregation (#15) | 3 |
+| inputs computed by other decisions (decision requirement graphs, #14) | 3 |
 | output entries that are expressions (#53) | 3 |
-| columns typed by an item definition (#54) | 2 |
-| inputs computed by other decisions (decision requirement graphs, #14) | 1 |
