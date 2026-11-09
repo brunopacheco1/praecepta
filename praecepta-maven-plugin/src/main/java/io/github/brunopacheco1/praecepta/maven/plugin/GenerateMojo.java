@@ -114,12 +114,7 @@ public class GenerateMojo extends AbstractMojo {
                 if (table.source != null && !table.source.isAbsolute()) {
                     table.source = new File(project.getBasedir(), table.source.getPath());
                 }
-                TableCompiler.Result result;
-                try {
-                    result = TableCompiler.compile(table, packageName, severity, fileHeader);
-                } catch (IllegalArgumentException e) {
-                    throw new MojoFailureException(e.getMessage(), e);
-                }
+                var result = compile(table, severity);
                 if (!classNames.add(result.className())) {
                     throw new MojoFailureException("Two tables generate the class " + result.className() + "; set <name> on one");
                 }
@@ -138,6 +133,15 @@ public class GenerateMojo extends AbstractMojo {
         var resource = new Resource();
         resource.setDirectory(resourceDirectory.getPath());
         project.addResource(resource);
+    }
+
+    /** Compiles one table; a configuration or table mistake fails the build with its message. */
+    private TableCompiler.Result compile(TableConfig table, Severity severity) throws MojoFailureException {
+        try {
+            return TableCompiler.compile(table, packageName, severity, fileHeader);
+        } catch (IllegalArgumentException e) {
+            throw new MojoFailureException(e.getMessage(), e);
+        }
     }
 
     private static Severity severity(String value) throws MojoFailureException {

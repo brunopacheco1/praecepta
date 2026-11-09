@@ -92,14 +92,14 @@ class EnumInputTest {
 
     @Test
     void enum_values_must_be_within_declared_input_values() {
-        Assertions.assertThatThrownBy(() -> PraeceptaEngine.<Order, String>builder()
-                        .hitPolicy(HitPolicy.FIRST)
-                        .enumInput("country", Country.class, Order::country)
-                        .allowedValues("country", List.of("PT", "ES", "FR"))
-                        .enumInput("segment", Segment.class, Segment::value, Order::segment)
-                        .output(output -> output.values().get("discount"))
-                        .rules(RULES)
-                        .build())
+        var builder = PraeceptaEngine.<Order, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .enumInput("country", Country.class, Order::country)
+                .allowedValues("country", List.of("PT", "ES", "FR"))
+                .enumInput("segment", Segment.class, Segment::value, Order::segment)
+                .output(output -> output.values().get("discount"))
+                .rules(RULES);
+        Assertions.assertThatThrownBy(builder::build)
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("Column 'country': enum value 'DE' is not one of the column's input values");
     }

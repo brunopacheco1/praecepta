@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 /** Java identifiers for table, column and value names. */
 final class JavaNames {
@@ -58,7 +58,7 @@ final class JavaNames {
      *
      * @param what describes the texts in the error message, e.g. "columns of table X"
      */
-    static List<String> distinct(List<String> texts, Function<String, String> naming, String what) {
+    static List<String> distinct(List<String> texts, UnaryOperator<String> naming, String what) {
         var names = new ArrayList<String>();
         var seen = new HashMap<String, String>();
         for (var text : texts) {

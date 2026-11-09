@@ -15,7 +15,10 @@ import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
+import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
@@ -49,77 +52,104 @@ public final class DmnWriter {
      */
     public static String write(DecisionTable table) {
         var id = identifier(table.name());
-        var xml = new StringBuilder();
-        xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-           .append("<definitions xmlns=\"").append(NAMESPACE).append("\" id=\"definitions_").append(id)
-           .append("\" name=\"").append(attribute(table.name()))
-           .append("\" namespace=\"https://github.com/brunopacheco1/praecepta/").append(id).append("\">\n");
+        var xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        xml.append("<definitions").append(attribute("xmlns", NAMESPACE)).append(idAndName("definitions_" + id, table.name()))
+           .append(attribute("namespace", "https://github.com/brunopacheco1/praecepta/" + id)).append(">\n");
+        var inputs = table.inputs();
+        for (int c = 0; c < inputs.size(); c++) {
+            inputData(xml, c, inputs.get(c));
+        }
+        decision(xml, id, table);
+        xml.append("</definitions>\n");
+        return xml.toString();
+    }
+
+    /** The {@code inputData} of an input, which Drools needs to bind its value. */
+    private static void inputData(StringBuilder xml, int c, InputColumn input) {
+        xml.append("  <inputData").append(idAndName("input_data_" + c, input.name())).append(">\n")
+           .append("    <variable").append(idAndName("input_variable_" + c, input.name())).append(typed(input.type())).append("/>\n")
+           .append("  </inputData>\n");
+    }
+
+    private static void decision(StringBuilder xml, String id, DecisionTable table) {
+        xml.append("  <decision").append(idAndName("decision_" + id, table.name())).append(">\n")
+           .append("    <variable").append(idAndName("decision_variable", table.name())).append("/>\n");
+        for (int c = 0; c < table.inputs().size(); c++) {
+            xml.append("    <informationRequirement").append(id("requirement_" + c)).append(">")
+               .append("<requiredInput").append(attribute("href", "#input_data_" + c)).append("/></informationRequirement>\n");
+        }
+        decisionTable(xml, table);
+        xml.append("  </decision>\n");
+    }
+
+    private static void decisionTable(StringBuilder xml, DecisionTable table) {
+        xml.append("    <decisionTable").append(id("table")).append(attribute("hitPolicy", hitPolicy(table.hitPolicy())));
+        if (table.aggregation() != null) {
+            xml.append(attribute("aggregation", table.aggregation().name()));
+        }
+        xml.append(">\n");
+        var inputs = table.inputs();
+        for (int c = 0; c < inputs.size(); c++) {
+            input(xml, c, inputs.get(c));
+        }
+        var outputs = table.outputs();
+        for (int c = 0; c < outputs.size(); c++) {
+            output(xml, c, outputs.get(c));
+        }
+        var rules = table.rules();
+        for (int r = 0; r < rules.size(); r++) {
+            rule(xml, r, rules.get(r), table);
+        }
+        xml.append("    </decisionTable>\n");
+    }
+
+    private static void input(StringBuilder xml, int c, InputColumn input) {
+        xml.append("      <input").append(id("input_" + c)).append(attribute("label", input.name())).append(">\n");
+        expression(xml, "inputExpression", id("input_expression_" + c) + typed(input.type()), input.name());
+        if (input.allowedValues() != null) {
+            var values = unaryTests(input.allowedValues(), input.type(), "input values of column '" + input.name() + "'");
+            expression(xml, "inputValues", id("input_values_" + c), values);
+        }
+        xml.append("      </input>\n");
+    }
+
+    private static void output(StringBuilder xml, int c, OutputColumn output) {
+        xml.append("      <output").append(idAndName("output_" + c, output.name())).append(typed(output.type()));
+        if (output.values().isEmpty()) {
+            xml.append("/>\n");
+            return;
+        }
+        var values = output.values().stream()
+                .map(value -> literal(value, output.type(), "output values of '" + output.name() + "'"))
+                .collect(Collectors.joining(", "));
+        xml.append(">\n");
+        expression(xml, "outputValues", id("output_values_" + c), values);
+        xml.append("      </output>\n");
+    }
+
+    /** @param r the rule's index, from 0 */
+    private static void rule(StringBuilder xml, int r, Praeceptum rule, DecisionTable table) {
+        var where = "Rule " + rule.priority();
+        xml.append("      <rule").append(id("rule_" + r)).append(">\n");
         var inputs = table.inputs();
         for (int c = 0; c < inputs.size(); c++) {
             var input = inputs.get(c);
-            xml.append("  <inputData id=\"input_data_").append(c).append("\" name=\"").append(attribute(input.name())).append("\">\n")
-               .append("    <variable id=\"input_variable_").append(c).append("\" name=\"").append(attribute(input.name()))
-               .append("\" typeRef=\"").append(typeRef(input.type())).append("\"/>\n")
-               .append("  </inputData>\n");
-        }
-        xml.append("  <decision id=\"decision_").append(id).append("\" name=\"").append(attribute(table.name())).append("\">\n")
-           .append("    <variable id=\"decision_variable\" name=\"").append(attribute(table.name())).append("\"/>\n");
-        for (int c = 0; c < inputs.size(); c++) {
-            xml.append("    <informationRequirement id=\"requirement_").append(c).append("\">")
-               .append("<requiredInput href=\"#input_data_").append(c).append("\"/></informationRequirement>\n");
-        }
-        xml.append("    <decisionTable id=\"table\" hitPolicy=\"").append(hitPolicy(table.hitPolicy())).append('"');
-        if (table.aggregation() != null) {
-            xml.append(" aggregation=\"").append(table.aggregation().name()).append('"');
-        }
-        xml.append(">\n");
-        for (int c = 0; c < inputs.size(); c++) {
-            var input = inputs.get(c);
-            xml.append("      <input id=\"input_").append(c).append("\" label=\"").append(attribute(input.name())).append("\">\n")
-               .append("        <inputExpression id=\"input_expression_").append(c).append("\" typeRef=\"").append(typeRef(input.type()))
-               .append("\"><text>").append(text(input.name())).append("</text></inputExpression>\n");
-            if (input.allowedValues() != null) {
-                xml.append("        <inputValues id=\"input_values_").append(c).append("\"><text>")
-                   .append(text(unaryTests(input.allowedValues(), input.type(), "input values of column '" + input.name() + "'")))
-                   .append("</text></inputValues>\n");
-            }
-            xml.append("      </input>\n");
+            var cell = unaryTests(rule.input().values().get(input.name()), input.type(), where + ", column '" + input.name() + "'");
+            expression(xml, "inputEntry", id("input_entry_" + r + "_" + c), cell);
         }
         var outputs = table.outputs();
         for (int c = 0; c < outputs.size(); c++) {
             var output = outputs.get(c);
-            xml.append("      <output id=\"output_").append(c).append("\" name=\"").append(attribute(output.name()))
-               .append("\" typeRef=\"").append(typeRef(output.type())).append('"');
-            if (output.values().isEmpty()) {
-                xml.append("/>\n");
-            } else {
-                xml.append(">\n        <outputValues id=\"output_values_").append(c).append("\"><text>")
-                   .append(text(output.values().stream().map(value -> literal(value, output.type(), "output values of '" + output.name() + "'"))
-                           .collect(Collectors.joining(", "))))
-                   .append("</text></outputValues>\n      </output>\n");
-            }
+            var value = literal(rule.output().values().get(output.name()), output.type(), where + ", output '" + output.name() + "'");
+            expression(xml, "outputEntry", id("output_entry_" + r + "_" + c), value);
         }
-        int r = 0;
-        for (var rule : table.rules()) {
-            var where = "Rule " + rule.priority();
-            xml.append("      <rule id=\"rule_").append(r).append("\">\n");
-            for (int c = 0; c < inputs.size(); c++) {
-                var input = inputs.get(c);
-                xml.append("        <inputEntry id=\"input_entry_").append(r).append('_').append(c).append("\"><text>")
-                   .append(text(unaryTests(rule.input().values().get(input.name()), input.type(), where + ", column '" + input.name() + "'")))
-                   .append("</text></inputEntry>\n");
-            }
-            for (int c = 0; c < outputs.size(); c++) {
-                var output = outputs.get(c);
-                xml.append("        <outputEntry id=\"output_entry_").append(r).append('_').append(c).append("\"><text>")
-                   .append(text(literal(rule.output().values().get(output.name()), output.type(), where + ", output '" + output.name() + "'")))
-                   .append("</text></outputEntry>\n");
-            }
-            xml.append("      </rule>\n");
-            r++;
-        }
-        xml.append("    </decisionTable>\n  </decision>\n</definitions>\n");
-        return xml.toString();
+        xml.append("      </rule>\n");
+    }
+
+    /** A line holding an element with a FEEL expression: {@code <tag attributes><text>expression</text></tag>}. */
+    private static void expression(StringBuilder xml, String tag, String attributes, String expression) {
+        xml.append("        <").append(tag).append(attributes).append("><text>").append(escapeText(expression))
+           .append("</text></").append(tag).append(">\n");
     }
 
     static String typeRef(ColumnType type) {
@@ -148,9 +178,9 @@ public final class DmnWriter {
     /** Standard FEEL text for parsed unary tests. */
     public static String render(UnaryTests tests) {
         return switch (tests) {
-            case UnaryTests.Any any -> "-";
-            case UnaryTests.Positive positive -> join(positive.tests());
-            case UnaryTests.Negated negated -> "not(" + join(negated.tests()) + ")";
+            case UnaryTests.Any() -> "-";
+            case UnaryTests.Positive(var positive) -> join(positive);
+            case UnaryTests.Negated(var negated) -> "not(" + join(negated) + ")";
         };
     }
 
@@ -160,11 +190,11 @@ public final class DmnWriter {
 
     private static String test(Test test) {
         return switch (test) {
-            case NullTest n -> "null";
-            case Equals e -> FeelLiterals.literal(e.value());
-            case Compare c -> c.operator().symbol() + " " + FeelLiterals.literal(c.value());
-            case Range r -> (r.lowClosed() ? "[" : "(") + FeelLiterals.literal(r.low()) + ".."
-                    + FeelLiterals.literal(r.high()) + (r.highClosed() ? "]" : ")");
+            case NullTest() -> "null";
+            case Equals(var value) -> FeelLiterals.literal(value);
+            case Compare(var operator, var value) -> operator.symbol() + " " + FeelLiterals.literal(value);
+            case Range(var low, var lowClosed, var high, var highClosed) -> (lowClosed ? "[" : "(") + FeelLiterals.literal(low) + ".."
+                    + FeelLiterals.literal(high) + (highClosed ? "]" : ")");
         };
     }
 
@@ -195,16 +225,35 @@ public final class DmnWriter {
         return Boolean.valueOf(text);
     }
 
+    /**
+     * A DMN id from a name: characters other than ASCII letters, digits and {@code _} become {@code _},
+     * and an id that does not start with a letter gets a {@code d_} prefix.
+     */
     private static String identifier(String name) {
-        var id = name.replaceAll("[^A-Za-z0-9_]", "_");
+        var id = name.replaceAll("\\W", "_");
         return id.isEmpty() || !Character.isLetter(id.charAt(0)) ? "d_" + id : id;
     }
 
-    private static String text(String value) {
-        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    /** The attributes {@code id="..." name="..."}. */
+    private static String idAndName(String id, String name) {
+        return id(id) + attribute("name", name);
     }
 
-    private static String attribute(String value) {
-        return text(value).replace("\"", "&quot;");
+    private static String id(String id) {
+        return attribute("id", id);
+    }
+
+    /** The attribute {@code typeRef="..."} of a column type. */
+    private static String typed(ColumnType type) {
+        return attribute("typeRef", typeRef(type));
+    }
+
+    /** An attribute, with a leading space and its value escaped: {@code  name="value"}. */
+    private static String attribute(String name, String value) {
+        return " " + name + "=\"" + escapeText(value).replace("\"", "&quot;") + "\"";
+    }
+
+    private static String escapeText(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 }

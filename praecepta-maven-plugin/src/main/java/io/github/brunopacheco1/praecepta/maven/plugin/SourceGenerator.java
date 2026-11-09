@@ -30,6 +30,9 @@ final class SourceGenerator {
 
     private static final String ENGINE = "io.github.brunopacheco1.praecepta.engine.";
 
+    /** The Javadoc line of {@code evaluate} for a value outside its column's value list. */
+    private static final String THROWS_INVALID_INPUT = throwsTag("InvalidInputException", "a value is outside its column's value list");
+
     private final String packageName;
     private final String className;
     private final DecisionTable table;
@@ -85,7 +88,7 @@ final class SourceGenerator {
         for (int c = 0; c < table.inputs().size(); c++) {
             var column = table.inputs().get(c);
             var values = TableCompiler.enumValues(column);
-            if (values == null) {
+            if (values.isEmpty()) {
                 continue;
             }
             var constants = JavaNames.distinct(values, JavaNames::constant, "Values of column '" + column.name() + "'");
@@ -106,7 +109,7 @@ final class SourceGenerator {
 
     private String inputJavaType(int c) {
         var column = table.inputs().get(c);
-        if (TableCompiler.enumValues(column) != null) {
+        if (!TableCompiler.enumValues(column).isEmpty()) {
             return enumName(c);
         }
         return javaType(column.type());
@@ -177,8 +180,8 @@ final class SourceGenerator {
             .append("    private ").append(className).append("() {\n    }\n\n");
         if (single) {
             java.append("    /**\n     * @return the selected output, or empty if no rule matches\n")
-                .append("     * @throws ").append(ENGINE).append("exceptions.HitPolicyViolationException if the hit policy is violated\n")
-                .append("     * @throws ").append(ENGINE).append("exceptions.InvalidInputException if a value is outside its column's value list\n")
+                .append(throwsTag("HitPolicyViolationException", "the hit policy is violated"))
+                .append(THROWS_INVALID_INPUT)
                 .append("     */\n")
                 .append("    public static java.util.Optional<").append(outputType).append("> evaluate(").append(inputType).append(" input) {\n")
                 .append("        var outputs = ENGINE.evaluate(input);\n")
@@ -186,7 +189,7 @@ final class SourceGenerator {
                 .append("    }\n\n");
         } else {
             java.append("    /**\n     * @return the outputs of every matching rule, in hit-policy order; empty if no rule matches\n")
-                .append("     * @throws ").append(ENGINE).append("exceptions.InvalidInputException if a value is outside its column's value list\n")
+                .append(THROWS_INVALID_INPUT)
                 .append("     */\n")
                 .append("    public static java.util.List<").append(outputType).append("> evaluate(").append(inputType).append(" input) {\n")
                 .append("        return ENGINE.evaluate(input);\n    }\n\n");
@@ -208,7 +211,7 @@ final class SourceGenerator {
             var column = table.inputs().get(c);
             var name = stringLiteral(column.name());
             var getter = inputType + "::" + inputMembers.get(c);
-            if (TableCompiler.enumValues(column) != null) {
+            if (!TableCompiler.enumValues(column).isEmpty()) {
                 var enumType = inputType + "." + enumName(c);
                 java.append("                    .enumInput(").append(name).append(", ").append(enumType).append(".class, ")
                     .append(enumType).append("::value, ").append(getter).append(")\n");
@@ -231,26 +234,36 @@ final class SourceGenerator {
         // one NUMBER output (checked when compiling); missing values are skipped, as in DMN
         var field = outputMembers.getFirst();
         var strategy = ENGINE + "OutputStrategy<" + outputType + ">";
+        var aComparedToB = " || a." + field + "().compareTo(b." + field + "()) ";
         return "new " + strategy + "() {\n"
                + "                        @Override\n"
                + "                        public " + outputType + " transform(" + ENGINE + "beans.PraeceptaOutput output) {\n"
                + "                            return " + outputType + ".of(output);\n                        }\n\n"
-               + "                        @Override\n"
-               + "                        public " + outputType + " sum(" + outputType + " a, " + outputType + " b) {\n"
-               + "                            return a." + field + "() == null ? b : b." + field + "() == null ? a : new " + outputType
-               + "(a." + field + "().add(b." + field + "()));\n                        }\n\n"
-               + "                        @Override\n"
-               + "                        public " + outputType + " min(" + outputType + " a, " + outputType + " b) {\n"
-               + "                            return a." + field + "() == null ? b : b." + field + "() == null || a." + field
-               + "().compareTo(b." + field + "()) <= 0 ? a : b;\n                        }\n\n"
-               + "                        @Override\n"
-               + "                        public " + outputType + " max(" + outputType + " a, " + outputType + " b) {\n"
-               + "                            return a." + field + "() == null ? b : b." + field + "() == null || a." + field
-               + "().compareTo(b." + field + "()) >= 0 ? a : b;\n                        }\n"
+               + aggregate("sum", field, " ? a : new " + outputType + "(a." + field + "().add(b." + field + "()))") + "\n"
+               + aggregate("min", field, aComparedToB + "<= 0 ? a : b") + "\n"
+               + aggregate("max", field, aComparedToB + ">= 0 ? a : b")
                + "                    }";
     }
 
+    /**
+     * One method of the output strategy that combines two outputs {@code a} and {@code b}. It returns
+     * {@code b} if {@code a}'s value is missing; {@code rest} handles a missing value in {@code b}.
+     *
+     * @param rest the end of the returned expression, after {@code b.<field>() == null}
+     */
+    private String aggregate(String method, String field, String rest) {
+        return "                        @Override\n"
+               + "                        public " + outputType + " " + method + "(" + outputType + " a, " + outputType + " b) {\n"
+               + "                            return a." + field + "() == null ? b : b." + field + "() == null" + rest + ";\n"
+               + "                        }\n";
+    }
+
     // ---- helpers ---------------------------------------------------------------------------------
+
+    /** A {@code @throws} line of the generated Javadoc, for an exception of the engine. */
+    private static String throwsTag(String exception, String condition) {
+        return "     * @throws " + ENGINE + "exceptions." + exception + " if " + condition + "\n";
+    }
 
     private static java.util.List<String> headerLines(String text) {
         if (text == null || text.isBlank()) {

@@ -16,6 +16,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +71,8 @@ final class ColumnIndex {
     private final Set<String> disallowedStrings;
     /** NUMBER/DATE: sorted distinct boundaries. */
     private final Comparable<?>[] boundaries;
+    /** The value classes, by class number. */
+    private final List<ValueClass> classes;
     private final int otherClass;
     final int nullClass;
     final long[][] masks;
@@ -90,46 +93,21 @@ final class ColumnIndex {
         this.type = type;
         this.isString = type == ColumnType.STRING;
         this.hasAllowedValues = allowedValues != null;
-        var classes = new ArrayList<ValueClass>();
-        if (type == ColumnType.STRING) {
-            var written = new LinkedHashSet<String>();
-            cellsByBit.forEach(cell -> collectStrings(cell, written));
-            if (allowedValues != null) {
-                collectStrings(allowedValues, written);
-            }
-            var byValue = new HashMap<String, Integer>();
-            for (var value : written) {
-                byValue.put(value, classes.size());
-                classes.add(new ValueClass.Point(value));
-            }
-            stringClasses = Map.copyOf(byValue);
-            otherClass = classes.size();
-            classes.add(new ValueClass.OtherString());
+        var partition = new ArrayList<ValueClass>();
+        if (isString) {
+            stringClasses = addStringClasses(cellsByBit, allowedValues, partition);
+            otherClass = partition.size();
+            partition.add(new ValueClass.OtherString());
             boundaries = null;
         } else {
-            var points = new TreeSet<Comparable<?>>(ColumnIndex::compare);
-            if (type == ColumnType.BOOLEAN) {
-                points.add(Boolean.FALSE);
-                points.add(Boolean.TRUE);
-            }
-            cellsByBit.forEach(cell -> collectBoundaries(cell, points));
-            if (allowedValues != null) {
-                collectBoundaries(allowedValues, points);
-            }
-            boundaries = points.toArray(Comparable<?>[]::new);
-            for (int i = 0; i <= boundaries.length; i++) {
-                var low = i == 0 ? null : boundaries[i - 1];
-                var high = i == boundaries.length ? null : boundaries[i];
-                classes.add(new ValueClass.Between(low, high));
-                if (high != null) {
-                    classes.add(new ValueClass.Point(high));
-                }
-            }
+            boundaries = sortedBoundaries(type, cellsByBit, allowedValues);
+            addOrderedClasses(boundaries, partition);
             stringClasses = null;
             otherClass = -1;
         }
-        nullClass = classes.size();
-        classes.add(new ValueClass.Missing());
+        nullClass = partition.size();
+        partition.add(new ValueClass.Missing());
+        classes = List.copyOf(partition);
 
         masks = new long[classes.size()][words];
         empty = new boolean[classes.size()];
@@ -138,47 +116,116 @@ final class ColumnIndex {
             var valueClass = classes.get(k);
             empty[k] = isEmpty(valueClass);
             allowed[k] = allowedValues == null || valueClass instanceof ValueClass.Missing || accepts(allowedValues, valueClass);
-            for (int bit = 0; bit < cellsByBit.size(); bit++) {
-                if (!empty[k] && accepts(cellsByBit.get(bit), valueClass)) {
-                    BitsetIndex.set(masks[k], bit);
-                }
+            if (!empty[k]) {
+                markAcceptingRules(masks[k], cellsByBit, valueClass);
             }
         }
-        this.classes = List.copyOf(classes);
-        if (type == ColumnType.STRING) {
-            var byValue = new HashMap<String, long[]>();
-            var disallowed = new java.util.HashSet<String>();
-            stringClasses.forEach((value, k) -> {
-                byValue.put(value, masks[k]);
-                if (!allowed[k]) {
-                    disallowed.add(value);
-                }
-            });
-            stringMasks = Map.copyOf(byValue);
+
+        if (isString) {
+            stringMasks = masksByString();
             otherMask = masks[otherClass];
-            disallowedStrings = hasAllowedValues ? Set.copyOf(disallowed) : null;
+            disallowedStrings = hasAllowedValues ? writtenButNotAllowed() : null;
         } else {
             stringMasks = null;
             otherMask = null;
             disallowedStrings = null;
         }
         nullMask = masks[nullClass];
-        if (enumValues == null) {
-            ordinalMasks = null;
-        } else {
-            ordinalMasks = new long[enumValues.length][];
-            for (int ordinal = 0; ordinal < enumValues.length; ordinal++) {
-                try {
-                    ordinalMasks[ordinal] = stringMaskSlow(enumValues[ordinal]);
-                } catch (InvalidInputException e) {
-                    throw new InvalidDecisionTableException("Column '%s': enum value '%s' is not one of the column's input values"
-                            .formatted(name, enumValues[ordinal]));
-                }
+        ordinalMasks = enumValues == null ? null : masksByOrdinal(enumValues);
+    }
+
+    // ---- building the classes ---------------------------------------------------------------------
+
+    /**
+     * STRING: adds one class per value written in the cells or the allowed values, in first-seen
+     * order, and returns the class of each value.
+     */
+    private static Map<String, Integer> addStringClasses(List<UnaryTests> cellsByBit, UnaryTests allowedValues,
+            List<ValueClass> into) {
+        var written = new LinkedHashSet<String>();
+        cellsByBit.forEach(cell -> collectStrings(cell, written));
+        if (allowedValues != null) {
+            collectStrings(allowedValues, written);
+        }
+        var byValue = new HashMap<String, Integer>();
+        for (var value : written) {
+            byValue.put(value, into.size());
+            into.add(new ValueClass.Point(value));
+        }
+        return Map.copyOf(byValue);
+    }
+
+    /** Ordered columns: the distinct values the cells and the allowed values compare against, sorted. */
+    private static Comparable<?>[] sortedBoundaries(ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues) {
+        var points = new TreeSet<Comparable<?>>(ColumnIndex::compare);
+        if (type == ColumnType.BOOLEAN) {
+            points.add(Boolean.FALSE);
+            points.add(Boolean.TRUE);
+        }
+        cellsByBit.forEach(cell -> collectBoundaries(cell, points));
+        if (allowedValues != null) {
+            collectBoundaries(allowedValues, points);
+        }
+        return points.toArray(Comparable<?>[]::new);
+    }
+
+    /** Ordered columns: the gap before each boundary, the boundary itself, and the gap after the last one. */
+    private static void addOrderedClasses(Comparable<?>[] boundaries, List<ValueClass> into) {
+        Comparable<?> low = null;
+        for (var boundary : boundaries) {
+            into.add(new ValueClass.Between(low, boundary));
+            into.add(new ValueClass.Point(boundary));
+            low = boundary;
+        }
+        into.add(new ValueClass.Between(low, null));
+    }
+
+    /** Sets the bit of every rule whose cell accepts the class. */
+    private static void markAcceptingRules(long[] mask, List<UnaryTests> cellsByBit, ValueClass valueClass) {
+        for (int bit = 0; bit < cellsByBit.size(); bit++) {
+            if (accepts(cellsByBit.get(bit), valueClass)) {
+                BitsetIndex.set(mask, bit);
             }
         }
     }
 
-    private final List<ValueClass> classes;
+    /** STRING fast path: the mask of each written or allowed value. */
+    private Map<String, long[]> masksByString() {
+        var byValue = new HashMap<String, long[]>();
+        stringClasses.forEach((value, k) -> byValue.put(value, masks[k]));
+        return Map.copyOf(byValue);
+    }
+
+    /** STRING: the values written in the rules that the declared input values do not allow. */
+    private Set<String> writtenButNotAllowed() {
+        var disallowed = new HashSet<String>();
+        stringClasses.forEach((value, k) -> {
+            if (!allowed[k]) {
+                disallowed.add(value);
+            }
+        });
+        return Set.copyOf(disallowed);
+    }
+
+    /**
+     * Enum-bound STRING column: the mask of each constant, by ordinal.
+     *
+     * @throws InvalidDecisionTableException if an enum value is outside the declared input values
+     */
+    private long[][] masksByOrdinal(String[] enumValues) {
+        var byOrdinal = new long[enumValues.length][];
+        for (int ordinal = 0; ordinal < enumValues.length; ordinal++) {
+            try {
+                byOrdinal[ordinal] = stringMaskSlow(enumValues[ordinal]);
+            } catch (InvalidInputException e) {
+                throw new InvalidDecisionTableException("Column '%s': enum value '%s' is not one of the column's input values"
+                        .formatted(name, enumValues[ordinal]));
+            }
+        }
+        return byOrdinal;
+    }
+
+    // ---- lookup -----------------------------------------------------------------------------------
 
     /**
      * The mask of rules accepting a raw input value: a String (typed getter or text map) or, if the
@@ -349,12 +396,12 @@ final class ColumnIndex {
         var first = classes.get(from);
         var last = classes.get(to);
         var low = switch (first) {
-            case ValueClass.Point p -> "[" + FeelLiterals.literal(p.value());
+            case ValueClass.Point(var value) -> "[" + FeelLiterals.literal(value);
             case ValueClass.Between b -> b.low() == null ? "(-inf" : "(" + FeelLiterals.literal(b.low());
             default -> throw new IllegalStateException("not an ordered class");
         };
         var high = switch (last) {
-            case ValueClass.Point p -> FeelLiterals.literal(p.value()) + "]";
+            case ValueClass.Point(var value) -> FeelLiterals.literal(value) + "]";
             case ValueClass.Between b -> b.high() == null ? "+inf)" : FeelLiterals.literal(b.high()) + ")";
             default -> throw new IllegalStateException("not an ordered class");
         };
@@ -363,7 +410,12 @@ final class ColumnIndex {
 
     /** A concrete value inside a non-empty class, or null for the missing class / any other string. */
     Object representative(int valueClass) {
-        return classes.get(valueClass).representative(type);
+        return switch (classes.get(valueClass)) {
+            case ValueClass.Point(var value) -> value;
+            case ValueClass.Between gap -> valueInside(gap);
+            case ValueClass.OtherString o -> null;
+            case ValueClass.Missing m -> null;
+        };
     }
 
     /** Whether the class stands for every string not written in the rules (no concrete example). */
@@ -389,33 +441,24 @@ final class ColumnIndex {
 
         default String describe() {
             return switch (this) {
-                case Point p -> FeelLiterals.literal(p.value());
-                case Between b -> "(" + (b.low() == null ? "-inf" : FeelLiterals.literal(b.low())) + ".."
-                        + (b.high() == null ? "+inf" : FeelLiterals.literal(b.high())) + ")";
+                case Point(var value) -> FeelLiterals.literal(value);
+                case Between(var low, var high) -> "(" + (low == null ? "-inf" : FeelLiterals.literal(low)) + ".."
+                        + (high == null ? "+inf" : FeelLiterals.literal(high)) + ")";
                 case OtherString o -> "any other value";
                 case Missing m -> "null";
-            };
-        }
-
-        default Object representative(ColumnType type) {
-            return switch (this) {
-                case Point p -> p.value();
-                case Between b -> between(b, type);
-                case OtherString o -> null;
-                case Missing m -> null;
             };
         }
     }
 
     /** A value inside a non-empty open interval: a round step beyond an open end, else the midpoint. */
-    private static Object between(ValueClass.Between b, ColumnType type) {
+    private Object valueInside(ValueClass.Between gap) {
         return switch (type) {
-            case DATE -> betweenDates((LocalDate) b.low(), (LocalDate) b.high());
-            case TIME -> betweenTimes((LocalTime) b.low(), (LocalTime) b.high());
-            case DATE_TIME -> betweenDateTimes((LocalDateTime) b.low(), (LocalDateTime) b.high());
-            case NUMBER -> betweenNumbers(b);
+            case DATE -> betweenDates((LocalDate) gap.low(), (LocalDate) gap.high());
+            case TIME -> betweenTimes((LocalTime) gap.low(), (LocalTime) gap.high());
+            case DATE_TIME -> betweenDateTimes((LocalDateTime) gap.low(), (LocalDateTime) gap.high());
+            case NUMBER -> betweenNumbers((BigDecimal) gap.low(), (BigDecimal) gap.high());
             // BOOLEAN gaps are always empty, and STRING has no intervals
-            case BOOLEAN, STRING -> throw new IllegalStateException("no value between " + b);
+            case BOOLEAN, STRING -> throw new IllegalStateException("no value between " + gap);
         };
     }
 
@@ -454,9 +497,7 @@ final class ColumnIndex {
         return LocalDateTime.ofInstant(middle, ZoneOffset.UTC);
     }
 
-    private static BigDecimal betweenNumbers(ValueClass.Between b) {
-        var low = (BigDecimal) b.low();
-        var high = (BigDecimal) b.high();
+    private static BigDecimal betweenNumbers(BigDecimal low, BigDecimal high) {
         if (low == null) {
             return high == null ? BigDecimal.ZERO : high.subtract(BigDecimal.ONE);
         }
@@ -496,11 +537,9 @@ final class ColumnIndex {
     private static boolean accepts(UnaryTests cell, ValueClass valueClass) {
         return switch (cell) {
             case UnaryTests.Any any -> true;
-            case UnaryTests.Positive positive -> disjunction(positive.tests(), valueClass) == Boolean.TRUE;
-            case UnaryTests.Negated negated -> {
-                var inner = disjunction(negated.tests(), valueClass);
-                yield inner == Boolean.FALSE; // not(unknown) is unknown: no match
-            }
+            case UnaryTests.Positive(var tests) -> disjunction(tests, valueClass) == Boolean.TRUE;
+            // not(unknown) is unknown: no match
+            case UnaryTests.Negated(var tests) -> disjunction(tests, valueClass) == Boolean.FALSE;
         };
     }
 
@@ -530,23 +569,23 @@ final class ColumnIndex {
         }
         return switch (test) {
             case NullTest n -> false;
-            case Equals e -> switch (valueClass) {
-                case ValueClass.Point p -> compare(p.value(), e.value()) == 0;
+            case Equals(var literal) -> switch (valueClass) {
+                case ValueClass.Point(var value) -> compare(value, literal) == 0;
                 default -> false; // literals are boundaries / written values, never inside other classes
             };
             case Compare c -> switch (valueClass) {
-                case ValueClass.Point p -> compares(p.value(), c);
-                case ValueClass.Between b -> switch (c.operator()) {
+                case ValueClass.Point(var value) -> compares(value, c);
+                case ValueClass.Between(var low, var high) -> switch (c.operator()) {
                     // c.value() is a boundary, so it lies entirely on one side of the open interval
-                    case LT, LE -> b.high() != null && compare(b.high(), c.value()) <= 0;
-                    case GT, GE -> b.low() != null && compare(b.low(), c.value()) >= 0;
+                    case LT, LE -> high != null && compare(high, c.value()) <= 0;
+                    case GT, GE -> low != null && compare(low, c.value()) >= 0;
                 };
                 default -> false;
             };
             case Range r -> switch (valueClass) {
-                case ValueClass.Point p -> inRange(p.value(), r);
-                case ValueClass.Between b -> b.low() != null && b.high() != null
-                        && compare(r.low(), b.low()) <= 0 && compare(r.high(), b.high()) >= 0;
+                case ValueClass.Point(var value) -> inRange(value, r);
+                case ValueClass.Between(var low, var high) -> low != null && high != null
+                        && compare(r.low(), low) <= 0 && compare(r.high(), high) >= 0;
                 default -> false;
             };
         };
@@ -572,8 +611,8 @@ final class ColumnIndex {
 
     private static void collectStrings(UnaryTests cell, Set<String> into) {
         for (var test : tests(cell)) {
-            if (test instanceof Equals e) {
-                into.add((String) e.value());
+            if (test instanceof Equals(var value)) {
+                into.add((String) value);
             }
         }
     }
@@ -581,7 +620,7 @@ final class ColumnIndex {
     private static void collectBoundaries(UnaryTests cell, Set<Comparable<?>> into) {
         for (var test : tests(cell)) {
             switch (test) {
-                case Equals e -> into.add(e.value());
+                case Equals(var value) -> into.add(value);
                 case Compare c -> into.add(c.value());
                 case Range r -> {
                     into.add(r.low());
@@ -597,8 +636,8 @@ final class ColumnIndex {
     private static List<Test> tests(UnaryTests cell) {
         return switch (cell) {
             case UnaryTests.Any any -> List.of();
-            case UnaryTests.Positive positive -> positive.tests();
-            case UnaryTests.Negated negated -> negated.tests();
+            case UnaryTests.Positive(var tests) -> tests;
+            case UnaryTests.Negated(var tests) -> tests;
         };
     }
 

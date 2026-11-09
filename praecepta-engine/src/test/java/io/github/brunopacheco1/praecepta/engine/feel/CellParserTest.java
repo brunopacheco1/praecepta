@@ -151,6 +151,24 @@ class CellParserTest {
     }
 
     @Test
+    void escapes_and_parentheses_decide_where_a_test_ends() {
+        // an escaped backslash does not escape the closing quote
+        Assertions.assertThat(CellParser.parse("\"a\\\\\", \"b\"", ColumnType.STRING))
+                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("a\\"), new Equals("b"))));
+        // the parenthesis of a date call does not close an interval; the one after it does
+        Assertions.assertThat(CellParser.parse("[date(\"2025-01-01\")..date(\"2025-01-31\")), date(\"2025-03-01\")", ColumnType.DATE))
+                .isEqualTo(new UnaryTests.Positive(List.of(
+                        new Range(LocalDate.of(2025, 1, 1), true, LocalDate.of(2025, 1, 31), false),
+                        new Equals(LocalDate.of(2025, 3, 1)))));
+    }
+
+    @Test
+    void unquoted_text_over_several_lines_is_not_checked_for_feel_syntax() {
+        Assertions.assertThat(CellParser.parse("a(\nb", ColumnType.STRING))
+                .isEqualTo(new UnaryTests.Positive(List.of(new Equals("a(\nb"))));
+    }
+
+    @Test
     void dates_use_the_date_function_or_iso_text() {
         var start = LocalDate.of(2025, 1, 1);
         var end = LocalDate.of(2025, 12, 31);
@@ -184,6 +202,10 @@ class CellParserTest {
             "NUMBER; [1..2;           unterminated interval",
             "STRING; a,,b;            empty test",
             "STRING; a(b;             quote the text",
+            "STRING; \"a\\\";         unterminated string",
+            "STRING; a), b;           unexpected characters in 'a), b'",
+            "NUMBER; [1..(2, 3];      unterminated interval",
+            "NUMBER; [1..\"2];        unterminated interval",
     })
     void invalid_cells_are_rejected_with_a_reason(ColumnType type, String cell, String reason) {
         Assertions.assertThatThrownBy(() -> CellParser.parse(cell, type))

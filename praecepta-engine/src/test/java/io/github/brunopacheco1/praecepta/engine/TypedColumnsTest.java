@@ -85,7 +85,8 @@ class TypedColumnsTest {
                 .rules(RULES)
                 .build();
         Assertions.assertThat(engine.evaluate(Map.of("country", "ES", "age", "40", "since", "2018-07-01"))).containsExactly("gold");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("country", "ES", "age", "forty")))
+        var notANumber = Map.of("country", "ES", "age", "forty");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(notANumber))
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("age=forty");
     }
@@ -96,9 +97,11 @@ class TypedColumnsTest {
                 .allowedValues("country", List.of("PT", "ES", "FR"))
                 .allowedValues("age", "[0..120]")
                 .build();
-        Assertions.assertThatThrownBy(() -> engine.evaluate(new Applicant("DE", 30, null)))
+        var undeclaredCountry = new Applicant("DE", 30, null);
+        var undeclaredAge = new Applicant("PT", 130, null);
+        Assertions.assertThatThrownBy(() -> engine.evaluate(undeclaredCountry))
                 .isInstanceOfSatisfying(InvalidInputException.class, e -> Assertions.assertThat(e.getColumn()).isEqualTo("country"));
-        Assertions.assertThatThrownBy(() -> engine.evaluate(new Applicant("PT", 130, null)))
+        Assertions.assertThatThrownBy(() -> engine.evaluate(undeclaredAge))
                 .isInstanceOf(InvalidInputException.class);
         Assertions.assertThat(engine.evaluate(new Applicant(null, 30, null))).isNotEmpty(); // missing is always allowed
     }
@@ -124,7 +127,8 @@ class TypedColumnsTest {
     @Test
     void invalid_cells_name_the_rule_and_column() {
         var broken = List.of(rule(7, "\"PT\"", "[65..18]", "", "x"));
-        Assertions.assertThatThrownBy(() -> engine(HitPolicy.FIRST).rules(broken).build())
+        var builder = engine(HitPolicy.FIRST).rules(broken);
+        Assertions.assertThatThrownBy(builder::build)
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("Rule 7, column 'age'")
                 .hasMessageContaining("interval starts after it ends");

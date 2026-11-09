@@ -160,10 +160,13 @@ final class TableCompiler {
 
     // ---- shared helpers ---------------------------------------------------------------------------
 
-    /** The values of a string column's value list, or null if it has none (it then stays a String). */
+    /**
+     * The values of a string column's value list, or an empty list if it has none (it then stays a
+     * String). A value list always holds at least one value.
+     */
     static List<String> enumValues(InputColumn column) {
         if (column.type() != ColumnType.STRING || column.allowedValues() == null) {
-            return null;
+            return List.of();
         }
         var tests = (UnaryTests.Positive) CellParser.parse(column.allowedValues(), ColumnType.STRING);
         var values = new LinkedHashMap<String, Boolean>();

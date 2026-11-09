@@ -13,6 +13,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.IntPredicate;
 import java.util.regex.Pattern;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
@@ -100,7 +101,7 @@ public final class CellParser {
 
         private List<Test> tests(String text) {
             var tests = new ArrayList<Test>();
-            for (var part : splitTopLevel(text, cell)) {
+            for (var part : splitTopLevel(text)) {
                 tests.add(test(part.strip()));
             }
             if (tests.isEmpty()) {
@@ -161,7 +162,7 @@ public final class CellParser {
             if (strictFeel) {
                 throw new CellSyntaxException(cell, "'" + text + "' is a FEEL name (a variable), which is not supported; quote string literals");
             }
-            if (text.matches(".*[\"()\\[\\]].*")) {
+            if (hasFeelSyntax(text)) {
                 throw new CellSyntaxException(cell, "unexpected characters in '" + text + "'; quote the text");
             }
             return text; // Praecepta's original unquoted syntax
@@ -208,15 +209,16 @@ public final class CellParser {
                 throw new CellSyntaxException(cell, "unterminated string " + text);
             }
             var value = new StringBuilder();
-            for (int i = 1; i < text.length() - 1; i++) {
+            int end = text.length() - 1; // the closing quote
+            int i = 1;
+            while (i < end) {
                 char c = text.charAt(i);
-                if (c == '\\' && i + 1 < text.length() - 1) {
-                    value.append(text.charAt(++i));
-                } else if (c == '"') {
+                if (c == '"') {
                     throw new CellSyntaxException(cell, "unexpected quote in " + text);
-                } else {
-                    value.append(c);
                 }
+                boolean escape = c == '\\' && i + 1 < end;
+                value.append(escape ? text.charAt(i + 1) : c);
+                i += escape ? 2 : 1;
             }
             return value.toString();
         }
@@ -226,111 +228,146 @@ public final class CellParser {
                 throw new CellSyntaxException(cell, what + " are only supported on NUMBER, DATE, TIME and DATE_TIME columns");
             }
         }
-    }
 
-    /**
-     * Whether a time or date-time ends with an offset or a zone: {@code Z}, {@code +02:00},
-     * {@code -0500}, {@code @Europe/Paris}. An offset follows the time, so its sign comes after a
-     * colon; the dashes of a date ({@code 2025-01-31}) do not count.
-     */
-    private static boolean hasZone(String iso) {
-        if (iso.indexOf('@') >= 0 || iso.endsWith("Z") || iso.endsWith("z")) {
-            return true;
+        /**
+         * Whether unquoted text holds a quote, a parenthesis or a bracket, which belong to FEEL syntax.
+         * Text over several lines is let through, as it always has been.
+         */
+        private static boolean hasFeelSyntax(String text) {
+            return text.chars().anyMatch(c -> "\"()[]".indexOf(c) >= 0) && text.chars().noneMatch(Parser::isLineTerminator);
         }
-        int sign = Math.max(iso.lastIndexOf('+'), iso.lastIndexOf('-'));
-        return sign > 0 && iso.lastIndexOf(':', sign) >= 0 && OFFSET_DIGITS.matcher(iso.substring(sign + 1)).matches();
+
+        /** A line terminator, as Java's regular expressions define it. */
+        private static boolean isLineTerminator(int c) {
+            return c == '\n' || c == '\r' || c == '\u0085' || c == '\u2028' || c == '\u2029';
+        }
+
+        /**
+         * Whether a time or date-time ends with an offset or a zone: {@code Z}, {@code +02:00},
+         * {@code -0500}, {@code @Europe/Paris}. An offset follows the time, so its sign comes after a
+         * colon; the dashes of a date ({@code 2025-01-31}) do not count.
+         */
+        private static boolean hasZone(String iso) {
+            if (iso.indexOf('@') >= 0 || iso.endsWith("Z") || iso.endsWith("z")) {
+                return true;
+            }
+            int sign = Math.max(iso.lastIndexOf('+'), iso.lastIndexOf('-'));
+            return sign > 0 && iso.lastIndexOf(':', sign) >= 0 && OFFSET_DIGITS.matcher(iso.substring(sign + 1)).matches();
+        }
+
+        /**
+         * Splits on commas outside quotes, parentheses and intervals. An interval may use outward-facing
+         * brackets ({@code ]1..2[}), so it is skipped as a unit rather than by bracket depth.
+         */
+        private List<String> splitTopLevel(String text) {
+            var parts = new ArrayList<String>();
+            int end = -1;
+            do {
+                int start = end + 1;
+                end = endOfTest(text, start);
+                parts.add(text.substring(start, end));
+            } while (end < text.length());
+            return parts;
+        }
+
+        /**
+         * Index of the comma that ends the test starting at {@code start}, or the text's length if it is
+         * the last test. A leading interval is skipped whole; after it, commas inside strings or
+         * parentheses do not count.
+         */
+        private int endOfTest(String text, int start) {
+            int i = afterLeadingInterval(text, start);
+            int depth = 0;
+            while (i < text.length()) {
+                char c = text.charAt(i);
+                if (c == ',' && depth == 0) {
+                    return i;
+                }
+                if (c == '"') {
+                    i = closingQuote(text, i);
+                    if (i == text.length()) {
+                        throw new CellSyntaxException(cell, "unterminated string");
+                    }
+                } else if (c == '(') {
+                    depth++;
+                } else if (c == ')') {
+                    depth--;
+                }
+                i++;
+            }
+            return i;
+        }
+
+        /** Index just after the interval a test starts with (after whitespace), or of its first character if it has none. */
+        private int afterLeadingInterval(String text, int start) {
+            int i = start;
+            while (i < text.length() && Character.isWhitespace(text.charAt(i))) {
+                i++;
+            }
+            boolean interval = i < text.length() && "[](".indexOf(text.charAt(i)) >= 0;
+            return interval ? endOfInterval(text, i) + 1 : i;
+        }
+
+        /** Index of the bracket closing the interval that starts at {@code open}: the first one after its {@code ..}. */
+        private int endOfInterval(String text, int open) {
+            int dots = nextOutsideStringsAndParentheses(text, open + 1, i -> text.startsWith("..", i));
+            int close = nextOutsideStringsAndParentheses(text, dots + 2, i -> "])[".indexOf(text.charAt(i)) >= 0);
+            if (close == text.length()) {
+                throw new CellSyntaxException(cell, "unterminated interval");
+            }
+            return close;
+        }
+
+        /**
+         * The first index from {@code from} that is outside strings and parentheses and is {@code wanted},
+         * or the text's length if there is none. A closing parenthesis with none open is skipped.
+         */
+        private static int nextOutsideStringsAndParentheses(String text, int from, IntPredicate wanted) {
+            int depth = 0;
+            int i = from;
+            while (i < text.length()) {
+                char c = text.charAt(i);
+                if (depth == 0 && wanted.test(i)) {
+                    return i;
+                }
+                if (c == '"') {
+                    i = closingQuote(text, i);
+                } else if (c == '(') {
+                    depth++;
+                } else if (c == ')' && depth > 0) {
+                    depth--;
+                }
+                i++;
+            }
+            return text.length();
+        }
+
+        /** Index of the quote closing the string that opens at {@code open}, or the text's length if there is none. */
+        private static int closingQuote(String text, int open) {
+            int i = open + 1;
+            while (i < text.length() && text.charAt(i) != '"') {
+                i += text.charAt(i) == '\\' ? 2 : 1; // a backslash escapes the next character
+            }
+            return Math.min(i, text.length());
+        }
+
+        /** Index of the first {@code ..} outside quotes, after the opening bracket, or -1 if there is none. */
+        private static int topLevelDots(String text) {
+            boolean quoted = false;
+            for (int i = 1; i < text.length() - 2; i++) {
+                char c = text.charAt(i);
+                if (c == '"') {
+                    quoted = !quoted;
+                } else if (!quoted && c == '.' && text.charAt(i + 1) == '.') {
+                    return i;
+                }
+            }
+            return -1;
+        }
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     static int compare(Comparable<?> a, Comparable<?> b) {
         return ((Comparable) a).compareTo(b);
-    }
-
-    /**
-     * Splits on commas outside quotes, parentheses and intervals. An interval may use outward-facing
-     * brackets ({@code ]1..2[}), so it is skipped as a unit rather than by bracket depth.
-     */
-    private static List<String> splitTopLevel(String text, String cell) {
-        var parts = new ArrayList<String>();
-        int i = 0;
-        while (true) {
-            int start = i;
-            while (i < text.length() && Character.isWhitespace(text.charAt(i))) {
-                i++;
-            }
-            if (i < text.length() && "[](".indexOf(text.charAt(i)) >= 0) {
-                i = endOfInterval(text, i, cell) + 1;
-            }
-            int depth = 0;
-            boolean quoted = false;
-            for (; i < text.length(); i++) {
-                char c = text.charAt(i);
-                if (quoted) {
-                    if (c == '\\') {
-                        i++;
-                    } else if (c == '"') {
-                        quoted = false;
-                    }
-                } else if (c == '"') {
-                    quoted = true;
-                } else if (c == '(') {
-                    depth++;
-                } else if (c == ')') {
-                    depth--;
-                } else if (c == ',' && depth == 0) {
-                    break;
-                }
-            }
-            if (quoted) {
-                throw new CellSyntaxException(cell, "unterminated string");
-            }
-            parts.add(text.substring(start, Math.min(i, text.length())));
-            if (i >= text.length()) {
-                return parts;
-            }
-            i++; // skip the comma
-        }
-    }
-
-    /** Index of the bracket closing the interval that starts at {@code open}. */
-    private static int endOfInterval(String text, int open, String cell) {
-        boolean quoted = false;
-        boolean seenDots = false;
-        int depth = 0;
-        for (int i = open + 1; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (quoted) {
-                if (c == '\\') {
-                    i++;
-                } else if (c == '"') {
-                    quoted = false;
-                }
-            } else if (c == '"') {
-                quoted = true;
-            } else if (c == '(') {
-                depth++;
-            } else if (c == ')' && depth > 0) {
-                depth--;
-            } else if (depth == 0 && !seenDots && c == '.' && i + 1 < text.length() && text.charAt(i + 1) == '.') {
-                seenDots = true;
-                i++;
-            } else if (depth == 0 && seenDots && "])[".indexOf(c) >= 0) {
-                return i;
-            }
-        }
-        throw new CellSyntaxException(cell, "unterminated interval");
-    }
-
-    private static int topLevelDots(String text) {
-        boolean quoted = false;
-        for (int i = 1; i < text.length() - 2; i++) {
-            char c = text.charAt(i);
-            if (c == '"') {
-                quoted = !quoted;
-            } else if (!quoted && c == '.' && text.charAt(i + 1) == '.') {
-                return i;
-            }
-        }
-        return -1;
     }
 }
