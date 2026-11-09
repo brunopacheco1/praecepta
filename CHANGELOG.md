@@ -11,6 +11,11 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+### Added
+- **Independently verified reproducible builds:** [Reproducible Central](https://github.com/jvm-repo-rebuild/reproducible-central)
+  rebuilds Praecepta's releases and checks them against Maven Central; 0.2.0 matches bit for bit (14 of
+  14 artifacts). Its badge is in the README and on the website.
+
 ### Changed
 - **Releases keep the build timestamp committed in the tag** (`project.build.outputTimestamp`), so
   a release can be rebuilt bit for bit from its tag with only the version changed. 0.2.0 was

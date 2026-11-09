@@ -251,7 +251,8 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
             <li><strong>Bad input fails cleanly,</strong> with an error naming the decision, rule and column.</li>
             <li><strong>Declared input values are enforced:</strong> anything else is rejected, not matched.</li>
             <li><strong>Generated code is safe to compile:</strong> names and text from tables are sanitised.</li>
-            <li><strong>Releases are authentic:</strong> signed, with provenance and an SBOM.</li>
+            <li><strong>Releases are authentic:</strong> signed, with provenance and an SBOM, and rebuilt
+              bit for bit by an independent project.</li>
           </ul>
         </div>
         <div class="limits">
@@ -375,12 +376,24 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
             </svg>
           </a>
         </li>
+        <li>
+          <a href="https://github.com/jvm-repo-rebuild/reproducible-central/blob/master/content/io/github/brunopacheco1/praecepta/README.md" aria-label="Reproducible Builds, by Reproducible Central: @REPRODUCIBLE_OK@ of @REPRODUCIBLE_ALL@">
+            <svg class="armilla @REPRODUCIBLE_STATE@" viewBox="0 0 128 112" aria-hidden="true">
+              <path class="arm-band" d="M40 98 A52 44 0 1 1 88 98"/>
+              <circle class="arm-knob" cx="40" cy="98" r="7"/>
+              <circle class="arm-knob" cx="88" cy="98" r="7"/>
+              <text class="arm-label" x="64" y="50">REPRODUCIBLE</text>
+              <text class="arm-value arm-num" x="64" y="72">@REPRODUCIBLE_OK@/@REPRODUCIBLE_ALL@</text>
+            </svg>
+          </a>
+        </li>
       </ul>
       <ul class="plain two">
         <li><strong>Apache-2.0</strong>, and <a href="https://reuse.software">REUSE</a>-compliant: every file
           states its author and licence.</li>
-        <li><strong>Signed releases</strong> with an SBOM, build provenance and third-party notices on every
-          <a href="https://github.com/brunopacheco1/praecepta/releases">GitHub release</a>.</li>
+        <li><strong>Signed, reproducible releases</strong> with an SBOM, SLSA Build Level 2 provenance and
+          third-party notices on every <a href="https://github.com/brunopacheco1/praecepta/releases">GitHub release</a>;
+          <a href="https://github.com/jvm-repo-rebuild/reproducible-central/blob/master/content/io/github/brunopacheco1/praecepta/README.md">Reproducible Central</a> rebuilds each one and checks it matches Maven Central bit for bit.</li>
         <li><strong>Checked on every change:</strong> tests on Java 21, 25 and 27, an enforced code style,
           compiler warnings as errors, SonarCloud, CodeQL, dependency checks, and fuzzing of the parsers
           that read untrusted input.</li>
