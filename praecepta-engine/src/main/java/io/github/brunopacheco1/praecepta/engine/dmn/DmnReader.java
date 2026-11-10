@@ -49,7 +49,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * a zone; columns typed by an item definition of one of those types, whose allowed values become the
  * input value list unless the input declares its own; input entries in Praecepta's FEEL subset
  * (lists, {@code not(...)}, {@code null}, comparisons, intervals, {@code -}); input and output value
- * lists; literal output entries; every hit policy; SUM, MIN and MAX aggregation. Anything else is rejected with an
+ * lists; literal output entries; every hit policy; SUM, MIN, MAX and COUNT aggregation. Anything else is rejected with an
  * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered
  * from 1 in table order.
  */
@@ -151,8 +151,9 @@ public final class DmnReader {
             case "SUM" -> AggregationOperator.SUM;
             case "MIN" -> AggregationOperator.MIN;
             case "MAX" -> AggregationOperator.MAX;
+            case "COUNT" -> AggregationOperator.COUNT;
             default -> throw new InvalidDecisionTableException(
-                    "%s: aggregation '%s' is not supported (SUM, MIN and MAX are)".formatted(where, value));
+                    "%s: aggregation '%s' is not supported (SUM, MIN, MAX and COUNT are)".formatted(where, value));
         };
     }
 

@@ -123,18 +123,22 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         };
     }
 
-    /** DMN COLLECT with an aggregator over a single numeric output column. Empty input → null (COUNT → 0). */
+    /**
+     * DMN COLLECT with an aggregator over a single numeric output column, skipping missing outputs.
+     * COUNT counts the matching rules. No match → null (COUNT → 0).
+     */
     public BigDecimal aggregate(Map<String, ?> input, String output, Aggregator aggregator) {
         if (hitPolicy != HitPolicy.COLLECT) {
             throw new IllegalStateException("DMN only allows aggregation with COLLECT");
         }
-        var values = matches(input).stream()
+        var matched = matches(input);
+        var values = matched.stream()
                 .map(rule -> rule.output().values().get(output))
                 .filter(Objects::nonNull)
                 .map(BigDecimal::new)
                 .toList();
         return switch (aggregator) {
-            case COUNT -> BigDecimal.valueOf(values.size());
+            case COUNT -> BigDecimal.valueOf(matched.size());
             case SUM -> values.isEmpty() ? null : values.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
             case MIN -> values.stream().min(Comparator.naturalOrder()).orElse(null);
             case MAX -> values.stream().max(Comparator.naturalOrder()).orElse(null);

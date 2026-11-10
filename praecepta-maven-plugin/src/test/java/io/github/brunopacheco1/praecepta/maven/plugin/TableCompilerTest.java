@@ -158,6 +158,24 @@ class TableCompilerTest {
     }
 
     @Test
+    void collect_count_tables_return_the_number_of_matching_rules() throws Exception {
+        var config = new TableConfig(table("fees.csv"), "Fees", null, HitPolicy.COLLECT, AggregationOperator.COUNT,
+                List.of(new ColumnConfig("zone", ColumnType.STRING, null, List.of())),
+                List.of(new ColumnConfig("fee", ColumnType.NUMBER, null, List.of())));
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".FeesInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Fees").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("islands")))
+                    .get().hasToString("FeesOutput[fee=2]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("mainland")))
+                    .get().hasToString("FeesOutput[fee=1]");
+        }
+    }
+
+    @Test
     void validation_errors_fail_the_build_with_the_report() {
         var config = new TableConfig(table("overlapping.csv"), "Tier", null, HitPolicy.UNIQUE, null,
                 List.of(new ColumnConfig("country", ColumnType.STRING, null, List.of())),

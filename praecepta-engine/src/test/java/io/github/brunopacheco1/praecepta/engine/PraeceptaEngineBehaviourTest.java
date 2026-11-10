@@ -294,6 +294,14 @@ class PraeceptaEngineBehaviourTest {
         }
 
         @Test
+        void count_needs_an_output_strategy_that_counts_and_says_so_when_built() {
+            var builder = byColumn(HitPolicy.COLLECT).aggregation(AggregationOperator.COUNT);
+            Assertions.assertThatThrownBy(builder::build)
+                    .isInstanceOf(UnsupportedOperationException.class)
+                    .hasMessage("This OutputStrategy does not support aggregation");
+        }
+
+        @Test
         void priorities_compare_output_columns_in_declaration_order_and_ties_keep_rule_order() {
             //    grade  level  (all rules match every input)
             // 1  B      x

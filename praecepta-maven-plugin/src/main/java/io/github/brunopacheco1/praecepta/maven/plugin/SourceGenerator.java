@@ -191,6 +191,11 @@ final class SourceGenerator {
                                     public ${Output} max(${Output} a, ${Output} b) {
                                         return a.${field}() == null ? b : b.${field}() == null || a.${field}().compareTo(b.${field}()) >= 0 ? a : b;
                                     }
+
+                                    @Override
+                                    public ${Output} count(int matches) {
+                                        return new ${Output}(java.math.BigDecimal.valueOf(matches));
+                                    }
                                 }""";
 
     // ---- generator ------------------------------------------------------------------------------

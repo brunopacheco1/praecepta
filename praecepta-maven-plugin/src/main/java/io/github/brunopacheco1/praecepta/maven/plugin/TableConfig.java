@@ -43,7 +43,7 @@ public class TableConfig {
     /** Excel and CSV only (required there). */
     HitPolicy hitPolicy;
 
-    /** Excel and CSV only: SUM, MIN or MAX for a COLLECT table with one NUMBER output. */
+    /** Excel and CSV only: SUM, MIN, MAX or COUNT for a COLLECT table with one NUMBER output. */
     AggregationOperator aggregation;
 
     /** Excel and CSV only: the input columns, in order. */
