@@ -31,7 +31,9 @@ import net.jqwik.api.Tuple;
  * A random decision table plus inputs to evaluate against it. Columns are STRING, NUMBER, DATE,
  * BOOLEAN, TIME or DATE_TIME, and cells use every form of the grammar: wildcards, literals (quoted
  * and legacy unquoted, function and bare forms), lists, comparisons, intervals with every bracket
- * style, {@code not(...)} and {@code null}. Values come from small domains, and dates are consecutive
+ * style, {@code not(...)} and {@code null}. String columns compare less often than the others, so
+ * that both kinds of string column (with and without comparisons) are common, and string inputs
+ * include values between and around the letters the cells mention. Values come from small domains, and dates are consecutive
  * days, so overlaps, boundaries and empty gaps between days are frequent; times and date-times step
  * by half an hour and twelve hours, and inputs fall on and between those steps. Some columns declare
  * input values, and inputs include values outside them.
@@ -50,7 +52,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     static final LocalDate DAY0 = LocalDate.of(2025, 1, 1);
     static final LocalTime TIME0 = LocalTime.of(8, 0);
     static final LocalDateTime MOMENT0 = DAY0.atTime(6, 0);
-    private static final List<String> LETTERS = List.of("a", "b", "c", "d");
+    /** String values: a column's domain is the first two to four; comparisons and intervals use all six. */
+    private static final List<String> LETTERS = List.of("a", "b", "c", "d", "e", "f");
 
     /** Column definition: type, string domain, and declared input values (null if none). */
     private record Column(ColumnType type, List<String> domain, String allowed) {
@@ -115,11 +118,18 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 Tuple.of(4, Arbitraries.just("")),
                 Tuple.of(1, Arbitraries.just("-")),
                 Tuple.of(4, single),
-                Tuple.of(column.type().supportsComparisons() ? 4 : 0, test(column)),
+                Tuple.of(comparisonWeight(column.type()), test(column)),
                 Tuple.of(2, list),
                 Tuple.of(1, negated),
                 Tuple.of(1, Arbitraries.just("null")),
                 Tuple.of(1, single.map(value -> "null, " + value)));
+    }
+
+    private static int comparisonWeight(ColumnType type) {
+        if (!type.supportsComparisons()) {
+            return 0;
+        }
+        return type == ColumnType.STRING ? 1 : 4;
     }
 
     /** A literal, written in every accepted style. */
@@ -158,7 +168,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             case DATE -> "date(\"" + DAY0.plusDays(i) + "\")";
             case TIME -> "time(\"" + DateTimeFormatter.ISO_LOCAL_TIME.format(TIME0.plusMinutes(30L * i)) + "\")";
             case DATE_TIME -> "date and time(\"" + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(MOMENT0.plusHours(12L * i)) + "\")";
-            case STRING, BOOLEAN -> throw new IllegalArgumentException("no intervals on " + type);
+            case STRING -> "\"" + LETTERS.get(i) + "\"";
+            case BOOLEAN -> throw new IllegalArgumentException("no intervals on " + type);
         };
     }
 
@@ -170,6 +181,10 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                     var options = new ArrayList<Object>(column.domain());
                     options.add("q");
                     options.add(" ");
+                    // around and between the letters, for comparisons: below "a", between "a" and "b", "e"
+                    options.add("A");
+                    options.add("ab");
+                    options.add("e");
                     yield Arbitraries.of(options).injectNull(0.15);
                 }
                 case NUMBER -> Arbitraries.integers().between(-2, 12)

@@ -281,6 +281,84 @@ class ColumnIndexBehaviourTest {
     }
 
     @Test
+    void comparing_string_classes() {
+        var column = column(ColumnType.STRING, null, "< \"B\"", "[\"B\"..\"D\")", ">= \"D\"", "\"C\"", "not(\"A\")", "null");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf.."A") rules=[0, 4] example=0 (String)
+                1 "A" rules=[0] example=A (String)
+                2 ("A".."B") rules=[0, 4] example=Aa (String)
+                3 "B" rules=[1, 4] example=B (String)
+                4 ("B".."C") rules=[1, 4] example=Ba (String)
+                5 "C" rules=[1, 3, 4] example=C (String)
+                6 ("C".."D") rules=[1, 4] example=Ca (String)
+                7 "D" rules=[2, 4] example=D (String)
+                8 ("D"..+inf) rules=[2, 4] example=Da (String)
+                9 null missing rules=[4, 5] example=-
+                """);
+        Assertions.assertThat(column.describe(List.of(0, 1, 2, 3, 4, 8))).containsExactly("(-inf..\"C\")", "(\"D\"..+inf)");
+        // strings compare by UTF-16 code unit: lower case sorts after upper case, a space before both
+        Assertions.assertThat(lookups(column, null, "A", "Aardvark", "B", "Ba", "C", "Cz", "D", "Zed", "a", " B", "", "  ")).isEqualTo("""
+                null -> [4, 5]
+                'A' (String) -> [0]
+                'Aardvark' (String) -> [0, 4]
+                'B' (String) -> [1, 4]
+                'Ba' (String) -> [1, 4]
+                'C' (String) -> [1, 3, 4]
+                'Cz' (String) -> [1, 4]
+                'D' (String) -> [2, 4]
+                'Zed' (String) -> [2, 4]
+                'a' (String) -> [2, 4]
+                ' B' (String) -> [0, 4]
+                '' (String) -> [4, 5]
+                '  ' (String) -> [4, 5]
+                """);
+    }
+
+    @Test
+    void comparing_string_classes_hold_no_value_between_a_string_and_its_successor() {
+        // the successor of "A" is "A" followed by U+0000; below "" and U+0000 only blank (missing) strings lie
+        Assertions.assertThat(column(ColumnType.STRING, null, "[\"A\"..\"A\u0000\"]").empty).containsExactly(false, false, true, false, false, false);
+        Assertions.assertThat(column(ColumnType.STRING, null, "< \"\"").empty[0]).isTrue();
+        Assertions.assertThat(column(ColumnType.STRING, null, "< \"\u0000\"").empty[0]).isTrue();
+        Assertions.assertThat(column(ColumnType.STRING, null, "< \"\u0001\"").representative(0)).isEqualTo("\u0000");
+        // examples take a readable suffix when one fits, else U+0000
+        Assertions.assertThat(column(ColumnType.STRING, null, "\"A\"", "< \"A0\"").representative(2)).isEqualTo("A!");
+        Assertions.assertThat(column(ColumnType.STRING, null, "\"A\"", "< \"A!\"").representative(2)).isEqualTo("A\u0000");
+    }
+
+    @Test
+    void comparing_string_classes_with_declared_values_and_an_enum() {
+        var cells = cells(ColumnType.STRING, "< \"B\"", "> \"A\"");
+        var allowed = CellParser.parse("\"A\",\"B\",\"C\"", ColumnType.STRING);
+        var column = new ColumnIndex("c", ColumnType.STRING, cells, allowed, 1, null);
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf.."A") disallowed rules=[0] example=0 (String)
+                1 "A" rules=[0] example=A (String)
+                2 ("A".."B") disallowed rules=[0, 1] example=Aa (String)
+                3 "B" rules=[1] example=B (String)
+                4 ("B".."C") disallowed rules=[1] example=Ba (String)
+                5 "C" rules=[1] example=C (String)
+                6 ("C"..+inf) disallowed rules=[1] example=Ca (String)
+                7 null missing rules=[] example=-
+                """);
+        Assertions.assertThat(lookups(column, null, "A", "B", "C", "Ab", "D")).isEqualTo("""
+                null -> []
+                'A' (String) -> [0]
+                'B' (String) -> [1]
+                'C' (String) -> [1]
+                'Ab' (String) -> Input c=Ab is not one of the column's allowed input values
+                'D' (String) -> Input c=D is not one of the column's allowed input values
+                """);
+        var byEnum = new ColumnIndex("letter", ColumnType.STRING, cells, allowed, 1, new String[] {"A", "B", "C"});
+        Assertions.assertThat(lookups(byEnum, null, Letter.A, Letter.B, Letter.C)).isEqualTo("""
+                null -> []
+                'A' (Letter) -> [0]
+                'B' (Letter) -> [1]
+                'C' (Letter) -> [1]
+                """);
+    }
+
+    @Test
     void enum_bound_string_classes() {
         var cells = cells(ColumnType.STRING, "\"A\",\"B\"", "not(\"A\")", "null");
         var enumValues = new String[] {"A", "B", "C"};

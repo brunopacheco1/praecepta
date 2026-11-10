@@ -75,8 +75,8 @@ Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drool
   (e.g. `income > 2 * rent`). Praecepta cells are FEEL *simple unary tests* on one column.
 - **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
   boxed expressions.
-- **Durations** ([planned](https://github.com/brunopacheco1/praecepta/issues/52)), **times with a
-  time zone**, and string ranges ([planned](https://github.com/brunopacheco1/praecepta/issues/13)).
+- **Durations** ([planned](https://github.com/brunopacheco1/praecepta/issues/52)) and **times with a
+  time zone**.
 - **A process engine, a modeller or a decision service** around the tables.
 
 # Getting Started
@@ -119,14 +119,15 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 | `true`, `false` | that boolean | BOOLEAN |
 | `time("08:30:00")` or `08:30:00` | that time of day | TIME |
 | `date and time("2025-01-31T08:30:00")` or `2025-01-31T08:30:00` | that date and time | DATE_TIME |
-| `< 18`, `<= 18`, `> 18`, `>= 18` | comparisons | NUMBER, DATE, TIME, DATE_TIME |
-| `[18..65)`, `(0..1]`, `]a..b[` | intervals: `[`/`]` closed, `(`/`)` or outward brackets open | NUMBER, DATE, TIME, DATE_TIME |
+| `< 18`, `<= 18`, `> 18`, `>= 18`, `< "N"` | comparisons | all but BOOLEAN |
+| `[18..65)`, `(0..1]`, `]a..b[`, `["A".."M"]` | intervals: `[`/`]` closed, `(`/`)` or outward brackets open | all but BOOLEAN |
 | `null` | only a missing value | all |
 | `not(...)` | anything the list inside does not match | all |
 
 Missing values follow FEEL: they fail comparisons and intervals, equal only `null`, and so satisfy
-`not("FR")`. Blank text counts as missing. Times and date-times are local: values with a time zone or
-offset (`Z`, `+02:00`, `@Europe/Paris`) are rejected.
+`not("FR")`. Blank text counts as missing. Strings compare as Java's `String.compareTo` does,
+character by character and case-sensitively (`"Zed" < "apple"`). Times and date-times are local:
+values with a time zone or offset (`Z`, `+02:00`, `@Europe/Paris`) are rejected.
 
 ### Typed columns and input value lists
 ```java
@@ -147,7 +148,7 @@ var engine = PraeceptaEngine.<Applicant, String>builder()
 With declared input values, other (non-missing) values throw `InvalidInputException`, and
 `validationReport()` lists **gaps**: declared inputs no rule matches, e.g.
 `country = "FR", age in [18..120]`. Gaps are only analysed when every string column the rules test
-declares its values. With map-based inputs, declare non-string columns with
+declares its values or uses comparisons or intervals (any other string then falls between them). With map-based inputs, declare non-string columns with
 `.columnType("age", ColumnType.NUMBER)`; their text is parsed.
 
 Notes:

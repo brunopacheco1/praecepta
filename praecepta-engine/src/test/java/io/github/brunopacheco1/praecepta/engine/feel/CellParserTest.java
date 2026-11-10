@@ -163,6 +163,19 @@ class CellParserTest {
     }
 
     @Test
+    void strings_compare_and_form_intervals_quoted_or_unquoted() {
+        Assertions.assertThat(CellParser.parse("[\"A\"..\"M\"]", ColumnType.STRING))
+                .isEqualTo(positive(new Range("A", true, "M", true)));
+        Assertions.assertThat(CellParser.parseFeel("< \"N\", >= \"x y\"", ColumnType.STRING))
+                .isEqualTo(positive(new Compare(Operator.LT, "N"), new Compare(Operator.GE, "x y")));
+        // Praecepta's unquoted words work as ends too, and the ends may be equal
+        Assertions.assertThat(CellParser.parse("(a..m], [PT..PT]", ColumnType.STRING))
+                .isEqualTo(positive(new Range("a", false, "m", true), new Range("PT", true, "PT", true)));
+        Assertions.assertThat(CellParser.parse("not(< \"N\")", ColumnType.STRING))
+                .isEqualTo(new UnaryTests.Negated(List.of(new Compare(Operator.LT, "N"))));
+    }
+
+    @Test
     void dates_use_the_date_function_or_iso_text() {
         var start = LocalDate.of(2025, 1, 1);
         var end = LocalDate.of(2025, 12, 31);
@@ -174,9 +187,8 @@ class CellParserTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = ';', value = {
-            "STRING; < 10;            only supported on NUMBER, DATE, TIME and DATE_TIME",
-            "STRING; [a..b];          only supported on NUMBER, DATE, TIME and DATE_TIME",
-            "BOOLEAN; < true;         only supported on NUMBER, DATE, TIME and DATE_TIME",
+            "BOOLEAN; < true;         comparisons are not supported on BOOLEAN columns",
+            "BOOLEAN; [false..true];  intervals are not supported on BOOLEAN columns",
             "BOOLEAN; yes;            is not a boolean",
             "TIME;   time(\"25:00:00\"); invalid time",
             "TIME;   8am;             is not a time",

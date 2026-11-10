@@ -37,7 +37,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   date and time("2025-01-31T08:30:00")
  *                            date-time literal (DATE_TIME columns; a bare 2025-01-31T08:30:00 too)
  *   true, false              boolean literals (BOOLEAN columns)
- *   &lt; 18, &gt;= 2.5            comparisons (NUMBER, DATE, TIME and DATE_TIME columns)
+ *   &lt; 18, &gt;= 2.5, &lt; "N"      comparisons (all but BOOLEAN columns; strings compare lexicographically)
  *   [18..65), (0..1], ]a..b[  intervals; [ and ] include their end, ( ) and outward-facing brackets exclude it
  *   null                     only a missing value
  *   not(t1, t2)              anything but these tests
@@ -160,7 +160,7 @@ public final class CellParser {
 
         private void requireComparisons(String what) {
             if (!type.supportsComparisons()) {
-                throw new CellSyntaxException(cell, what + " are only supported on NUMBER, DATE, TIME and DATE_TIME columns");
+                throw new CellSyntaxException(cell, what + " are not supported on " + type + " columns");
             }
         }
 
@@ -394,19 +394,21 @@ public final class CellParser {
         }
 
         /**
-         * Index of the first {@code ..} outside quotes, after the opening bracket and before the closing
-         * one, or -1 if there is none. Unlike {@link #closingQuote}, a backslash escapes nothing here:
-         * every quote opens or closes a string, as it always has.
+         * Index of the first {@code ..} outside strings, after the opening bracket and before the closing
+         * one, or -1 if there is none. As in {@link #closingQuote}, a backslash inside a string escapes
+         * the next character, so the escaped quotes {@code DmnWriter} writes into a string end, as in
+         * {@code ["a\"..b".."c"]}, do not end it.
          */
         private static int topLevelDots(String text) {
-            boolean quoted = false;
-            for (int i = 1; i < text.length() - 2; i++) {
+            int i = 1;
+            while (i < text.length() - 2) {
                 char c = text.charAt(i);
                 if (c == '"') {
-                    quoted = !quoted;
-                } else if (!quoted && c == '.' && text.charAt(i + 1) == '.') {
+                    i = closingQuote(text, i);
+                } else if (c == '.' && text.charAt(i + 1) == '.') {
                     return i;
                 }
+                i++;
             }
             return -1;
         }
