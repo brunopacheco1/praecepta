@@ -21,13 +21,13 @@ same models (literal expressions, contexts, invocations) are outside Praecepta's
 is *not supported* when the table uses a feature Praecepta does not have (the DMN reader
 rejects it), or the inputs are of a kind it does not take.
 
-**51 of 86 checks pass (59.3 %).** Of the 51 checks Praecepta supports, 51 pass (100.0 %).
+**54 of 86 checks pass (62.8 %).** Of the 54 checks Praecepta supports, 54 pass (100.0 %).
 
 | Outcome | Checks |
 |---|---:|
-| Passed | 51 |
+| Passed | 54 |
 | Failed | 0 |
-| Not supported | 35 |
+| Not supported | 32 |
 
 ## By test case
 
@@ -46,7 +46,7 @@ rejects it), or the inputs are of a kind it does not take.
 | [compliance-level-2/0113-outputOrder-hitpolicy-singleinoutcol](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0113-outputOrder-hitpolicy-singleinoutcol) | 3 | 0 | 0 |  |
 | [compliance-level-2/0114-min-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0114-min-collect-hitpolicy) | 3 | 0 | 0 |  |
 | [compliance-level-2/0115-sum-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0115-sum-collect-hitpolicy) | 3 | 0 | 0 |  |
-| [compliance-level-2/0116-count-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0116-count-collect-hitpolicy) | 0 | 0 | 3 | COUNT aggregation (#15) |
+| [compliance-level-2/0116-count-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0116-count-collect-hitpolicy) | 3 | 0 | 0 |  |
 | [compliance-level-2/0117-multi-any-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0117-multi-any-hitpolicy) | 3 | 0 | 0 |  |
 | [compliance-level-2/0118-multi-priority-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0118-multi-priority-hitpolicy) | 3 | 0 | 0 |  |
 | [compliance-level-2/0119-multi-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0119-multi-collect-hitpolicy) | 3 | 0 | 0 |  |
@@ -65,6 +65,5 @@ What the unsupported checks need, by number of checks:
 |---|---:|
 | cells that compare with another input (#51) | 20 |
 | duration columns (#52) | 6 |
-| COUNT aggregation (#15) | 3 |
 | inputs computed by other decisions (decision requirement graphs, #14) | 3 |
 | output entries that are expressions (#53) | 3 |

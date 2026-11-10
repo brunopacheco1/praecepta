@@ -8,9 +8,9 @@ package io.github.brunopacheco1.praecepta.engine;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 
 /**
- * Converts rule outputs to the engine's output type. {@link #sum}, {@link #min} and {@link #max}
- * are only needed for COLLECT aggregations, and are applied to the matching outputs on every
- * evaluation, so they should be cheap and side-effect free.
+ * Converts rule outputs to the engine's output type. {@link #sum}, {@link #min}, {@link #max} and
+ * {@link #count} are only needed for COLLECT aggregations, and are applied on every evaluation, so
+ * they should be cheap and side-effect free.
  */
 @FunctionalInterface
 public interface OutputStrategy<O> {
@@ -27,6 +27,14 @@ public interface OutputStrategy<O> {
     }
 
     default O sum(O obj1, O obj2) {
+        throw new UnsupportedOperationException("This OutputStrategy does not support aggregation");
+    }
+
+    /**
+     * The output of a COUNT aggregation: the number of matching rules, zero when none match. The
+     * engine calls it with zero once when it is built, so a strategy without it fails there.
+     */
+    default O count(int matches) {
         throw new UnsupportedOperationException("This OutputStrategy does not support aggregation");
     }
 }

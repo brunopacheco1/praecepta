@@ -44,7 +44,7 @@ builds an engine once and calls it.
    (`InputStrategy`), finds its class, and ANDs the masks, 64 rules per machine word. The hit policy
    then reads the result: FIRST and PRIORITY take the lowest set bit (bits are numbered in rule or
    priority order), UNIQUE and ANY check their constraint, RULE ORDER, OUTPUT ORDER and COLLECT walk
-   the set bits, and COLLECT aggregates with SUM, MIN or MAX (`OutputStrategy`).
+   the set bits, and COLLECT aggregates with SUM, MIN, MAX or COUNT (`OutputStrategy`).
 4. **Validation** (`TableAnalysis`, `ValidationReport`), when the engine is built: overlapping rules
    (UNIQUE), conflicting outputs (ANY), rules that can never fire (FIRST, PRIORITY), and gaps
    (declared inputs that no rule covers, with an example). The analysis is exact, because it searches
@@ -56,7 +56,7 @@ An engine is **immutable** once built: any number of threads may share it withou
 - `DmnReader` reads DMN 1.1 to 1.5 (as written by Camunda Modeler, Drools, Trisotech and
   `DmnWriter`) into a `DecisionTable`: hit policy, aggregation, column types, value lists and rules.
   It uses the JDK's XML parser with DTDs and external entities disabled. Anything it does not
-  support (durations, times with a zone, computed expressions, function calls, COUNT) is rejected
+  support (durations, times with a zone, computed expressions, function calls) is rejected
   with an error naming the decision, rule and column.
 - `DmnWriter` writes a `DecisionTable` as standard DMN 1.3, which `DmnReader` reads back unchanged
   and which Camunda 8 and Drools evaluate identically (the benchmarks check this).

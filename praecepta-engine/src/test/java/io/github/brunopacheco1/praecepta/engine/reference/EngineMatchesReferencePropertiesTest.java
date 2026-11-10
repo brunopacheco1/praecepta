@@ -245,6 +245,11 @@ class EngineMatchesReferencePropertiesTest {
             }
 
             @Override
+            public BigDecimal count(int matches) {
+                return BigDecimal.valueOf(matches);
+            }
+
+            @Override
             public BigDecimal min(BigDecimal a, BigDecimal b) {
                 return a.min(b);
             }

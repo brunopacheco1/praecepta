@@ -162,7 +162,7 @@ final class TckRunner {
         };
     }
 
-    /** One output per matching rule; aggregations sum, min or max the single NUMBER output. */
+    /** One output per matching rule; aggregations sum, min, max or count the single NUMBER output. */
     private static OutputStrategy<PraeceptaOutput> outputs(DecisionTable table) {
         var column = table.outputs().getFirst().name();
         return new OutputStrategy<>() {
@@ -184,6 +184,11 @@ final class TckRunner {
             @Override
             public PraeceptaOutput max(PraeceptaOutput a, PraeceptaOutput b) {
                 return combine(a, b, BigDecimal::max);
+            }
+
+            @Override
+            public PraeceptaOutput count(int matches) {
+                return new PraeceptaOutput(Map.of(column, String.valueOf(matches)));
             }
 
             private PraeceptaOutput combine(PraeceptaOutput a, PraeceptaOutput b, BinaryOperator<BigDecimal> operator) {
@@ -262,8 +267,7 @@ final class TckRunner {
         }
         var aggregation = AGGREGATION.matcher(message);
         if (aggregation.find()) {
-            var operator = aggregation.group(1);
-            return operator + " aggregation" + (operator.equals("COUNT") ? " (#15)" : "");
+            return aggregation.group(1) + " aggregation";
         }
         if (EXPRESSION.matcher(message).find()) {
             return "input expressions other than a variable name";

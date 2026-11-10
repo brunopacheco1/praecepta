@@ -68,6 +68,11 @@ public final class Fees {
                         public FeesOutput max(FeesOutput a, FeesOutput b) {
                             return a.fee() == null ? b : b.fee() == null || a.fee().compareTo(b.fee()) >= 0 ? a : b;
                         }
+
+                        @Override
+                        public FeesOutput count(int matches) {
+                            return new FeesOutput(java.math.BigDecimal.valueOf(matches));
+                        }
                     })
                     .build();
         } catch (java.io.IOException e) {

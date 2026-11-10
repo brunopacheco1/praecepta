@@ -12,6 +12,7 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 
+import io.github.brunopacheco1.praecepta.engine.OutputStrategy;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
@@ -147,7 +148,18 @@ final class TableCompiler {
         var builder = PraeceptaEngine.<Map<String, String>, PraeceptaOutput>builder()
                 .table(table)
                 .inputs(PraeceptaInput::new)
-                .output(output -> output);
+                .output(new OutputStrategy<>() {
+                    @Override
+                    public PraeceptaOutput transform(PraeceptaOutput output) {
+                        return output;
+                    }
+
+                    // a COUNT engine builds its no-match output up front; the generated strategy counts too
+                    @Override
+                    public PraeceptaOutput count(int matches) {
+                        return new PraeceptaOutput(Map.of());
+                    }
+                });
         if (failOn != null) {
             builder.failOn(failOn);
         }

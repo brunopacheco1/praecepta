@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.BinaryOperator;
 import java.util.function.Function;
+import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -101,8 +102,12 @@ public final class PraeceptaEngine<I, O> {
     /** ANY only: the mask of the rules whose outputs equal this rule's. */
     private final long[][] sameOutputsByBit;
 
-    /** The COLLECT aggregation, or null. */
+    /** The COLLECT aggregation combining outputs (SUM, MIN, MAX), or null. */
     private final BinaryOperator<O> reduce;
+    /** COUNT only: the output for each number of matching rules; null otherwise. */
+    private final IntFunction<O> count;
+    /** The result when no rule matches: empty, or the COUNT output for zero. */
+    private final List<O> noMatch;
     private final ValidationReport report;
 
     private PraeceptaEngine(Builder<I, O> builder) {
@@ -144,6 +149,8 @@ public final class PraeceptaEngine<I, O> {
         }
         sameOutputsByBit = hitPolicy == HitPolicy.ANY ? sameOutputMasks(rules, bitToRule, index.words()) : null;
         reduce = reducer(builder.aggregation, builder.outputStrategy);
+        count = builder.aggregation == AggregationOperator.COUNT ? builder.outputStrategy::count : null;
+        noMatch = count == null ? List.of() : List.of(count.apply(0));
         report = validate(index, rules, hitPolicy, builder.failOn);
     }
 
@@ -156,7 +163,8 @@ public final class PraeceptaEngine<I, O> {
      * Evaluates the decision table.
      *
      * @return the outputs selected by the hit policy: at most one for single-hit policies (and for
-     *         aggregations), several for multi-hit ones; empty if no rule matches
+     *         aggregations), several for multi-hit ones; empty if no rule matches, except for COUNT,
+     *         which always returns one output
      * @throws HitPolicyViolationException if the input matches several rules under UNIQUE, or rules
      *                                     with different outputs under ANY
      * @throws InvalidInputException       if a value is outside its column's declared input values, or
@@ -168,7 +176,7 @@ public final class PraeceptaEngine<I, O> {
                 ? index.match(input, extractorReader)
                 : index.match(inputStrategy.transform(input).values(), mapReader);
         if (matches.length == 0) {
-            return List.of();
+            return noMatch;
         }
         // the lowest set bit is the first matching rule in rule order, or the highest-priority one
         return switch (hitPolicy) {
@@ -191,6 +199,9 @@ public final class PraeceptaEngine<I, O> {
                 yield singleByBit[bit];
             }
             case RULE_ORDER, OUTPUT_ORDER, COLLECT -> {
+                if (count != null) {
+                    yield List.of(count.apply(BitsetIndex.count(matches)));
+                }
                 var selected = new Object[BitsetIndex.count(matches)];
                 int i = 0;
                 for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
@@ -286,6 +297,7 @@ public final class PraeceptaEngine<I, O> {
             case SUM -> strategy::sum;
             case MIN -> strategy::min;
             case MAX -> strategy::max;
+            case COUNT -> null;
         };
     }
 
@@ -543,7 +555,7 @@ public final class PraeceptaEngine<I, O> {
             return this;
         }
 
-        /** Aggregates COLLECT results into a single output, using the output strategy's sum/min/max. */
+        /** Aggregates COLLECT results into a single output, using the output strategy's sum/min/max/count. */
         public Builder<I, O> aggregation(AggregationOperator aggregation) {
             this.aggregation = Objects.requireNonNull(aggregation, "aggregation");
             return this;

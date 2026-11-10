@@ -179,14 +179,25 @@ class DmnReaderTest {
     }
 
     @Test
-    void count_aggregation_is_not_supported() {
+    void reads_count_aggregation() {
         var xml = model("""
                   <decision id="t" name="t"><decisionTable hitPolicy="COLLECT" aggregation="COUNT">
                     <input><inputExpression typeRef="string"><text>a</text></inputExpression></input>
                     <output name="result" typeRef="number"/>
                   </decisionTable></decision>""");
+        Assertions.assertThat(DmnReader.read(stream(xml)).aggregation()).isEqualTo(AggregationOperator.COUNT);
+    }
+
+    @Test
+    void unknown_aggregation_is_not_supported() {
+        var xml = model("""
+                  <decision id="t" name="t"><decisionTable hitPolicy="COLLECT" aggregation="AVG">
+                    <input><inputExpression typeRef="string"><text>a</text></inputExpression></input>
+                    <output name="result" typeRef="number"/>
+                  </decisionTable></decision>""");
         var dmn = stream(xml);
-        Assertions.assertThatThrownBy(() -> DmnReader.read(dmn)).hasMessageContaining("aggregation 'COUNT' is not supported");
+        Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
+                .hasMessageContaining("aggregation 'AVG' is not supported (SUM, MIN, MAX and COUNT are)");
     }
 
     @Test

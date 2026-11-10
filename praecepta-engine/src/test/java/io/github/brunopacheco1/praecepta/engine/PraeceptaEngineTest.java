@@ -115,6 +115,14 @@ class PraeceptaEngineTest {
             Assertions.assertThat(engine.evaluate(FR_CORP)).isEmpty();
         }
 
+        @Test
+        void collect_can_count_the_matching_rules_even_when_none_match() {
+            var engine = engine(HitPolicy.COLLECT).aggregation(AggregationOperator.COUNT).build();
+            Assertions.assertThat(engine.evaluate(PT_SMB)).containsExactly(new Discount("#", 3));
+            Assertions.assertThat(engine.evaluate(ES_SMB)).containsExactly(new Discount("#", 2));
+            Assertions.assertThat(engine.evaluate(FR_CORP)).containsExactly(new Discount("#", 0));
+        }
+
         @ParameterizedTest
         @EnumSource(HitPolicy.class)
         void no_match_is_an_empty_result_under_every_policy(HitPolicy policy) {
@@ -264,6 +272,11 @@ class PraeceptaEngineTest {
                     @Override
                     public Discount sum(Discount a, Discount b) {
                         return new Discount("*", a.percent() + b.percent());
+                    }
+
+                    @Override
+                    public Discount count(int matches) {
+                        return new Discount("#", matches);
                     }
                 })
                 .rules(RULES);

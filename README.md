@@ -28,7 +28,7 @@ them when you build; evaluate them with a dependency-free engine.
 
 # Features
 - All DMN hit policies: UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER and COLLECT
-  (with SUM / MIN / MAX aggregation)
+  (with SUM / MIN / MAX / COUNT aggregation)
 - DMN FEEL cells on STRING, NUMBER, DATE, BOOLEAN, TIME and DATE_TIME columns: lists, `not(...)`,
   comparisons, intervals, `null`; unquoted `PT,ES` cells from earlier versions keep working
 - Optional DMN input value lists: values outside them are rejected
@@ -186,8 +186,8 @@ Supported: input expressions that name a variable, including FEEL names with spa
 with allowed values, which become the input value list); input entries in the cell syntax above, as strict FEEL
 (strings quoted, since an unquoted word is a reference to another variable, and dates and times
 written with `date(...)`, `time(...)` and `date and time(...)`); literal output
-entries; every hit policy, with SUM, MIN and MAX aggregation. Anything else (durations, times with a
-zone, cells that refer to other variables, computed expressions, function calls, COUNT) is rejected
+entries; every hit policy, with SUM, MIN, MAX and COUNT aggregation. Anything else (durations, times with a
+zone, cells that refer to other variables, computed expressions, function calls) is rejected
 with a message naming the decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
 evaluate identically, which is how the benchmarks feed them.
 
