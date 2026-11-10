@@ -394,19 +394,21 @@ public final class CellParser {
         }
 
         /**
-         * Index of the first {@code ..} outside quotes, after the opening bracket and before the closing
-         * one, or -1 if there is none. Unlike {@link #closingQuote}, a backslash escapes nothing here:
-         * every quote opens or closes a string, as it always has.
+         * Index of the first {@code ..} outside strings, after the opening bracket and before the closing
+         * one, or -1 if there is none. As in {@link #closingQuote}, a backslash inside a string escapes
+         * the next character, so the escaped quotes {@code DmnWriter} writes into a string end, as in
+         * {@code ["a\"..b".."c"]}, do not end it.
          */
         private static int topLevelDots(String text) {
-            boolean quoted = false;
-            for (int i = 1; i < text.length() - 2; i++) {
+            int i = 1;
+            while (i < text.length() - 2) {
                 char c = text.charAt(i);
                 if (c == '"') {
-                    quoted = !quoted;
-                } else if (!quoted && c == '.' && text.charAt(i + 1) == '.') {
+                    i = closingQuote(text, i);
+                } else if (c == '.' && text.charAt(i + 1) == '.') {
                     return i;
                 }
+                i++;
             }
             return -1;
         }
