@@ -28,6 +28,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
@@ -108,7 +109,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             return new Outcome.InvalidInput(invalid);
         }
         var matches = matches(input);
-        var outputs = matches.stream().map(Praeceptum::output).toList();
+        var outputs = matches.stream().map(rule -> output(rule, input)).toList();
         return switch (hitPolicy) {
             case UNIQUE -> matches.size() > 1
                     ? new Outcome.Violation("UNIQUE: %d rules match".formatted(matches.size()))
@@ -146,6 +147,22 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     }
 
     public enum Aggregator { COUNT, SUM, MIN, MAX }
+
+    /**
+     * The rule's outputs for this input: an output that names an input takes the text of the input's
+     * value (null if missing), as plain outputs are text.
+     */
+    public PraeceptaOutput output(Praeceptum rule, Map<String, ?> input) {
+        if (rule.output().references().isEmpty()) {
+            return rule.output();
+        }
+        var values = new HashMap<>(rule.output().values());
+        rule.output().references().forEach((output, column) -> {
+            var value = value(input, column);
+            values.put(output, value == null ? null : FeelLiterals.text(value));
+        });
+        return new PraeceptaOutput(values);
+    }
 
     // ---- static analysis, by brute force --------------------------------------------------------
 

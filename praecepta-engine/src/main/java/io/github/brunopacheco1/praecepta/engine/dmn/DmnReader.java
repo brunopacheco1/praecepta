@@ -49,7 +49,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * a zone; columns typed by an item definition of one of those types, whose allowed values become the
  * input value list unless the input declares its own; input entries in Praecepta's FEEL subset
  * (lists, {@code not(...)}, {@code null}, comparisons, intervals, {@code -}); input and output value
- * lists; literal output entries; every hit policy; SUM, MIN, MAX and COUNT aggregation. Anything else is rejected with an
+ * lists; output entries that are literals or name one of the table's inputs (of the output's type, or
+ * any input for a string output); every hit policy; SUM, MIN, MAX and COUNT aggregation. Anything else is rejected with an
  * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered
  * from 1 in table order.
  */
@@ -246,11 +247,37 @@ public final class DmnReader {
             cells.put(column.name(), text);
         }
         Map<String, String> values = new HashMap<>();
+        Map<String, String> references = new HashMap<>();
         for (int c = 0; c < outputs.size(); c++) {
             var column = outputs.get(c);
-            values.put(column.name(), outputValue(textOf(outputEntries.get(c)), column.type(), ruleWhere + ", output '" + column.name() + "'"));
+            var text = textOf(outputEntries.get(c)).strip();
+            var outputWhere = ruleWhere + ", output '" + column.name() + "'";
+            var input = namedInput(text, inputs, column, outputWhere);
+            if (input != null) {
+                references.put(column.name(), input.name());
+            } else {
+                values.put(column.name(), outputValue(text, column.type(), outputWhere));
+            }
         }
-        return new Praeceptum(number, new PraeceptaInput(cells), new PraeceptaOutput(values));
+        return new Praeceptum(number, new PraeceptaInput(cells), new PraeceptaOutput(values, references));
+    }
+
+    /**
+     * The input column an output entry names, as in {@code a}, which returns the input {@code a}; null if
+     * the entry names none. The input must be of the output's type, unless the output is a string,
+     * which takes any value as its text (as it takes unquoted number or date literals).
+     */
+    private static InputColumn namedInput(String text, List<InputColumn> inputs, OutputColumn output, String where) {
+        for (var input : inputs) {
+            if (input.name().equals(text)) {
+                if (input.type() != output.type() && output.type() != ColumnType.STRING) {
+                    throw new InvalidDecisionTableException("%s: names input '%s', a %s, but the output is a %s"
+                            .formatted(where, text, input.type().feelName(), output.type().feelName()));
+                }
+                return input;
+            }
+        }
+        return null;
     }
 
     // ---- values ----------------------------------------------------------------------------------
@@ -281,12 +308,12 @@ public final class DmnReader {
                 }
             }
             throw new InvalidDecisionTableException(
-                    "%s: '%s' is not supported; output entries must be literals (quote text)".formatted(where, literal));
+                    "%s: '%s' is not supported; output entries must be literals (quote text) or name an input".formatted(where, literal));
         }
         return literalValue(literal, type)
                 .map(FeelLiterals::text)
                 .orElseThrow(() -> new InvalidDecisionTableException(
-                        "%s: '%s' is not supported; output entries must be literals".formatted(where, literal)));
+                        "%s: '%s' is not supported; output entries must be literals or name an input".formatted(where, literal)));
     }
 
     /** The value of an entry that is a single literal of the type (no list, comparison or name). */

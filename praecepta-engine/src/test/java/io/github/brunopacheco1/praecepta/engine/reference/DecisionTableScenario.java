@@ -39,7 +39,9 @@ import net.jqwik.api.Tuple;
  * input values, and inputs include values outside them.
  *
  * <p>Every rule has outputs {@code id} (its 1-based position, unique), {@code out} (one of x/y/z,
- * often shared) and {@code n} (a small number, for aggregation).
+ * often shared), {@code n} (a small number, for aggregation) and {@code echo}, which one time in three
+ * names the input {@code c0} (so it takes that input's value) and is otherwise {@code "a"}, a value a
+ * string input may also have.
  */
 public record DecisionTableScenario(List<String> columns, Map<String, ColumnType> types, Map<String, String> allowedValues,
         List<Praeceptum> rules, List<Map<String, Object>> inputs) {
@@ -47,6 +49,10 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     public static final String ID = "id";
     public static final String OUT = "out";
     public static final String NUMBER = "n";
+    /** An output that names the input {@code c0} in some rules. */
+    public static final String ECHO = "echo";
+    /** The {@link #ECHO} of the rules that do not name {@code c0}. */
+    private static final String ECHO_VALUE = "a";
     public static final List<String> OUT_VALUES = List.of("x", "y", "z");
 
     static final LocalDate DAY0 = LocalDate.of(2025, 1, 1);
@@ -99,14 +105,14 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         return Arbitraries.oneOf(Arbitraries.just((String) null), Arbitraries.just((String) null), declared);
     }
 
-    private record RuleRow(List<String> cells, String out, int number) {
+    private record RuleRow(List<String> cells, String out, int number, boolean echoesInput) {
     }
 
     private static Arbitrary<RuleRow> rule(List<Column> columns) {
         var cells = new ArrayList<Arbitrary<String>>();
         columns.forEach(column -> cells.add(cell(column)));
-        return Combinators.combine(Combinators.combine(cells).as(List::copyOf), Arbitraries.of(OUT_VALUES), Arbitraries.integers().between(1, 9))
-                .as(RuleRow::new);
+        return Combinators.combine(Combinators.combine(cells).as(List::copyOf), Arbitraries.of(OUT_VALUES), Arbitraries.integers().between(1, 9),
+                Arbitraries.of(true, false, false)).as(RuleRow::new);
     }
 
     @SuppressWarnings("unchecked")
@@ -219,8 +225,12 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             for (int c = 0; c < names.size(); c++) {
                 cells.put(names.get(c), row.cells().get(c));
             }
-            var outputs = Map.of(ID, String.valueOf(r + 1), OUT, row.out(), NUMBER, String.valueOf(row.number()));
-            rules.add(new Praeceptum(r + 1, new PraeceptaInput(cells), new PraeceptaOutput(outputs)));
+            var outputs = new HashMap<>(Map.of(ID, String.valueOf(r + 1), OUT, row.out(), NUMBER, String.valueOf(row.number())));
+            Map<String, String> references = row.echoesInput() ? Map.of(ECHO, names.getFirst()) : Map.of();
+            if (!row.echoesInput()) {
+                outputs.put(ECHO, ECHO_VALUE);
+            }
+            rules.add(new Praeceptum(r + 1, new PraeceptaInput(cells), new PraeceptaOutput(Map.copyOf(outputs), references)));
         }
         var inputs = new ArrayList<Map<String, Object>>();
         for (var row : inputRows) {
@@ -260,12 +270,19 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     }
 
     /**
-     * The rules with {@link #OUT} as their only output. Without the unique {@link #ID}, overlapping
-     * rules can agree, as ANY needs.
+     * The rules with {@link #OUT} and {@link #ECHO} as their only outputs. Without the unique {@link #ID},
+     * overlapping rules can agree, as ANY needs.
      */
     public static List<Praeceptum> outOnly(List<Praeceptum> rules) {
         return rules.stream()
-                .map(rule -> new Praeceptum(rule.priority(), rule.input(), new PraeceptaOutput(Map.of(OUT, rule.output().values().get(OUT)))))
+                .map(rule -> {
+                    var values = new HashMap<String, String>();
+                    values.put(OUT, rule.output().values().get(OUT));
+                    if (rule.output().values().containsKey(ECHO)) {
+                        values.put(ECHO, rule.output().values().get(ECHO));
+                    }
+                    return new Praeceptum(rule.priority(), rule.input(), new PraeceptaOutput(Map.copyOf(values), rule.output().references()));
+                })
                 .toList();
     }
 

@@ -98,6 +98,8 @@ class DmnRoundTripPropertiesTest {
         if (policy != HitPolicy.ANY) {
             outputs.add(new DecisionTable.OutputColumn(DecisionTableScenario.NUMBER, ColumnType.NUMBER));
         }
+        // a string output, which takes the value of any input it names
+        outputs.add(new DecisionTable.OutputColumn(DecisionTableScenario.ECHO, ColumnType.STRING));
         return new DecisionTable("round_trip", policy, null, inputs, outputs, rules);
     }
 }

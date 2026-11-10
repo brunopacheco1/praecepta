@@ -20,6 +20,14 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `tBureauCallType`, a `string` with the allowed values `"FULL","MINI","NONE"`. The column takes
   the base type, and the allowed values become its input value list unless the input declares its
   own. Item definitions may build on one another; structured types and collections are still rejected.
+- **Output entries that name an input** ([#53](https://github.com/brunopacheco1/praecepta/issues/53)):
+  a DMN output entry `a` returns the input `a`. `PraeceptaOutput` gains `references` (output
+  column to input column; the one-argument constructor keeps working), and the engine fills those
+  outputs in from each evaluated input with the text of its value, so an `OutputStrategy` still sees
+  only values. Rules without references keep their outputs built once. Under ANY such outputs are
+  compared per evaluation; in an output with a priority list they are rejected. `DmnReader` reads
+  them when the input has the output's type (a string output takes any input), and `DmnWriter`
+  writes them back. The DMN TCK now passes 55 of 86 checks (was 54).
 - **String ranges in cells** ([#13](https://github.com/brunopacheco1/praecepta/issues/13)): STRING
   columns take comparisons and intervals (`< "N"`, `["A".."M"]`, also unquoted outside DMN),
   ordered as `String.compareTo` orders them (by UTF-16 code unit, so case-sensitively). Such a
