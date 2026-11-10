@@ -9,7 +9,11 @@ import java.util.Locale;
 
 /** The type of an input column, which decides how its cells are parsed and its values compared. */
 public enum ColumnType {
-    /** Text, compared exactly. Cells: literals ({@code "PT"} or legacy {@code PT}), lists, {@code not(...)}. */
+    /**
+     * Text, compared exactly. Cells: literals ({@code "PT"} or legacy {@code PT}), lists, {@code not(...)},
+     * and comparisons and intervals ({@code < "N"}, {@code ["A".."M"]}), which order strings as
+     * {@link String#compareTo} does (character by character, by UTF-16 code unit).
+     */
     STRING,
     /** Decimal numbers, compared by value ({@code 1.0} equals {@code 1}). Cells add comparisons and intervals. */
     NUMBER,
@@ -30,8 +34,8 @@ public enum ColumnType {
         return this == DATE_TIME ? "date and time" : name().toLowerCase(Locale.ROOT);
     }
 
-    /** Whether cells may compare values of this type ({@code <}, {@code >=}, intervals): all but STRING and BOOLEAN. */
+    /** Whether cells may compare values of this type ({@code <}, {@code >=}, intervals): all but BOOLEAN. */
     public boolean supportsComparisons() {
-        return this != STRING && this != BOOLEAN;
+        return this != BOOLEAN;
     }
 }

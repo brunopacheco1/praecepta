@@ -126,6 +126,32 @@ class TypedColumnsTest {
     }
 
     @Test
+    void strings_compare_by_character_and_then_reveal_gaps_without_value_lists() {
+        //   surname          → desk
+        // 1 < "N"              1
+        // 2 ["N".."T")         2
+        var engine = PraeceptaEngine.<String, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .input("surname", surname -> surname)
+                .output(output -> output.values().get("desk"))
+                .rules(List.of(
+                        new Praeceptum(1, new PraeceptaInput(Map.of("surname", "< \"N\"")), new PraeceptaOutput(Map.of("desk", "1"))),
+                        new Praeceptum(2, new PraeceptaInput(Map.of("surname", "[\"N\"..\"T\")")), new PraeceptaOutput(Map.of("desk", "2")))))
+                .build();
+        Assertions.assertThat(engine.evaluate("Mills")).containsExactly("1");
+        Assertions.assertThat(engine.evaluate("N")).containsExactly("2");
+        Assertions.assertThat(engine.evaluate("Silva")).containsExactly("2");
+        Assertions.assertThat(engine.evaluate("Taylor")).isEmpty();
+        Assertions.assertThat(engine.evaluate("nash")).as("lower case sorts after upper case").isEmpty();
+        Assertions.assertThat(engine.evaluate(null)).as("a missing value fails comparisons").isEmpty();
+        // with comparisons, a string column has no class of "any other value", so gaps are reported
+        Assertions.assertThat(engine.validationReport().issues(Kind.GAP)).singleElement().satisfies(gap -> {
+            Assertions.assertThat(gap.detail()).isEqualTo("surname in [\"T\"..+inf)");
+            Assertions.assertThat(gap.example()).containsEntry("surname", "T");
+        });
+    }
+
+    @Test
     void invalid_cells_name_the_rule_and_column() {
         var broken = List.of(rule(7, "\"PT\"", "[65..18]", "", "x"));
         var builder = engine(HitPolicy.FIRST).rules(broken);

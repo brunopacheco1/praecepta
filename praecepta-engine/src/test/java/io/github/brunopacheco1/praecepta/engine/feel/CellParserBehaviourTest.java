@@ -50,10 +50,17 @@ class CellParserBehaviourTest {
     }
 
     @Test
-    void an_interval_on_a_string_column_is_rejected_before_its_ends_are_read() {
-        Assertions.assertThatThrownBy(() -> CellParser.parse("[a..b]", ColumnType.STRING))
+    void an_interval_on_a_boolean_column_is_rejected_before_its_ends_are_read() {
+        Assertions.assertThatThrownBy(() -> CellParser.parse("[a..b]", ColumnType.BOOLEAN))
                 .isInstanceOf(CellSyntaxException.class)
-                .hasMessage("Invalid cell '[a..b]': intervals are only supported on NUMBER, DATE, TIME and DATE_TIME columns");
+                .hasMessage("Invalid cell '[a..b]': intervals are not supported on BOOLEAN columns");
+    }
+
+    @Test
+    void a_string_interval_must_not_start_after_it_ends() {
+        Assertions.assertThatThrownBy(() -> CellParser.parse("[\"b\"..\"a\"]", ColumnType.STRING))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessage("Invalid cell '[\"b\"..\"a\"]': interval starts after it ends");
     }
 
     @Test

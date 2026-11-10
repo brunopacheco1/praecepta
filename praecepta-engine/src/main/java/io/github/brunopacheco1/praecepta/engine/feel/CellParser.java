@@ -37,7 +37,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   date and time("2025-01-31T08:30:00")
  *                            date-time literal (DATE_TIME columns; a bare 2025-01-31T08:30:00 too)
  *   true, false              boolean literals (BOOLEAN columns)
- *   &lt; 18, &gt;= 2.5            comparisons (NUMBER, DATE, TIME and DATE_TIME columns)
+ *   &lt; 18, &gt;= 2.5, &lt; "N"      comparisons (all but BOOLEAN columns; strings compare lexicographically)
  *   [18..65), (0..1], ]a..b[  intervals; [ and ] include their end, ( ) and outward-facing brackets exclude it
  *   null                     only a missing value
  *   not(t1, t2)              anything but these tests
@@ -160,7 +160,7 @@ public final class CellParser {
 
         private void requireComparisons(String what) {
             if (!type.supportsComparisons()) {
-                throw new CellSyntaxException(cell, what + " are only supported on NUMBER, DATE, TIME and DATE_TIME columns");
+                throw new CellSyntaxException(cell, what + " are not supported on " + type + " columns");
             }
         }
 

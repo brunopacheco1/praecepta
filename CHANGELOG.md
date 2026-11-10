@@ -20,6 +20,13 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `tBureauCallType`, a `string` with the allowed values `"FULL","MINI","NONE"`. The column takes
   the base type, and the allowed values become its input value list unless the input declares its
   own. Item definitions may build on one another; structured types and collections are still rejected.
+- **String ranges in cells** ([#13](https://github.com/brunopacheco1/praecepta/issues/13)): STRING
+  columns take comparisons and intervals (`< "N"`, `["A".."M"]`, also unquoted outside DMN),
+  ordered as `String.compareTo` orders them (by UTF-16 code unit, so case-sensitively). Such a
+  column is indexed like a number column: values the rules mention keep the hash lookup, and other
+  values find their interval by binary search. Since every string then falls in some interval, gaps
+  are reported for it without an input value list. `ColumnType.supportsComparisons()` is now true
+  for every type but BOOLEAN.
 - **COUNT aggregation** ([#15](https://github.com/brunopacheco1/praecepta/issues/15)): a COLLECT
   table can return the number of matching rules. `OutputStrategy.count(int)` builds the output from
   it (zero when no rule matches, so a COUNT table always returns one output); the engine calls it

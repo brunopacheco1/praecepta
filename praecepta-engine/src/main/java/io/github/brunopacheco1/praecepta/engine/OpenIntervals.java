@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.util.List;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 
@@ -22,13 +23,20 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
  */
 final class OpenIntervals {
 
+    /** The smallest string after another is that string followed by this character. */
+    private static final String LOWEST_CHARACTER = String.valueOf(Character.MIN_VALUE);
+    /** Suffixes tried for a readable string inside an interval, before falling back to {@link #LOWEST_CHARACTER}. */
+    private static final List<String> READABLE_SUFFIXES = List.of("a", "A", "0", "!");
+
     private OpenIntervals() {
     }
 
     /**
      * Whether no value of the type lies in the interval: between consecutive days or nanoseconds,
-     * before midnight or after the last nanosecond of a day, or anywhere outside {@code false} and
-     * {@code true} (both are always boundaries).
+     * before midnight or after the last nanosecond of a day, anywhere outside {@code false} and
+     * {@code true} (both are always boundaries), or between a string and its successor. Below the
+     * empty string, or the one-character string U+0000, there is no non-blank string, and blank ones
+     * count as missing.
      */
     static boolean isEmpty(ColumnType type, Comparable<?> low, Comparable<?> high) {
         return switch (type) {
@@ -36,7 +44,8 @@ final class OpenIntervals {
             case DATE -> low != null && high != null && !((LocalDate) low).plusDays(1).isBefore((LocalDate) high);
             case TIME -> emptyTimes((LocalTime) low, (LocalTime) high);
             case DATE_TIME -> low != null && high != null && !((LocalDateTime) low).plusNanos(1).isBefore((LocalDateTime) high);
-            case NUMBER, STRING -> false;
+            case STRING -> emptyStrings((String) low, (String) high);
+            case NUMBER -> false;
         };
     }
 
@@ -50,9 +59,36 @@ final class OpenIntervals {
             case TIME -> betweenTimes((LocalTime) low, (LocalTime) high);
             case DATE_TIME -> betweenDateTimes((LocalDateTime) low, (LocalDateTime) high);
             case NUMBER -> betweenNumbers((BigDecimal) low, (BigDecimal) high);
-            // BOOLEAN intervals are always empty, and STRING has none
-            case BOOLEAN, STRING -> throw new IllegalStateException("no %s value between %s and %s".formatted(type, low, high));
+            case STRING -> betweenStrings((String) low, (String) high);
+            // BOOLEAN intervals are always empty
+            case BOOLEAN -> throw new IllegalStateException("no %s value between %s and %s".formatted(type, low, high));
         };
+    }
+
+    private static boolean emptyStrings(String low, String high) {
+        if (high == null) {
+            return false;
+        }
+        if (low == null) {
+            return high.isEmpty() || high.equals(LOWEST_CHARACTER);
+        }
+        return high.equals(low + LOWEST_CHARACTER);
+    }
+
+    /**
+     * A non-blank string inside a non-empty interval: the lower bound (or nothing) followed by a
+     * readable suffix if one fits, else by U+0000, which is the lower bound's successor and so lies
+     * inside any non-empty interval.
+     */
+    private static String betweenStrings(String low, String high) {
+        var prefix = low == null ? "" : low;
+        for (var suffix : READABLE_SUFFIXES) {
+            var candidate = prefix + suffix;
+            if (high == null || candidate.compareTo(high) < 0) {
+                return candidate;
+            }
+        }
+        return prefix + LOWEST_CHARACTER;
     }
 
     private static boolean emptyTimes(LocalTime low, LocalTime high) {

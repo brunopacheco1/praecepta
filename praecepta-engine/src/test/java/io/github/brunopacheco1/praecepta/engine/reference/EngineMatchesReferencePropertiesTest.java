@@ -154,9 +154,22 @@ class EngineMatchesReferencePropertiesTest {
 
     @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
     void gaps_are_reported_exactly_when_valid_inputs_go_unmatched(@ForAll("scenariosWithValueLists") DecisionTableScenario s) {
-        var engine = engine(s, s.rules(), HitPolicy.COLLECT, List.of(), true);
         var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of());
         Assertions.assertThat(reference.gapAnalysisApplies(s.columns())).isTrue();
+        assertGapsMatchUncoveredInputs(s, reference);
+    }
+
+    /** Also without value lists: number, date and time columns, and string columns that compare. */
+    @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void gaps_are_reported_exactly_wherever_gap_analysis_applies(@ForAll("scenarios") DecisionTableScenario s) {
+        var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of());
+        if (reference.gapAnalysisApplies(s.columns())) {
+            assertGapsMatchUncoveredInputs(s, reference);
+        }
+    }
+
+    private static void assertGapsMatchUncoveredInputs(DecisionTableScenario s, ReferenceMatcher reference) {
+        var engine = engine(s, s.rules(), HitPolicy.COLLECT, List.of(), true);
         var gaps = engine.validationReport().issues(Kind.GAP);
         var uncovered = reference.uncoveredInputs(s.columns());
 

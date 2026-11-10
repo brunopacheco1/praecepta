@@ -206,11 +206,17 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return findings;
     }
 
-    /** Gaps are only analysed when every string column the rules constrain declares its input values. */
+    /**
+     * Gaps are only analysed when every string column the rules constrain either declares its input
+     * values or compares (then, like a number column, it has no single class of unmentioned values).
+     */
     public boolean gapAnalysisApplies(List<String> columns) {
         for (var column : columns) {
-            boolean constrained = rules.stream().anyMatch(rule -> !(parse(rule.input().values().get(column), column) instanceof UnaryTests.Any));
-            if (type(column) == ColumnType.STRING && constrained && !allowedValues.containsKey(column)) {
+            var cells = rules.stream().map(rule -> parse(rule.input().values().get(column), column)).toList();
+            boolean constrained = cells.stream().anyMatch(cell -> !(cell instanceof UnaryTests.Any));
+            boolean compares = cells.stream().flatMap(cell -> tests(cell).stream())
+                    .anyMatch(test -> test instanceof Compare || test instanceof Range);
+            if (type(column) == ColumnType.STRING && constrained && !compares && !allowedValues.containsKey(column)) {
                 return false;
             }
         }
@@ -274,13 +280,21 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return representativeInputs(Map.of(), columns, withMissing);
     }
 
-    /** Every string the cells mention, sorted, and one they do not. */
+    /**
+     * Every string the cells mention, sorted, and one they do not. For comparisons and intervals, also
+     * a string below them all (U+0000, the lowest non-blank string) and each one's successor (the
+     * string followed by U+0000), which lies after it and before or on the next one.
+     */
     private static List<Object> stringRepresentatives(List<UnaryTests> cells) {
         var written = new TreeSet<String>();
         cells.forEach(cell -> literals(cell).forEach(v -> written.add((String) v)));
-        var values = new ArrayList<Object>(written);
-        values.add("other-value");
-        return values;
+        var values = new TreeSet<String>(written);
+        var lowest = String.valueOf(Character.MIN_VALUE);
+        values.add(lowest);
+        written.forEach(value -> values.add(value + lowest));
+        var result = new ArrayList<Object>(values);
+        result.add("other-value");
+        return result;
     }
 
     /** The values the cells mention, the points around each and between neighbours, in order. */
@@ -400,14 +414,17 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         };
     }
 
-    private static List<Object> literals(UnaryTests cell) {
-        var tests = switch (cell) {
-            case UnaryTests.Any any -> List.<Test>of();
+    private static List<Test> tests(UnaryTests cell) {
+        return switch (cell) {
+            case UnaryTests.Any any -> List.of();
             case UnaryTests.Positive positive -> positive.tests();
             case UnaryTests.Negated negated -> negated.tests();
         };
+    }
+
+    private static List<Object> literals(UnaryTests cell) {
         var values = new ArrayList<Object>();
-        for (var test : tests) {
+        for (var test : tests(cell)) {
             switch (test) {
                 case Equals e -> values.add(e.value());
                 case Compare c -> values.add(c.value());

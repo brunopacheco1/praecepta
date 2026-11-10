@@ -19,7 +19,6 @@ import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Issue;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind;
-import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 
@@ -232,11 +231,14 @@ final class TableAnalysis {
         return gaps;
     }
 
-    /** Only when every constrained string column has declared input values (else everything is a gap). */
+    /**
+     * Only when every constrained string column that groups the values its rules do not mention has
+     * declared input values (else every such value is a gap).
+     */
     private boolean gapAnalysisApplies() {
         for (int c = 0; c < index.columnCount(); c++) {
             var col = index.column(c);
-            if (col.type == ColumnType.STRING && !col.hasAllowedValues && isConstrained(col)) {
+            if (col.groupsOtherValues() && !col.hasAllowedValues && isConstrained(col)) {
                 return false;
             }
         }

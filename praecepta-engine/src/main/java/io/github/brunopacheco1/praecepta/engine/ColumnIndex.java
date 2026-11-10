@@ -39,11 +39,13 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  * <ul>
  * <li>STRING: one class per value written in the column (or declared allowed), one for every other
  * value, and one for a missing value.</li>
- * <li>NUMBER, DATE, TIME and DATE_TIME: with the boundary values {@code b0 < b1 < ... < bk} mentioned
- * by the rules (and the allowed values), the classes are
- * {@code (-inf, b0), [b0], (b0, b1), [b1], ..., (bk, +inf)} and a missing value. Lookup is a binary
- * search. An interval that holds no value (between consecutive days, or consecutive nanoseconds;
- * before midnight or after the last nanosecond of a day for times) is marked empty.</li>
+ * <li>NUMBER, DATE, TIME and DATE_TIME, and STRING columns whose cells compare ({@code < "N"},
+ * {@code ["A".."M"]}): with the boundary values {@code b0 < b1 < ... < bk} mentioned by the rules
+ * (and the allowed values), the classes are {@code (-inf, b0), [b0], (b0, b1), [b1], ..., (bk, +inf)}
+ * and a missing value. Lookup is a binary search; a STRING column first looks the value up among its
+ * boundaries, as an unordered one does. An interval that holds no value (between consecutive days,
+ * or consecutive nanoseconds; before midnight or after the last nanosecond of a day for times; between
+ * a string and the same string followed by the character U+0000) is marked empty.</li>
  * <li>BOOLEAN: ordered like the others with {@code false < true}, both always boundaries, so the
  * classes are {@code [false]}, {@code [true]} and a missing value (the intervals are all empty).</li>
  * </ul>
@@ -59,13 +61,16 @@ final class ColumnIndex {
     final String name;
     final ColumnType type;
     private final boolean isString;
-    /** STRING fast path: written value -> mask, plus the masks of other and missing values. */
+    /**
+     * STRING fast path: written value -> mask, plus the masks of other values (null when the column
+     * compares, as its other values fall in intervals) and of missing values.
+     */
     private final Map<String, long[]> stringMasks;
     private final long[] otherMask;
     private final long[] nullMask;
     /** STRING values written in the rules but outside the declared input values (null if none declared). */
     private final Set<String> disallowedStrings;
-    /** Ordered columns (all but STRING): the sorted distinct boundaries. */
+    /** Ordered columns (all but STRING, and STRING columns whose cells compare): the sorted distinct boundaries; else null. */
     private final Comparable<?>[] boundaries;
     /** The value classes, by class number. */
     private final List<ValueClass> classes;
@@ -92,8 +97,8 @@ final class ColumnIndex {
 
         var partition = new ArrayList<ValueClass>();
         Map<String, Integer> stringClasses;
-        int otherClass;
-        if (isString) {
+        int otherClass = -1;
+        if (isString && !compares(cellsByBit)) {
             stringClasses = addStringClasses(cellsByBit, allowedValues, partition);
             otherClass = partition.size();
             partition.add(new ValueClass.OtherString());
@@ -101,8 +106,7 @@ final class ColumnIndex {
         } else {
             boundaries = sortedBoundaries(type, cellsByBit, allowedValues);
             addOrderedClasses(boundaries, partition);
-            stringClasses = null;
-            otherClass = -1;
+            stringClasses = isString ? boundaryClasses(boundaries) : null;
         }
         nullClass = partition.size();
         partition.add(new ValueClass.Missing());
@@ -122,7 +126,7 @@ final class ColumnIndex {
 
         if (isString) {
             stringMasks = masksByString(stringClasses);
-            otherMask = masks[otherClass];
+            otherMask = otherClass < 0 ? null : masks[otherClass];
             disallowedStrings = hasAllowedValues ? writtenButNotAllowed(stringClasses) : null;
         } else {
             stringMasks = null;
@@ -150,6 +154,20 @@ final class ColumnIndex {
         for (var value : written) {
             byValue.put(value, into.size());
             into.add(new ValueClass.Point(value));
+        }
+        return Map.copyOf(byValue);
+    }
+
+    /** Whether some cell compares or tests an interval, which makes a STRING column ordered. */
+    private static boolean compares(List<UnaryTests> cellsByBit) {
+        return cellsByBit.stream().flatMap(cell -> tests(cell).stream()).anyMatch(test -> test instanceof Compare || test instanceof Range);
+    }
+
+    /** Ordered STRING column: the class of each boundary, which is class {@code 2i + 1} for boundary {@code i}. */
+    private static Map<String, Integer> boundaryClasses(Comparable<?>[] boundaries) {
+        var byValue = new HashMap<String, Integer>();
+        for (int i = 0; i < boundaries.length; i++) {
+            byValue.put((String) boundaries[i], 2 * i + 1);
         }
         return Map.copyOf(byValue);
     }
@@ -293,6 +311,9 @@ final class ColumnIndex {
             if (text.isBlank()) {
                 return nullMask;
             }
+            if (boundaries != null) {
+                return maskOf(text); // the interval between the boundaries the text falls in
+            }
             if (hasAllowedValues) {
                 throw new InvalidInputException(name, text);
             }
@@ -305,7 +326,11 @@ final class ColumnIndex {
     }
 
     private long[] orderedMask(Object raw) {
-        var value = convert(raw);
+        return maskOf(convert(raw));
+    }
+
+    /** The mask of a converted value of an ordered column (null if missing), checked against the declared values. */
+    private long[] maskOf(Object value) {
         int valueClass = classOf(value);
         if (hasAllowedValues && !allowed[valueClass]) {
             throw new InvalidInputException(name, value);
@@ -344,7 +369,7 @@ final class ColumnIndex {
                     case TIME -> LocalTime.parse(value);
                     case DATE_TIME -> LocalDateTime.parse(value);
                     case BOOLEAN -> bool(text);
-                    case STRING -> throw new IllegalStateException("STRING columns are not ordered");
+                    case STRING -> throw new IllegalStateException("STRING values are looked up as they are, not converted");
                 };
             } catch (NumberFormatException | DateTimeParseException e) {
                 throw notValid(text);
@@ -391,6 +416,14 @@ final class ColumnIndex {
         return masks.length;
     }
 
+    /**
+     * Whether one class stands for every value the rules do not mention: a STRING column whose cells
+     * do not compare. Every such value is then a gap unless the column declares its input values.
+     */
+    boolean groupsOtherValues() {
+        return otherMask != null;
+    }
+
     /** Whether a valid input can fall in the class: it holds some value and the declared input values allow it. */
     boolean canOccur(int valueClass) {
         return !empty[valueClass] && allowed[valueClass];
@@ -407,12 +440,12 @@ final class ColumnIndex {
     }
 
     /**
-     * Describes a set of distinct classes for a report. For types with comparisons (numbers, dates and
-     * times), adjacent classes merge into intervals, e.g. {@code [18], (18..65), [65]} becomes
-     * {@code [18..65]}. Empty classes do not break a run.
+     * Describes a set of distinct classes for a report. For ordered columns with comparisons (numbers,
+     * dates, times and comparing strings), adjacent classes merge into intervals, e.g.
+     * {@code [18], (18..65), [65]} becomes {@code [18..65]}. Empty classes do not break a run.
      */
     List<String> describe(List<Integer> valueClasses) {
-        if (!type.supportsComparisons()) { // no intervals to merge
+        if (boundaries == null || !type.supportsComparisons()) { // no intervals to merge
             return valueClasses.stream().map(this::describe).toList();
         }
         var sorted = valueClasses.stream().sorted().toList();
