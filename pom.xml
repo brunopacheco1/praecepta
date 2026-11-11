@@ -92,6 +92,10 @@
 
         <!-- Spring Boot starter (#20): its BOM is imported by praecepta-spring-boot-starter only -->
         <spring-boot.version>4.1.2</spring-boot.version>
+
+        <!-- Micronaut module (#77): the Micronaut 4 platform BOM, imported by praecepta-micronaut alone
+             (Micronaut 5 needs Java 25, above the project's Java 21 baseline) -->
+        <micronaut-platform.version>4.10.24</micronaut-platform.version>
     </properties>
 
     <modules>
@@ -101,6 +105,7 @@
         <module>praecepta-integration</module>
         <module>praecepta-maven-plugin</module>
         <module>praecepta-spring-boot-starter</module>
+        <module>praecepta-micronaut</module>
         <module>praecepta-benchmarks</module>
         <module>praecepta-tck</module>
     </modules>

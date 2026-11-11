@@ -45,7 +45,7 @@ describe modules that do not exist yet; their authors update them as they land.
 | `praecepta-gradle-plugin` | `praecepta-gradle-plugin` | compiler; Gradle API (`provided`) | planned (#18) |
 | `io.github.brunopacheco1.praecepta.gradle.plugin` (groupId `io.github.brunopacheco1.praecepta`) | `praecepta-gradle-plugin-marker` | gradle plugin (pom only) | planned (#18) |
 | `praecepta-spring-boot-starter` | `praecepta-spring-boot-starter` | integration; Spring Boot (`provided`) | 0.5 (#20) |
-| `praecepta-micronaut` | `praecepta-micronaut` | integration; Micronaut (`provided`) | planned (#77) |
+| `praecepta-micronaut` | `praecepta-micronaut` | integration; Micronaut 4 (`provided`) | 0.5 (#77) |
 | `praecepta-quarkus` | `praecepta-quarkus` | integration, `quarkus-arc` | planned (#76) |
 | `praecepta-quarkus-deployment` | `praecepta-quarkus-deployment` | runtime, `quarkus-arc-deployment`, and compiler if it takes spreadsheets | planned (#76) |
 
@@ -250,11 +250,22 @@ cannot fail differently at runtime.
   problems in Spring Boot's "APPLICATION FAILED TO START" report.
 - The endpoint's `@Selector` parameter is found by name, so the module compiles with `-parameters`.
 
-### Micronaut module (#77, planned)
-- `praecepta-micronaut`, package `io.github.brunopacheco1.praecepta.micronaut`: a `@Factory`,
-  `@ConfigurationProperties("praecepta")` configuration, and a management endpoint when
-  `micronaut-management` is present. Files are found with `TableLocations` and the application's class
-  loader. Micronaut's annotation processors must not make the compiler warn (the build uses `-Werror`).
+### Micronaut module (#77)
+- `praecepta-micronaut`, package `io.github.brunopacheco1.praecepta.micronaut`: a `@Factory`
+  (`PraeceptaFactory`), `@ConfigurationProperties("praecepta")` configuration (`PraeceptaConfiguration`),
+  and a management endpoint (`PraeceptaEndpoint`) when `micronaut-management` is present. Files are found
+  with `TableLocations` and the application's class loader. Micronaut's annotation processors must not make
+  the compiler warn (the build uses `-Werror`); they write bytecode, not sources, so they do not.
+- Built against Micronaut 4 (the platform BOM `io.micronaut.platform:micronaut-platform`, imported in the
+  module only). Micronaut 5 needs Java 25, above the project's baseline.
+- **Engine beans.** The `Decisions` bean is `@Context` with `@Order(Ordered.HIGHEST_PRECEDENCE)`, so it is
+  the first context-scoped bean created. While it is created, it registers a singleton
+  `RuntimeBeanDefinition` per decision, typed with the engine's generic type and qualified with
+  `Qualifiers.byName(<name>)`. Every application bean, context-scoped ones included, can therefore inject
+  the engines with `@Named`, so the fallback above (`Decisions` only) is not needed.
+- **The endpoint** keeps Micronaut's default for endpoints, `sensitive`, since the reports show the
+  rules' conditions: `endpoints.praecepta.sensitive: false` opens it, or Micronaut Security guards it.
+  An unknown name answers 404 (the read method returns null).
 
 ### Quarkus extension (#76, planned)
 - `praecepta-quarkus` (runtime) and `praecepta-quarkus-deployment`, built with

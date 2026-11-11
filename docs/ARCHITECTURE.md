@@ -19,6 +19,7 @@ builds an engine once and calls it.
 | `praecepta-integration` | engine | The runtime core of the framework integrations: finds DMN files by location pattern and builds a map-based engine per decision, with its validation report (`Decisions`). Independent of any framework. |
 | `praecepta-maven-plugin` | compiler, Maven API | The `generate` goal: runs the compiler on the configured tables and adds the results to the Maven build. |
 | `praecepta-spring-boot-starter` | integration, Spring Boot (`provided`) | Spring Boot auto-configuration: loads the tables at `praecepta.locations` at startup, registers a `Decisions` bean and an engine bean per decision, and reports them through the Actuator endpoint `praecepta`. |
+| `praecepta-micronaut` | integration, Micronaut 4 (`provided`) | The Micronaut module: loads the DMN files at startup into a `Decisions` bean and one engine bean per decision, named after it, and reports through the `praecepta` management endpoint. |
 | `praecepta-benchmarks` | engine, Camunda 8, Drools, JMH | Compares Praecepta with other engines; not published. |
 | `praecepta-tck` | engine | Runs the DMN TCK's decision-table cases; not published. |
 
@@ -161,6 +162,12 @@ The Spring Boot starter loads the tables while the context registers its bean de
 `praecepta.<name>` and qualified by the decision's name; its resources are found with Spring's
 `ResourcePatternResolver`, so the nested jars of an executable jar are searched too. A table that fails
 stops the refresh before any application bean is created.
+
+The Micronaut module (`praecepta-micronaut`) creates `Decisions` as the first context-scoped bean
+(`@Context`, highest precedence) and, while doing so, registers one singleton bean definition per
+decision (`RuntimeBeanDefinition`, qualified by the decision's name), so every bean of the application
+can inject an engine with `@Named`. Micronaut's annotation processors generate the bean definitions and
+the configuration binding at compile time, so nothing is reflective.
 
 ## Native images
 Praecepta needs no reflection, so GraalVM's `native-image` builds applications that use it without a
