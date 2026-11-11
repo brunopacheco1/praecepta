@@ -44,6 +44,14 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   (`rules/**/*.dmn`). `ExcelLoader` does not work in native images (Apache POI); compile Excel tables at
   build time instead. A `Native image` workflow builds and runs a test application with GraalVM for JDK 21
   and 25. See [Native images](README.md#native-images).
+- **`praecepta-spring-boot-starter`** ([#20](https://github.com/brunopacheco1/praecepta/issues/20)):
+  Spring Boot 4 auto-configuration. At startup it loads the DMN files at `praecepta.locations`
+  (`classpath*:rules/**/*.dmn` by default), registers a `Decisions` bean (`praeceptaDecisions`) and one
+  engine bean per decision table, `PraeceptaEngine<Map<String, String>, Map<String, String>>` injected with
+  `@Qualifier("<decision name>")`, and stops the application, listing every problem, when a table cannot
+  be loaded or has validation issues at `praecepta.fail-on` (`ERROR` by default); other issues are logged
+  as warnings. With Actuator, the endpoint `praecepta` reports each decision's columns and validation
+  issues. `praecepta.enabled=false` turns it off. Configuration metadata gives IDEs the keys.
 
 ### Changed
 - The release publishes every module but the benchmarks and the TCK runner, found by the build rather
