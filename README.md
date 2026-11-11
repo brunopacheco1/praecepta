@@ -417,6 +417,67 @@ To keep tables in Excel or CSV, convert them at build time with the [Maven plugi
 the DMN resources it writes are found by a pattern that covers their package, such as
 `classpath*:com/acme/pricing/*.dmn`. Its generated classes are static and need no bean.
 
+## Praecepta Micronaut
+For Micronaut 4 applications on Java 21+. At startup, the module:
+1. loads every DMN file under `src/main/resources/rules`;
+2. validates each decision table, refusing to start on errors;
+3. provides each table as an engine bean named after its decision.
+
+```xml
+<dependency>
+  <groupId>io.github.brunopacheco1</groupId>
+  <artifactId>praecepta-micronaut</artifactId>
+  <version>0.5.0</version>
+</dependency>
+```
+
+```java
+@Singleton
+class Pricing {
+
+    private final PraeceptaEngine<Map<String, String>, Map<String, String>> discount;
+
+    Pricing(@Named("Discount") PraeceptaEngine<Map<String, String>, Map<String, String>> discount) {
+        this.discount = discount;
+    }
+
+    List<Map<String, String>> discounts(String country, int age) {
+        return discount.evaluate(Map.of("country", country, "age", Integer.toString(age)));
+    }
+}
+```
+
+- **Names.** Every decision table of every file is one engine, named after the DMN decision's `name`
+  (its `id` when it has none). The `Decisions` bean holds them all:
+  `decisions.evaluate("Discount", Map.of("country", "PT"))`.
+- **Inputs and outputs are maps of text**, keyed by column name. Values are written as a table's cells
+  write literals: `42`, `2025-01-31`, `08:30Z`, or `["PT", "BR"]` for a list column. A missing or blank
+  value is a missing input. Each output map holds one matching rule's outputs, in the hit policy's order;
+  under a COLLECT aggregation, the one map holds the aggregate.
+- **Excel and CSV tables** reach the application through the [Maven plugin](#praecepta-maven-plugin),
+  which writes them as DMN resources: point `praecepta.locations` at their package as well
+  (`classpath*:rules/**/*.dmn, classpath*:com/acme/pricing/*.dmn`). The classes it generates stay
+  static (`Discount.evaluate(...)`) and are not beans.
+
+Settings, in `application.yml` (the same keys as the other framework integrations):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `praecepta.enabled` | `true` | `false` turns the module off: no beans, no endpoint. |
+| `praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load, as a comma-separated list or a YAML list. `classpath:` and `classpath*:` search every class path root, `file:` the file system; `*` matches within a directory, `**` across directories. When set, a location that finds no file stops startup. |
+| `praecepta.fail-on` | `ERROR` | The validation severity that stops startup: `ERROR`, `WARNING` or `NONE`. Unreadable or invalid tables stop it whatever this says. |
+
+A failed startup lists every problem at once (a `DecisionsException`). Issues below `fail-on` are logged
+as warnings, such as `Discount: WARNING rule 3 can never be selected`.
+
+With `micronaut-management`, the `praecepta` endpoint reports every decision: its hit policy, columns,
+rule count and validation issues (`GET /praecepta`, or `GET /praecepta/Discount` for one). Like other
+Micronaut endpoints it is sensitive by default, since the reports show the rules' conditions. Open it with
+`endpoints.praecepta.sensitive: false`, or secure it with Micronaut Security.
+
+Micronaut builds the module's beans and binds its settings at compile time, so it needs no reflection
+and no annotation processing in your build. In a native image, include the DMN files as resources.
+
 ## Native images
 Applications using Praecepta build as GraalVM native executables with no configuration for Praecepta
 itself: the engine uses no reflection, and the jars carry the reachability metadata they need under
@@ -538,7 +599,8 @@ Praecepta Engine has no runtime dependencies; it reads DMN with the JDK's XML pa
 Praecepta Loader depends on Apache POI. The Maven plugin uses it at build time only, through
 `praecepta-compiler`, the build-time core the build-tool integrations share. `praecepta-integration`,
 which the framework integrations share, needs only the engine. Their design is in
-[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md). `praecepta-micronaut` adds nothing beyond it: Micronaut
+is the application's own (`provided`).
 
 # Roadmap
 [docs/ROADMAP.md](docs/ROADMAP.md) has the plans for the next year; past decisions and their reasons are in
