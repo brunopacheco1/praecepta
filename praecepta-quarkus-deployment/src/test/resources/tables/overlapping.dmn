@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- a UNIQUE table whose two rules overlap on "PT": an ERROR of the validation report -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="overlapping" name="Overlapping" namespace="https://example.org/praecepta">
+  <decision id="tier" name="Tier">
+    <decisionTable hitPolicy="UNIQUE">
+      <input><inputExpression typeRef="string"><text>country</text></inputExpression></input>
+      <output name="tier" typeRef="string"/>
+      <rule><inputEntry><text>"PT"</text></inputEntry><outputEntry><text>"gold"</text></outputEntry></rule>
+      <rule><inputEntry><text>"PT","ES"</text></inputEntry><outputEntry><text>"silver"</text></outputEntry></rule>
+    </decisionTable>
+  </decision>
+</definitions>

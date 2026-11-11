@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# Merged by quarkus-extension-maven-plugin into the extension's descriptor
+name: "Praecepta"
+description: "DMN decision tables, validated while Quarkus builds the application and injected as engines"
+metadata:
+  keywords:
+    - "dmn"
+    - "decision-table"
+    - "rules"
+  guide: "https://github.com/brunopacheco1/praecepta#praecepta-quarkus-extension"
+  categories:
+    - "business-automation"
+  status: "preview"

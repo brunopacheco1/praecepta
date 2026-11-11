@@ -46,8 +46,8 @@ describe modules that do not exist yet; their authors update them as they land.
 | `io.github.brunopacheco1.praecepta.gradle.plugin` (groupId `io.github.brunopacheco1.praecepta`) | `praecepta-gradle-plugin-marker` | gradle plugin (pom only) | planned (#18) |
 | `praecepta-spring-boot-starter` | `praecepta-spring-boot-starter` | integration; Spring Boot (`provided`) | 0.5 (#20) |
 | `praecepta-micronaut` | `praecepta-micronaut` | integration; Micronaut 4 (`provided`) | 0.5 (#77) |
-| `praecepta-quarkus` | `praecepta-quarkus` | integration, `quarkus-arc` | planned (#76) |
-| `praecepta-quarkus-deployment` | `praecepta-quarkus-deployment` | runtime, `quarkus-arc-deployment`, and compiler if it takes spreadsheets | planned (#76) |
+| `praecepta-quarkus` | `praecepta-quarkus` | integration; `quarkus-arc` (`provided`) | 0.5 (#76) |
+| `praecepta-quarkus-deployment` | `praecepta-quarkus-deployment` | runtime, compiler; `quarkus-arc-deployment` (`provided`) | 0.5 (#76) |
 
 All share the groupId `io.github.brunopacheco1` (except the Gradle plugin marker, whose coordinates
 Gradle dictates), the version of the reactor, and the parent POM. Every module is a directory directly
@@ -141,9 +141,13 @@ The same keys everywhere: Spring Boot and Micronaut read them under `praecepta`,
 
 A pattern that matches nothing is an error when `praecepta.locations` was set explicitly (the message
 names the pattern); with the default, finding nothing gives an empty `Decisions` and an INFO log line.
-Integrations add no other key without updating this table (for example the Quarkus extension's
-build-time declarations of Excel and CSV tables, if it takes them, under `quarkus.praecepta.tables."<name>"`,
-mirroring `TableDefinition` in kebab-case).
+Integrations add no other key without updating this table. The Quarkus extension adds one: build-time
+declarations of Excel and CSV tables under `quarkus.praecepta.tables."<key>"`, mirroring
+`TableDefinition` in kebab-case (`source`, `decision`, `hit-policy`, `aggregation`, and
+`inputs[n]`/`outputs[n]` with `name`, `type`, `allowed-values`, `priority`, `list`). The key only groups
+a table's settings: the decision is named after the file, as a build plugin names it, and `name` and
+`file-header` have no meaning without generated classes. A relative `source` is resolved against the
+project's directory.
 
 ## Beans and names
 - **A decision's name** is the DMN decision's `name` attribute (its `id` when it has none), exactly as
@@ -151,7 +155,7 @@ mirroring `TableDefinition` in kebab-case).
   file name without extension, or the DMN decision's name), not its generated class name.
 - **Every framework registers one `Decisions` bean** (Spring bean name `praeceptaDecisions`), created at
   startup, never lazily: Micronaut makes it `@Context`, Spring a non-lazy singleton, Quarkus a
-  `@Startup`-initialised `@ApplicationScoped`/`@Singleton` bean. This is the portable way in:
+  `@Startup`-initialised `@Singleton` bean. This is the portable way in:
   `decisions.evaluate("Discount", Map.of("country", "PT"))`.
 - **Each decision is also an engine bean** of type
   `PraeceptaEngine<Map<String, String>, Map<String, String>>`, qualified by the decision's name:
@@ -161,7 +165,9 @@ mirroring `TableDefinition` in kebab-case).
   - Micronaut: `@Named("Discount")` (`Qualifiers.byName`), registered before the application's beans are
     created; if Micronaut cannot do that for files found at runtime, the module offers only `Decisions`
     and says so in its README section.
-  - Quarkus: `@Identifier("Discount")` on synthetic beans produced at build time (`@Named` works too).
+  - Quarkus: `@Identifier("Discount")` on `@Singleton` synthetic beans produced at build time (`@Named`
+    works too). `PraeceptaEngine` is a final class, so it cannot have the client proxy a normal scope such
+    as `@ApplicationScoped` needs; engines are immutable, so a singleton behaves the same.
 - Nothing is registered for typed records or generated classes (see above).
 
 ## Reports and failures
@@ -171,15 +177,15 @@ mirroring `TableDefinition` in kebab-case).
 | Where validation runs | startup | startup | build (`quarkus:build`, dev mode, tests) |
 | A failing table | context fails to start with the `DecisionsException` (a `FailureAnalyzer` may format it) | context fails to start | the build fails with the `DecisionsException` message |
 | Warnings | logged at startup | logged at startup | logged by the build step |
-| Report endpoint | Actuator endpoint `praecepta` (`/actuator/praecepta`, and `/actuator/praecepta/{name}` for one decision), when Actuator is present; exposed under Actuator's usual rules | management endpoint `praecepta` (`/praecepta`, `/praecepta/{name}`), when `micronaut-management` is present | `Decisions` at runtime; a Dev UI card and a `/q/praecepta` route if they fit |
+| Report endpoint | Actuator endpoint `praecepta` (`/actuator/praecepta`, and `/actuator/praecepta/{name}` for one decision), when Actuator is present; exposed under Actuator's usual rules | management endpoint `praecepta` (`/praecepta`, `/praecepta/{name}`), when `micronaut-management` is present | `Decisions` at runtime (`describe()`, `get(name).report()`); no Dev UI card or `/q/praecepta` route yet, since a route would make the extension depend on `quarkus-vertx-http` |
 
 The endpoints return `Decisions.describe()` (`{"decisions": {"Discount": {...}}}`) and
 `Decision.describe()` for one decision (404 for an unknown name): `name`, `location`, `hitPolicy`,
 `aggregation`, `rules`, `inputs` and `outputs` (`name`, `type`, and `list` for inputs) and `issues`
 (`severity`, `kind`, `rules`, `detail`, `example`, `message`). They only read; nothing evaluates through
-them. In Quarkus the runtime builds engines from the DMN the build step validated (as resources
-registered for native images, or bytes recorded at build time), with `fail-on` already enforced, so it
-cannot fail differently at runtime.
+them. In Quarkus the runtime builds engines from the DMN the build step validated (written into the
+application as generated resources, `META-INF/praecepta/tables/<n>.dmn`, registered for native images),
+with `fail-on` already enforced, so it cannot fail differently at runtime.
 
 ## Per integration
 ### Gradle plugin (#18, planned)
@@ -231,6 +237,12 @@ cannot fail differently at runtime.
   repository has no entry for Apache POI. Spreadsheets reach a native executable as DMN, compiled at build
   time, as principle 3 already has it.
 - **No reflection:** the engine needs none. Framework modules keep to that.
+- For Quarkus, `native.yml` should also build a small Quarkus application with `praecepta-quarkus`
+  (a DMN file under `src/main/resources/rules/` and a declared CSV table) with `-Dnative` (Quarkus'
+  `quarkus-maven-plugin`, `quarkus.native.container-build` off inside the GraalVM image) and run its
+  `@QuarkusIntegrationTest`, or call the executable, to check that an injected engine evaluates. The
+  extension reads the tables while the image is built (static init) and keeps the engines in the image
+  heap; this has not been built natively yet.
 
 ### Spring Boot starter (#20)
 - One module, `praecepta-spring-boot-starter` (auto-configuration and starter together), package
@@ -267,14 +279,25 @@ cannot fail differently at runtime.
   rules' conditions: `endpoints.praecepta.sensitive: false` opens it, or Micronaut Security guards it.
   An unknown name answers 404 (the read method returns null).
 
-### Quarkus extension (#76, planned)
-- `praecepta-quarkus` (runtime) and `praecepta-quarkus-deployment`, built with
+### Quarkus extension (#76)
+- `praecepta-quarkus` (runtime: `PraeceptaRecorder`) and `praecepta-quarkus-deployment` (build steps:
+  `PraeceptaProcessor`; configuration: `PraeceptaBuildTimeConfig`), built with
   `quarkus-extension-maven-plugin`, side by side under the repository root (the Quarkus BOM imported in
-  each module's own `<dependencyManagement>`). The deployment module finds DMN files in the application's archives with
-  `Location.matches`, validates them with `Decisions.load` at build time, registers them for native
-  images, and produces the `Decisions` and engine beans. Spreadsheet tables and dev-mode reload are
-  optional; if spreadsheets are taken, they go through `praecepta-compiler` in the deployment module
-  only, so Apache POI never reaches the application.
+  each module's own `<dependencyManagement>`).
+- The deployment module finds DMN files with `Location.matches` in the application's own archive, the
+  other application archives and every runtime dependency (the class path the application will have,
+  not the build's), and `file:` patterns with `TableLocations`. It compiles the declared Excel and CSV
+  tables with `praecepta-compiler` (so Apache POI stays in the deployment module), validates everything
+  with `Decisions.load` at build time, logs the remaining issues, writes the validated DMN into the
+  application as generated resources (registered for native images), and produces the `Decisions` and
+  engine beans from a `STATIC_INIT` recorder.
+- Dev mode restarts the application when a file a class path pattern matches changes or appears, or
+  when a `file:` table or a declared spreadsheet changes; a table that fails shows on the error page.
+- `quarkus-arc` and `quarkus-arc-deployment` are `provided`: every Quarkus application has them, and
+  their tree (Jakarta APIs under EPL-2.0, GraalVM's SDK under UPL-1.0) is outside the licence allowlist.
+- Tested with `QuarkusExtensionTest` (Quarkus 3.35 deprecated `QuarkusUnitTest` for removal, which
+  `-Werror` rejects) and `QuarkusDevModeTest`, in the default `mvn verify` (about 20 seconds); no
+  production-mode or native test yet (see Native images).
 
 ## Registering a module
 New modules need these and nothing else:
@@ -296,7 +319,7 @@ New modules need these and nothing else:
 4. **SBOM and licences:** every published module writes `target/bom.json`, and CI checks all of them
    against the allowlist in `.github/scripts/check_sbom_licenses.py` and scans them for known
    vulnerabilities, without being told about new modules. Framework dependencies the application always
-   has (Spring Boot, Micronaut, the Gradle and Maven APIs) are `provided` (or optional), so they are not
+   has (Spring Boot, Micronaut, Quarkus' ArC, the Gradle and Maven APIs) are `provided` (or optional), so they are not
    part of what Praecepta ships. Do not widen the allowlist in an integration's change: report a
    dependency it rejects to the maintainer.
 5. **API documentation:** the website publishes every published module's Javadoc at
