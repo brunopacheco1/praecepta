@@ -30,7 +30,9 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   does. The Maven plugin generates `OffsetTime` and `ZonedDateTime` components for columns whose
   values are all written with a zone (and for the inputs their cells compare with), and fails the
   build for a column that mixes both kinds. A time with a zone id (`time("16:12:00@Europe/Paris")`)
-  is still rejected, as it has no fixed offset.
+  is still rejected, as it has no fixed offset. The DMN TCK now passes 81 of its 86 checks (was 78):
+  the rest need chained decisions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) or
+  output entries that are expressions ([#71](https://github.com/brunopacheco1/praecepta/issues/71)).
 
 ### Changed
 - **Map-based inputs accept times and date-times with a time zone**, which they used to reject as

@@ -154,14 +154,8 @@ final class TckRunner {
 
     private static String text(Simple simple) {
         return switch (simple.type()) {
-            case "", "string", "decimal", "double", "integer", "int", "long", "float", "date", "boolean",
+            case "", "string", "decimal", "double", "integer", "int", "long", "float", "date", "boolean", "time", "dateTime",
                  "duration", "dayTimeDuration", "yearMonthDuration" -> simple.text();
-            case "time", "dateTime" -> {
-                if (ZONED.matcher(simple.text().strip()).matches()) {
-                    throw new Unsupported("times and date-times with a time zone (#70)");
-                }
-                yield simple.text();
-            }
             default -> throw new Unsupported(unsupportedType(simple.type()));
         };
     }
@@ -239,8 +233,6 @@ final class TckRunner {
     // ---- reasons ----------------------------------------------------------------------------------
 
     private static final Pattern TYPE = Pattern.compile("type '([^']*)' is not supported");
-    /** An xsd:time or xsd:dateTime value with an offset or zone. */
-    private static final Pattern ZONED = Pattern.compile(".*\\d([Zz]|[+-]\\d{2}:?\\d{2}|@.+)");
     private static final Pattern AGGREGATION = Pattern.compile("aggregation '([^']*)' is not supported");
     private static final Pattern EXPRESSION = Pattern.compile("input expression '([^']*)' is not supported");
 
@@ -251,7 +243,7 @@ final class TckRunner {
     private static final List<Map.Entry<String, String>> PHRASES = List.of(
             Map.entry("is a structured item definition", "columns of a structured type"),
             Map.entry("is a collection", "list inputs (#25)"),
-            Map.entry("has a time zone", "times and date-times with a time zone (#70)"),
+            Map.entry("is a time with a zone id", "times with a zone id, which have no fixed offset"),
             Map.entry("output entries must be literals", "output entries that are expressions (#71)"));
 
     /**
