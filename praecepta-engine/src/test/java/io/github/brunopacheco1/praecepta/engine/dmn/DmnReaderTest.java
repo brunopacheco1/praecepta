@@ -87,6 +87,23 @@ class DmnReaderTest {
     }
 
     @Test
+    void read_all_reads_every_decision_table_in_document_order() {
+        var tables = DmnReader.readAll(resource("dmn11-two-decisions.dmn"));
+        Assertions.assertThat(tables).extracting(DecisionTable::name).containsExactly("Carrier", "Fee");
+        Assertions.assertThat(tables.getLast()).isEqualTo(DmnReader.read(resource("dmn11-two-decisions.dmn"), "Fee"));
+        Assertions.assertThat(DmnReader.readAll(resource("camunda-modeler-discount.dmn"))).singleElement()
+                .isEqualTo(DmnReader.read(resource("camunda-modeler-discount.dmn")));
+
+        var noTables = new ByteArrayInputStream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <inputData id="x" name="x"/>
+                </definitions>""".getBytes(StandardCharsets.UTF_8));
+        Assertions.assertThat(DmnReader.readAll(noTables)).isEmpty();
+        var notDmn = new ByteArrayInputStream("<html/>".getBytes(StandardCharsets.UTF_8));
+        Assertions.assertThatThrownBy(() -> DmnReader.readAll(notDmn)).isInstanceOf(InvalidDecisionTableException.class);
+    }
+
+    @Test
     void reads_dmn_1_1_and_picks_a_decision_by_name() {
         var carrier = DmnReader.read(resource("dmn11-two-decisions.dmn"), "Carrier");
         Assertions.assertThat(carrier.inputs()).containsExactly(new InputColumn("weight", ColumnType.NUMBER));

@@ -12,8 +12,12 @@ which:
    listed in `CHANGELOG.md`;
 2. sets the version from the tag, then builds and runs the tests;
 3. signs every artifact with the **release key**;
-4. publishes `praecepta` (parent POM), `praecepta-engine`, `praecepta-loader` and
-   `praecepta-maven-plugin` to Maven Central, waiting until they are live;
+4. publishes every module but the benchmarks, the TCK runner and the test projects that opt out
+   (`skipPublishing`; see [INTEGRATIONS.md](INTEGRATIONS.md#registering-a-module)) to Maven Central:
+   the parent POM, `praecepta-engine`, `praecepta-loader`, `praecepta-compiler`,
+   `praecepta-integration`, `praecepta-maven-plugin` and the framework and build-tool integrations,
+   waiting until they are live. The list is never written down: the workflow finds the signed jars
+   (`.github/scripts/published_modules.py`);
 5. records build provenance for the jars (GitHub artifact attestations);
 6. creates a GitHub release with the changelog section, jars, signatures, SBOMs, the provenance
    bundle (`praecepta-X.Y.Z.intoto.jsonl`) and `THIRD-PARTY-NOTICES.txt`.
@@ -101,8 +105,13 @@ it was built with (in the jar manifests' `Build-Jdk-Spec`; 25 for the current wo
 ```bash
 git checkout vX.Y.Z
 ./mvnw versions:set -DnewVersion=X.Y.Z -DgenerateBackupPoms=false -DprocessAllModules -DupdateBuildOutputTimestampPolicy=never
-./mvnw -Prelease clean package -pl praecepta-engine,praecepta-loader,praecepta-maven-plugin -am -DskipTests -Dinvoker.skip -Dgpg.skip
+./mvnw -Prelease clean package -pl '!praecepta-benchmarks,!praecepta-tck' -DskipTests -Dinvoker.skip -Dgpg.skip
 ```
+
+Releases up to 0.4.0 were built with `-pl praecepta-engine,praecepta-loader,praecepta-maven-plugin -am`
+instead; rebuild those with that list. From 0.5.0 the command names only the modules left out, so a new
+published module changes nothing here. Every module is a directory directly under the root, so the
+version rewrite below (`pom.xml */pom.xml`) reaches all of them.
 
 The release workflow builds with the Maven Wrapper (`./mvnw`), which pins the Maven version in
 `.mvn/wrapper/maven-wrapper.properties` (3.9.15, checked by its SHA-256). Releases before 0.4.0 used
@@ -117,7 +126,9 @@ where `${version}` is the buildspec's own `version=`. Written that way, the buil
 its release, so Reproducible Central's tooling can add the next release on its own: it notices new
 versions on Maven Central and copies the previous buildspec, changing only `version=` (and `jdk=` if
 the jars name another JDK). Nothing needs doing per release unless the rebuild command changes; a
-pull request adding `praecepta-X.Y.Z.buildspec` there only makes it sooner. 0.2.0 is the exception:
+pull request adding `praecepta-X.Y.Z.buildspec` there only makes it sooner. The command did change
+for 0.5.0 (the module list above), so its buildspec needs one pull request there with the new
+`command=`; later releases copy it unchanged. 0.2.0 is the exception:
 its workflow still stamped the time of the release run, so its `.buildspec` names 0.2.0 and also sets
 `project.build.outputTimestamp` to `2026-11-08T20:08:06Z`.
 

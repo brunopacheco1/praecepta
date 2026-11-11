@@ -8,6 +8,7 @@ package io.github.brunopacheco1.praecepta.maven.plugin;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.github.brunopacheco1.praecepta.compiler.ColumnDefinition;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 
 /**
@@ -40,7 +41,7 @@ public class ColumnConfig {
     /**
      * STRING (default), NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION or YEAR_MONTH_DURATION. A
      * TIME or DATE_TIME column whose values are all written with a time zone generates an {@code OffsetTime}
-     * or {@code ZonedDateTime} (see {@link TimeZones}).
+     * or {@code ZonedDateTime}.
      */
     ColumnType type = ColumnType.STRING;
 
@@ -75,5 +76,10 @@ public class ColumnConfig {
         var column = new ColumnConfig(name, type, allowedValues, List.of());
         column.list = true;
         return column;
+    }
+
+    /** The column as praecepta-compiler takes it. */
+    ColumnDefinition definition() {
+        return new ColumnDefinition(name, type, allowedValues, priority, list);
     }
 }

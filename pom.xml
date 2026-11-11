@@ -91,6 +91,8 @@
     <modules>
         <module>praecepta-engine</module>
         <module>praecepta-loader</module>
+        <module>praecepta-compiler</module>
+        <module>praecepta-integration</module>
         <module>praecepta-maven-plugin</module>
         <module>praecepta-benchmarks</module>
         <module>praecepta-tck</module>

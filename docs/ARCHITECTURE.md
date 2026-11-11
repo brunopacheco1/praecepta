@@ -15,8 +15,15 @@ builds an engine once and calls it.
 |---|---|---|
 | `praecepta-engine` | the JDK only (`java.xml`) | The engine, the cell parser, DMN reading and writing, and validation. A JPMS module, `io.github.brunopacheco1.praecepta.engine`. |
 | `praecepta-loader` | engine, Apache POI | Reads rules from Excel (first sheet) and semicolon-separated CSV files. |
-| `praecepta-maven-plugin` | engine, loader, Maven API | Compiles tables at build time: validates them, writes them as DMN resources and generates typed Java classes. |
+| `praecepta-compiler` | engine, loader | The build-time core of the build tools: loads a table, validates it, writes it as DMN and generates typed Java classes (`TableCompiler`). Independent of any build tool. |
+| `praecepta-integration` | engine | The runtime core of the framework integrations: finds DMN files by location pattern and builds a map-based engine per decision, with its validation report (`Decisions`). Independent of any framework. |
+| `praecepta-maven-plugin` | compiler, Maven API | The `generate` goal: runs the compiler on the configured tables and adds the results to the Maven build. |
 | `praecepta-benchmarks` | engine, Camunda 8, Drools, JMH | Compares Praecepta with other engines; not published. |
+| `praecepta-tck` | engine | Runs the DMN TCK's decision-table cases; not published. |
+
+The framework and build-tool integrations of 0.5 (Gradle, Spring Boot, Micronaut, Quarkus, native
+images) build on `praecepta-compiler` and `praecepta-integration`; their shared design (module names,
+configuration keys, bean names, reports, failures) is in [INTEGRATIONS.md](INTEGRATIONS.md).
 
 ## From a table to an answer
 
@@ -114,8 +121,12 @@ An engine is **immutable** once built: any number of threads may share it withou
 - `DmnWriter` writes a `DecisionTable` as standard DMN 1.3, which `DmnReader` reads back unchanged
   and which Camunda 8 and Drools evaluate identically (the benchmarks check this).
 
-## The Maven plugin
-`GenerateMojo` runs `TableCompiler` for each configured table:
+## The compiler and the Maven plugin
+`TableCompiler` (in `praecepta-compiler`) compiles one table, described by a `TableDefinition`, with
+`CompilerOptions` that name the package, the failing severity, the file header, the tool named in the
+generated files and how messages name the tool's settings. `GenerateMojo` turns each configured table
+into a `TableDefinition` and runs `TableCompiler` on it; the Gradle plugin and the Quarkus extension do
+the same with their own configuration:
 1. load it (Excel or CSV through the loader, or DMN through `DmnReader`);
 2. build an engine and validate it, failing the build at the configured severity; each input is
    bound with a getter of the Java type the generated record gives it, so the analysis sees the
@@ -127,7 +138,17 @@ An engine is **immutable** once built: any number of threads may share it withou
    `TimeZones` decides which time and date-time columns become `OffsetTime` and `ZonedDateTime`:
    those whose written values all have a zone, together with the inputs their cells compare with.
 
-At runtime, the generated code needs only `praecepta-engine`.
+At runtime, the generated code needs only `praecepta-engine`. The tool writes the result with
+`CompiledTable.write`, so every tool writes the same files.
+
+## Framework integrations
+`praecepta-integration` turns DMN files into named engines for the Spring Boot, Micronaut and Quarkus
+integrations: `TableLocations` finds files by pattern (`classpath*:rules/**/*.dmn`), `Decisions.load`
+reads every decision table of every file (`DmnReader.readAll`) and builds one `Decision` per table, with
+an engine bound to maps of text (`PraeceptaEngine<Map<String, String>, Map<String, String>>`) and its
+validation report, and fails with every problem at once (`DecisionsException`): unreadable files, invalid
+tables, duplicate names, and validation issues at the configured severity. Maps rather than records,
+because a container finds its tables at runtime; typed records remain the build plugins' job.
 
 ## Design decisions
 The main decisions and their reasons (strict DMN semantics, bitsets instead of a trie or generated

@@ -3,11 +3,12 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.brunopacheco1.praecepta.maven.plugin;
+package io.github.brunopacheco1.praecepta.compiler;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -29,62 +30,56 @@ import io.github.brunopacheco1.praecepta.loader.csv.CsvLoader;
 import io.github.brunopacheco1.praecepta.loader.excel.ExcelLoader;
 
 /**
- * Compiles one table: loads it, validates it with the engine, renders it as DMN and generates the
- * Java sources that load that DMN at runtime. Independent of Maven, so it can be tested directly.
+ * Compiles one table: loads it, validates it with the engine, renders it as DMN and generates the Java
+ * sources that load that DMN at runtime. Independent of any build tool: the Maven plugin (and the Gradle
+ * plugin and Quarkus extension) turn their configuration into a {@link TableDefinition} and write the
+ * {@link CompiledTable} where their build expects it.
+ *
+ * <pre>{@code
+ * var options = CompilerOptions.of("com.acme.pricing", "praecepta-gradle-plugin").withFailOn(Severity.WARNING);
+ * var compiled = TableCompiler.compile(TableDefinition.dmn(Path.of("src/main/rules/shipping.dmn")), options);
+ * compiled.report().issues().forEach(issue -> log.warn(compiled.className() + ": " + issue));
+ * compiled.write(generatedSources, generatedResources);
+ * }</pre>
  */
-final class TableCompiler {
-
-    /**
-     * @param table      the table as loaded
-     * @param className  simple name of the generated decision class
-     * @param report     the engine's static analysis of the table
-     * @param dmn        the table as DMN, to ship as {@code <className>.dmn} next to the classes
-     * @param sources    generated Java sources by simple class name
-     */
-    record Result(DecisionTable table, String className, ValidationReport report, String dmn, Map<String, String> sources) {
-    }
+public final class TableCompiler {
 
     private TableCompiler() {
     }
 
     /**
-     * @throws IllegalArgumentException with a readable message if the configuration or the table is invalid,
-     *                                  or if validation finds issues at least as severe as {@code failOn}
+     * Compiles one table.
+     *
+     * @return the loaded table, its validation report, its DMN and the generated sources
+     * @throws IllegalArgumentException with a readable message, naming settings as
+     *                                  {@link CompilerOptions#settingNames()} does, if the definition or the
+     *                                  table is invalid, or if validation finds issues at least as severe as
+     *                                  {@link CompilerOptions#failOn()}
      */
-    static Result compile(TableConfig config, String packageName, Severity failOn) {
-        return compile(config, packageName, failOn, null);
-    }
-
-    /**
-     * @param fileHeader text put first in every generated source as comments (e.g. the user's SPDX
-     *                   header), or null for none
-     */
-    static Result compile(TableConfig config, String packageName, Severity failOn, String fileHeader) {
-        if (config.source == null) {
-            throw new IllegalArgumentException("Every <table> needs a <source>");
+    public static CompiledTable compile(TableDefinition definition, CompilerOptions options) {
+        if (definition.source() == null) {
+            throw new IllegalArgumentException("Every %s needs a %s".formatted(options.setting("table"), options.setting("source")));
         }
-        var table = load(config);
-        var className = JavaNames.type(config.name != null ? config.name : table.name());
-        var report = validate(table, failOn);
+        var table = load(definition, options);
+        var className = JavaNames.type(definition.name() != null ? definition.name() : table.name());
+        var report = validate(table, options.failOn());
         var dmn = DmnWriter.write(table);
-        var sources = new SourceGenerator(packageName, className, table, config.source.getName(), fileHeader).generate();
-        return new Result(table, className, report, dmn, sources);
+        var sources = new SourceGenerator(options, className, table, fileName(definition.source())).generate();
+        return new CompiledTable(table, options.packageName(), className, report, dmn, sources);
     }
 
     // ---- loading ----------------------------------------------------------------------------------
 
-    private static DecisionTable load(TableConfig config) {
-        var file = config.source;
-        if (!file.isFile()) {
+    private static DecisionTable load(TableDefinition definition, CompilerOptions options) {
+        var file = definition.source();
+        if (!Files.isRegularFile(file)) {
             throw new IllegalArgumentException("Table source " + file + " does not exist");
         }
-        var fileName = file.getName();
-        var extension = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
-        try (var stream = Files.newInputStream(file.toPath())) {
-            return switch (extension) {
-                case "dmn" -> dmn(config, stream);
-                case "xlsx", "xls" -> spreadsheet(config, stream, false);
-                case "csv" -> spreadsheet(config, stream, true);
+        try (var stream = Files.newInputStream(file)) {
+            return switch (extension(file)) {
+                case "dmn" -> dmn(definition, stream, options);
+                case "xlsx", "xls" -> spreadsheet(definition, stream, false, options);
+                case "csv" -> spreadsheet(definition, stream, true, options);
                 default -> throw new IllegalArgumentException("Table source %s: expected a .xlsx, .csv or .dmn file".formatted(file));
             };
         } catch (IOException e) {
@@ -92,55 +87,68 @@ final class TableCompiler {
         }
     }
 
-    private static DecisionTable dmn(TableConfig config, InputStream stream) {
-        if (config.hitPolicy != null || config.aggregation != null || !config.inputs.isEmpty() || !config.outputs.isEmpty()) {
-            throw new IllegalArgumentException(("Table source %s: a DMN model declares its own hit policy and columns; "
-                    + "remove <hitPolicy>, <aggregation>, <inputs> and <outputs>").formatted(config.source));
-        }
-        return DmnReader.read(stream, config.decision);
+    private static String fileName(Path file) {
+        return file.getFileName().toString();
     }
 
-    /** An Excel or CSV table: the pom declares its hit policy and columns, the file holds its rules. */
-    private static DecisionTable spreadsheet(TableConfig config, InputStream stream, boolean csv) {
-        var where = "Table source " + config.source;
-        checkSpreadsheetConfig(config, where);
-        var inputs = config.inputs.stream()
-                .map(column -> new InputColumn(requiredName(column, where), column.type, column.allowedValues))
+    private static String extension(Path file) {
+        var fileName = fileName(file);
+        return fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private static DecisionTable dmn(TableDefinition definition, InputStream stream, CompilerOptions options) {
+        if (definition.hitPolicy() != null || definition.aggregation() != null || !definition.inputs().isEmpty()
+                || !definition.outputs().isEmpty()) {
+            throw new IllegalArgumentException(("Table source %s: a DMN model declares its own hit policy and columns; "
+                    + "remove %s, %s, %s and %s").formatted(definition.source(), options.setting("hitPolicy"),
+                            options.setting("aggregation"), options.setting("inputs"), options.setting("outputs")));
+        }
+        return DmnReader.read(stream, definition.decision());
+    }
+
+    /** An Excel or CSV table: the build declares its hit policy and columns, the file holds its rules. */
+    private static DecisionTable spreadsheet(TableDefinition definition, InputStream stream, boolean csv, CompilerOptions options) {
+        var where = "Table source " + definition.source();
+        checkSpreadsheetDefinition(definition, where, options);
+        var inputs = definition.inputs().stream()
+                .map(column -> new InputColumn(requiredName(column, where, options), column.type(), column.allowedValues()))
                 .toList();
-        var outputs = config.outputs.stream()
-                .map(column -> new OutputColumn(requiredName(column, where), column.type, column.priority))
+        var outputs = definition.outputs().stream()
+                .map(column -> new OutputColumn(requiredName(column, where, options), column.type(), column.priority()))
                 .toList();
         var inputNames = new LinkedHashSet<>(inputs.stream().map(InputColumn::name).toList());
         var outputNames = new LinkedHashSet<>(outputs.stream().map(OutputColumn::name).toList());
-        var fileName = config.source.getName();
+        var fileName = fileName(definition.source());
         var rules = csv
                 ? new CsvLoader(stream, fileName, inputNames, outputNames).getPraecepta()
                 : new ExcelLoader(stream, fileName, inputNames, outputNames).getPraecepta();
         var tableName = fileName.substring(0, fileName.lastIndexOf('.'));
-        var lists = config.inputs.stream().filter(column -> column.list).map(column -> column.name).collect(Collectors.toSet());
-        if (config.outputs.stream().anyMatch(column -> column.list)) {
-            throw new IllegalArgumentException(where + ": <list> only applies to inputs");
+        var lists = definition.inputs().stream().filter(ColumnDefinition::list).map(ColumnDefinition::name)
+                .collect(Collectors.toSet());
+        if (definition.outputs().stream().anyMatch(ColumnDefinition::list)) {
+            throw new IllegalArgumentException(where + ": %s only applies to inputs".formatted(options.setting("list")));
         }
-        return new DecisionTable(tableName, config.hitPolicy, config.aggregation, inputs, outputs, rules, false, lists);
+        return new DecisionTable(tableName, definition.hitPolicy(), definition.aggregation(), inputs, outputs, rules, false, lists);
     }
 
-    private static void checkSpreadsheetConfig(TableConfig config, String where) {
-        if (config.decision != null) {
-            throw new IllegalArgumentException(where + ": <decision> only applies to DMN sources");
+    private static void checkSpreadsheetDefinition(TableDefinition definition, String where, CompilerOptions options) {
+        if (definition.decision() != null) {
+            throw new IllegalArgumentException(where + ": %s only applies to DMN sources".formatted(options.setting("decision")));
         }
-        if (config.hitPolicy == null) {
-            throw new IllegalArgumentException(where + ": <hitPolicy> is required for Excel and CSV tables");
+        if (definition.hitPolicy() == null) {
+            throw new IllegalArgumentException(where + ": %s is required for Excel and CSV tables".formatted(options.setting("hitPolicy")));
         }
-        if (config.inputs.isEmpty() || config.outputs.isEmpty()) {
-            throw new IllegalArgumentException(where + ": declare the <inputs> and <outputs> columns");
+        if (definition.inputs().isEmpty() || definition.outputs().isEmpty()) {
+            throw new IllegalArgumentException(where + ": declare the %s and %s columns"
+                    .formatted(options.setting("inputs"), options.setting("outputs")));
         }
     }
 
-    private static String requiredName(ColumnConfig column, String where) {
-        if (column.name == null || column.name.isBlank()) {
-            throw new IllegalArgumentException(where + ": every column needs a <name>");
+    private static String requiredName(ColumnDefinition column, String where, CompilerOptions options) {
+        if (column.name() == null || column.name().isBlank()) {
+            throw new IllegalArgumentException(where + ": every column needs a %s".formatted(options.setting("name")));
         }
-        return column.name;
+        return column.name();
     }
 
     // ---- validation ---------------------------------------------------------------------------

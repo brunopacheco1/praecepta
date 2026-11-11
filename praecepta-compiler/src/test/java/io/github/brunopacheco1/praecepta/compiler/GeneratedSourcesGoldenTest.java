@@ -3,9 +3,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.brunopacheco1.praecepta.maven.plugin;
+package io.github.brunopacheco1.praecepta.compiler;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -31,7 +30,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
  * regenerate them with:
  *
  * <pre>
- * mvn -pl praecepta-maven-plugin -am test -Dtest=GeneratedSourcesGoldenTest -Dsurefire.failIfNoSpecifiedTests=false -Dgolden.update=true
+ * mvn -pl praecepta-compiler -am test -Dtest=GeneratedSourcesGoldenTest -Dsurefire.failIfNoSpecifiedTests=false -Dgolden.update=true
  * </pre>
  */
 class GeneratedSourcesGoldenTest {
@@ -40,16 +39,16 @@ class GeneratedSourcesGoldenTest {
 
     static List<Arguments> tables() {
         // an aggregating COLLECT table with an enum column and a file header of two lines
-        var fees = new TableConfig(table("fees.csv"), "Fees", null, HitPolicy.COLLECT, AggregationOperator.SUM,
-                List.of(new ColumnConfig("zone", ColumnType.STRING, "\"islands\",\"mainland\"", List.of())),
-                List.of(new ColumnConfig("fee", ColumnType.NUMBER, null, List.of())));
+        var fees = new TableDefinition(table("fees.csv"), "Fees", null, HitPolicy.COLLECT, AggregationOperator.SUM,
+                List.of(new ColumnDefinition("zone", ColumnType.STRING, "\"islands\",\"mainland\"", List.of())),
+                List.of(new ColumnDefinition("fee", ColumnType.NUMBER, null, List.of())));
         // a single-hit table with typed columns and an enum, in the default package, with no header
-        var discount = new TableConfig(table("discount.csv"), "Discount", null, HitPolicy.FIRST, null,
-                List.of(new ColumnConfig("country", ColumnType.STRING, "\"PT\",\"ES\",\"FR\"", List.of()),
-                        new ColumnConfig("age", ColumnType.NUMBER, "[0..120]", List.of()),
-                        new ColumnConfig("since", ColumnType.DATE, null, List.of())),
-                List.of(new ColumnConfig("discount", ColumnType.NUMBER, null, List.of()),
-                        new ColumnConfig("tier", ColumnType.STRING, null, List.of())));
+        var discount = new TableDefinition(table("discount.csv"), "Discount", null, HitPolicy.FIRST, null,
+                List.of(new ColumnDefinition("country", ColumnType.STRING, "\"PT\",\"ES\",\"FR\"", List.of()),
+                        new ColumnDefinition("age", ColumnType.NUMBER, "[0..120]", List.of()),
+                        new ColumnDefinition("since", ColumnType.DATE, null, List.of())),
+                List.of(new ColumnDefinition("discount", ColumnType.NUMBER, null, List.of()),
+                        new ColumnDefinition("tier", ColumnType.STRING, null, List.of())));
         return List.of(
                 Arguments.of("fees", fees, "com.acme.rules", "Golden test header\nsecond line"),
                 Arguments.of("discount", discount, "", null));
@@ -57,9 +56,9 @@ class GeneratedSourcesGoldenTest {
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("tables")
-    void generated_files_match_the_golden_files(String name, TableConfig config, String packageName, String header)
+    void generated_files_match_the_golden_files(String name, TableDefinition config, String packageName, String header)
             throws IOException {
-        var result = TableCompiler.compile(config, packageName, Severity.ERROR, header);
+        var result = TableCompilerTest.compile(config, packageName, Severity.ERROR, header);
         var generated = new TreeMap<String, String>();
         result.sources().forEach((className, source) -> generated.put(className + ".java.txt", source));
         generated.put(result.className() + ".dmn.txt", result.dmn());
@@ -93,9 +92,9 @@ class GeneratedSourcesGoldenTest {
         return files;
     }
 
-    private static File table(String name) {
+    private static Path table(String name) {
         try {
-            return Path.of(GeneratedSourcesGoldenTest.class.getResource("/tables/" + name).toURI()).toFile();
+            return Path.of(GeneratedSourcesGoldenTest.class.getResource("/tables/" + name).toURI());
         } catch (URISyntaxException e) {
             throw new IllegalStateException(e);
         }

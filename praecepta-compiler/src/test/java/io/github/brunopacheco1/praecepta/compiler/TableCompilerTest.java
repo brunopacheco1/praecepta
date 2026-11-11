@@ -3,10 +3,9 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-package io.github.brunopacheco1.praecepta.maven.plugin;
+package io.github.brunopacheco1.praecepta.compiler;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.net.URISyntaxException;
@@ -54,13 +53,13 @@ class TableCompilerTest {
 
     @Test
     void a_csv_table_becomes_typed_classes_backed_by_a_dmn_resource() throws Exception {
-        var config = new TableConfig(table("discount.csv"), "Discount", null, HitPolicy.FIRST, null,
-                List.of(new ColumnConfig("country", ColumnType.STRING, "\"PT\",\"ES\",\"FR\"", List.of()),
-                        new ColumnConfig("age", ColumnType.NUMBER, "[0..120]", List.of()),
-                        new ColumnConfig("since", ColumnType.DATE, null, List.of())),
-                List.of(new ColumnConfig("discount", ColumnType.NUMBER, null, List.of()),
-                        new ColumnConfig("tier", ColumnType.STRING, null, List.of())));
-        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        var config = new TableDefinition(table("discount.csv"), "Discount", null, HitPolicy.FIRST, null,
+                List.of(new ColumnDefinition("country", ColumnType.STRING, "\"PT\",\"ES\",\"FR\"", List.of()),
+                        new ColumnDefinition("age", ColumnType.NUMBER, "[0..120]", List.of()),
+                        new ColumnDefinition("since", ColumnType.DATE, null, List.of())),
+                List.of(new ColumnDefinition("discount", ColumnType.NUMBER, null, List.of()),
+                        new ColumnDefinition("tier", ColumnType.STRING, null, List.of())));
+        var result = compile(config, PACKAGE, Severity.ERROR);
 
         Assertions.assertThat(result.sources()).containsOnlyKeys("DiscountInput", "DiscountOutput", "Discount");
         Assertions.assertThat(result.sources().get("DiscountInput"))
@@ -97,8 +96,8 @@ class TableCompilerTest {
 
     @Test
     void a_dmn_table_keeps_its_own_columns_and_value_lists() throws Exception {
-        var config = new TableConfig(table("camunda-modeler-discount.dmn"), null, null, null, null, List.of(), List.of());
-        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        var config = new TableDefinition(table("camunda-modeler-discount.dmn"), null, null, null, null, List.of(), List.of());
+        var result = compile(config, PACKAGE, Severity.ERROR);
 
         Assertions.assertThat(result.className()).isEqualTo("Discount");
         Assertions.assertThat(result.sources().get("DiscountInput"))
@@ -118,8 +117,8 @@ class TableCompilerTest {
 
     @Test
     void inputs_that_dmn_cells_compare_with_become_input_components() throws Exception {
-        var config = new TableConfig(table("limits.dmn"), "Limits", null, null, null, List.of(), List.of());
-        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        var config = new TableDefinition(table("limits.dmn"), "Limits", null, null, null, List.of(), List.of());
+        var result = compile(config, PACKAGE, Severity.ERROR);
         Assertions.assertThat(result.sources().get("LimitsInput"))
                 .contains("public record LimitsInput(java.math.BigDecimal amount, java.math.BigDecimal limit)");
 
@@ -136,11 +135,11 @@ class TableCompilerTest {
 
     @Test
     void list_columns_become_lists_matched_element_by_element() throws Exception {
-        var config = new TableConfig(table("nationalities.csv"), "Offer", null, HitPolicy.FIRST, null,
-                List.of(ColumnConfig.listInput("nationalities", ColumnType.STRING, "\"PT\",\"ES\",\"BR\""),
-                        ColumnConfig.listInput("ages", ColumnType.NUMBER, null)),
-                List.of(new ColumnConfig("offer", ColumnType.STRING, null, List.of())));
-        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        var config = new TableDefinition(table("nationalities.csv"), "Offer", null, HitPolicy.FIRST, null,
+                List.of(ColumnDefinition.listInput("nationalities", ColumnType.STRING, "\"PT\",\"ES\",\"BR\""),
+                        ColumnDefinition.listInput("ages", ColumnType.NUMBER, null)),
+                List.of(new ColumnDefinition("offer", ColumnType.STRING, null, List.of())));
+        var result = compile(config, PACKAGE, Severity.ERROR);
 
         Assertions.assertThat(result.sources().get("OfferInput"))
                 .contains("public record OfferInput(java.util.List<String> nationalities, java.util.List<java.math.BigDecimal> ages)");
@@ -169,12 +168,12 @@ class TableCompilerTest {
 
     @Test
     void duration_columns_become_durations_and_periods() throws Exception {
-        var config = new TableConfig(table("waits.csv"), "Wait", null, HitPolicy.FIRST, null,
-                List.of(new ColumnConfig("delay", ColumnType.DAY_TIME_DURATION, null, List.of()),
-                        new ColumnConfig("tenure", ColumnType.YEAR_MONTH_DURATION, null, List.of())),
-                List.of(new ColumnConfig("extension", ColumnType.DAY_TIME_DURATION, null, List.of()),
-                        new ColumnConfig("plan", ColumnType.STRING, null, List.of())));
-        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        var config = new TableDefinition(table("waits.csv"), "Wait", null, HitPolicy.FIRST, null,
+                List.of(new ColumnDefinition("delay", ColumnType.DAY_TIME_DURATION, null, List.of()),
+                        new ColumnDefinition("tenure", ColumnType.YEAR_MONTH_DURATION, null, List.of())),
+                List.of(new ColumnDefinition("extension", ColumnType.DAY_TIME_DURATION, null, List.of()),
+                        new ColumnDefinition("plan", ColumnType.STRING, null, List.of())));
+        var result = compile(config, PACKAGE, Severity.ERROR);
 
         Assertions.assertThat(result.sources().get("WaitInput"))
                 .contains("public record WaitInput(java.time.Duration delay, java.time.Period tenure)");
@@ -194,15 +193,15 @@ class TableCompilerTest {
 
     @Test
     void boolean_time_and_date_time_columns_become_java_types() throws Exception {
-        var config = new TableConfig(table("shifts.csv"), "Shift", null, HitPolicy.FIRST, null,
-                List.of(new ColumnConfig("overtime", ColumnType.BOOLEAN, null, List.of()),
-                        new ColumnConfig("start", ColumnType.TIME, null, List.of()),
-                        new ColumnConfig("at", ColumnType.DATE_TIME, null, List.of())),
-                List.of(new ColumnConfig("paid", ColumnType.BOOLEAN, null, List.of()),
-                        new ColumnConfig("until", ColumnType.TIME, null, List.of()),
-                        new ColumnConfig("reviewed", ColumnType.DATE_TIME, null, List.of()),
-                        new ColumnConfig("rate", ColumnType.STRING, null, List.of())));
-        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        var config = new TableDefinition(table("shifts.csv"), "Shift", null, HitPolicy.FIRST, null,
+                List.of(new ColumnDefinition("overtime", ColumnType.BOOLEAN, null, List.of()),
+                        new ColumnDefinition("start", ColumnType.TIME, null, List.of()),
+                        new ColumnDefinition("at", ColumnType.DATE_TIME, null, List.of())),
+                List.of(new ColumnDefinition("paid", ColumnType.BOOLEAN, null, List.of()),
+                        new ColumnDefinition("until", ColumnType.TIME, null, List.of()),
+                        new ColumnDefinition("reviewed", ColumnType.DATE_TIME, null, List.of()),
+                        new ColumnDefinition("rate", ColumnType.STRING, null, List.of())));
+        var result = compile(config, PACKAGE, Severity.ERROR);
 
         Assertions.assertThat(result.sources().get("ShiftInput"))
                 .contains("public record ShiftInput(Boolean overtime, java.time.LocalTime start, java.time.LocalDateTime at)");
@@ -227,12 +226,12 @@ class TableCompilerTest {
 
     @Test
     void times_and_date_times_written_with_a_zone_become_offset_times_and_zoned_date_times() throws Exception {
-        var config = new TableConfig(table("deliveries.csv"), "Delivery", null, HitPolicy.FIRST, null,
-                List.of(new ColumnConfig("cutOff", ColumnType.TIME, null, List.of()),
-                        new ColumnConfig("at", ColumnType.DATE_TIME, null, List.of())),
-                List.of(new ColumnConfig("slot", ColumnType.STRING, null, List.of()),
-                        new ColumnConfig("due", ColumnType.DATE_TIME, null, List.of())));
-        var result = TableCompiler.compile(config, PACKAGE, Severity.WARNING);
+        var config = new TableDefinition(table("deliveries.csv"), "Delivery", null, HitPolicy.FIRST, null,
+                List.of(new ColumnDefinition("cutOff", ColumnType.TIME, null, List.of()),
+                        new ColumnDefinition("at", ColumnType.DATE_TIME, null, List.of())),
+                List.of(new ColumnDefinition("slot", ColumnType.STRING, null, List.of()),
+                        new ColumnDefinition("due", ColumnType.DATE_TIME, null, List.of())));
+        var result = compile(config, PACKAGE, Severity.WARNING);
 
         Assertions.assertThat(result.sources().get("DeliveryInput"))
                 .contains("public record DeliveryInput(java.time.OffsetTime cutOff, java.time.ZonedDateTime at)");
@@ -259,10 +258,10 @@ class TableCompilerTest {
 
     @Test
     void list_columns_of_times_written_with_a_zone_become_lists_of_offset_times() throws Exception {
-        var config = new TableConfig(table("windows.csv"), "Window", null, HitPolicy.FIRST, null,
-                List.of(ColumnConfig.listInput("slots", ColumnType.TIME, null)),
-                List.of(new ColumnConfig("fee", ColumnType.NUMBER, null, List.of())));
-        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        var config = new TableDefinition(table("windows.csv"), "Window", null, HitPolicy.FIRST, null,
+                List.of(ColumnDefinition.listInput("slots", ColumnType.TIME, null)),
+                List.of(new ColumnDefinition("fee", ColumnType.NUMBER, null, List.of())));
+        var result = compile(config, PACKAGE, Severity.ERROR);
 
         Assertions.assertThat(result.sources().get("WindowInput"))
                 .contains("public record WindowInput(java.util.List<java.time.OffsetTime> slots)");
@@ -288,8 +287,8 @@ class TableCompilerTest {
 
     @Test
     void inputs_compared_with_a_zoned_column_take_a_zone_too() throws Exception {
-        var config = new TableConfig(table("cutoffs.dmn"), "Cutoffs", null, null, null, List.of(), List.of());
-        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        var config = new TableDefinition(table("cutoffs.dmn"), "Cutoffs", null, null, null, List.of(), List.of());
+        var result = compile(config, PACKAGE, Severity.ERROR);
         Assertions.assertThat(result.sources().get("CutoffsInput"))
                 .contains("public record CutoffsInput(java.time.OffsetTime at, java.time.OffsetTime limit)");
 
@@ -308,10 +307,10 @@ class TableCompilerTest {
 
     @Test
     void a_column_with_times_with_and_without_a_zone_is_rejected() {
-        var config = new TableConfig(table("mixed-times.csv"), "Mixed", null, HitPolicy.FIRST, null,
-                List.of(new ColumnConfig("start", ColumnType.TIME, null, List.of())),
-                List.of(new ColumnConfig("rate", ColumnType.STRING, null, List.of())));
-        Assertions.assertThatThrownBy(() -> TableCompiler.compile(config, PACKAGE, Severity.ERROR))
+        var config = new TableDefinition(table("mixed-times.csv"), "Mixed", null, HitPolicy.FIRST, null,
+                List.of(new ColumnDefinition("start", ColumnType.TIME, null, List.of())),
+                List.of(new ColumnDefinition("rate", ColumnType.STRING, null, List.of())));
+        Assertions.assertThatThrownBy(() -> compile(config, PACKAGE, Severity.ERROR))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Table 'mixed-times': input 'start' takes time values both with and without a time zone, "
                         + "but its generated record component holds one kind");
@@ -319,8 +318,8 @@ class TableCompilerTest {
 
     @Test
     void outputs_naming_a_zoned_input_and_zoned_time_outputs_keep_their_zone() throws Exception {
-        var config = new TableConfig(table("appointments.dmn"), "Appointment", null, null, null, List.of(), List.of());
-        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        var config = new TableDefinition(table("appointments.dmn"), "Appointment", null, null, null, List.of(), List.of());
+        var result = compile(config, PACKAGE, Severity.ERROR);
         Assertions.assertThat(result.sources().get("AppointmentInput")).contains("public record AppointmentInput(java.time.ZonedDateTime at)");
         Assertions.assertThat(result.sources().get("AppointmentOutput"))
                 .contains("public record AppointmentOutput(java.time.ZonedDateTime confirmed, java.time.OffsetTime opens)");
@@ -342,8 +341,8 @@ class TableCompilerTest {
 
     @Test
     void inputs_a_cell_links_must_be_written_with_one_kind_of_time() {
-        var config = new TableConfig(table("linked-times.dmn"), "Linked", null, null, null, List.of(), List.of());
-        Assertions.assertThatThrownBy(() -> TableCompiler.compile(config, PACKAGE, Severity.ERROR))
+        var config = new TableDefinition(table("linked-times.dmn"), "Linked", null, null, null, List.of(), List.of());
+        Assertions.assertThatThrownBy(() -> compile(config, PACKAGE, Severity.ERROR))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Table 'linked': input 'start' takes time values both with and without a time zone, "
                         + "but its generated record component holds one kind");
@@ -351,18 +350,18 @@ class TableCompilerTest {
 
     @Test
     void a_time_output_that_is_not_a_time_is_rejected() {
-        var config = new TableConfig(table("bad-time-output.csv"), "Opening", null, HitPolicy.FIRST, null,
-                List.of(new ColumnConfig("start", ColumnType.TIME, null, List.of())),
-                List.of(new ColumnConfig("opens", ColumnType.TIME, null, List.of())));
-        Assertions.assertThatThrownBy(() -> TableCompiler.compile(config, PACKAGE, Severity.ERROR))
+        var config = new TableDefinition(table("bad-time-output.csv"), "Opening", null, HitPolicy.FIRST, null,
+                List.of(new ColumnDefinition("start", ColumnType.TIME, null, List.of())),
+                List.of(new ColumnDefinition("opens", ColumnType.TIME, null, List.of())));
+        Assertions.assertThatThrownBy(() -> compile(config, PACKAGE, Severity.ERROR))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Table 'bad-time-output': output 'opens' value 'noon' is not a time");
     }
 
     @Test
     void dmn_output_expressions_and_named_list_inputs_run_in_generated_code() throws Exception {
-        var config = new TableConfig(table("flu.dmn"), "Flu", null, null, null, List.of(), List.of());
-        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        var config = new TableDefinition(table("flu.dmn"), "Flu", null, null, null, List.of(), List.of());
+        var result = compile(config, PACKAGE, Severity.ERROR);
         Assertions.assertThat(result.sources().get("FluInput"))
                 .contains("public record FluInput(String symptom, java.math.BigDecimal days, java.util.List<String> fluSymptoms)");
         Assertions.assertThat(result.sources().get("FluOutput")).contains("public record FluOutput(String message, java.math.BigDecimal hours)");
@@ -385,10 +384,10 @@ class TableCompilerTest {
 
     @Test
     void collect_sum_tables_return_the_aggregate() throws Exception {
-        var config = new TableConfig(table("fees.csv"), "Fees", null, HitPolicy.COLLECT, AggregationOperator.SUM,
-                List.of(new ColumnConfig("zone", ColumnType.STRING, null, List.of())),
-                List.of(new ColumnConfig("fee", ColumnType.NUMBER, null, List.of())));
-        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        var config = new TableDefinition(table("fees.csv"), "Fees", null, HitPolicy.COLLECT, AggregationOperator.SUM,
+                List.of(new ColumnDefinition("zone", ColumnType.STRING, null, List.of())),
+                List.of(new ColumnDefinition("fee", ColumnType.NUMBER, null, List.of())));
+        var result = compile(config, PACKAGE, Severity.ERROR);
         Assertions.assertThat(result.sources().get("FeesInput")).contains("public record FeesInput(String zone)");
 
         try (var loader = compileAndLoad(result)) {
@@ -401,10 +400,10 @@ class TableCompilerTest {
 
     @Test
     void collect_count_tables_return_the_number_of_matching_rules() throws Exception {
-        var config = new TableConfig(table("fees.csv"), "Fees", null, HitPolicy.COLLECT, AggregationOperator.COUNT,
-                List.of(new ColumnConfig("zone", ColumnType.STRING, null, List.of())),
-                List.of(new ColumnConfig("fee", ColumnType.NUMBER, null, List.of())));
-        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        var config = new TableDefinition(table("fees.csv"), "Fees", null, HitPolicy.COLLECT, AggregationOperator.COUNT,
+                List.of(new ColumnDefinition("zone", ColumnType.STRING, null, List.of())),
+                List.of(new ColumnDefinition("fee", ColumnType.NUMBER, null, List.of())));
+        var result = compile(config, PACKAGE, Severity.ERROR);
 
         try (var loader = compileAndLoad(result)) {
             var input = loader.loadClass(PACKAGE + ".FeesInput");
@@ -419,67 +418,67 @@ class TableCompilerTest {
 
     @Test
     void validation_errors_fail_the_build_with_the_report() {
-        var config = new TableConfig(table("overlapping.csv"), "Tier", null, HitPolicy.UNIQUE, null,
-                List.of(new ColumnConfig("country", ColumnType.STRING, null, List.of())),
-                List.of(new ColumnConfig("tier", ColumnType.STRING, null, List.of())));
-        Assertions.assertThatThrownBy(() -> TableCompiler.compile(config, PACKAGE, Severity.ERROR))
+        var config = new TableDefinition(table("overlapping.csv"), "Tier", null, HitPolicy.UNIQUE, null,
+                List.of(new ColumnDefinition("country", ColumnType.STRING, null, List.of())),
+                List.of(new ColumnDefinition("tier", ColumnType.STRING, null, List.of())));
+        Assertions.assertThatThrownBy(() -> compile(config, PACKAGE, Severity.ERROR))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Table 'overlapping'")
                 .hasMessageContaining("overlap");
         // with failOn NONE the report is returned instead
-        Assertions.assertThat(TableCompiler.compile(config, PACKAGE, null).report().issues()).isNotEmpty();
+        Assertions.assertThat(compile(config, PACKAGE, null).report().issues()).isNotEmpty();
     }
 
     @Test
     void configuration_mistakes_are_explained() {
-        var dmnWithPolicy = new TableConfig(table("camunda-modeler-discount.dmn"), null, null, HitPolicy.FIRST, null, List.of(), List.of());
-        Assertions.assertThatThrownBy(() -> TableCompiler.compile(dmnWithPolicy, PACKAGE, Severity.ERROR))
+        var dmnWithPolicy = new TableDefinition(table("camunda-modeler-discount.dmn"), null, null, HitPolicy.FIRST, null, List.of(), List.of());
+        Assertions.assertThatThrownBy(() -> compile(dmnWithPolicy, PACKAGE, Severity.ERROR))
                 .hasMessageContaining("a DMN model declares its own hit policy and columns");
 
-        var csvWithoutPolicy = new TableConfig(table("fees.csv"), null, null, null, null,
-                List.of(new ColumnConfig("zone", ColumnType.STRING, null, List.of())),
-                List.of(new ColumnConfig("fee", ColumnType.NUMBER, null, List.of())));
-        Assertions.assertThatThrownBy(() -> TableCompiler.compile(csvWithoutPolicy, PACKAGE, Severity.ERROR))
+        var csvWithoutPolicy = new TableDefinition(table("fees.csv"), null, null, null, null,
+                List.of(new ColumnDefinition("zone", ColumnType.STRING, null, List.of())),
+                List.of(new ColumnDefinition("fee", ColumnType.NUMBER, null, List.of())));
+        Assertions.assertThatThrownBy(() -> compile(csvWithoutPolicy, PACKAGE, Severity.ERROR))
                 .hasMessageContaining("<hitPolicy> is required");
 
-        var sumOfText = new TableConfig(table("fees.csv"), null, null, HitPolicy.COLLECT, AggregationOperator.SUM,
-                List.of(new ColumnConfig("zone", ColumnType.STRING, null, List.of())),
-                List.of(new ColumnConfig("fee", ColumnType.STRING, null, List.of())));
-        Assertions.assertThatThrownBy(() -> TableCompiler.compile(sumOfText, PACKAGE, Severity.ERROR))
+        var sumOfText = new TableDefinition(table("fees.csv"), null, null, HitPolicy.COLLECT, AggregationOperator.SUM,
+                List.of(new ColumnDefinition("zone", ColumnType.STRING, null, List.of())),
+                List.of(new ColumnDefinition("fee", ColumnType.STRING, null, List.of())));
+        Assertions.assertThatThrownBy(() -> compile(sumOfText, PACKAGE, Severity.ERROR))
                 .hasMessageContaining("SUM aggregation needs exactly one NUMBER output");
 
-        var missing = new TableConfig(new File("nope.xlsx"), null, null, HitPolicy.FIRST, null, List.of(), List.of());
-        Assertions.assertThatThrownBy(() -> TableCompiler.compile(missing, PACKAGE, Severity.ERROR))
+        var missing = new TableDefinition(Path.of("nope.xlsx"), null, null, HitPolicy.FIRST, null, List.of(), List.of());
+        Assertions.assertThatThrownBy(() -> compile(missing, PACKAGE, Severity.ERROR))
                 .hasMessageContaining("does not exist");
     }
 
     // REUSE-IgnoreStart: the header below is test data, not this file's licence
     @Test
     void generated_sources_start_with_the_configured_header() throws Exception {
-        var config = new TableConfig(table("fees.csv"), "Fees", null, HitPolicy.COLLECT, AggregationOperator.SUM,
-                List.of(new ColumnConfig("zone", ColumnType.STRING, null, List.of())),
-                List.of(new ColumnConfig("fee", ColumnType.NUMBER, null, List.of())));
+        var config = new TableDefinition(table("fees.csv"), "Fees", null, HitPolicy.COLLECT, AggregationOperator.SUM,
+                List.of(new ColumnDefinition("zone", ColumnType.STRING, null, List.of())),
+                List.of(new ColumnDefinition("fee", ColumnType.NUMBER, null, List.of())));
         var header = """
 
                     SPDX-FileCopyrightText: Acme Corp
 
                     SPDX-License-Identifier: MIT
                 """;
-        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR, header);
+        var result = compile(config, PACKAGE, Severity.ERROR, header);
         Assertions.assertThat(result.sources().values()).allSatisfy(source -> Assertions.assertThat(source)
                 .startsWith("// SPDX-FileCopyrightText: Acme Corp\n//\n// SPDX-License-Identifier: MIT\n// Generated by"));
         compileAndLoad(result).close(); // still valid Java
 
-        Assertions.assertThat(TableCompiler.compile(config, PACKAGE, Severity.ERROR).sources().get("Fees")).startsWith("// Generated by");
+        Assertions.assertThat(compile(config, PACKAGE, Severity.ERROR).sources().get("Fees")).startsWith("// Generated by");
     }
 
     @Test
     void file_headers_cannot_smuggle_unicode_escapes_into_comments() {
-        var config = new TableConfig(table("fees.csv"), "Fees", null, HitPolicy.COLLECT, AggregationOperator.SUM,
-                List.of(new ColumnConfig("zone", ColumnType.STRING, null, List.of())),
-                List.of(new ColumnConfig("fee", ColumnType.NUMBER, null, List.of())));
+        var config = new TableDefinition(table("fees.csv"), "Fees", null, HitPolicy.COLLECT, AggregationOperator.SUM,
+                List.of(new ColumnDefinition("zone", ColumnType.STRING, null, List.of())),
+                List.of(new ColumnDefinition("fee", ColumnType.NUMBER, null, List.of())));
         // javac would decode a backslash-u escape even inside a comment and could end it early
-        Assertions.assertThatThrownBy(() -> TableCompiler.compile(config, PACKAGE, Severity.ERROR, "Copyright \\u000a evil"))
+        Assertions.assertThatThrownBy(() -> compile(config, PACKAGE, Severity.ERROR, "Copyright \\u000a evil"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("<fileHeader> must not contain backslashes");
     }
@@ -499,18 +498,78 @@ class TableCompilerTest {
                 .hasMessageContaining("'a b' and 'a-b' both become the Java name A_B");
     }
 
+    @Test
+    void options_name_the_tool_and_its_settings() {
+        var csvWithoutPolicy = new TableDefinition(table("fees.csv"), null, null, null, null,
+                List.of(ColumnDefinition.of("zone", ColumnType.STRING)), List.of(ColumnDefinition.of("fee", ColumnType.NUMBER)));
+        var gradle = CompilerOptions.of(PACKAGE, "praecepta-gradle-plugin");
+        Assertions.assertThatThrownBy(() -> TableCompiler.compile(csvWithoutPolicy, gradle))
+                .hasMessageEndingWith(": 'hitPolicy' is required for Excel and CSV tables");
+        Assertions.assertThatThrownBy(() -> TableCompiler.compile(TableDefinition.dmn(null), gradle))
+                .hasMessage("Every 'table' needs a 'source'");
+        Assertions.assertThatThrownBy(() -> TableCompiler.compile(TableDefinition.dmn(null), gradle.withSettingNames(String::toUpperCase)))
+                .hasMessage("Every TABLE needs a SOURCE");
+
+        var fees = new TableDefinition(table("fees.csv"), "Fees", null, HitPolicy.COLLECT, AggregationOperator.SUM,
+                List.of(ColumnDefinition.of("zone", ColumnType.STRING)), List.of(ColumnDefinition.of("fee", ColumnType.NUMBER)));
+        var result = TableCompiler.compile(fees, gradle.withFileHeader("Acme"));
+        Assertions.assertThat(result.sources().get("Fees"))
+                .startsWith("// Acme\n// Generated by praecepta-gradle-plugin from fees.csv. Do not edit.\n")
+                .contains(" * praecepta-gradle-plugin from {@code fees.csv} and validated at build time.");
+    }
+
+    @Test
+    void fail_on_follows_the_options() {
+        var overlapping = new TableDefinition(table("overlapping.csv"), "Tier", null, HitPolicy.UNIQUE, null,
+                List.of(ColumnDefinition.of("country", ColumnType.STRING)), List.of(ColumnDefinition.of("tier", ColumnType.STRING)));
+        var options = CompilerOptions.of(PACKAGE, "test");
+        Assertions.assertThat(options.failOn()).isEqualTo(Severity.ERROR);
+        Assertions.assertThatThrownBy(() -> TableCompiler.compile(overlapping, options)).hasMessageContaining("overlap");
+        Assertions.assertThat(TableCompiler.compile(overlapping, options.withFailOn(null)).report().issues()).isNotEmpty();
+    }
+
+    @Test
+    void a_compiled_table_writes_its_dmn_and_sources_into_the_package_directories() throws Exception {
+        var fees = new TableDefinition(table("fees.csv"), "Fees", null, HitPolicy.COLLECT, AggregationOperator.SUM,
+                List.of(ColumnDefinition.of("zone", ColumnType.STRING)), List.of(ColumnDefinition.of("fee", ColumnType.NUMBER)));
+        var result = TableCompiler.compile(fees, CompilerOptions.of(PACKAGE, "test"));
+        Assertions.assertThat(result.resourcePath()).isEqualTo("com/acme/rules/Fees.dmn");
+
+        var written = result.write(out.resolve("java"), out.resolve("resources"));
+        Assertions.assertThat(written).containsExactly(out.resolve("resources/com/acme/rules/Fees.dmn"),
+                out.resolve("java/com/acme/rules/FeesInput.java"), out.resolve("java/com/acme/rules/FeesOutput.java"),
+                out.resolve("java/com/acme/rules/Fees.java"));
+        Assertions.assertThat(out.resolve("resources/com/acme/rules/Fees.dmn")).content(StandardCharsets.UTF_8).isEqualTo(result.dmn());
+
+        var inDefaultPackage = TableCompiler.compile(fees, CompilerOptions.of("", "test"));
+        Assertions.assertThat(inDefaultPackage.resourcePath()).isEqualTo("Fees.dmn");
+        inDefaultPackage.write(out.resolve("default"), out.resolve("default"));
+        Assertions.assertThat(out.resolve("default/Fees.java")).exists();
+        Assertions.assertThat(out.resolve("default/Fees.dmn")).exists();
+    }
+
     // ---- helpers -------------------------------------------------------------------------------
 
-    private static File table(String name) {
+    /** Compiles as the Maven plugin does, so messages name settings as pom elements. */
+    static CompiledTable compile(TableDefinition definition, String packageName, Severity failOn) {
+        return compile(definition, packageName, failOn, null);
+    }
+
+    static CompiledTable compile(TableDefinition definition, String packageName, Severity failOn, String fileHeader) {
+        return TableCompiler.compile(definition,
+                new CompilerOptions(packageName, failOn, fileHeader, "praecepta-maven-plugin", CompilerOptions.XML_ELEMENTS));
+    }
+
+    private static Path table(String name) {
         try {
-            return Path.of(TableCompilerTest.class.getResource("/tables/" + name).toURI()).toFile();
+            return Path.of(TableCompilerTest.class.getResource("/tables/" + name).toURI());
         } catch (URISyntaxException e) {
             throw new IllegalStateException(e);
         }
     }
 
     /** Writes the generated sources and DMN, compiles them against the engine jar only, and loads them. */
-    private URLClassLoader compileAndLoad(TableCompiler.Result result) throws Exception {
+    private URLClassLoader compileAndLoad(CompiledTable result) throws Exception {
         var packageDir = out.resolve(PACKAGE.replace('.', '/'));
         Files.createDirectories(packageDir);
         var files = new ArrayList<String>();

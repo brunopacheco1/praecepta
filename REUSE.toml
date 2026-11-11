@@ -14,8 +14,8 @@ path = [
     "**/*.dmn",
     # fuzz-test inputs (seeds and any crash reproducers), which are raw data
     "**/*FuzzTestInputs/**",
-    # the Maven plugin's golden generated sources and DMN, compared byte for byte
-    "praecepta-maven-plugin/src/test/resources/golden/**",
+    # the compiler's golden generated sources and DMN, compared byte for byte
+    "praecepta-compiler/src/test/resources/golden/**",
     # benchmark results: JMH output, logs and generated summaries
     "praecepta-benchmarks/results/**",
     # the social image, rendered from site/brand/social.svg

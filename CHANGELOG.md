@@ -11,6 +11,32 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+### Added
+- **`praecepta-compiler`**: the build-time core of the Maven plugin (`TableCompiler`, and the source
+  generation it drives) as a module of its own, independent of Maven, so the Gradle plugin
+  ([#18](https://github.com/brunopacheco1/praecepta/issues/18)) and the Quarkus extension
+  ([#76](https://github.com/brunopacheco1/praecepta/issues/76)) generate exactly what the Maven plugin
+  does. `TableCompiler.compile(TableDefinition, CompilerOptions)` returns a `CompiledTable` with the table,
+  its validation report, its DMN and the generated sources, and `CompiledTable.write(sourceRoot,
+  resourceRoot)` writes them; `CompilerOptions` names the tool in the generated files and how messages
+  name its settings. The Maven plugin's goal, configuration, messages and generated files are unchanged.
+- **`praecepta-integration`**: what the Spring Boot, Micronaut and Quarkus integrations share, with no
+  dependency but the engine. `TableLocations` finds DMN files by pattern (`classpath*:rules/**/*.dmn`,
+  `file:...`) in directories and jars; `Decisions.load(sources, failOn)` builds one engine per decision
+  table, bound to maps of text (`PraeceptaEngine<Map<String, String>, Map<String, String>>`), keeps each
+  validation report, and fails with every problem at once (`DecisionsException`): unreadable or invalid
+  files, two decisions with one name, and validation issues at the given severity. COLLECT aggregations
+  give one map with the aggregate (a SUM with FEEL's 34 digits). `Decisions.describe()` gives the
+  reports as plain maps for management endpoints. The design shared by the integrations is in
+  [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+- `DmnReader.readAll(InputStream)` reads every decision table of a DMN model, in document order.
+
+### Changed
+- The release publishes every module but the benchmarks and the TCK runner, found by the build rather
+  than listed, so new modules need no change to the release, the SBOM checks or the website. Rebuilding a
+  release from 0.5.0 on uses `-pl '!praecepta-benchmarks,!praecepta-tck'` (see
+  [docs/RELEASING.md](docs/RELEASING.md)).
+
 ## [0.4.0] - 2026-11-11
 
 Inputs that hold lists, output entries that are expressions, times and date-times with a time zone,

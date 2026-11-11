@@ -418,7 +418,10 @@ Drools' experimental alpha-network compilation is not part of the default compar
 # Dependencies
 Praecepta Engine has no runtime dependencies; it reads DMN with the JDK's XML parser.
 
-Praecepta Loader depends on Apache POI. The Maven plugin uses the loader at build time only.
+Praecepta Loader depends on Apache POI. The Maven plugin uses it at build time only, through
+`praecepta-compiler`, the build-time core the build-tool integrations share. `praecepta-integration`,
+which the framework integrations share, needs only the engine. Their design is in
+[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 # Roadmap
 [docs/ROADMAP.md](docs/ROADMAP.md) has the plans for the next year; past decisions and their reasons are in
@@ -426,6 +429,7 @@ Praecepta Loader depends on Apache POI. The Maven plugin uses the loader at buil
 
 # Project documents
 - [Architecture](docs/ARCHITECTURE.md): modules, the bitset index, DMN and the Maven plugin.
+- [Integrations](docs/INTEGRATIONS.md): how the build-tool and framework integrations fit together.
 - [Security assurance case](docs/SECURITY-ASSURANCE.md): what to expect, threats, and how they are countered.
 - [Governance](GOVERNANCE.md): roles, decisions and continuity.
 - [Contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md) and [security policy](SECURITY.md).

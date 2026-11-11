@@ -28,7 +28,7 @@
     <dependencies>
         <dependency>
             <groupId>io.github.brunopacheco1</groupId>
-            <artifactId>praecepta-loader</artifactId>
+            <artifactId>praecepta-compiler</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

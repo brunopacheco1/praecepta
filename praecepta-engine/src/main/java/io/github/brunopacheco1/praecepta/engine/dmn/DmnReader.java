@@ -93,18 +93,31 @@ public final class DmnReader {
         return decisionTable(decision, new ItemDefinitions(root));
     }
 
+    /**
+     * Reads every decision table of the model, in document order, as a framework integration does when it
+     * gives each decision of a DMN file its own engine. Decisions whose logic is not a decision table are
+     * skipped.
+     *
+     * @return the tables; empty if the model has none
+     * @throws InvalidDecisionTableException if the model, or any of its decision tables, cannot be read
+     */
+    public static List<DecisionTable> readAll(InputStream dmn) {
+        var root = parseModel(dmn);
+        var types = new ItemDefinitions(root);
+        return decisionsWithTables(root).stream().map(decision -> decisionTable(decision, types)).toList();
+    }
+
     // ---- the table -------------------------------------------------------------------------------
+
+    /** The model's decisions whose logic is a decision table, in document order. */
+    private static List<Element> decisionsWithTables(Element root) {
+        return descendants(root, "decision").stream().filter(decision -> child(decision, "decisionTable") != null).toList();
+    }
 
     /** The named decision, or the model's only decision with a table if no name is given. */
     private static Element decisionToRead(Element root, String decisionName) {
-        var decisions = new ArrayList<Element>();
-        var names = new ArrayList<String>();
-        for (var decision : descendants(root, "decision")) {
-            if (child(decision, "decisionTable") != null) {
-                decisions.add(decision);
-                names.add(decision.getAttribute("name"));
-            }
-        }
+        var decisions = decisionsWithTables(root);
+        var names = decisions.stream().map(decision -> decision.getAttribute("name")).toList();
         if (decisionName != null) {
             int at = names.indexOf(decisionName);
             if (at < 0) {

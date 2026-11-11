@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 name: Release
-# Pushing a signed tag vX.Y.Z publishes engine, loader and Maven plugin to Maven Central.
-# Owner setup and the release steps: docs/RELEASING.md.
+# Pushing a signed tag vX.Y.Z publishes every published module (all but the benchmarks, the TCK runner
+# and test projects) to Maven Central. Owner setup and the release steps: docs/RELEASING.md.
 on:
   push:
     tags: ['v*']
@@ -67,22 +67,31 @@ jobs:
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           MAVEN_GPG_KEY: ${{ secrets.RELEASE_GPG_KEY }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
-        # the benchmarks are not published. The Maven Wrapper pins Maven (.mvn/wrapper), so the
-        # release is built with the same Maven that Reproducible Central's buildspec names (tool=)
-        run: ./mvnw -B -P release -pl praecepta-engine,praecepta-loader,praecepta-maven-plugin -am deploy
+        # Every module but the benchmarks and the TCK runner, which are slow to build and never
+        # published; other unpublished modules (test projects) skip publishing in their POM. The
+        # Maven Wrapper pins Maven (.mvn/wrapper), so the release is built with the same Maven that
+        # Reproducible Central's buildspec names (tool=)
+        run: ./mvnw -B -P release -pl '!praecepta-benchmarks,!praecepta-tck' deploy
+      - name: Find the published modules
+        # the modules whose signed jars the build left in target/, so this list needs no upkeep
+        id: published
+        run: |
+          python3 .github/scripts/published_modules.py jars "${VERSION}" > published-modules.txt
+          cat published-modules.txt
+          {
+            echo 'jars<<EOF'
+            while read -r module artifact; do echo "${module}/target/${artifact}-${VERSION}.jar"; done < published-modules.txt
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
       - name: Third-party notices
-        run: >
-          python3 .github/scripts/third_party_notices.py "${VERSION}"
-          praecepta-loader/target/bom.json praecepta-maven-plugin/target/bom.json
-          > THIRD-PARTY-NOTICES.txt
+        run: |
+          mapfile -t sboms < <(python3 .github/scripts/published_modules.py sboms)
+          python3 .github/scripts/third_party_notices.py "${VERSION}" "${sboms[@]}" > THIRD-PARTY-NOTICES.txt
       - name: Build provenance
         id: provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: |
-            praecepta-engine/target/praecepta-engine-${{ env.VERSION }}.jar
-            praecepta-loader/target/praecepta-loader-${{ env.VERSION }}.jar
-            praecepta-maven-plugin/target/praecepta-maven-plugin-${{ env.VERSION }}.jar
+          subject-path: ${{ steps.published.outputs.jars }}
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -91,13 +100,13 @@ jobs:
           # (until the next version heading or the link references at the bottom)
           awk -v v="## [${VERSION}]" 'index($0, v) == 1 {on = 1; next} /^## \[/ || /^\[[^]]*\]: / {on = 0} on' CHANGELOG.md > notes.md
           files=()
-          for module in praecepta-engine praecepta-loader praecepta-maven-plugin; do
+          while read -r module artifact; do
             for suffix in .jar -sources.jar -javadoc.jar; do
-              files+=("${module}/target/${module}-${VERSION}${suffix}" "${module}/target/${module}-${VERSION}${suffix}.asc")
+              files+=("${module}/target/${artifact}-${VERSION}${suffix}" "${module}/target/${artifact}-${VERSION}${suffix}.asc")
             done
-            cp "${module}/target/bom.json" "${module}-${VERSION}-cyclonedx.json"
-            files+=("${module}-${VERSION}-cyclonedx.json")
-          done
+            cp "${module}/target/bom.json" "${artifact}-${VERSION}-cyclonedx.json"
+            files+=("${artifact}-${VERSION}-cyclonedx.json")
+          done < published-modules.txt
           # the signed provenance bundle (Sigstore, SLSA v1) beside the artifacts, so it can be
           # verified offline and found by tools such as the OpenSSF Scorecard
           cp "${{ steps.provenance.outputs.bundle-path }}" "praecepta-${VERSION}.intoto.jsonl"

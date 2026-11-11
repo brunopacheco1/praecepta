@@ -9,6 +9,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.github.brunopacheco1.praecepta.compiler.TableDefinition;
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 
@@ -64,5 +65,12 @@ public class TableConfig {
         this.aggregation = aggregation;
         this.inputs = new ArrayList<>(inputs);
         this.outputs = new ArrayList<>(outputs);
+    }
+
+    /** The table as praecepta-compiler takes it. */
+    TableDefinition definition() {
+        return new TableDefinition(source == null ? null : source.toPath(), name, decision, hitPolicy, aggregation,
+                inputs == null ? List.of() : inputs.stream().map(ColumnConfig::definition).toList(),
+                outputs == null ? List.of() : outputs.stream().map(ColumnConfig::definition).toList());
     }
 }
