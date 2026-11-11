@@ -27,6 +27,14 @@ This runs the unit tests and the property-based tests, runs the Maven plugin's i
 (`praecepta-maven-plugin/src/it`, skip with `-Dinvoker.skip`), checks the SPDX header of every Java
 source and POM, and writes a CycloneDX SBOM per module (`target/bom.json`).
 
+Every build runs the checks of the native-image test project (`praecepta-maven-plugin/src/it/native-app`)
+on the JVM. To build it as a native executable and run that too, use GraalVM (for JDK 21 or later) as the
+JDK and enable the `native` profile; it takes a few minutes, and CI does it in the `Native image` workflow:
+
+```
+mvn -pl praecepta-maven-plugin -am verify -Pnative
+```
+
 The code targets **Java 21** (`--release 21`): newer language features or APIs fail to compile.
 CI builds and tests on Java 21, 25 and 27, and runs the plugin's integration tests on Maven 3.9,
 3.10 and 4.0 (on pull requests only when the plugin, the engine or a POM changes). A newer push to a

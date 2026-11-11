@@ -197,16 +197,40 @@ cannot fail differently at runtime.
 - Published to Maven Central only, with the plugin marker artifact so that `plugins { id(...) version
   "..." }` resolves from `mavenCentral()` in `pluginManagement`; the Gradle Plugin Portal is not used.
 
-### Native images (#19, planned)
-- No new published module. A workflow `native.yml` (pull requests touching the engine, compiler,
-  integration or Maven plugin sources, main, weekly; superseded runs cancelled) builds a small project
-  with the Maven plugin and GraalVM's `native-maven-plugin`, in the official GraalVM container image, and
-  runs the executable. The project lives where the default `mvn verify` does not build it (for example an
-  invoker project selected only by a profile).
-- If generated code needs metadata (the DMN resource each decision class reads), the compiler writes it
-  through `CompiledTable` (with golden files updated on purpose), so the Maven and Gradle plugins ship it
-  alike; the engine itself needs no reflection. Framework modules keep to that: no reflection, resources
-  registered by their own native support.
+### Native images (#19)
+- **No new module.** The test project is `praecepta-maven-plugin/src/it/native-app`, an invoker project:
+  an application that uses the engine (`DmnReader`, `DmnWriter`, map-based engines), the loader (CSV), the
+  integration core (`TableLocations.DEFAULT`, `Decisions`) and two classes the plugin generates (from a CSV
+  and a DMN table), and checks every answer. The default `mvn verify` runs those checks on the JVM in a few
+  seconds; the plugin's `native` profile (`-Pnative`) also builds the project with GraalVM's
+  `native-maven-plugin` and runs the executable.
+- **Workflow `native.yml`** runs `mvn -pl praecepta-maven-plugin -am verify -Pnative` with GraalVM for JDK
+  21 and 25, set up by `graalvm/setup-graalvm` (the task that built it asked for that action rather than the
+  container image this section first named; locally the same build runs in
+  `ghcr.io/graalvm/native-image-community`). It runs on pull requests touching the engine, loader,
+  compiler, integration or Maven plugin sources, the test project, a POM or the workflow; on main; and
+  weekly; superseded runs are cancelled. On GraalVM for JDK 24 and later the test project builds with
+  `--exact-reachability-metadata`, so a resource that no metadata registers fails the run instead of
+  reading as absent.
+- **Metadata** lives in the jars, as `META-INF/native-image/io.github.brunopacheco1/<artifactId>/resource-config.json`
+  (the format GraalVM for JDK 21 reads too), and reaches every native build that has the jar on its class
+  path, whatever runs `native-image`:
+  - `praecepta-engine`: the JDK XML parser's message bundle (without it a malformed DMN file fails with a
+    `MissingResourceException`), and JAXP's `DocumentBuilderFactory` service file (needed under
+    `--exact-reachability-metadata` only).
+  - `praecepta-integration`: `rules` and `rules/**/*.dmn`, the files of `TableLocations.DEFAULT`. A framework
+    module whose `praecepta.locations` names other files registers those through its own native support
+    (Spring's `RuntimeHints`, Micronaut's resource configuration, Quarkus's
+    `NativeImageResourceBuildItem`); with the default it needs nothing.
+  - `praecepta-compiler` writes none, and the golden files are unchanged: the generated classes read their
+    DMN through `getResourceAsStream` with a constant name, which `native-image` registers by itself
+    (verified on GraalVM for JDK 21 and, under `--exact-reachability-metadata`, 25). `CompiledTable.write`
+    stays the place to add some if a GraalVM release stops doing that.
+- **Excel is not supported natively.** `ExcelLoader` fails on the first workbook (Apache POI needs the
+  `CP1252` charset, XMLBeans' message bundles and its schema type system), and GraalVM's shared metadata
+  repository has no entry for Apache POI. Spreadsheets reach a native executable as DMN, compiled at build
+  time, as principle 3 already has it.
+- **No reflection:** the engine needs none. Framework modules keep to that.
 
 ### Spring Boot starter (#20, planned)
 - One module, `praecepta-spring-boot-starter` (auto-configuration and starter together), package

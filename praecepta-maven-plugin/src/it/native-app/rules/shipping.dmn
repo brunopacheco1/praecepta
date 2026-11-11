@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- compiled by the plugin into it.nativeapp.generated.Shipping: an enum, a number, a date, a time with an offset, a list and an output expression -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="shipping" name="shipping" namespace="https://example.com/shipping">
+  <itemDefinition name="tCountries" isCollection="true"><typeRef>string</typeRef></itemDefinition>
+  <decision id="shipping" name="Shipping">
+    <decisionTable id="table" hitPolicy="FIRST">
+      <input id="country" label="country">
+        <inputExpression typeRef="string"><text>country</text></inputExpression>
+        <inputValues><text>"PT","ES","FR"</text></inputValues>
+      </input>
+      <input id="weight" label="weight"><inputExpression typeRef="number"><text>weight</text></inputExpression></input>
+      <input id="ordered" label="ordered"><inputExpression typeRef="date"><text>ordered</text></inputExpression></input>
+      <input id="cutOff" label="cutOff"><inputExpression typeRef="time"><text>cutOff</text></inputExpression></input>
+      <input id="destinations" label="destinations"><inputExpression typeRef="tCountries"><text>destinations</text></inputExpression></input>
+      <output id="carrier" name="carrier" typeRef="string"/>
+      <output id="cost" name="cost" typeRef="number"/>
+      <rule id="air">
+        <inputEntry><text>"PT"</text></inputEntry>
+        <inputEntry><text>&lt;= 10</text></inputEntry>
+        <inputEntry><text>&gt;= date("2025-01-01")</text></inputEntry>
+        <inputEntry><text>&lt; time("12:00:00+01:00")</text></inputEntry>
+        <inputEntry><text>list contains(?, "BR")</text></inputEntry>
+        <outputEntry><text>"air"</text></outputEntry>
+        <outputEntry><text>weight * 1.5 + 2</text></outputEntry>
+      </rule>
+      <rule id="ground">
+        <inputEntry><text>-</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"ground"</text></outputEntry>
+        <outputEntry><text>7</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

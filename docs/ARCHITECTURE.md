@@ -155,6 +155,32 @@ validation report, and fails with every problem at once (`DecisionsException`): 
 tables, duplicate names, and validation issues at the configured severity. Maps rather than records,
 because a container finds its tables at runtime; typed records remain the build plugins' job.
 
+## Native images
+Praecepta needs no reflection, so GraalVM's `native-image` builds applications that use it without a
+`Feature` or reflection metadata. What it does need is in each jar, under
+`META-INF/native-image/io.github.brunopacheco1/<artifactId>/resource-config.json`, which `native-image`
+reads from every jar on its class path, whichever build tool or framework runs it:
+- **`praecepta-engine`** registers the message bundle of the JDK's XML parser
+  (`com.sun.org.apache.xerces.internal.impl.msg.XMLMessages`), without which `DmnReader` fails on a
+  malformed file with a `MissingResourceException` instead of its `InvalidDecisionTableException`, and the
+  `javax.xml.parsers.DocumentBuilderFactory` service file that JAXP looks up, which only
+  `--exact-reachability-metadata` requires.
+- **`praecepta-integration`** registers `rules` and `rules/**/*.dmn`, the files `TableLocations.DEFAULT`
+  finds, so the default location works in a native image; `TableLocations` lists them through the image's
+  `resource:` file system.
+- **`praecepta-compiler` writes none.** The classes it generates read their DMN with
+  `getResourceAsStream` and a constant name, which `native-image` registers itself (checked on GraalVM for
+  JDK 21 and 25, the latter with `--exact-reachability-metadata`).
+- **`praecepta-loader` ships none**: `CsvLoader` reads the application's files, which the application
+  registers. `ExcelLoader` does not work natively (Apache POI needs charsets, XMLBeans bundles and schema
+  metadata that neither POI nor GraalVM's shared metadata repository provides); Excel tables reach a native
+  executable as DMN, compiled at build time.
+
+The metadata uses the `resource-config.json` format, which GraalVM for JDK 21 reads as well as later
+releases. `praecepta-maven-plugin/src/it/native-app` is an application that uses all of this; every build
+runs its checks on the JVM, and the `Native image` workflow (`-Pnative`) builds it with GraalVM for JDK 21
+and 25 and runs the executable.
+
 ## Design decisions
 The main decisions and their reasons (strict DMN semantics, bitsets instead of a trie or generated
 code, the Java baseline, DMN as the exchange format, the licence) are recorded in

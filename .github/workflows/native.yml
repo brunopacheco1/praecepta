@@ -1,0 +1,58 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# GraalVM native images (#19): builds the Maven plugin's native-image test project
+# (praecepta-maven-plugin/src/it/native-app) as a native executable with GraalVM's native-image, and runs
+# it. The project uses the engine, the loader (CSV), the integration core and classes the plugin
+# generates, and checks every answer; the same checks run on the JVM in every build. A native build
+# takes minutes, so on pull requests this runs only when what goes into the executable changes; always
+# on main, and weekly so a new GraalVM release is noticed.
+name: Native image
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'praecepta-engine/src/main/**'
+      - 'praecepta-loader/src/main/**'
+      - 'praecepta-compiler/src/main/**'
+      - 'praecepta-integration/src/main/**'
+      - 'praecepta-maven-plugin/src/main/**'
+      - 'praecepta-maven-plugin/src/it/native-app/**'
+      - '**/pom.xml'
+      - '.github/workflows/native.yml'
+  schedule:
+    - cron: '47 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# a newer push to the same pull request replaces the run in progress; pushes to main always finish
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  native:
+    # GraalVM for the oldest Java Praecepta supports, and for the current LTS
+    name: Native image (GraalVM for JDK ${{ matrix.java }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['21', '25']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: graalvm/setup-graalvm@f70bc8032f90a104502824a54bcb94b6f01715bc # v1.6.8
+        with:
+          distribution: graalvm-community
+          java-version: ${{ matrix.java }}
+          cache: maven
+      - name: Build the native executable and run it
+        # -Pnative: the plugin's invoker builds src/it/native-app with native-image and runs the executable;
+        # the unit tests already ran in the Java CI workflow
+        run: |
+          native-image --version
+          mvn -B -pl praecepta-maven-plugin -am verify -Pnative -DskipTests

@@ -12,6 +12,8 @@ path = [
     "**/*.csv",
     "**/*.xlsx",
     "**/*.dmn",
+    # GraalVM native-image metadata (JSON has no comments)
+    "**/META-INF/native-image/**/*.json",
     # fuzz-test inputs (seeds and any crash reproducers), which are raw data
     "**/*FuzzTestInputs/**",
     # the compiler's golden generated sources and DMN, compared byte for byte
