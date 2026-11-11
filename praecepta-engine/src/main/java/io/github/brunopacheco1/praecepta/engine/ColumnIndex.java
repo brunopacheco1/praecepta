@@ -277,6 +277,112 @@ final class ColumnIndex {
             var stringClasses = type == ColumnType.STRING ? boundaryClasses(localLine.boundaries) : null;
             return new Partition(localLine, zonedLine, wallLine, List.copyOf(classes), stringClasses, -1);
         }
+
+        /**
+         * STRING: adds one class per value written in the cells or the allowed values, in first-seen
+         * order, and returns the class of each value.
+         */
+        private static Map<String, Integer> addStringClasses(List<UnaryTests> cellsByBit, UnaryTests allowedValues,
+                List<ValueClass> into) {
+            var written = new LinkedHashSet<String>();
+            cellsByBit.forEach(cell -> collectStrings(cell, written));
+            if (allowedValues != null) {
+                collectStrings(allowedValues, written);
+            }
+            var byValue = new HashMap<String, Integer>();
+            for (var value : written) {
+                byValue.put(value, into.size());
+                into.add(new ValueClass.Point(value));
+            }
+            return Map.copyOf(byValue);
+        }
+
+        /** Whether some cell compares or tests an interval, which makes a STRING column ordered. */
+        private static boolean hasOrderTests(List<UnaryTests> cellsByBit) {
+            return cellsByBit.stream().flatMap(cell -> cell.tests().stream()).anyMatch(test -> test instanceof Compare || test instanceof Range);
+        }
+
+        /** Ordered STRING column: the class of each boundary, which is class {@code 2i + 1} for boundary {@code i}. */
+        private static Map<String, Integer> boundaryClasses(Comparable<?>[] boundaries) {
+            var byValue = new HashMap<String, Integer>();
+            for (int i = 0; i < boundaries.length; i++) {
+                byValue.put((String) boundaries[i], 2 * i + 1);
+            }
+            return Map.copyOf(byValue);
+        }
+
+        /** Which of the values the cells and the allowed values compare against split a line. */
+        private enum Boundaries {
+            /** Every value, by its local time: the line of values without a time zone, and of the types that have none. */
+            LOCAL_TIMES,
+            /** The values with a time zone, by instant. */
+            WITH_ZONE,
+            /** The values without a time zone: the local times a value with a zone is compared with. */
+            WITHOUT_ZONE;
+
+            /** The boundary a value is on this line, or null if it is none. */
+            Object of(Comparable<?> value) {
+                return switch (this) {
+                    case LOCAL_TIMES -> FeelTemporals.local(value);
+                    case WITH_ZONE -> FeelTemporals.hasZone(value) ? value : null;
+                    case WITHOUT_ZONE -> FeelTemporals.hasZone(value) ? null : value;
+                };
+            }
+        }
+
+        /** Ordered columns: the distinct boundaries of a line, sorted. */
+        private static Comparable<?>[] sortedBoundaries(ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues,
+                Boundaries which) {
+            var values = new ArrayList<Comparable<?>>();
+            if (type == ColumnType.BOOLEAN) {
+                values.add(Boolean.FALSE);
+                values.add(Boolean.TRUE);
+            }
+            cellsByBit.forEach(cell -> collectBoundaries(cell, values));
+            if (allowedValues != null) {
+                collectBoundaries(allowedValues, values);
+            }
+            // a line sorts values of one kind only: across the kinds, FEEL's order is not transitive
+            var points = new TreeSet<>(ColumnIndex::compare);
+            values.stream().map(which::of).filter(Objects::nonNull).forEach(points::add);
+            return points.toArray(Comparable<?>[]::new);
+        }
+
+        private static void collectStrings(UnaryTests cell, Set<String> into) {
+            for (var test : cell.tests()) {
+                if (test instanceof Equals(var value)) {
+                    into.add((String) value);
+                }
+            }
+        }
+
+        /** Adds the values of every test; with or without a time zone; each line then takes its own. */
+        private static void collectBoundaries(UnaryTests cell, List<Comparable<?>> into) {
+            cell.tests().forEach(test -> into.addAll(UnaryTests.values(test)));
+        }
+
+        /** A line's classes: the interval before each boundary, the boundary itself, and the interval after the last one. */
+        private static List<ValueClass> orderedClasses(Comparable<?>[] boundaries, boolean zoned) {
+            var classes = new ArrayList<ValueClass>();
+            Comparable<?> low = null;
+            for (var boundary : boundaries) {
+                classes.add(new ValueClass.Between(low, boundary, zoned));
+                classes.add(new ValueClass.Point(boundary));
+                low = boundary;
+            }
+            classes.add(new ValueClass.Between(low, null, zoned));
+            return classes;
+        }
+
+        /** The classes of values with a time zone: each class of instants paired with each class of local times. */
+        private static void addZonedClasses(Comparable<?>[] instants, Comparable<?>[] localTimes, List<ValueClass> into) {
+            var walls = orderedClasses(localTimes, false);
+            for (var instant : orderedClasses(instants, true)) {
+                for (var wall : walls) {
+                    into.add(new ValueClass.Zoned(instant, wall));
+                }
+            }
+        }
     }
 
     /**
@@ -293,112 +399,6 @@ final class ColumnIndex {
                 markAcceptingRules(mask, cells.byBit(), valueClass);
             }
             masks[k] = Masks.compact(mask, cells.form());
-        }
-    }
-
-    /**
-     * STRING: adds one class per value written in the cells or the allowed values, in first-seen
-     * order, and returns the class of each value.
-     */
-    private static Map<String, Integer> addStringClasses(List<UnaryTests> cellsByBit, UnaryTests allowedValues,
-            List<ValueClass> into) {
-        var written = new LinkedHashSet<String>();
-        cellsByBit.forEach(cell -> collectStrings(cell, written));
-        if (allowedValues != null) {
-            collectStrings(allowedValues, written);
-        }
-        var byValue = new HashMap<String, Integer>();
-        for (var value : written) {
-            byValue.put(value, into.size());
-            into.add(new ValueClass.Point(value));
-        }
-        return Map.copyOf(byValue);
-    }
-
-    /** Whether some cell compares or tests an interval, which makes a STRING column ordered. */
-    private static boolean hasOrderTests(List<UnaryTests> cellsByBit) {
-        return cellsByBit.stream().flatMap(cell -> cell.tests().stream()).anyMatch(test -> test instanceof Compare || test instanceof Range);
-    }
-
-    /** Ordered STRING column: the class of each boundary, which is class {@code 2i + 1} for boundary {@code i}. */
-    private static Map<String, Integer> boundaryClasses(Comparable<?>[] boundaries) {
-        var byValue = new HashMap<String, Integer>();
-        for (int i = 0; i < boundaries.length; i++) {
-            byValue.put((String) boundaries[i], 2 * i + 1);
-        }
-        return Map.copyOf(byValue);
-    }
-
-    /** Which of the values the cells and the allowed values compare against split a line. */
-    private enum Boundaries {
-        /** Every value, by its local time: the line of values without a time zone, and of the types that have none. */
-        LOCAL_TIMES,
-        /** The values with a time zone, by instant. */
-        WITH_ZONE,
-        /** The values without a time zone: the local times a value with a zone is compared with. */
-        WITHOUT_ZONE;
-
-        /** The boundary a value is on this line, or null if it is none. */
-        Object of(Comparable<?> value) {
-            return switch (this) {
-                case LOCAL_TIMES -> FeelTemporals.local(value);
-                case WITH_ZONE -> FeelTemporals.hasZone(value) ? value : null;
-                case WITHOUT_ZONE -> FeelTemporals.hasZone(value) ? null : value;
-            };
-        }
-    }
-
-    /** Ordered columns: the distinct boundaries of a line, sorted. */
-    private static Comparable<?>[] sortedBoundaries(ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues,
-            Boundaries which) {
-        var values = new ArrayList<Comparable<?>>();
-        if (type == ColumnType.BOOLEAN) {
-            values.add(Boolean.FALSE);
-            values.add(Boolean.TRUE);
-        }
-        cellsByBit.forEach(cell -> collectBoundaries(cell, values));
-        if (allowedValues != null) {
-            collectBoundaries(allowedValues, values);
-        }
-        // a line sorts values of one kind only: across the kinds, FEEL's order is not transitive
-        var points = new TreeSet<>(ColumnIndex::compare);
-        values.stream().map(which::of).filter(Objects::nonNull).forEach(points::add);
-        return points.toArray(Comparable<?>[]::new);
-    }
-
-    private static void collectStrings(UnaryTests cell, Set<String> into) {
-        for (var test : cell.tests()) {
-            if (test instanceof Equals(var value)) {
-                into.add((String) value);
-            }
-        }
-    }
-
-    /** Adds the values of every test; with or without a time zone; each line then takes its own. */
-    private static void collectBoundaries(UnaryTests cell, List<Comparable<?>> into) {
-        cell.tests().forEach(test -> into.addAll(UnaryTests.values(test)));
-    }
-
-    /** A line's classes: the interval before each boundary, the boundary itself, and the interval after the last one. */
-    private static List<ValueClass> orderedClasses(Comparable<?>[] boundaries, boolean zoned) {
-        var classes = new ArrayList<ValueClass>();
-        Comparable<?> low = null;
-        for (var boundary : boundaries) {
-            classes.add(new ValueClass.Between(low, boundary, zoned));
-            classes.add(new ValueClass.Point(boundary));
-            low = boundary;
-        }
-        classes.add(new ValueClass.Between(low, null, zoned));
-        return classes;
-    }
-
-    /** The classes of values with a time zone: each class of instants paired with each class of local times. */
-    private static void addZonedClasses(Comparable<?>[] instants, Comparable<?>[] localTimes, List<ValueClass> into) {
-        var walls = orderedClasses(localTimes, false);
-        for (var instant : orderedClasses(instants, true)) {
-            for (var wall : walls) {
-                into.add(new ValueClass.Zoned(instant, wall));
-            }
         }
     }
 
