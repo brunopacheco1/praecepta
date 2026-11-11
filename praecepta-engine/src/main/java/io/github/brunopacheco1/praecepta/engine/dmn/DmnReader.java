@@ -168,7 +168,7 @@ public final class DmnReader {
         if (column.isEmpty()) {
             column = input.getAttribute("label").strip();
         }
-        if (!isName(column)) {
+        if (!CellParser.isName(column)) {
             throw new InvalidDecisionTableException("%s: input expression '%s' is not supported; it must name an input variable"
                     .formatted(where, column));
         }
@@ -181,11 +181,6 @@ public final class DmnReader {
         var allowed = values.strip();
         parseCell(allowed, type.columnType(), where + ", input values of '" + column + "'");
         return new InputColumn(column, type.columnType(), allowed);
-    }
-
-    /** A FEEL name, or a qualified name such as {@code applicant.age} (see {@link CellParser#isName}). */
-    static boolean isName(String text) {
-        return CellParser.isName(text);
     }
 
     private static OutputColumn outputColumn(Element output, String unnamed, ItemDefinitions types, String where) {

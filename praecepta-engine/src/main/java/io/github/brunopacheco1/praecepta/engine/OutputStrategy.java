@@ -15,7 +15,10 @@ import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 @FunctionalInterface
 public interface OutputStrategy<O> {
 
-    /** Converts one rule's outputs. Called once per rule, when the engine is built. */
+    /**
+     * Converts one rule's outputs. Called once per rule, when the engine is built, except for a rule
+     * whose output names an input: its output is converted on every evaluation, with that input's value.
+     */
     O transform(PraeceptaOutput output);
 
     default O max(O obj1, O obj2) {

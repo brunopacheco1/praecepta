@@ -109,12 +109,13 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
       <div class="cards">
         <article>
           <h3>Strict DMN hit policies</h3>
-          <p>UNIQUE, ANY, PRIORITY, FIRST, OUTPUT ORDER, RULE ORDER, and COLLECT with SUM, MIN and MAX.</p>
+          <p>UNIQUE, ANY, PRIORITY, FIRST, OUTPUT ORDER, RULE ORDER, and COLLECT with SUM, MIN, MAX and COUNT.</p>
         </article>
         <article>
           <h3>FEEL cells</h3>
           <p>Lists, <code>not(...)</code>, comparisons, intervals and <code>null</code> on string, number,
-            date, boolean, time and date-time columns, with optional input value lists.</p>
+            date, boolean, time, date-time and duration columns, with optional input value lists. In DMN,
+            cells may also compare with another input, as in <code>&gt; limit</code>.</p>
         </article>
         <article>
           <h3>Validation when you build</h3>
@@ -229,13 +230,13 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
       <h2 id="not-title">What it is not</h2>
       <p>Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drools when you need:</p>
       <ul class="plain">
-        <li><strong>Full FEEL:</strong> functions, arithmetic, contexts, and tests across several columns,
-          such as <code>income &gt; 2 * rent</code>. Praecepta cells are FEEL simple unary tests on one
-          column.</li>
+        <li><strong>Full FEEL:</strong> functions, arithmetic, contexts and computed expressions, such as
+          <code>income &gt; 2 * rent</code>. Praecepta cells are FEEL simple unary tests; in DMN they may
+          compare with another input (<code>&gt; limit</code>), but not compute with it.</li>
         <li><strong>Decision requirement graphs:</strong> decisions feeding other decisions, business
           knowledge models and boxed expressions.</li>
-        <li><strong>Durations and times with a zone:</strong> duration columns are
-          <a href="https://github.com/brunopacheco1/praecepta/issues/52">planned</a>; times and date-times are local.</li>
+        <li><strong>Times with a zone:</strong> times and date-times are local
+          (<a href="https://github.com/brunopacheco1/praecepta/issues/70">#70</a>).</li>
         <li><strong>A process engine, a modeller or a decision service</strong> around the tables.</li>
       </ul>
     </section>
@@ -407,31 +408,30 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
       <h2 id="roadmap-title">Roadmap</h2>
       <ol class="timeline">
         <li>
-          <h3>0.2</h3>
+          <h3>0.3</h3>
           <ul class="plain">
-            <li>Fast builds for large FIRST and PRIORITY tables (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>)</li>
-            <li>The DMN conformance kit in every build (<a href="https://github.com/brunopacheco1/praecepta/issues/22">#22</a>,
-              <a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
-            <li>Boolean, time and date-time columns, and input names with spaces
-              (<a href="https://github.com/brunopacheco1/praecepta/issues/12">#12</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/47">#47</a>)</li>
+            <li>Cells that compare with another input, duration columns and string ranges
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/51">#51</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/52">#52</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/13">#13</a>)</li>
+            <li>COUNT, outputs that name an input, item-definition types
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/15">#15</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/53">#53</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/54">#54</a>)</li>
+            <li>Faster number, date and duration columns (<a href="https://github.com/brunopacheco1/praecepta/issues/16">#16</a>); the DMN conformance kit passes 78 of 86
+              (<a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
           </ul>
         </li>
         <li>
-          <h3>Next: 0.3</h3>
+          <h3>Next: 0.4</h3>
           <ul class="plain">
-            <li>Item-definition types, COUNT, outputs that name an input, string ranges
-              (<a href="https://github.com/brunopacheco1/praecepta/issues/54">#54</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/15">#15</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/53">#53</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/13">#13</a>)</li>
+            <li>Times with a zone, output entries that are expressions, list-valued inputs
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/70">#70</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/71">#71</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/25">#25</a>)</li>
           </ul>
         </li>
         <li>
           <h3>Later this year</h3>
           <ul class="plain">
-            <li>Cells that compare with another input, durations and list-valued inputs
-              (<a href="https://github.com/brunopacheco1/praecepta/issues/51">#51</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/52">#52</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/25">#25</a>)</li>
-            <li>Faster number and date columns, compressed bitmaps
-              (<a href="https://github.com/brunopacheco1/praecepta/issues/16">#16</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/17">#17</a>)</li>
+            <li>Compressed bitmaps for very large tables (<a href="https://github.com/brunopacheco1/praecepta/issues/17">#17</a>)</li>
             <li>Gradle, GraalVM, Spring Boot and a playground, as people ask
               (<a href="https://github.com/brunopacheco1/praecepta/issues/18">#18</a>–<a href="https://github.com/brunopacheco1/praecepta/issues/21">#21</a>)</li>
+            <li>Decisions feeding other decisions, if they fit (<a href="https://github.com/brunopacheco1/praecepta/issues/14">#14</a>)</li>
           </ul>
         </li>
         <li>

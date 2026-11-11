@@ -231,4 +231,31 @@ class CellParserTest {
     private static UnaryTests negated(UnaryTests.Test... tests) {
         return new UnaryTests.Negated(List.of(tests));
     }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "age                          | true",
+            "Credit Score                 | true",
+            "Applicant data.Monthly income | true",
+            "Rate 2                       | true",
+            "is_ok?                       | true",
+            "𝓐ge                       | true",
+            "Ⅷ rate                    | false",
+            "2nd rate                     | false",
+            "a..b                         | false",
+            "a. b                         | false",
+            "a  b                         | false",
+            "a.2b                         | false",
+            "age * 2                      | false",
+            "f(x)                         | false",
+    })
+    void feel_names_allow_single_spaces_between_words(String text, boolean name) {
+        Assertions.assertThat(CellParser.isName(text)).as(text).isEqualTo(name);
+    }
+
+    @Test
+    void very_long_names_are_checked_without_a_stack_overflow() {
+        Assertions.assertThat(CellParser.isName("a".repeat(1_000_000))).isTrue();
+        Assertions.assertThat(CellParser.isName("a b.".repeat(250_000) + "c")).isTrue();
+    }
 }

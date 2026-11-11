@@ -52,14 +52,14 @@ Java 21 or later (tested on 21, 25 and 27). Pick the modules you need:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-engine</artifactId>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
 </dependency>
 
 <!-- optional: load rules from Excel or CSV at runtime (brings Apache POI) -->
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-loader</artifactId>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
 </dependency>
 ```
 
@@ -72,11 +72,12 @@ Central.
 
 # What Praecepta is not
 Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drools when you need:
-- **Full FEEL**: functions, arithmetic, contexts, lists and expressions spanning several columns
-  (e.g. `income > 2 * rent`). Praecepta cells are FEEL *simple unary tests* on one column.
+- **Full FEEL**: functions, arithmetic, contexts, lists and computed expressions (e.g.
+  `income > 2 * rent`). Praecepta cells are FEEL *simple unary tests*; in DMN they may compare with
+  another input (`> limit`), but not compute with it.
 - **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
   boxed expressions.
-- **Times with a time zone**.
+- **Times with a time zone** ([#70](https://github.com/brunopacheco1/praecepta/issues/70)).
 - **A process engine, a modeller or a decision service** around the tables.
 
 # Getting Started
@@ -195,7 +196,7 @@ another input (`> limit`, `[floor..limit]`, `not(home)`), which then becomes an 
 bound like a column (with map-based inputs it is read with the type of the column that names it);
 output entries that are literals
 or name one of the table's inputs (`a` returns the input `a`); every hit policy, with SUM, MIN, MAX and COUNT aggregation. Anything else (times with a
-zone, computed expressions, function calls) is rejected
+zone, computed expressions such as `Symptom + " is listed"`, function calls) is rejected
 with a message naming the decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
 evaluate identically, which is how the benchmarks feed them.
 
@@ -237,7 +238,7 @@ Numbers are `BigDecimal` and dates `LocalDate`. At runtime the generated code ne
 <plugin>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-maven-plugin</artifactId>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
   <executions><execution><goals><goal>generate</goal></goals></execution></executions>
   <configuration>
     <packageName>com.acme.pricing</packageName>

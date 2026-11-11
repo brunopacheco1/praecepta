@@ -42,13 +42,14 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * <ul>
  * <li>STRING: one class per value written in the column (or declared allowed), one for every other
  * value, and one for a missing value.</li>
- * <li>NUMBER, DATE, TIME and DATE_TIME, and STRING columns whose cells compare ({@code < "N"},
+ * <li>NUMBER, DATE, TIME, DATE_TIME, DAY_TIME_DURATION and YEAR_MONTH_DURATION, and STRING columns whose cells compare ({@code < "N"},
  * {@code ["A".."M"]}): with the boundary values {@code b0 < b1 < ... < bk} mentioned by the rules
  * (and the allowed values), the classes are {@code (-inf, b0), [b0], (b0, b1), [b1], ..., (bk, +inf)}
  * and a missing value. Lookup is a binary search; a STRING column first looks the value up among its
  * boundaries, as an unordered one does. An interval that holds no value (between consecutive days,
  * or consecutive nanoseconds; before midnight or after the last nanosecond of a day for times; between
- * a string and the same string followed by the character U+0000) is marked empty.</li>
+ * durations a nanosecond or a month apart; between a string and the same string followed by the
+ * character U+0000) is marked empty.</li>
  * <li>BOOLEAN: ordered like the others with {@code false < true}, both always boundaries, so the
  * classes are {@code [false]}, {@code [true]} and a missing value (the intervals are all empty).</li>
  * </ul>
@@ -105,7 +106,7 @@ final class ColumnIndex {
         var partition = new ArrayList<ValueClass>();
         Map<String, Integer> stringClasses;
         int otherClass = -1;
-        if (isString && !compares(cellsByBit)) {
+        if (isString && !hasOrderTests(cellsByBit)) {
             stringClasses = addStringClasses(cellsByBit, allowedValues, partition);
             otherClass = partition.size();
             partition.add(new ValueClass.OtherString());
@@ -115,7 +116,7 @@ final class ColumnIndex {
             addOrderedClasses(boundaries, partition);
             stringClasses = isString ? boundaryClasses(boundaries) : null;
         }
-        keys = boundaries == null || isString ? null : PrimitiveKeys.of(type, boundaries);
+        keys = boundaries == null ? null : PrimitiveKeys.of(type, boundaries);
         nullClass = partition.size();
         partition.add(new ValueClass.Missing());
         classes = List.copyOf(partition);
@@ -168,7 +169,7 @@ final class ColumnIndex {
     }
 
     /** Whether some cell compares or tests an interval, which makes a STRING column ordered. */
-    private static boolean compares(List<UnaryTests> cellsByBit) {
+    private static boolean hasOrderTests(List<UnaryTests> cellsByBit) {
         return cellsByBit.stream().flatMap(cell -> tests(cell).stream()).anyMatch(test -> test instanceof Compare || test instanceof Range);
     }
 
@@ -288,7 +289,8 @@ final class ColumnIndex {
     /**
      * The mask of rules accepting a raw input value. For a STRING column the value is a String, or an
      * enum constant if the column is enum-bound; for the other types it is the typed value (a Number,
-     * LocalDate, Boolean, LocalTime or LocalDateTime) or its text. Blank text counts as missing.
+     * LocalDate, Boolean, LocalTime, LocalDateTime, Duration or Period) or its text. Blank text counts as
+     * missing.
      *
      * @throws InvalidInputException if the value is outside the declared input values, or text that
      *                               is not a valid value of the column's type
@@ -308,7 +310,7 @@ final class ColumnIndex {
             }
             return stringMaskSlow((String) raw);
         }
-        return orderedMask(raw);
+        return maskOf(convert(raw));
     }
 
     private long[] stringMaskSlow(String text) {
@@ -334,10 +336,6 @@ final class ColumnIndex {
         return mask;
     }
 
-    private long[] orderedMask(Object raw) {
-        return maskOf(convert(raw));
-    }
-
     /** The mask of a converted value of an ordered column (null if missing), checked against the declared values. */
     private long[] maskOf(Object value) {
         int valueClass = classOf(value);
@@ -347,10 +345,7 @@ final class ColumnIndex {
         return masks[valueClass];
     }
 
-    /**
-     * The class of a converted value of an ordered column, or the missing class for null. Boundary
-     * {@code i} is class {@code 2i + 1}; the interval just below it is class {@code 2i}.
-     */
+    /** The class of a converted value of an ordered column (see {@link #classOfSearch}), or the missing class for null. */
     private int classOf(Object value) {
         if (value == null) {
             return nullClass;
@@ -361,7 +356,14 @@ final class ColumnIndex {
                 return byKey;
             }
         }
-        int found = Arrays.binarySearch(boundaries, value, ColumnIndex::compare);
+        return classOfSearch(Arrays.binarySearch(boundaries, value, ColumnIndex::compare));
+    }
+
+    /**
+     * The class of a value from its binary search among the boundaries: boundary {@code i} is class
+     * {@code 2i + 1}, and the interval just below it is class {@code 2i}.
+     */
+    static int classOfSearch(int found) {
         return found >= 0 ? 2 * found + 1 : 2 * (-found - 1);
     }
 
@@ -608,7 +610,7 @@ final class ColumnIndex {
                 default -> false; // literals are boundaries / written values, never inside other classes
             };
             case Compare c -> switch (valueClass) {
-                case ValueClass.Point(var value) -> compares(value, c);
+                case ValueClass.Point(var value) -> satisfies(value, c);
                 case ValueClass.Between(var low, var high) -> switch (c.operator()) {
                     // c.value() is a boundary, so it lies entirely on one side of the open interval
                     case LT, LE -> high != null && compare(high, c.value()) <= 0;
@@ -625,7 +627,7 @@ final class ColumnIndex {
         };
     }
 
-    private static boolean compares(Comparable<?> value, Compare c) {
+    private static boolean satisfies(Comparable<?> value, Compare c) {
         int cmp = compare(value, c.value());
         return switch (c.operator()) {
             case LT -> cmp < 0;
