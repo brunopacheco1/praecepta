@@ -48,7 +48,7 @@ them when you build; evaluate them with a dependency-free engine.
 - Immutable, thread-safe engines; no runtime dependencies
 - Rules from code, Excel, CSV or DMN files (DMN 1.1 to 1.5, as written by Camunda Modeler and
   other tools), and DMN export
-- A Maven plugin that validates tables at build time and generates typed input and output
+- Maven and Gradle plugins that validate tables at build time and generate typed input and output
   records, so applications ship only the engine
 - A Spring Boot starter that loads DMN tables at startup as engine beans, validates them, and reports
   them through Actuator
@@ -75,8 +75,8 @@ Java 21 or later (tested on 21, 25 and 27). Pick the modules you need:
 </dependency>
 ```
 
-Or compile tables at build time with the [Maven plugin](#praecepta-maven-plugin), so that only
-`praecepta-engine` is needed at runtime. Every release is signed and has an SBOM, SLSA Build Level 2
+Or compile tables at build time with the [Maven plugin](#praecepta-maven-plugin) or the
+[Gradle plugin](#praecepta-gradle-plugin), so that only `praecepta-engine` is needed at runtime. Every release is signed and has an SBOM, SLSA Build Level 2
 provenance (`gh attestation verify`) and third-party notices on its
 [GitHub release](https://github.com/brunopacheco1/praecepta/releases), and
 [Reproducible Central](https://github.com/jvm-repo-rebuild/reproducible-central/blob/master/content/io/github/brunopacheco1/praecepta/README.md) rebuilds it independently to check it is bit-for-bit identical to Maven
@@ -361,6 +361,65 @@ default output.
 Generated code belongs to your project, so it carries no Praecepta licence header. Set
 `<fileHeader>` to prepend your own, such as your project's SPDX lines.
 `Discount.validationReport()` gives the build-time findings, and `Discount.engine()` the engine.
+
+## Praecepta Gradle Plugin
+Does for Gradle what the Maven plugin does, with the same settings and the same generated files.
+Runs on Gradle 8.5 and later (CI tests 8.5, the last 8.x and the current 9.x) on Java 21+. It is
+published to Maven Central only, with its plugin marker, so Gradle finds it there:
+
+```kotlin
+// settings.gradle.kts
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+```
+
+```kotlin
+// build.gradle.kts
+plugins {
+    java
+    id("io.github.brunopacheco1.praecepta") version "0.5.0"
+}
+
+dependencies {
+    implementation("io.github.brunopacheco1:praecepta-engine:0.5.0")
+}
+
+praecepta {
+    packageName = "com.acme.pricing"
+    tables {
+        register("discount") {
+            source = file("src/main/rules/discount.xlsx")
+            hitPolicy = "FIRST"
+            inputs {
+                column("country") { allowedValues = "\"PT\",\"ES\",\"FR\"" }
+                column("age") { type = "NUMBER" }
+            }
+            outputs {
+                column("discount") { type = "NUMBER" }
+            }
+        }
+        // DMN files carry their own hit policy, columns and value lists
+        register("shipping") { source = file("src/main/rules/shipping.dmn") }
+    }
+}
+```
+
+The `generatePraecepta` task writes the classes to `build/generated/sources/praecepta/java/main`
+and the DMN resources to `build/generated/resources/praecepta/main`, both part of the `main` source
+set, so `compileJava` and `processResources` run it first. It is cacheable (its inputs are the
+table files, by name and content, and the settings) and works with the configuration cache.
+
+The settings are the Maven plugin's, as Gradle properties: `packageName`, `failOn` (`ERROR` by
+default, `WARNING` or `NONE`), `fileHeader` and `skip` (or `-Ppraecepta.skip=true`); per table
+`source`, `decision`, `hitPolicy` and `aggregation`; per column `type`, `allowedValues`, `priority`
+and `list`. One differs: `name` is the name a table is registered under, as in every Gradle
+container, so the generated class is named by `className` (the Maven plugin's `<name>`), which
+defaults to the DMN decision's name or the file name. A column's name is the argument of `column`.
+The Groovy DSL takes the same settings (`register('discount') { hitPolicy = 'FIRST' ... }`).
 
 ## Praecepta Spring Boot Starter
 For Spring Boot 4 applications. At startup it loads every DMN file under `rules/` on the class path,
@@ -662,7 +721,7 @@ Drools' experimental alpha-network compilation is not part of the default compar
 # Dependencies
 Praecepta Engine has no runtime dependencies; it reads DMN with the JDK's XML parser.
 
-Praecepta Loader depends on Apache POI. The Maven plugin uses it at build time only, through
+Praecepta Loader depends on Apache POI. The Maven and Gradle plugins use it at build time only, through
 `praecepta-compiler`, the build-time core the build-tool integrations share. `praecepta-integration`,
 which the framework integrations share, needs only the engine. The Quarkus extension's runtime module
 needs `praecepta-integration` and Quarkus' own `quarkus-arc`; its deployment module, which only
