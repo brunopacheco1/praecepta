@@ -16,7 +16,8 @@ ENGINES = ["praecepta", "camunda", "drools"]
 EVALUATION_SUITES = [
     ("scale", "Latency by table size",
      "One decision on one thread, mean (± 99.9% confidence interval). `synthetic` tables have string columns, "
-     "`mixed` ones string, number and date columns; both COLLECT. `real` is the 119-rule FIRST table."),
+     "`mixed` ones string, number and date columns, `lookup` ones string columns with many values (a code per "
+     "rule); all COLLECT. `real` is the 119-rule FIRST table."),
     ("columns", "Latency by number of columns", "1,000 rules; `x<n>` is the number of input columns."),
     ("policies", "Latency by hit policy",
      "The same 1,000 mixed rules under FIRST, PRIORITY and RULE ORDER (COLLECT is in the size table), and "

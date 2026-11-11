@@ -54,7 +54,7 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
 
     private static final String REAL_TABLE = "tables/decision_table.xlsx";
     private static final Pattern GENERATED =
-            Pattern.compile("(synthetic|mixed|unique)-(\\d+)(?:x(\\d+))?(?:-(collect|first|priority|ruleorder|unique))?");
+            Pattern.compile("(synthetic|mixed|unique|lookup)-(\\d+)(?:x(\\d+))?(?:-(collect|first|priority|ruleorder|unique))?");
     private static final double WILDCARDS = 0.4;
     private static final int STRING_DOMAIN = 8;
     private static final long SEED = 42;
@@ -68,7 +68,10 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
      *   <li>{@code mixed-<rules>[x<columns>]}: random string, number and date columns, interleaved
      *       (default 9, a multiple of 3), using every FEEL cell form Praecepta supports (COLLECT);</li>
      *   <li>{@code unique-<rules>[x<columns>]}: random string columns (default 10) whose rules never
-     *       overlap, as in lookup tables (UNIQUE).</li>
+     *       overlap, as in lookup tables (UNIQUE);</li>
+     *   <li>{@code lookup-<rules>[x<columns>]}: string columns (default 6, at least 3) with many distinct
+     *       values, as in a price list by product: most of their value classes hold a few rules each
+     *       (COLLECT).</li>
      * </ul>
      * A suffix {@code -collect}, {@code -first}, {@code -priority}, {@code -ruleorder} or
      * {@code -unique} changes the hit policy and nothing else: {@code mixed-1000-first} has the same
@@ -89,6 +92,7 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
         return switch (kind) {
             case "synthetic" -> synthetic(name, rules, columnsOr(columns, 10), hitPolicyOr(hitPolicySuffix, HitPolicy.COLLECT));
             case "mixed" -> mixed(name, rules, columnsOr(columns, 9), hitPolicyOr(hitPolicySuffix, HitPolicy.COLLECT));
+            case "lookup" -> lookup(name, rules, columnsOr(columns, 6), hitPolicyOr(hitPolicySuffix, HitPolicy.COLLECT));
             default -> unique(name, rules, columnsOr(columns, 10), hitPolicyOr(hitPolicySuffix, HitPolicy.UNIQUE));
         };
     }
@@ -200,6 +204,35 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
             for (int c = 0; c < columns; c++) {
                 var cell = c < keys ? "v" + combination.get(c) : randomStringCell(random, c, columns);
                 values.put(inputs.get(c), cell);
+            }
+            cells.add(values);
+        }
+        return build(name, inputs, strings(columns), cells, hitPolicy);
+    }
+
+    /**
+     * Random string table with many distinct values per column, the case of compact masks (#17): each
+     * rule names its own code in {@code c0}, a value shared by about ten rules in {@code c1} and one
+     * shared by about a hundred in {@code c2}, never a wildcard there; the other columns are random, as
+     * in {@link #synthetic}. A value of the first columns is accepted by few rules, so its mask is
+     * nearly empty.
+     */
+    static Table lookup(String name, int ruleCount, int columns, HitPolicy hitPolicy) {
+        if (columns < 3) {
+            throw new IllegalArgumentException("Lookup tables have at least 3 columns: " + name);
+        }
+        var random = new Random(SEED);
+        var inputs = columnNames("c", columns);
+        int groups = Math.max(STRING_DOMAIN, ruleCount / 10);
+        int families = Math.max(STRING_DOMAIN, ruleCount / 100);
+        var cells = new ArrayList<Map<String, String>>();
+        for (int r = 0; r < ruleCount; r++) {
+            var values = new HashMap<String, String>();
+            values.put(inputs.get(0), "k" + r);
+            values.put(inputs.get(1), "g" + random.nextInt(groups));
+            values.put(inputs.get(2), "f" + random.nextInt(families));
+            for (int c = 3; c < columns; c++) {
+                values.put(inputs.get(c), randomStringCell(random, c, columns));
             }
             cells.add(values);
         }
