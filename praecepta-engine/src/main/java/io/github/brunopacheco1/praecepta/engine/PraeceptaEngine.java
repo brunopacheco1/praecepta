@@ -267,9 +267,31 @@ public final class PraeceptaEngine<I, O> {
 
     /**
      * A rule's outputs that name an input: its other outputs, and for each named one, the output
-     * column and the input column's position in the evaluation order.
+     * column and the input column's position in the evaluation order. A class, not a record: it holds
+     * arrays and is never compared.
      */
-    private record NamedInputs(Map<String, String> values, String[] outputs, int[] columns) {
+    private static final class NamedInputs {
+        private final Map<String, String> values;
+        private final String[] outputs;
+        private final int[] columns;
+
+        NamedInputs(Map<String, String> values, String[] outputs, int[] columns) {
+            this.values = values;
+            this.outputs = outputs;
+            this.columns = columns;
+        }
+
+        Map<String, String> values() {
+            return values;
+        }
+
+        String[] outputs() {
+            return outputs;
+        }
+
+        int[] columns() {
+            return columns;
+        }
     }
 
     /**
