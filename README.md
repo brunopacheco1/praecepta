@@ -206,6 +206,8 @@ var engine = PraeceptaEngine.<Customer, String>builder()
 
 These are the semantics of FEEL's `list contains`: a missing list makes every test unknown, while an
 empty one passes none. Elements may not be missing, and declared input values apply to each element.
+The elements of a list of times or date-times may have a time zone or not; each is compared as a
+single value is, so an element FEEL cannot compare with a cell leaves that test unknown.
 With map-based inputs, declare the column with `.listColumnType("nationalities", ColumnType.STRING)`
 and give a FEEL list as text: `["PT", "BR"]` (or `PT, BR`), `[]` for an empty list. Rules that test a
 list column are left out of the static analysis (overlaps, unreachable rules, gaps), since a list
@@ -339,9 +341,8 @@ engine against a naive reference implementation of DMN decision-table semantics 
 # DMN conformance
 `praecepta-tck` runs the decision-table test cases of the
 [DMN Technology Compatibility Kit](https://github.com/dmn-tck/tck) in every build. Every check whose
-table Praecepta can read passes (80 of 86); the others need features it does not have yet: inputs
-computed by other decisions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) and times
-with a time zone ([#70](https://github.com/brunopacheco1/praecepta/issues/70)). The pass rate, the results per
+table Praecepta can read passes (83 of 86); the other three need inputs computed by other decisions
+([#14](https://github.com/brunopacheco1/praecepta/issues/14)), which Praecepta does not have yet. The pass rate, the results per
 test case and what each unsupported check needs are in
 [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md).
 

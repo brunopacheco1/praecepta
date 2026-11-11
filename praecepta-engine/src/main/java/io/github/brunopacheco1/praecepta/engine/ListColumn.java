@@ -25,10 +25,14 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  *
  * <p>The elements are looked up in an ordinary {@link ColumnIndex} over the same cells, whose masks hold,
  * for an element, the rules with a positive cell that one of its tests accepts and the rules with a
- * {@code not(...)} cell that none of its tests accepts (an element is never missing, so no test is
- * unknown). One pass over the elements ORs, per rule, "some element passes a test"; the list's mask is
- * then the rules with {@code -}, the positive rules some element passes, and the negated rules none
- * passes: a few word operations per element. The element masks may be dense or sparse ({@link Masks});
+ * {@code not(...)} cell that none of its tests accepts. An element is never missing, so its tests are
+ * unknown only when FEEL cannot compare it with a literal (a time with a time zone and one without):
+ * the positive rule then misses the element's bit, and the negated rule too, which counts here as "some
+ * element may pass". So, as with FEEL's three-valued {@code or}, a positive cell holds when some element
+ * is known to pass and a {@code not(...)} when every element is known to fail. One pass over the
+ * elements ORs, per rule, "some element passes a test"; the list's mask is then the rules with
+ * {@code -}, the positive rules some element passes, and the negated rules none passes: a few word
+ * operations per element. The element masks may be dense or sparse ({@link Masks});
  * the list masks are dense.
  */
 final class ListColumn {

@@ -58,7 +58,8 @@ import net.jqwik.api.Tuple;
  * other kind (a zone where the inputs have none, or none where they have one), which FEEL cannot compare
  * with the inputs. Some columns declare input values, and inputs include values outside them. One column
  * in five holds lists ({@link #lists}): its inputs are lists of zero to three of the values a single
- * input could take, missing lists, and now and then a list holding a missing element, which is invalid.
+ * input could take (a list of times or date-times now and then mixes values with and without a zone),
+ * missing lists, and now and then a list holding a missing element, which is invalid.
  *
  * <p>Every rule has outputs {@code id} (its 1-based position, unique), {@code out} (one of x/y/z,
  * often shared), {@code n} (a small number, for aggregation) and {@code echo}, which one time in four
@@ -180,8 +181,29 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         return scenarios(true, MAX_RULES);
     }
 
+    /**
+     * Scenarios whose two or three columns all hold times, or all date-times, each with or without a time
+     * zone, and half of them lists: as {@link #arbitrary()} makes them otherwise. Values with and without
+     * a zone meet in the same lists, and cells of one column often name another, so membership in a list
+     * of the other kind (unknown in FEEL) is common.
+     */
+    public static Arbitrary<DecisionTableScenario> temporal() {
+        var columns = Arbitraries.of(ColumnType.TIME, ColumnType.DATE_TIME)
+                .flatMap(type -> temporalColumn(type).list().ofMinSize(2).ofMaxSize(3));
+        return Arbitraries.oneOf(scenarios(columns, MAX_RULES), scenarios(columns, MAX_RULES).map(DecisionTableScenario::withVariableCells));
+    }
+
+    private static Arbitrary<Column> temporalColumn(ColumnType type) {
+        return Arbitraries.of(false, true).flatMap(zoned -> Arbitraries.of(false, true).flatMap(list ->
+                oneTimeInThree(interval(type, zoned)).map(allowed -> new Column(type, List.of(), allowed, zoned, list))));
+    }
+
     private static Arbitrary<DecisionTableScenario> scenarios(boolean allStringsDeclared, int maxRules) {
-        return column(allStringsDeclared).list().ofMinSize(1).ofMaxSize(3).flatMap(columns -> {
+        return scenarios(column(allStringsDeclared).list().ofMinSize(1).ofMaxSize(3), maxRules);
+    }
+
+    private static Arbitrary<DecisionTableScenario> scenarios(Arbitrary<List<Column>> tableColumns, int maxRules) {
+        return tableColumns.flatMap(columns -> {
             var rules = rule(columns).list().ofMinSize(1).ofMaxSize(maxRules);
             var inputs = input(columns).list().ofMinSize(1).ofMaxSize(12);
             var forms = Arbitraries.of(ForcedMaskForm.values());
@@ -376,19 +398,33 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         for (var column : columns) {
             if (column.list()) {
                 // zero to three values; now and then a list holding a missing element, which is invalid
-                var withMissing = value(column, false).list().ofMinSize(1).ofMaxSize(2).map(elements -> {
+                var element = element(column);
+                var withMissing = element.list().ofMinSize(1).ofMaxSize(2).map(elements -> {
                     var list = new ArrayList<Object>(elements);
                     list.add(null);
                     return list;
                 });
                 values.add(Arbitraries.<Object>frequencyOf(
-                        Tuple.of(12, value(column, false).list().ofMaxSize(3)),
+                        Tuple.of(12, element.list().ofMaxSize(3)),
                         Tuple.of(1, withMissing)).injectNull(0.15));
             } else {
                 values.add(value(column, true).injectNull(0.15));
             }
         }
         return Combinators.combine(values).as(row -> new ArrayList<>(row));
+    }
+
+    /**
+     * An element of a list column: a value of its type, and for times and date-times one time in five of
+     * the other kind (with a zone where the column's have none, or none where they have one), which a list
+     * may mix, as FEEL lets it.
+     */
+    private static Arbitrary<Object> element(Column column) {
+        if (column.type() != ColumnType.TIME && column.type() != ColumnType.DATE_TIME) {
+            return value(column, false);
+        }
+        var otherKind = new Column(column.type(), column.domain(), column.allowed(), !column.zoned(), true);
+        return Arbitraries.frequencyOf(Tuple.of(4, value(column, false)), Tuple.of(1, value(otherKind, false)));
     }
 
     /** A value of the column's type; a blank string (a missing value) only if {@code blank}. */

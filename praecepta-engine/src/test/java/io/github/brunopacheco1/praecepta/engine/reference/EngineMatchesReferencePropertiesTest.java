@@ -61,6 +61,11 @@ class EngineMatchesReferencePropertiesTest {
     }
 
     @Provide
+    Arbitrary<DecisionTableScenario> temporalScenarios() {
+        return DecisionTableScenario.temporal();
+    }
+
+    @Provide
     Arbitrary<DecisionTableScenario> scenariosWithValueLists() {
         return DecisionTableScenario.withStringValueLists();
     }
@@ -140,6 +145,17 @@ class EngineMatchesReferencePropertiesTest {
             Assertions.assertThatCode(() -> engine(s, s.rules(), policy, priority, perColumn))
                     .as("policy %s", policy)
                     .doesNotThrowAnyException();
+        }
+    }
+
+    // ---- times and date-times, with and without a zone, single and in lists ------------------------
+
+    @Property(tries = TRIES, edgeCases = EdgeCasesMode.NONE)
+    void temporal_tables_match_the_reference_under_every_hit_policy(@ForAll("temporalScenarios") DecisionTableScenario s,
+            @ForAll("priorities") List<String> priority, @ForAll boolean perColumn) {
+        for (var policy : HitPolicy.values()) {
+            var rules = policy == HitPolicy.ANY ? DecisionTableScenario.outOnly(s.rules()) : s.rules();
+            assertSameHits(s, rules, policy, priority, perColumn);
         }
     }
 

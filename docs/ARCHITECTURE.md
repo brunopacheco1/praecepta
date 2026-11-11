@@ -60,7 +60,11 @@ builds an engine once and calls it.
      For each element, its class mask gives the positive cells it passes and the `not(...)` cells it
      breaks; ORing those over the elements gives "some element passes", and the list's mask is the
      `-` rules, the positive rules some element passes, and the negated rules none passes. A missing
-     and an empty list have fixed masks. Two nationalities cost one more OR per mask word.
+     and an empty list have fixed masks. Two nationalities cost one more OR per mask word. The
+     element index stores its masks in either form (see below), and the list masks it gives are
+     dense. Elements of a time or date-time list may have a zone or not: the element index has
+     both lines, and an element on the other line than a cell's literal makes that test unknown,
+     which, as in FEEL's `or`, keeps the `not(...)` cells from matching.
    - **Memory** grows with columns × classes × rules, never with the product of the values.
    - **Compact masks** (`Masks`): a mask is stored dense (one bit per rule) unless at most a quarter
      of its 64-bit words hold a set bit; it is then stored *sparse*, as the pairs (word, bits) of its

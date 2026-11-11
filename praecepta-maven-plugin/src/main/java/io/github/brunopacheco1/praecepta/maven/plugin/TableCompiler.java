@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -147,8 +148,9 @@ final class TableCompiler {
     /**
      * Builds the engine as the generated code will: each input bound with the getter of its generated
      * Java type, so that times and date-times with a time zone, or without, are analysed as the record
-     * gives them. The getters are never called, so no classes are needed yet. A string column with a value
-     * list is bound as a string: the table's value list is the generated enum's constants.
+     * gives them, and inputs that hold lists as lists. The getters are never called, so no classes are
+     * needed yet. A string column with a value list is bound as a string: the table's value list is the
+     * generated enum's constants.
      */
     private static ValidationReport validate(DecisionTable table, Severity failOn) {
         if (table.aggregation() != null
@@ -172,8 +174,10 @@ final class TableCompiler {
                 });
         try {
             var zoned = TimeZones.of(table).inputs();
-            table.inputs().forEach(column -> bind(builder, column.name(), column.type(), zoned.contains(column.name())));
-            table.namedInputs().forEach((name, type) -> bind(builder, name, type, zoned.contains(name)));
+            var lists = table.listInputs();
+            table.inputs().forEach(column -> bind(builder, column.name(), column.type(), zoned.contains(column.name()),
+                    lists.contains(column.name())));
+            table.namedInputs().forEach((name, type) -> bind(builder, name, type, zoned.contains(name), lists.contains(name)));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(e.getMessage().startsWith("Table '") ? e.getMessage()
                     : "Table '%s': %s".formatted(table.name(), e.getMessage()), e);
@@ -188,8 +192,20 @@ final class TableCompiler {
         }
     }
 
-    /** Binds an input with a getter of the Java type generated code gives it; validation never calls it. */
-    private static void bind(PraeceptaEngine.Builder<Object, PraeceptaOutput> builder, String name, ColumnType type, boolean zoned) {
+    /**
+     * Binds an input with a getter of the Java type generated code gives it, a {@code java.util.List} of
+     * that type for an input that holds lists; validation never calls it.
+     */
+    private static void bind(PraeceptaEngine.Builder<Object, PraeceptaOutput> builder, String name, ColumnType type, boolean zoned,
+            boolean list) {
+        if (list) {
+            if (type == ColumnType.STRING) {
+                builder.listInput(name, input -> List.<String>of());
+            } else {
+                builder.listInput(name, type, input -> List.of());
+            }
+            return;
+        }
         switch (type) {
             case STRING -> builder.input(name, input -> null);
             case NUMBER -> builder.numberInput(name, input -> null);

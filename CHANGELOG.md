@@ -11,6 +11,14 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+Times and date-times with a time zone, inputs that hold lists, output entries that are expressions,
+and compact masks for large tables. The features work together: a list may hold times with a time
+zone, and a list column's elements are looked up in masks of either form. The DMN conformance kit
+(TCK) now passes 83 of its 86 decision-table checks (was 78); the other three need inputs computed
+by other decisions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)). Read *Changed*
+before upgrading if you deconstruct `PraeceptaOutput` or `DecisionTable` with record patterns, or
+feed map-based inputs to tables that compare times.
+
 ### Added
 - **Times and date-times with a time zone** ([#70](https://github.com/brunopacheco1/praecepta/issues/70)):
   TIME columns also take times with an offset (`time("16:12:00+01:00")`, `16:12:00Z`), held as
@@ -30,9 +38,8 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   does. The Maven plugin generates `OffsetTime` and `ZonedDateTime` components for columns whose
   values are all written with a zone (and for the inputs their cells compare with), and fails the
   build for a column that mixes both kinds. A time with a zone id (`time("16:12:00@Europe/Paris")`)
-  is still rejected, as it has no fixed offset. The DMN TCK now passes 81 of its 86 checks (was 78):
-  the rest need chained decisions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) or
-  output entries that are expressions ([#71](https://github.com/brunopacheco1/praecepta/issues/71)).
+  is still rejected, as it has no fixed offset. With it, the three checks of the DMN TCK's
+  `0036-dt-variable-input` that use zoned inputs pass.
 - **Inputs that hold lists** ([#25](https://github.com/brunopacheco1/praecepta/issues/25)): a column
   may hold several values, such as a customer's nationalities. Bind it with
   `listInput("nationalities", Customer::nationalities)` (strings) or
@@ -43,7 +50,9 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   element** does, so `not("PT")` reads "without PT". As in FEEL's `list contains`, a missing (null)
   list makes every test unknown, so it matches only `-` and `null`, while an empty list matches no
   test, and so every `not(...)`. Elements may not be missing, and declared input values apply to the
-  elements. The index ORs the masks of the elements' values, a few word operations per element, then
+  elements. The elements of a TIME or DATE_TIME list may have a time zone or not, each compared as a
+  single value of its kind is: an element that cannot be compared with a cell's literal leaves its test
+  unknown, so a `not(...)` holds only when every element is known to fail. The index ORs the masks of the elements' values, a few word operations per element, then
   ANDs across columns as usual. `DecisionTable` gains `listInputs`, and
   `DecisionTable.cell(rule, column)` parses a cell as the table holds it.
   - **DMN:** strict FEEL compares a list as a whole (`"PT"` never equals `["PT","BR"]`), so a list
@@ -75,10 +84,8 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   outputs are compared; an output with a priority list cannot be an expression. `DmnReader` reads such
   entries, checking that the value has the output's type (a string output takes a number as its text),
   and `DmnWriter` writes them back unchanged. Other FEEL (function calls, comparisons, `if`, lists) is
-  still rejected with a message saying what is not supported. With list inputs above, the DMN TCK's
-  `0039-dt-list-semantics` now passes: **80 of 86 checks** (was 78); the rest need chained decisions
-  ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) or times with a time zone
-  ([#70](https://github.com/brunopacheco1/praecepta/issues/70)).
+  still rejected with a message saying what is not supported. With list inputs above, both checks of
+  the DMN TCK's `0039-dt-list-semantics` pass.
 
 ### Changed
 - **Compact masks for large tables** ([#17](https://github.com/brunopacheco1/praecepta/issues/17)):
@@ -87,7 +94,8 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   words hold a bit (so it takes at most half the memory), which never happens in tables of up to 192
   rules except for empty masks; other masks stay dense, as before. When a column's mask is sparse,
   evaluation intersects the later columns only on its words. Under ANY, the masks of rules with the
-  same outputs are stored the same way. There is no new dependency and no API change. On an Apple M2
+  same outputs are stored the same way, and a list column looks up its elements in masks of either
+  form. There is no new dependency and no API change. On an Apple M2
   Pro, with the new `lookup-<rules>` benchmark tables (a code per rule, as in a price list),
   `lookup-10000` went from 17.6 to 4.6 MB of retained heap and from 676 to 387 ns/op
   (`EvaluationBenchmark`); `mixed-10000` from 6.7 to 5.3 MB. `mixed-100`, `mixed-1000`,

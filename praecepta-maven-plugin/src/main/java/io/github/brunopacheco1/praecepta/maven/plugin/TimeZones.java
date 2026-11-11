@@ -27,7 +27,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * component has one Java type, while FEEL lets a column hold values of both kinds, so the table decides:
  * <ul>
  * <li>an input takes values with a zone when the literals written for it (its cells and input value
- * list) all have one and there is at least one. Inputs that cells compare ({@code > other}) take the
+ * list) all have one and there is at least one; for an input that holds lists, its elements do. Inputs that cells compare ({@code > other}) take the
  * same kind, since FEEL cannot compare values of different kinds, so the inputs linked by such cells
  * are decided together;</li>
  * <li>an output has values with a zone when its literal values all have one and so do the inputs its
@@ -69,8 +69,7 @@ final class TimeZones {
             }
             var cells = new ArrayList<UnaryTests>();
             for (var rule : table.rules()) {
-                var text = rule.input().values().get(column.name());
-                cells.add(table.feelCells() ? CellParser.parseFeel(text, column.type()) : CellParser.parse(text, column.type()));
+                cells.add(table.cell(rule, column)); // a list column's cells test its elements
             }
             if (column.allowedValues() != null) {
                 cells.add(CellParser.parse(column.allowedValues(), column.type()));

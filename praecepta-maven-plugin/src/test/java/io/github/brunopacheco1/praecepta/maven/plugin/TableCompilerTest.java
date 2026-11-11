@@ -5,6 +5,7 @@
  */
 package io.github.brunopacheco1.praecepta.maven.plugin;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
@@ -37,6 +38,7 @@ import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
+import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 
 /**
  * Compiles tables, then compiles the generated sources with the JDK's compiler and runs them against
@@ -251,6 +253,35 @@ class TableCompilerTest {
             var eve = ZonedDateTime.of(2025, 12, 23, 22, 59, 0, 0, ZoneOffset.UTC);
             var afternoon = (Optional<?>) evaluate.invoke(null, constructor.newInstance(OffsetTime.of(11, 0, 0, 0, ZoneOffset.UTC), eve));
             Assertions.assertThat(afternoon).get().hasToString("DeliveryOutput[slot=afternoon, due=2025-12-24T15:00Z]");
+        }
+    }
+
+    @Test
+    void list_columns_of_times_written_with_a_zone_become_lists_of_offset_times() throws Exception {
+        var config = new TableConfig(table("windows.csv"), "Window", null, HitPolicy.FIRST, null,
+                List.of(ColumnConfig.listInput("slots", ColumnType.TIME, null)),
+                List.of(new ColumnConfig("fee", ColumnType.NUMBER, null, List.of())));
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+
+        Assertions.assertThat(result.sources().get("WindowInput"))
+                .contains("public record WindowInput(java.util.List<java.time.OffsetTime> slots)");
+        Assertions.assertThat(result.sources().get("Window"))
+                .contains(".listInput(\"slots\", io.github.brunopacheco1.praecepta.engine.beans.ColumnType.TIME, WindowInput::slots)");
+        Assertions.assertThat(result.dmn()).contains("some x in ? satisfies x &gt;= time(\"12:00:00+01:00\")", "isCollection=\"true\"");
+        // the same table from DMN, whose list cells use FEEL's list functions, takes the zone too
+        var fromDmn = DmnReader.read(new ByteArrayInputStream(result.dmn().getBytes(StandardCharsets.UTF_8)));
+        Assertions.assertThat(TimeZones.of(fromDmn).inputs()).containsExactly("slots");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".WindowInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Window").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            // 13:00+02:00 is 11:00Z, within [08:00Z..12:00Z]
+            var within = List.of(OffsetTime.of(13, 0, 0, 0, ZoneOffset.ofHours(2)));
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(within))).get().hasToString("WindowOutput[fee=5]");
+            var late = List.of(OffsetTime.of(7, 0, 0, 0, ZoneOffset.UTC), OffsetTime.of(14, 0, 0, 0, ZoneOffset.ofHours(1)));
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(late))).get().hasToString("WindowOutput[fee=3]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(List.of()))).get().hasToString("WindowOutput[fee=9]");
         }
     }
 
