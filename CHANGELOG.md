@@ -35,6 +35,15 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 - `PraeceptaEngine.Builder.defaultOutput(PraeceptaOutput)`, `DecisionTable.defaultOutput()` and
   `DecisionTable.OutputColumn.defaultValue()`: the output when no rule matches (see *Fixed*,
   [#79](https://github.com/brunopacheco1/praecepta/issues/79)).
+- **GraalVM native images** ([#19](https://github.com/brunopacheco1/praecepta/issues/19)): applications
+  using the engine, `praecepta-integration`, `CsvLoader` and the classes the Maven plugin generates build
+  as native executables with no configuration for Praecepta. The jars carry their reachability metadata
+  (`META-INF/native-image/io.github.brunopacheco1/<artifactId>/resource-config.json`): the engine keeps the
+  JDK XML parser's messages, without which a malformed DMN file failed natively with a
+  `MissingResourceException`, and the integration core registers the default location's files
+  (`rules/**/*.dmn`). `ExcelLoader` does not work in native images (Apache POI); compile Excel tables at
+  build time instead. A `Native image` workflow builds and runs a test application with GraalVM for JDK 21
+  and 25. See [Native images](README.md#native-images).
 
 ### Changed
 - The release publishes every module but the benchmarks and the TCK runner, found by the build rather
