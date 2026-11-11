@@ -108,7 +108,7 @@ final class FeelNumbers {
      * Halley's method, {@code y + 2 (x - exp(y)) / (x + exp(y))}, each of which triples the correct digits.
      */
     private static BigDecimal lnNearOne(BigDecimal x, double estimate) {
-        var y = new BigDecimal(estimate);
+        var y = BigDecimal.valueOf(estimate);
         for (int step = 0; step < 2; step++) {
             var e = exp(y);
             y = y.add(TWO.multiply(x.subtract(e), WORKING).divide(x.add(e), WORKING), WORKING);
