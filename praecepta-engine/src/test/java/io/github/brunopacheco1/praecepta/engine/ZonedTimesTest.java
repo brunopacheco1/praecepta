@@ -233,8 +233,10 @@ class ZonedTimesTest {
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "13:00"))).containsExactly("afternoon");
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "13:00Z"))).containsExactly("afternoon");
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "09:00+09:00"))).as("00:00Z, but 09:00 on the clock").containsExactly("morning");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("cutOff", "19:00"))).isInstanceOf(InvalidInputException.class);
-        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("cutOff", "19:00+09:00"))).as("10:00Z, but 19:00 on the clock")
+        var evening = Map.of("cutOff", "19:00");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(evening)).isInstanceOf(InvalidInputException.class);
+        var eveningInTokyo = Map.of("cutOff", "19:00+09:00");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(eveningInTokyo)).as("10:00Z, but 19:00 on the clock")
                 .isInstanceOf(InvalidInputException.class);
     }
 

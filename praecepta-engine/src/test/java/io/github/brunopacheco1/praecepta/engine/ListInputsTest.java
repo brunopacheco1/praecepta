@@ -75,13 +75,16 @@ class ListInputsTest {
                 .rules(NATIONALITY_RULES)
                 .build();
         Assertions.assertThat(engine.evaluate(customer("BR", "ES"))).containsExactly("iberian", "not-pt", "any");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(customer("PT", "FR")))
+        var french = customer("PT", "FR");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(french))
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("nationalities=FR");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(new Customer(Arrays.asList("PT", null), null)))
+        var withNull = new Customer(Arrays.asList("PT", null), null);
+        Assertions.assertThatThrownBy(() -> engine.evaluate(withNull))
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("holds a missing value");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(customer("PT", " ")))
+        var withBlank = customer("PT", " ");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(withBlank))
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("holds a missing value");
     }
@@ -135,10 +138,12 @@ class ListInputsTest {
         Assertions.assertThat(engine.evaluate(Map.of("nationalities", "[]"))).containsExactly("not-pt", "any");
         Assertions.assertThat(engine.evaluate(Map.of("nationalities", " "))).containsExactly("none", "any");
         Assertions.assertThat(engine.evaluate(Map.of())).containsExactly("none", "any");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("nationalities", "[\"PT\", null]")))
+        var withNull = Map.of("nationalities", "[\"PT\", null]");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(withNull))
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("is not a list of string values");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("nationalities", "[< 5]")))
+        var withComparison = Map.of("nationalities", "[< 5]");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(withComparison))
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("is not a list of string values");
     }

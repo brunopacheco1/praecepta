@@ -103,18 +103,7 @@ final class TimeZones {
             if (!isTemporal(output.type())) {
                 continue;
             }
-            var kinds = EnumSet.noneOf(Kind.class);
-            for (var rule : table.rules()) {
-                var input = rule.output().references().get(output.name());
-                if (input != null) {
-                    kinds.add(zonedInputs.contains(input) ? Kind.ZONED : Kind.LOCAL);
-                    continue;
-                }
-                var text = rule.output().values().get(output.name());
-                if (text != null) {
-                    kinds.add(kind(parse(text, output.type(), table, output.name())));
-                }
-            }
+            var kinds = outputKinds(table, output, zonedInputs);
             if (kinds.size() > 1) {
                 throw mixed(table, "output '" + output.name() + "'", output.type());
             }
@@ -123,6 +112,21 @@ final class TimeZones {
             }
         }
         return zoned;
+    }
+
+    /** The kinds of the values the rules give a time or date-time output: those of the inputs they name, and of their literals. */
+    private static Set<Kind> outputKinds(DecisionTable table, DecisionTable.OutputColumn output, Set<String> zonedInputs) {
+        var kinds = EnumSet.noneOf(Kind.class);
+        for (var rule : table.rules()) {
+            var input = rule.output().references().get(output.name());
+            var text = rule.output().values().get(output.name());
+            if (input != null) {
+                kinds.add(zonedInputs.contains(input) ? Kind.ZONED : Kind.LOCAL);
+            } else if (text != null) {
+                kinds.add(kind(parse(text, output.type(), table, output.name())));
+            }
+        }
+        return kinds;
     }
 
     private static Object parse(String text, ColumnType type, DecisionTable table, String output) {

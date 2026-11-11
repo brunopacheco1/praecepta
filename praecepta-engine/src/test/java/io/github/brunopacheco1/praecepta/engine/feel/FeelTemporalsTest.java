@@ -63,7 +63,7 @@ class FeelTemporalsTest {
         var nineInParis = OffsetTime.of(9, 0, 0, 0, ZoneOffset.ofHours(1));
         var eightUtc = OffsetTime.of(8, 0, 0, 0, ZoneOffset.UTC);
         Assertions.assertThat(FeelTemporals.compare(nineInParis, eightUtc)).isZero();
-        Assertions.assertThat(nineInParis.compareTo(eightUtc)).as("unlike Java's order").isNotZero();
+        Assertions.assertThatComparable(nineInParis).as("unlike Java's order").isNotEqualByComparingTo(eightUtc);
         Assertions.assertThat(FeelTemporals.compare(OffsetTime.of(23, 0, 0, 0, ZoneOffset.ofHours(-2)), eightUtc))
                 .as("23:00-02:00 is 01:00 the next day at offset zero").isPositive();
         var summer = ZonedDateTime.of(2025, 7, 1, 12, 0, 0, 0, ZoneId.of("Europe/Paris"));

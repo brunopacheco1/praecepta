@@ -97,7 +97,8 @@ class OutputExpressionsTest {
         var other = byColumn(HitPolicy.ANY, List.of(
                 rule(1, Map.of(), Map.of(), Map.of("total", "price * 2")),
                 rule(2, Map.of("country", "PT"), Map.of(), Map.of("total", "price * 3"))));
-        Assertions.assertThatThrownBy(() -> other.evaluate(new Order("PT", new BigDecimal(3), null, null)))
+        var three = new Order("PT", new BigDecimal(3), null, null);
+        Assertions.assertThatThrownBy(() -> other.evaluate(three))
                 .isInstanceOf(HitPolicyViolationException.class);
         Assertions.assertThat(other.evaluate(new Order("PT", BigDecimal.ZERO, null, null))).as("both give 0").containsExactly(values("total", "0"));
     }
@@ -111,7 +112,8 @@ class OutputExpressionsTest {
                 new Praeceptum(3, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of(), Map.of("total", "price")))));
         Assertions.assertThat(engine.evaluate(new Order("PT", new BigDecimal("1.5"), null, null))).containsExactly(values("total", "1.50"));
         Assertions.assertThat(engine.evaluate(new Order("PT", new BigDecimal("1.500"), null, null))).containsExactly(values("total", "1.50"));
-        Assertions.assertThatThrownBy(() -> engine.evaluate(new Order("PT", new BigDecimal("1.6"), null, null)))
+        var otherPrice = new Order("PT", new BigDecimal("1.6"), null, null);
+        Assertions.assertThatThrownBy(() -> engine.evaluate(otherPrice))
                 .isInstanceOf(HitPolicyViolationException.class);
 
         // outputs that read no input: a table's number output is compared by value, an untyped output as text
@@ -124,10 +126,11 @@ class OutputExpressionsTest {
                 .output(PraeceptaOutput::values)
                 .build();
         Assertions.assertThat(typed.validationReport().isEmpty()).isTrue();
-        Assertions.assertThat(typed.evaluate(new Order("PT", null, null, null))).containsExactly(values("total", "1.50"));
+        var noPrice = new Order("PT", null, null, null);
+        Assertions.assertThat(typed.evaluate(noPrice)).containsExactly(values("total", "1.50"));
         var untyped = byColumn(HitPolicy.ANY, rules);
         Assertions.assertThat(untyped.validationReport().issues(ValidationReport.Kind.CONFLICTING_OUTPUTS)).hasSize(1);
-        Assertions.assertThatThrownBy(() -> untyped.evaluate(new Order("PT", null, null, null)))
+        Assertions.assertThatThrownBy(() -> untyped.evaluate(noPrice))
                 .isInstanceOf(HitPolicyViolationException.class);
     }
 
@@ -177,14 +180,18 @@ class OutputExpressionsTest {
 
     @Test
     void expressions_are_checked_when_the_engine_is_built() {
-        Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, List.of(rule(1, Map.of(), Map.of(), Map.of("x", "country + price")))))
+        var mixed = List.of(rule(1, Map.of(), Map.of(), Map.of("x", "country + price")));
+        Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, mixed))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessage("Rule 1, output 'x': + combines a string and a number, which gives null in FEEL");
-        Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, List.of(rule(1, Map.of(), Map.of(), Map.of("x", "day + 1")))))
+        var date = List.of(rule(1, Map.of(), Map.of(), Map.of("x", "day + 1")));
+        Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, date))
                 .hasMessage("Rule 1, output 'x': 'day' is a date; output expressions combine strings and numbers");
-        Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, List.of(rule(1, Map.of(), Map.of(), Map.of("x", "tax * 2")))))
+        var unknown = List.of(rule(1, Map.of(), Map.of(), Map.of("x", "tax * 2")));
+        Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, unknown))
                 .hasMessageStartingWith("Rule 1: output 'x' names 'tax', which is not an input column");
-        Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, List.of(rule(1, Map.of(), Map.of(), Map.of("x", "abs(price)")))))
+        var call = List.of(rule(1, Map.of(), Map.of(), Map.of("x", "abs(price)")));
+        Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, call))
                 .hasMessage("Rule 1, output 'x': 'abs(price)' is not a supported output expression: "
                         + "function calls such as abs(...) are not supported");
     }

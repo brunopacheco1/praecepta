@@ -210,32 +210,53 @@ public final class CellParser {
 
         /** One disjunct of a list column's cell, as the test it applies to each element. */
         private Test listTest(String text) {
-            var contains = after(text, "list contains(");
-            if (contains != null && contains.endsWith(")")) {
-                var argument = after(after(contains.substring(0, contains.length() - 1), "?"), ",");
-                if (argument != null && !argument.isEmpty()) {
-                    return new Equals(literal(argument));
-                }
+            var contains = containsTest(text);
+            if (contains != null) {
+                return contains;
             }
             if ("null".equals(after(after(text, "?"), "="))) {
                 return new NullTest();
             }
-            var some = after(text, "some");
-            var element = some == null ? "" : firstWord(some);
-            if (isName(element) && !KEYWORDS.contains(element)) {
-                var test = after(after(after(after(after(some, element), "in"), "?"), "satisfies"), element);
-                if (test != null) {
-                    var interval = after(test, "in");
-                    if (interval != null && !interval.isEmpty() && isBracketed(interval) && topLevelDots(interval) > 0) {
-                        return interval(interval, topLevelDots(interval));
-                    }
-                    if (OPERATORS.stream().anyMatch(operator -> test.startsWith(operator.symbol()))) {
-                        return test(test);
-                    }
-                }
+            var some = someTest(text);
+            if (some != null) {
+                return some;
             }
             throw new CellSyntaxException(cell, "'" + text + "' does not test a list's elements; write list contains(?, value), "
                     + "some x in ? satisfies x < value, some x in ? satisfies x in [low..high] or ? = null");
+        }
+
+        /** {@code list contains(?, value)}: an element equals the value; null if the text is not that. */
+        private Test containsTest(String text) {
+            var contains = after(text, "list contains(");
+            if (contains == null || !contains.endsWith(")")) {
+                return null;
+            }
+            var argument = after(after(contains.substring(0, contains.length() - 1), "?"), ",");
+            return argument == null || argument.isEmpty() ? null : new Equals(literal(argument));
+        }
+
+        /**
+         * {@code some x in ? satisfies x < value} or {@code some x in ? satisfies x in [low..high]}: an element
+         * passes the comparison or lies in the interval; null if the text is not that.
+         */
+        private Test someTest(String text) {
+            var some = after(text, "some");
+            var element = some == null ? "" : firstWord(some);
+            if (!isName(element) || KEYWORDS.contains(element)) {
+                return null;
+            }
+            var test = after(after(after(after(after(some, element), "in"), "?"), "satisfies"), element);
+            if (test == null) {
+                return null;
+            }
+            var interval = after(test, "in");
+            if (interval != null && !interval.isEmpty() && isBracketed(interval) && topLevelDots(interval) > 0) {
+                return interval(interval, topLevelDots(interval));
+            }
+            if (OPERATORS.stream().anyMatch(operator -> test.startsWith(operator.symbol()))) {
+                return test(test);
+            }
+            return null;
         }
 
         /** The text up to its first whitespace. */
@@ -358,10 +379,8 @@ public final class CellParser {
             requireComparisons("intervals");
             var low = literal(text.substring(1, dots).strip());
             var high = literal(text.substring(dots + 2, text.length() - 1).strip());
-            if (!(low instanceof UnaryTests.Name) && !(high instanceof UnaryTests.Name)) {
-                if (FeelTemporals.compare(low, high) > 0) {
-                    throw new CellSyntaxException(cell, "interval starts after it ends");
-                }
+            if (!(low instanceof UnaryTests.Name) && !(high instanceof UnaryTests.Name) && FeelTemporals.compare(low, high) > 0) {
+                throw new CellSyntaxException(cell, "interval starts after it ends");
             }
             return new Range(low, text.charAt(0) == '[', high, text.charAt(text.length() - 1) == ']');
         }
@@ -385,8 +404,8 @@ public final class CellParser {
                 case NUMBER -> number(text);
                 case BOOLEAN -> bool(text);
                 case DATE -> temporal(text, DATE_CALL, BARE_DATE, LocalDate::parse, "date(\"yyyy-mm-dd\")");
-                case TIME -> temporal(text, TIME_CALL, BARE_TIME, FeelTemporals::parseTime, "time(\"hh:mm:ss\")");
-                case DATE_TIME -> temporal(text, DATE_TIME_CALL, BARE_DATE_TIME, FeelTemporals::parseDateTime,
+                case TIME -> temporal(text, TIME_CALL, BARE_TIME, iso -> (Comparable<?>) FeelTemporals.parseTime(iso), "time(\"hh:mm:ss\")");
+                case DATE_TIME -> temporal(text, DATE_TIME_CALL, BARE_DATE_TIME, iso -> (Comparable<?>) FeelTemporals.parseDateTime(iso),
                         "date and time(\"yyyy-mm-ddThh:mm:ss\")");
                 case DAY_TIME_DURATION -> temporal(text, DURATION_CALL, BARE_DURATION, Duration::parse, "duration(\"P1DT2H\")");
                 case YEAR_MONTH_DURATION -> temporal(text, DURATION_CALL, BARE_DURATION, Parser::yearsAndMonths, "duration(\"P1Y2M\")");

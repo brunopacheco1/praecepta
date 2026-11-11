@@ -192,17 +192,25 @@ final class Masks {
      * @return the number of pairs left, still in order and non-zero
      */
     static int andPairs(long[] pairs, int count, long[] mask, int words) {
+        return isSparse(mask, words) ? andPairsSparse(pairs, count, mask) : andPairsDense(pairs, count, mask);
+    }
+
+    /** {@link #andPairs} with a dense mask. */
+    private static int andPairsDense(long[] pairs, int count, long[] mask) {
         int kept = 0;
-        if (!isSparse(mask, words)) {
-            for (int i = 0; i < 2 * count; i += 2) {
-                long bits = pairs[i + 1] & mask[(int) pairs[i]];
-                if (bits != 0) {
-                    pairs[kept++] = pairs[i];
-                    pairs[kept++] = bits;
-                }
+        for (int i = 0; i < 2 * count; i += 2) {
+            long bits = pairs[i + 1] & mask[(int) pairs[i]];
+            if (bits != 0) {
+                pairs[kept++] = pairs[i];
+                pairs[kept++] = bits;
             }
-            return kept / 2;
         }
+        return kept / 2;
+    }
+
+    /** {@link #andPairs} with a sparse mask: both lists of pairs are in word order, so they merge. */
+    private static int andPairsSparse(long[] pairs, int count, long[] mask) {
+        int kept = 0;
         int j = 0;
         for (int i = 0; i < 2 * count && j < mask.length; i += 2) {
             long w = pairs[i];

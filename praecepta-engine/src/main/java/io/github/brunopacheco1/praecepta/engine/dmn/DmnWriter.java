@@ -50,6 +50,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 public final class DmnWriter {
 
     private static final String NAMESPACE = "https://www.omg.org/spec/DMN/20191111/MODEL/";
+    /** The prefix of the ids and item definition names of the table's inputs, followed by their number. */
+    private static final String INPUT = "input_";
 
     private DmnWriter() {
     }
@@ -124,7 +126,7 @@ public final class DmnWriter {
     private static void listItemDefinitions(StringBuilder xml, int v, InputColumn input) {
         var items = typeName(input.type());
         if (input.allowedValues() != null) {
-            items = "input_" + v + "_item";
+            items = INPUT + v + "_item";
             var values = standardFeel(input.allowedValues(), input.type(), false, false, "input values of column '" + input.name() + "'");
             xml.append("  <itemDefinition").append(attribute("name", items)).append(">\n")
                .append("    <typeRef>").append(typeName(input.type())).append("</typeRef>\n")
@@ -138,7 +140,7 @@ public final class DmnWriter {
 
     /** The name of the item definition of the list input at {@code v}. */
     private static String listTypeName(int v) {
-        return "input_" + v + "_list";
+        return INPUT + v + "_list";
     }
 
     /** The {@code inputData} of an input, which Drools needs to bind its value. */
@@ -186,7 +188,7 @@ public final class DmnWriter {
 
     /** A column; a list column's input values are those of its item type instead (see {@link #listItemDefinitions}). */
     private static void input(StringBuilder xml, int c, InputColumn input, DecisionTable table) {
-        xml.append("      <input").append(id("input_" + c)).append(attribute("label", input.name())).append(">\n");
+        xml.append("      <input").append(id(INPUT + c)).append(attribute("label", input.name())).append(">\n");
         expression(xml, "inputExpression", id("input_expression_" + c) + typed(input, c, table), input.name());
         if (input.allowedValues() != null && !table.listInputs().contains(input.name())) {
             var values = standardFeel(input.allowedValues(), input.type(), false, false, "input values of column '" + input.name() + "'");

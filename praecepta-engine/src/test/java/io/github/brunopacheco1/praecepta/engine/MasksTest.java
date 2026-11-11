@@ -145,13 +145,13 @@ class MasksTest {
             codes.add(CellParser.parse("\"k" + r + "\"", ColumnType.STRING));
             busy.add(CellParser.parse(r % 2 == 0 ? "-" : "\"x\"", ColumnType.STRING));
         }
-        var byCode = new ColumnIndex("code", ColumnType.STRING, codes, null, words, Zoning.LOCAL, null, Masks.Form.AUTO);
+        var byCode = new ColumnIndex("code", ColumnType.STRING, new ColumnIndex.Cells(codes, words, Masks.Form.AUTO), null, Zoning.LOCAL, null);
         var mask = byCode.maskFor("k700");
         Assertions.assertThat(mask).containsExactly(10, 1L << (700 - 640));
         Assertions.assertThat(byCode.maskFor("unknown")).isSameAs(Masks.EMPTY);
         Assertions.assertThat(byCode.accepts(byCode.classCount() - 1, 700)).isFalse();
 
-        var byWildcards = new ColumnIndex("busy", ColumnType.STRING, busy, null, words, Zoning.LOCAL, null, Masks.Form.AUTO);
+        var byWildcards = new ColumnIndex("busy", ColumnType.STRING, new ColumnIndex.Cells(busy, words, Masks.Form.AUTO), null, Zoning.LOCAL, null);
         Assertions.assertThat(byWildcards.maskFor("x")).hasSize(words);
         Assertions.assertThat(byWildcards.maskFor("y")).hasSize(words);
     }

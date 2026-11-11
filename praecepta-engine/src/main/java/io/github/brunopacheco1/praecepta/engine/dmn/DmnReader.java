@@ -140,11 +140,10 @@ public final class DmnReader {
 
         var rules = new ArrayList<Praeceptum>();
         var ruleElements = children(table, "rule");
-        var columns = new HashSet<String>();
-        inputs.forEach(input -> columns.add(input.name()));
+        var columns = new Columns(inputs, outputs, lists);
         var names = new ArrayList<NamedInput>();
         for (int i = 0; i < ruleElements.size(); i++) {
-            rules.add(rule(ruleElements.get(i), i + 1, inputs, lists, outputs, where, columns, names));
+            rules.add(rule(ruleElements.get(i), where + ", rule " + (i + 1), i + 1, columns, names));
         }
         // cells stay strict FEEL, where a name compares with another input
         var named = namedInputs(names, where);
@@ -190,21 +189,25 @@ public final class DmnReader {
             if (!named.containsKey(inputName) || typeRef.isBlank()) {
                 continue;
             }
-            Type type;
-            try {
-                type = types.resolve(typeRef, where + ", input '" + inputName + "'");
-            } catch (InvalidDecisionTableException e) {
-                continue; // a type Praecepta cannot hold, which no input value can be bound to either
-            }
-            if (type.list()) {
-                if (type.columnType() != named.get(inputName)) {
+            var type = typeIfSupported(types, typeRef, where + ", input '" + inputName + "'");
+            if (type.isPresent() && type.get().list()) {
+                if (type.get().columnType() != named.get(inputName)) {
                     throw new InvalidDecisionTableException("%s: a %s column compares with '%s', a list of %s".formatted(
-                            where, named.get(inputName).feelName(), inputName, type.columnType().feelName()));
+                            where, named.get(inputName).feelName(), inputName, type.get().columnType().feelName()));
                 }
                 lists.add(inputName);
             }
         }
         return lists;
+    }
+
+    /** A type, or none if Praecepta cannot hold it, in which case no input value can be bound to it either. */
+    private static Optional<Type> typeIfSupported(ItemDefinitions types, String typeRef, String where) {
+        try {
+            return Optional.of(types.resolve(typeRef, where));
+        } catch (InvalidDecisionTableException e) {
+            return Optional.empty();
+        }
     }
 
     private static HitPolicy hitPolicy(String value, String where) {
@@ -274,7 +277,7 @@ public final class DmnReader {
         if (column.isBlank()) {
             throw new InvalidDecisionTableException(where + ": every output of a multi-output table needs a name");
         }
-        var outputWhere = where + ", output '" + column + "'";
+        var outputWhere = outputWhere(where, column);
         var resolved = types.resolve(output.getAttribute(TYPE_REF), outputWhere);
         if (resolved.list()) {
             throw new InvalidDecisionTableException("%s: type '%s' is a collection, which is not supported for outputs"
@@ -291,55 +294,73 @@ public final class DmnReader {
     }
 
     /**
+     * The table's columns, as its rules are read.
+     *
+     * @param lists the inputs that hold lists
+     */
+    private record Columns(List<InputColumn> inputs, List<OutputColumn> outputs, Set<String> lists) {
+
+        /** Whether an input is one of the table's columns. */
+        boolean isInput(String name) {
+            return inputs.stream().anyMatch(input -> input.name().equals(name));
+        }
+    }
+
+    /**
      * A rule, with its input entries kept as written (once checked) and its output entries as plain text.
      *
-     * @param number  the rule's number, from 1 in table order
-     * @param columns the names of the table's columns
-     * @param names   where the inputs the rule's cells compare with, other than columns, are added
+     * @param where  the rule, as errors name it
+     * @param number the rule's number, from 1 in table order
+     * @param names  where the inputs the rule's cells compare with, other than columns, are added
      */
-    private static Praeceptum rule(Element rule, int number, List<InputColumn> inputs, Set<String> lists, List<OutputColumn> outputs,
-            String where, Set<String> columns, List<NamedInput> names) {
-        var ruleWhere = where + ", rule " + number;
+    private static Praeceptum rule(Element rule, String where, int number, Columns columns, List<NamedInput> names) {
         var inputEntries = children(rule, "inputEntry");
         var outputEntries = children(rule, "outputEntry");
-        if (inputEntries.size() != inputs.size() || outputEntries.size() != outputs.size()) {
+        if (inputEntries.size() != columns.inputs().size() || outputEntries.size() != columns.outputs().size()) {
             throw new InvalidDecisionTableException("%s: has %d input and %d output entries; the table has %d inputs and %d outputs"
-                    .formatted(ruleWhere, inputEntries.size(), outputEntries.size(), inputs.size(), outputs.size()));
+                    .formatted(where, inputEntries.size(), outputEntries.size(), columns.inputs().size(), columns.outputs().size()));
         }
+        var input = inputEntries(inputEntries, where, columns, names);
+        return new Praeceptum(number, input, outputEntries(outputEntries, where, columns));
+    }
+
+    /** A rule's input entries, kept as written once checked; adds the inputs they compare with that are not columns to {@code names}. */
+    private static PraeceptaInput inputEntries(List<Element> entries, String where, Columns columns, List<NamedInput> names) {
         Map<String, String> cells = new HashMap<>();
-        for (int c = 0; c < inputs.size(); c++) {
-            var column = inputs.get(c);
-            var text = textOf(inputEntries.get(c)).strip();
-            var cellWhere = ruleWhere + ", column '" + column.name() + "'";
-            if (lists.contains(column.name())) {
+        for (int c = 0; c < entries.size(); c++) {
+            var column = columns.inputs().get(c);
+            var text = textOf(entries.get(c)).strip();
+            var cellWhere = where + ", column '" + column.name() + "'";
+            if (columns.lists().contains(column.name())) {
                 parseListCell(text, column.type(), cellWhere); // a list column's cells name no input
             } else {
                 var cell = parseCell(text, column.type(), cellWhere);
                 if (cell.namesInputs()) {
-                    for (var name : UnaryTests.names(cell)) {
-                        if (!columns.contains(name)) {
-                            names.add(new NamedInput(name, column.type()));
-                        }
-                    }
+                    UnaryTests.names(cell).stream()
+                            .filter(name -> !columns.isInput(name))
+                            .forEach(name -> names.add(new NamedInput(name, column.type())));
                 }
             }
             cells.put(column.name(), text);
         }
+        return new PraeceptaInput(cells);
+    }
+
+    /** A rule's output entries, as plain text: literal values, names of inputs, and expressions computing a value. */
+    private static PraeceptaOutput outputEntries(List<Element> entries, String where, Columns columns) {
         Map<String, String> values = new HashMap<>();
         Map<String, String> references = new HashMap<>();
         Map<String, String> expressions = new HashMap<>();
-        for (int c = 0; c < outputs.size(); c++) {
-            var column = outputs.get(c);
-            var text = textOf(outputEntries.get(c)).strip();
-            var outputWhere = ruleWhere + ", output '" + column.name() + "'";
-            var input = namedInput(text, inputs, column, outputWhere);
+        for (int c = 0; c < entries.size(); c++) {
+            var column = columns.outputs().get(c);
+            var text = textOf(entries.get(c)).strip();
+            var outputWhere = outputWhere(where, column.name());
+            var input = namedInput(text, columns.inputs(), column, outputWhere);
+            var literal = input == null ? literalOutput(text, column.type()) : null;
             if (input != null) {
-                checkReference(input, lists, outputWhere);
+                checkReference(input, columns.lists(), outputWhere);
                 references.put(column.name(), input.name());
-                continue;
-            }
-            var literal = literalOutput(text, column.type());
-            if (literal != null) {
+            } else if (literal != null) {
                 values.put(column.name(), literal.text());
             } else {
                 // checked once the inputs the cells compare with are known (see checkComputedOutputs)
@@ -347,7 +368,12 @@ public final class DmnReader {
                 expressions.put(column.name(), text);
             }
         }
-        return new Praeceptum(number, new PraeceptaInput(cells), new PraeceptaOutput(values, references, expressions));
+        return new PraeceptaOutput(values, references, expressions);
+    }
+
+    /** An output, as errors name it. */
+    private static String outputWhere(String where, String column) {
+        return where + ", output '" + column + "'";
     }
 
     /** An output entry may name an input that holds single values only: an output holds one value. */
@@ -374,7 +400,7 @@ public final class DmnReader {
             var references = new HashMap<>(output.references());
             var expressions = new HashMap<String, String>();
             output.expressions().forEach((column, text) -> {
-                var outputWhere = where + ", rule " + rule.priority() + ", output '" + column + "'";
+                var outputWhere = outputWhere(where + ", rule " + rule.priority(), column);
                 var input = named.containsKey(text)
                         ? namedInput(text, List.of(new InputColumn(text, named.get(text))), outputsByName.get(column), outputWhere)
                         : null;
@@ -614,14 +640,7 @@ public final class DmnReader {
                 }
                 var allowed = nonBlankText(definition, "allowedValues");
                 if (Boolean.parseBoolean(definition.getAttribute("isCollection").strip())) {
-                    if (list) {
-                        throw new InvalidDecisionTableException("%s: type '%s' is a collection of collections, which is not supported"
-                                .formatted(where, name));
-                    }
-                    if (allowed != null || allowedValues != null) {
-                        throw new InvalidDecisionTableException(("%s: type '%s' constrains a collection as a whole, which is not supported; "
-                                + "declare the allowed values of its items in their item definition").formatted(where, name));
-                    }
+                    checkCollection(name, list, allowed != null || allowedValues != null, where);
                     list = true;
                 }
                 if (allowedValues == null && allowed != null) {
@@ -636,6 +655,24 @@ public final class DmnReader {
                 parseCell(allowedValues, type, where + ", allowed values of type '" + allowedBy + "'");
             }
             return new Type(type, allowedValues, list);
+        }
+
+        /**
+         * Checks a collection in a chain of item definitions: it is the only one, and neither it nor a
+         * definition derived from it declares allowed values, which would constrain the collection as a whole.
+         *
+         * @param inList      whether an earlier link of the chain is a collection already
+         * @param constrained whether it, or a definition derived from it, declares allowed values
+         */
+        private static void checkCollection(String name, boolean inList, boolean constrained, String where) {
+            if (inList) {
+                throw new InvalidDecisionTableException("%s: type '%s' is a collection of collections, which is not supported"
+                        .formatted(where, name));
+            }
+            if (constrained) {
+                throw new InvalidDecisionTableException(("%s: type '%s' constrains a collection as a whole, which is not supported; "
+                        + "declare the allowed values of its items in their item definition").formatted(where, name));
+            }
         }
 
         /** The item definition of that name, if it is a simple type or a collection: one with a base type and no components. */

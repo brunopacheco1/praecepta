@@ -94,10 +94,10 @@ final class ListColumn {
      *                               type, or the text is not a list
      */
     long[] maskFor(Object raw) {
-        var values = elementsOf(raw);
-        if (values == null) {
+        if (isMissing(raw)) {
             return missingMask;
         }
+        var values = elementsOf(raw);
         if (values.isEmpty()) {
             return emptyMask;
         }
@@ -105,28 +105,11 @@ final class ListColumn {
         for (var value : values) {
             var mask = elements.maskFor(element(value, raw));
             if (!Masks.isSparse(mask, words)) {
-                for (int w = 0; w < words; w++) {
-                    passed[w] |= mask[w] & positiveRules[w] | ~mask[w] & negatedRules[w];
-                }
-                continue;
-            }
-            // a sparse mask (see Masks): the words it leaves out are zero
-            if (!hasNegatedRules) {
-                // only the mask's own words can pass a positive rule
-                for (int pair = 0; pair < mask.length; pair += 2) {
-                    int w = (int) mask[pair];
-                    passed[w] |= mask[pair + 1] & positiveRules[w];
-                }
-                continue;
-            }
-            int pair = 0;
-            for (int w = 0; w < words; w++) {
-                long bits = 0;
-                if (pair < mask.length && mask[pair] == w) {
-                    bits = mask[pair + 1];
-                    pair += 2;
-                }
-                passed[w] |= bits & positiveRules[w] | ~bits & negatedRules[w];
+                passDense(passed, mask);
+            } else if (!hasNegatedRules) {
+                passPositiveSparse(passed, mask);
+            } else {
+                passSparse(passed, mask);
             }
         }
         for (int w = 0; w < words; w++) {
@@ -135,28 +118,60 @@ final class ListColumn {
         return passed;
     }
 
+    /** Adds the rules an element's dense mask passes: the positive rules accepting it, the negated rules rejecting it. */
+    private void passDense(long[] passed, long[] mask) {
+        for (int w = 0; w < words; w++) {
+            passed[w] |= mask[w] & positiveRules[w] | ~mask[w] & negatedRules[w];
+        }
+    }
+
+    /**
+     * As {@link #passDense}, for a sparse mask (see {@link Masks}) in a column without negated rules: only
+     * the mask's own words can pass a positive rule.
+     */
+    private void passPositiveSparse(long[] passed, long[] mask) {
+        for (int pair = 0; pair < mask.length; pair += 2) {
+            int w = (int) mask[pair];
+            passed[w] |= mask[pair + 1] & positiveRules[w];
+        }
+    }
+
+    /** As {@link #passDense}, for a sparse mask (see {@link Masks}): the words it leaves out are zero. */
+    private void passSparse(long[] passed, long[] mask) {
+        int pair = 0;
+        for (int w = 0; w < words; w++) {
+            long bits = 0;
+            if (pair < mask.length && mask[pair] == w) {
+                bits = mask[pair + 1];
+                pair += 2;
+            }
+            passed[w] |= bits & positiveRules[w] | ~bits & negatedRules[w];
+        }
+    }
+
     /** The rules whose cell is {@code -}. */
     long[] anyRules() {
         return anyRules.clone();
     }
 
-    /** The list's values, each as the element index reads it, or null if the list is missing. */
+    /** Whether a raw list is missing: null or blank text. */
+    static boolean isMissing(Object raw) {
+        return raw == null || raw instanceof String text && text.isBlank();
+    }
+
+    /** The values of a list that is not {@linkplain #isMissing missing}, each as the element index reads it. */
     List<Object> values(Object raw) {
         var values = elementsOf(raw);
-        if (values == null) {
-            return null;
-        }
         var read = new ArrayList<>(values.size());
         values.forEach(value -> read.add(elements.value(element(value, raw))));
         return read;
     }
 
-    /** The raw elements, or null if the list is missing. */
+    /** The raw elements of a list that is not {@linkplain #isMissing missing}. */
     private Collection<?> elementsOf(Object raw) {
         return switch (raw) {
-            case null -> null;
             case Collection<?> collection -> collection;
-            case String text -> text.isBlank() ? null : parse(text);
+            case String text -> parse(text);
             default -> throw new InvalidInputException(name, raw, "is not a list");
         };
     }

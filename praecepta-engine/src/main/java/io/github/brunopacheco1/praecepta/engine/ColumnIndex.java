@@ -127,78 +127,46 @@ final class ColumnIndex {
     private final ListColumn lists;
 
     /**
+     * A column's cells and how its masks are stored.
+     *
+     * @param byBit the column's cell of each rule, in bit order
+     * @param words the words in a dense mask: the table's rules / 64, rounded up
+     * @param form  the form each class mask is stored in
+     */
+    record Cells(List<UnaryTests> byBit, int words, Masks.Form form) {
+    }
+
+    /**
      * @param zoning     for a TIME or DATE_TIME column, whether its inputs come with a time zone, without
      *                   one or either way; ignored for other types
      * @param enumValues for a STRING column bound to an enum: each constant's value, by ordinal; else null
-     * @param form       the form each class mask is stored in
      * @throws InvalidDecisionTableException if an enum value is outside the declared input values
      */
-    ColumnIndex(String name, ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues, int words, Zoning zoning,
-            String[] enumValues, Masks.Form form) {
+    ColumnIndex(String name, ColumnType type, Cells cells, UnaryTests allowedValues, Zoning zoning, String[] enumValues) {
         this.name = name;
         this.type = type;
         this.isString = type == ColumnType.STRING;
-        this.temporal = type == ColumnType.TIME || type == ColumnType.DATE_TIME;
+        this.temporal = isTemporal(type);
         this.hasAllowedValues = allowedValues != null;
         this.lists = null;
 
-        var partition = new ArrayList<ValueClass>();
-        Map<String, Integer> stringClasses;
-        int otherClass = -1;
-        if (isString && !hasOrderTests(cellsByBit)) {
-            stringClasses = addStringClasses(cellsByBit, allowedValues, partition);
-            otherClass = partition.size();
-            partition.add(new ValueClass.OtherString());
-            localLine = null;
-            zonedLine = null;
-            wallLine = null;
-        } else {
-            if (!temporal || zoning.takesLocal()) {
-                localLine = new Line(sortedBoundaries(type, cellsByBit, allowedValues, Boundaries.LOCAL_TIMES), type);
-                partition.addAll(orderedClasses(localLine.boundaries, false));
-            } else {
-                localLine = null;
-            }
-            if (temporal && zoning.takesZoned()) {
-                zonedLine = new Line(sortedBoundaries(type, cellsByBit, allowedValues, Boundaries.WITH_ZONE), type);
-                wallLine = new Line(sortedBoundaries(type, cellsByBit, allowedValues, Boundaries.WITHOUT_ZONE), type);
-                addZonedClasses(zonedLine.boundaries, wallLine.boundaries, partition);
-            } else {
-                zonedLine = null;
-                wallLine = null;
-            }
-            stringClasses = isString ? boundaryClasses(localLine.boundaries) : null;
-        }
+        var partition = Partition.of(type, cells.byBit(), allowedValues, zoning);
+        localLine = partition.localLine();
+        zonedLine = partition.zonedLine();
+        wallLine = partition.wallLine();
         zonedBase = localLine == null ? 0 : localLine.classCount();
-        nullClass = partition.size();
-        partition.add(new ValueClass.Missing());
-        classes = List.copyOf(partition);
+        classes = partition.classes();
+        nullClass = classes.size() - 1;
 
-        this.words = words;
+        this.words = cells.words();
         masks = new long[classes.size()][];
         empty = new boolean[classes.size()];
         allowed = new boolean[classes.size()];
-        for (int k = 0; k < classes.size(); k++) {
-            var valueClass = classes.get(k);
-            empty[k] = isEmpty(valueClass);
-            allowed[k] = allowedValues == null || valueClass instanceof ValueClass.Missing || accepts(allowedValues, valueClass);
-            // built dense one class at a time, then stored in its form: never all dense at once
-            var mask = new long[words];
-            if (!empty[k]) {
-                markAcceptingRules(mask, cellsByBit, valueClass);
-            }
-            masks[k] = Masks.compact(mask, form);
-        }
+        fillClasses(cells, allowedValues);
 
-        if (isString) {
-            stringMasks = masksByString(stringClasses);
-            otherMask = otherClass < 0 ? null : masks[otherClass];
-            disallowedStrings = hasAllowedValues ? writtenButNotAllowed(stringClasses) : null;
-        } else {
-            stringMasks = null;
-            otherMask = null;
-            disallowedStrings = null;
-        }
+        stringMasks = isString ? masksByString(partition.stringClasses()) : null;
+        otherMask = partition.otherClass() < 0 ? null : masks[partition.otherClass()];
+        disallowedStrings = isString && hasAllowedValues ? writtenButNotAllowed(partition.stringClasses()) : null;
         nullMask = masks[nullClass];
         ordinalMasks = enumValues == null ? null : masksByOrdinal(enumValues);
         this.enumValues = enumValues == null ? null : enumValues.clone();
@@ -210,12 +178,12 @@ final class ColumnIndex {
      * which lists a rule matches: to the static analysis the column has one class, "any list", accepted
      * by every rule, and the engine leaves the rules that constrain it out of the analysis.
      *
-     * @param form the form the class masks of single elements are stored in; the list masks are dense
+     * @param cells the column's cells; the class masks of single elements are stored in their form, the list masks are dense
      */
-    static ColumnIndex ofLists(String name, ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues, int words,
-            Zoning zoning, Masks.Form form) {
-        var elements = new ColumnIndex(name, type, cellsByBit, allowedValues, words, zoning, null, form);
-        return new ColumnIndex(name, type, new ListColumn(name, type, elements, cellsByBit, words), cellsByBit.size(), words);
+    static ColumnIndex ofLists(String name, ColumnType type, Cells cells, UnaryTests allowedValues, Zoning zoning) {
+        var elements = new ColumnIndex(name, type, cells, allowedValues, zoning, null);
+        var lists = new ListColumn(name, type, elements, cells.byBit(), cells.words());
+        return new ColumnIndex(name, type, lists, cells.byBit().size(), cells.words());
     }
 
     private ColumnIndex(String name, ColumnType type, ListColumn lists, int rules, int words) {
@@ -267,6 +235,67 @@ final class ColumnIndex {
 
     // ---- building the classes ---------------------------------------------------------------------
 
+    private static boolean isTemporal(ColumnType type) {
+        return type == ColumnType.TIME || type == ColumnType.DATE_TIME;
+    }
+
+    /**
+     * How a column's values are split into classes, numbered in order, the missing class last.
+     *
+     * @param localLine     the line of values without a time zone (see {@link ColumnIndex#localLine}), or null
+     * @param zonedLine     the line of instants of values with a time zone, or null
+     * @param wallLine      with {@code zonedLine}: the line of their local times; else null
+     * @param stringClasses STRING: the class of each written, allowed or boundary value; else null
+     * @param otherClass    an unordered STRING column: the class of every other value; else -1
+     */
+    private record Partition(Line localLine, Line zonedLine, Line wallLine, List<ValueClass> classes,
+            Map<String, Integer> stringClasses, int otherClass) {
+
+        static Partition of(ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues, Zoning zoning) {
+            var classes = new ArrayList<ValueClass>();
+            if (type == ColumnType.STRING && !hasOrderTests(cellsByBit)) {
+                var stringClasses = addStringClasses(cellsByBit, allowedValues, classes);
+                int otherClass = classes.size();
+                classes.add(new ValueClass.OtherString());
+                classes.add(new ValueClass.Missing());
+                return new Partition(null, null, null, List.copyOf(classes), stringClasses, otherClass);
+            }
+            boolean temporal = isTemporal(type);
+            Line localLine = null;
+            if (!temporal || zoning.takesLocal()) {
+                localLine = new Line(sortedBoundaries(type, cellsByBit, allowedValues, Boundaries.LOCAL_TIMES), type);
+                classes.addAll(orderedClasses(localLine.boundaries, false));
+            }
+            Line zonedLine = null;
+            Line wallLine = null;
+            if (temporal && zoning.takesZoned()) {
+                zonedLine = new Line(sortedBoundaries(type, cellsByBit, allowedValues, Boundaries.WITH_ZONE), type);
+                wallLine = new Line(sortedBoundaries(type, cellsByBit, allowedValues, Boundaries.WITHOUT_ZONE), type);
+                addZonedClasses(zonedLine.boundaries, wallLine.boundaries, classes);
+            }
+            classes.add(new ValueClass.Missing());
+            var stringClasses = type == ColumnType.STRING ? boundaryClasses(localLine.boundaries) : null;
+            return new Partition(localLine, zonedLine, wallLine, List.copyOf(classes), stringClasses, -1);
+        }
+    }
+
+    /**
+     * Fills in each class whether it is empty and allowed, and the mask of the rules accepting it: built
+     * dense one class at a time, then stored in its form, so never all dense at once.
+     */
+    private void fillClasses(Cells cells, UnaryTests allowedValues) {
+        for (int k = 0; k < classes.size(); k++) {
+            var valueClass = classes.get(k);
+            empty[k] = isEmpty(valueClass);
+            allowed[k] = allowedValues == null || valueClass instanceof ValueClass.Missing || accepts(allowedValues, valueClass);
+            var mask = new long[words];
+            if (!empty[k]) {
+                markAcceptingRules(mask, cells.byBit(), valueClass);
+            }
+            masks[k] = Masks.compact(mask, cells.form());
+        }
+    }
+
     /**
      * STRING: adds one class per value written in the cells or the allowed values, in first-seen
      * order, and returns the class of each value.
@@ -310,9 +339,9 @@ final class ColumnIndex {
         WITHOUT_ZONE;
 
         /** The boundary a value is on this line, or null if it is none. */
-        Comparable<?> of(Comparable<?> value) {
+        Object of(Comparable<?> value) {
             return switch (this) {
-                case LOCAL_TIMES -> (Comparable<?>) FeelTemporals.local(value);
+                case LOCAL_TIMES -> FeelTemporals.local(value);
                 case WITH_ZONE -> FeelTemporals.hasZone(value) ? value : null;
                 case WITHOUT_ZONE -> FeelTemporals.hasZone(value) ? null : value;
             };
@@ -332,7 +361,7 @@ final class ColumnIndex {
             collectBoundaries(allowedValues, values);
         }
         // a line sorts values of one kind only: across the kinds, FEEL's order is not transitive
-        var points = new TreeSet<Comparable<?>>(ColumnIndex::compare);
+        var points = new TreeSet<>(ColumnIndex::compare);
         values.stream().map(which::of).filter(Objects::nonNull).forEach(points::add);
         return points.toArray(Comparable<?>[]::new);
     }
@@ -540,7 +569,7 @@ final class ColumnIndex {
      */
     Object value(Object raw) {
         if (lists != null) {
-            return lists.values(raw);
+            return ListColumn.isMissing(raw) ? null : lists.values(raw);
         }
         if (!isString) {
             return convert(raw);
@@ -670,32 +699,30 @@ final class ColumnIndex {
         if (localLine == null && zonedLine == null || !type.supportsComparisons()) { // no intervals to merge
             return valueClasses.stream().map(k -> plain(classes.get(k))).toList();
         }
-        var local = new ArrayList<Integer>();
-        var zoned = new ArrayList<Integer>(); // numbered from the first class with a zone
-        boolean missing = false;
-        for (int k : valueClasses.stream().sorted().toList()) {
-            if (k == nullClass) {
-                missing = true;
-            } else if (zonedLine != null && k >= zonedBase) {
-                zoned.add(k - zonedBase);
-            } else {
-                local.add(k);
-            }
-        }
+        var sorted = valueClasses.stream().sorted().toList();
+        var local = sorted.stream().filter(k -> k != nullClass && !hasZone(k)).toList();
+        var zoned = sorted.stream().filter(this::hasZone).map(k -> k - zonedBase).toList(); // numbered from the first class with a zone
         boolean bothKinds = localLine != null && zonedLine != null;
         // without boundaries with a zone, the classes with a zone mirror those without: same local times, same rules
         boolean mirrored = bothKinds && zonedLine.boundaries.length == 0 && zoned.equals(local);
+        var localWhole = bothKinds && !mirrored ? whole(false) : null;
+        var zonedWhole = bothKinds ? whole(true) : null;
         var parts = new ArrayList<String>();
         if (!local.isEmpty()) {
-            parts.addAll(runs(local, classes::get, k -> empty[k], localLine.classCount(), bothKinds && !mirrored ? whole(false) : null));
+            parts.addAll(runs(local, classes::get, k -> empty[k], localLine.classCount(), localWhole));
         }
         if (!zoned.isEmpty() && !mirrored) {
-            parts.addAll(zonedRuns(zoned, bothKinds ? whole(true) : null));
+            parts.addAll(zonedRuns(zoned, zonedWhole));
         }
-        if (missing) {
+        if (valueClasses.contains(nullClass)) {
             parts.add(plain(classes.get(nullClass)));
         }
         return parts;
+    }
+
+    /** Whether a class is one of values with a time zone. */
+    private boolean hasZone(int valueClass) {
+        return zonedLine != null && valueClass >= zonedBase && valueClass != nullClass;
     }
 
     /** How every value of one kind is described in a column that takes both: {@code any time with a time zone}. */
@@ -727,9 +754,23 @@ final class ColumnIndex {
         }
         if (zonedLine.boundaries.length == 0) { // no boundary with a zone: local times only
             var runs = runs(zoned, this::wallPart, w -> empty[zonedBase + w], walls, whole);
-            return whole == null ? runs : runs.stream().map(run -> run.equals(whole) ? run : run + " with a time zone").toList();
+            if (whole == null) {
+                return runs;
+            }
+            return runs.stream().map(run -> run.equals(whole) ? run : run + " with a time zone").toList();
         }
-        // both: the instants taken with all their local times merge into runs; the others are given with their local times
+        return instantByInstantRuns(zoned, whole);
+    }
+
+    /**
+     * The classes of values with a time zone, numbered from the first one, as runs, when boundaries both
+     * with and without a zone split them: the instants taken with all their local times merge into runs;
+     * the others are given with their local times.
+     *
+     * @param whole how all of them are described, or null to describe them as an interval
+     */
+    private List<String> instantByInstantRuns(List<Integer> zoned, String whole) {
+        int walls = wallLine.classCount();
         var wholeInstants = new ArrayList<Integer>();
         var partial = new ArrayList<String>();
         int at = 0;

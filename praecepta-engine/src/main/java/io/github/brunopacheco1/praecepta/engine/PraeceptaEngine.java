@@ -164,12 +164,11 @@ public final class PraeceptaEngine<I, O> {
         var columnIndexes = evaluationOrder.stream()
                 .map(column -> {
                     var type = types.get(column);
-                    var columnCells = inBitOrder(cells.get(column), bitToRule);
+                    var columnCells = new ColumnIndex.Cells(inBitOrder(cells.get(column), bitToRule), words, builder.maskForm);
                     var allowed = parseAllowedValues(column, type, allowedValues.get(column));
                     return lists.contains(column)
-                            ? ColumnIndex.ofLists(column, type, columnCells, allowed, words, zoning(builder, column), builder.maskForm)
-                            : new ColumnIndex(column, type, columnCells, allowed, words, zoning(builder, column),
-                                    enumValues.get(column), builder.maskForm);
+                            ? ColumnIndex.ofLists(column, type, columnCells, allowed, zoning(builder, column))
+                            : new ColumnIndex(column, type, columnCells, allowed, zoning(builder, column), enumValues.get(column));
                 })
                 .toList();
         index = new BitsetIndex(columnIndexes, bitToRule);

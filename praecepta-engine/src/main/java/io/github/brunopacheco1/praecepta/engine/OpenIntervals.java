@@ -159,12 +159,22 @@ final class OpenIntervals {
             localHigh = min(highest(localTimes), time ? BigInteger.valueOf(NANOS_PER_DAY - 1) : null);
         }
 
+        /** The first nanosecond of a span: its value, or the one after its lower bound; null if unbounded. */
         private static BigInteger lowest(Span span) {
-            return span.low() == null ? null : span.point() ? nanos(span.low()) : nanos(span.low()).add(BigInteger.ONE);
+            if (span.low() == null) {
+                return null;
+            }
+            var low = nanos(span.low());
+            return span.point() ? low : low.add(BigInteger.ONE);
         }
 
+        /** The last nanosecond of a span: its value, or the one before its upper bound; null if unbounded. */
         private static BigInteger highest(Span span) {
-            return span.high() == null ? null : span.point() ? nanos(span.high()) : nanos(span.high()).subtract(BigInteger.ONE);
+            if (span.high() == null) {
+                return null;
+            }
+            var high = nanos(span.high());
+            return span.point() ? high : high.subtract(BigInteger.ONE);
         }
 
         private static BigInteger nanos(Object value) {
@@ -183,12 +193,24 @@ final class OpenIntervals {
 
         /** The larger of two lower bounds; null is unbounded. */
         private static BigInteger max(BigInteger a, BigInteger b) {
-            return a == null ? b : b == null ? a : a.max(b);
+            if (a == null) {
+                return b;
+            }
+            if (b == null) {
+                return a;
+            }
+            return a.max(b);
         }
 
         /** The smaller of two upper bounds; null is unbounded. */
         private static BigInteger min(BigInteger a, BigInteger b) {
-            return a == null ? b : b == null ? a : a.min(b);
+            if (a == null) {
+                return b;
+            }
+            if (b == null) {
+                return a;
+            }
+            return a.min(b);
         }
 
         private static boolean empty(BigInteger low, BigInteger high) {
@@ -204,23 +226,42 @@ final class OpenIntervals {
             if (empty(instantLow, instantHigh) || empty(localLow, localHigh)) {
                 return null;
             }
-            var least = MAX_OFFSET_SECONDS.negate();
-            if (localLow != null && instantHigh != null) {
-                var difference = localLow.subtract(instantHigh);
-                var seconds = floorDiv(difference.add(NANOS_PER_SECOND).subtract(BigInteger.ONE)); // rounded up
-                least = least.max(seconds);
-            }
-            var most = MAX_OFFSET_SECONDS;
-            if (localHigh != null && instantLow != null) {
-                most = most.min(floorDiv(localHigh.subtract(instantLow)));
-            }
+            var least = leastOffsetSeconds();
+            var most = mostOffsetSeconds();
             if (least.compareTo(most) > 0) {
                 return null;
             }
             if (least.signum() <= 0 && most.signum() >= 0) {
                 return BigInteger.ZERO;
             }
-            // the nearest to zero that is a whole number of hours, else of quarters of an hour, else of seconds
+            return nearestToZero(least, most);
+        }
+
+        /** The least offset, in seconds, a value of the box may have: from its earliest local time and latest instant. */
+        private BigInteger leastOffsetSeconds() {
+            var least = MAX_OFFSET_SECONDS.negate();
+            if (localLow != null && instantHigh != null) {
+                var difference = localLow.subtract(instantHigh);
+                var seconds = floorDiv(difference.add(NANOS_PER_SECOND).subtract(BigInteger.ONE)); // rounded up
+                least = least.max(seconds);
+            }
+            return least;
+        }
+
+        /** The greatest offset, in seconds, a value of the box may have: from its latest local time and earliest instant. */
+        private BigInteger mostOffsetSeconds() {
+            var most = MAX_OFFSET_SECONDS;
+            if (localHigh != null && instantLow != null) {
+                most = most.min(floorDiv(localHigh.subtract(instantLow)));
+            }
+            return most;
+        }
+
+        /**
+         * The offset from {@code least} to {@code most}, both on the same side of zero, nearest to zero that is
+         * a whole number of hours, else of quarters of an hour, else of seconds.
+         */
+        private static BigInteger nearestToZero(BigInteger least, BigInteger most) {
             for (var step : ROUND_OFFSETS) {
                 var round = least.signum() > 0
                         ? floorDiv(least.add(step).subtract(BigInteger.ONE), step).multiply(step)
@@ -230,6 +271,17 @@ final class OpenIntervals {
                 }
             }
             return least.signum() > 0 ? least : most;
+        }
+
+        /** Between two bounds, the middle; beyond a single one (date-times only: a time's day bounds it), a day away. */
+        private static BigInteger localInside(BigInteger low, BigInteger high) {
+            if (low == null) {
+                return high.subtract(NANOS_IN_A_DAY);
+            }
+            if (high == null) {
+                return low.add(NANOS_IN_A_DAY);
+            }
+            return low.add(high).shiftRight(1);
         }
 
         /** Whole seconds in a number of nanoseconds, rounded down. */
@@ -251,8 +303,7 @@ final class OpenIntervals {
             var shift = offset.multiply(NANOS_PER_SECOND);
             var low = max(localLow, instantLow == null ? null : instantLow.add(shift));
             var high = min(localHigh, instantHigh == null ? null : instantHigh.add(shift));
-            // between two bounds, the middle; beyond a single one (date-times only: a time's day bounds it), a day away
-            var local = low == null ? high.subtract(NANOS_IN_A_DAY) : high == null ? low.add(NANOS_IN_A_DAY) : low.add(high).shiftRight(1);
+            var local = localInside(low, high);
             for (var unit : List.of(NANOS_PER_SECOND.multiply(BigInteger.valueOf(60)), NANOS_PER_SECOND)) {
                 var whole = floorDiv(local, unit).multiply(unit);
                 if (low == null || whole.compareTo(low) >= 0) {
@@ -405,8 +456,12 @@ final class OpenIntervals {
         if (local >= 0 && local < NANOS_PER_DAY) {
             return OffsetTime.of(LocalTime.ofNanoOfDay(local), preferred);
         }
-        int hours = key < 0 ? (int) Math.ceilDiv(-key, NANOS_PER_HOUR) : key >= NANOS_PER_DAY
-                ? -(int) Math.ceilDiv(key - NANOS_PER_DAY + 1, NANOS_PER_HOUR) : 0;
+        int hours = 0;
+        if (key < 0) {
+            hours = (int) Math.ceilDiv(-key, NANOS_PER_HOUR);
+        } else if (key >= NANOS_PER_DAY) {
+            hours = -(int) Math.ceilDiv(key - NANOS_PER_DAY + 1, NANOS_PER_HOUR);
+        }
         return OffsetTime.of(LocalTime.ofNanoOfDay(key + hours * NANOS_PER_HOUR), ZoneOffset.ofHours(hours));
     }
 

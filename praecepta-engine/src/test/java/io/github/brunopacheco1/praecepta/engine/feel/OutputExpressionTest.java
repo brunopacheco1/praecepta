@@ -169,23 +169,29 @@ class OutputExpressionTest {
         Map<String, ColumnType> types = Map.of("s", ColumnType.STRING, "n", ColumnType.NUMBER, "d", ColumnType.DATE);
         Assertions.assertThat(OutputExpression.parse("s + \"!\"").type(types::get)).isEqualTo(ColumnType.STRING);
         Assertions.assertThat(OutputExpression.parse("-n * 2").type(types::get)).isEqualTo(ColumnType.NUMBER);
-        Assertions.assertThatThrownBy(() -> OutputExpression.parse("s + n").type(types::get))
+        var stringPlusNumber = OutputExpression.parse("s + n");
+        Assertions.assertThatThrownBy(() -> stringPlusNumber.type(types::get))
                 .isInstanceOf(ExpressionTypeException.class)
                 .hasMessage("+ combines a string and a number, which gives null in FEEL");
-        Assertions.assertThatThrownBy(() -> OutputExpression.parse("s * 2").type(types::get))
+        var stringTimesNumber = OutputExpression.parse("s * 2");
+        Assertions.assertThatThrownBy(() -> stringTimesNumber.type(types::get))
                 .hasMessage("* combines a string and a number, which gives null in FEEL");
-        Assertions.assertThatThrownBy(() -> OutputExpression.parse("s - s").type(types::get))
+        var stringMinusString = OutputExpression.parse("s - s");
+        Assertions.assertThatThrownBy(() -> stringMinusString.type(types::get))
                 .hasMessage("- applies to numbers, not strings");
-        Assertions.assertThatThrownBy(() -> OutputExpression.parse("-s").type(types::get))
+        var negatedString = OutputExpression.parse("-s");
+        Assertions.assertThatThrownBy(() -> negatedString.type(types::get))
                 .hasMessage("- applies to numbers, not strings");
-        Assertions.assertThatThrownBy(() -> OutputExpression.parse("d + 1").type(types::get))
+        var datePlusNumber = OutputExpression.parse("d + 1");
+        Assertions.assertThatThrownBy(() -> datePlusNumber.type(types::get))
                 .hasMessage("'d' is a date; output expressions combine strings and numbers");
     }
 
     @Test
     void a_name_that_is_not_an_input_is_reported_by_name() {
         Map<String, ColumnType> types = Map.of("n", ColumnType.NUMBER);
-        Assertions.assertThatThrownBy(() -> OutputExpression.parse("n + limit").type(types::get))
+        var unknownName = OutputExpression.parse("n + limit");
+        Assertions.assertThatThrownBy(() -> unknownName.type(types::get))
                 .isInstanceOf(ExpressionTypeException.class)
                 .hasMessage("'limit' is not an input");
     }

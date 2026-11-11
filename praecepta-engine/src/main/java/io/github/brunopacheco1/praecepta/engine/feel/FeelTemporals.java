@@ -13,6 +13,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.Temporal;
 
 /**
  * Times and date-times with or without a time zone, as FEEL reads and orders them.
@@ -44,12 +45,11 @@ public final class FeelTemporals {
      * @throws DateTimeParseException if the text is not such a time; a time with a zone id
      *                                ({@code @Europe/Paris}) is not, as it has no fixed offset
      */
-    public static Comparable<?> parseTime(String text) {
+    public static Temporal parseTime(String text) {
         if (text.indexOf('@') >= 0) {
             throw new DateTimeParseException("a time with a zone id has no fixed offset", text, text.indexOf('@'));
         }
-        var parsed = DateTimeFormatter.ISO_TIME.parseBest(text, OffsetTime::from, LocalTime::from);
-        return (Comparable<?>) parsed;
+        return (Temporal) DateTimeFormatter.ISO_TIME.parseBest(text, OffsetTime::from, LocalTime::from);
     }
 
     /**
@@ -60,7 +60,7 @@ public final class FeelTemporals {
      * @return a {@link LocalDateTime}, or a {@link ZonedDateTime} if the text has an offset or a zone id
      * @throws DateTimeParseException if the text is not such a date and time, or names an unknown zone
      */
-    public static Comparable<?> parseDateTime(String text) {
+    public static Temporal parseDateTime(String text) {
         int at = text.indexOf('@');
         if (at >= 0) {
             var local = LocalDateTime.parse(text.substring(0, at));
@@ -70,8 +70,7 @@ public final class FeelTemporals {
                 throw new DateTimeParseException("unknown zone id: " + e.getMessage(), text, at + 1, e);
             }
         }
-        var parsed = DateTimeFormatter.ISO_DATE_TIME.parseBest(text, ZonedDateTime::from, LocalDateTime::from);
-        return (Comparable<?>) parsed;
+        return (Temporal) DateTimeFormatter.ISO_DATE_TIME.parseBest(text, ZonedDateTime::from, LocalDateTime::from);
     }
 
     /**
@@ -121,13 +120,21 @@ public final class FeelTemporals {
         return switch (a) {
             case OffsetTime time -> {
                 var other = (OffsetTime) b;
-                yield time.isBefore(other) ? -1 : time.isAfter(other) ? 1 : 0;
+                yield order(time.isBefore(other), time.isAfter(other));
             }
             case ZonedDateTime dateTime -> {
                 var other = (ZonedDateTime) b;
-                yield dateTime.isBefore(other) ? -1 : dateTime.isAfter(other) ? 1 : 0;
+                yield order(dateTime.isBefore(other), dateTime.isAfter(other));
             }
             default -> ((Comparable) a).compareTo(b);
         };
+    }
+
+    /** -1, 1 or 0 as a value is before, after or at the same instant as another. */
+    private static int order(boolean before, boolean after) {
+        if (before) {
+            return -1;
+        }
+        return after ? 1 : 0;
     }
 }

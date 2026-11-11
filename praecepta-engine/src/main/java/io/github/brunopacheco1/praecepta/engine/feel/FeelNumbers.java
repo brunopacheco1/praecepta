@@ -65,7 +65,7 @@ final class FeelNumbers {
         }
         boolean whole = exponent.signum() == 0 || exponent.stripTrailingZeros().scale() <= 0;
         if (base.signum() == 0) {
-            return exponent.signum() < 0 ? null : exponent.signum() == 0 ? BigDecimal.ONE : BigDecimal.ZERO;
+            return zeroToThe(exponent);
         }
         // the size of the result, to give up before computing one that is out of range
         double magnitude = exponent.doubleValue() * (base.precision() - base.scale() - 1 + Math.log10(leading(base)));
@@ -79,6 +79,15 @@ final class FeelNumbers {
             return null;
         }
         return inRange(exp(exponent.multiply(ln(base), WORKING)).round(PRECISION));
+    }
+
+    /** {@code 0 ** exponent}: 1 for a zero exponent, 0 for a positive one, null for a negative one. */
+    private static BigDecimal zeroToThe(BigDecimal exponent) {
+        return switch (exponent.signum()) {
+            case 0 -> BigDecimal.ONE;
+            case 1 -> BigDecimal.ZERO;
+            default -> null;
+        };
     }
 
     /** The absolute value of a number that is not zero, scaled into [1, 10). */

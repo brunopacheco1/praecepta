@@ -210,23 +210,29 @@ final class ExpressionParser {
         while (position < text.length() && (Character.isDigit(text.charAt(position)) || text.charAt(position) == '.')) {
             position++;
         }
-        if (position < text.length() && (text.charAt(position) == 'e' || text.charAt(position) == 'E')) {
-            int digit = position + 1;
-            if (digit < text.length() && (text.charAt(digit) == '+' || text.charAt(digit) == '-')) {
-                digit++;
-            }
-            if (digit < text.length() && Character.isDigit(text.charAt(digit))) {
-                position = digit;
-                while (position < text.length() && Character.isDigit(text.charAt(position))) {
-                    position++;
-                }
-            }
-        }
+        skipExponent();
         var digits = text.substring(start, position);
         try {
             return new BigDecimal(digits.startsWith(".") ? "0" + digits : digits);
         } catch (NumberFormatException e) {
             throw unsupported("'" + digits + "' is not a number");
+        }
+    }
+
+    /** Moves past an exponent ({@code e3}, {@code E-2}) if one follows; an {@code e} without digits is not one. */
+    private void skipExponent() {
+        if (position >= text.length() || (text.charAt(position) != 'e' && text.charAt(position) != 'E')) {
+            return;
+        }
+        int digit = position + 1;
+        if (digit < text.length() && (text.charAt(digit) == '+' || text.charAt(digit) == '-')) {
+            digit++;
+        }
+        if (digit < text.length() && Character.isDigit(text.charAt(digit))) {
+            position = digit;
+            while (position < text.length() && Character.isDigit(text.charAt(position))) {
+                position++;
+            }
         }
     }
 
