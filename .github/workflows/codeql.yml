@@ -10,6 +10,11 @@ on:
   schedule:
     - cron: '17 3 * * 1'
 
+# a newer push to the same pull request replaces the run in progress; pushes to main always finish
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 

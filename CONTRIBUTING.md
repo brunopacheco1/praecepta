@@ -29,7 +29,8 @@ source and POM, and writes a CycloneDX SBOM per module (`target/bom.json`).
 
 The code targets **Java 21** (`--release 21`): newer language features or APIs fail to compile.
 CI builds and tests on Java 21, 25 and 27, and runs the plugin's integration tests on Maven 3.9,
-3.10 and 4.0.
+3.10 and 4.0 (on pull requests only when the plugin, the engine or a POM changes). A newer push to a
+pull request cancels the checks still running for the previous one.
 
 ## Code style
 The code follows standard Java conventions; the build enforces them, so a pull request that breaks

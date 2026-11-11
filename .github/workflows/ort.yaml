@@ -8,6 +8,16 @@ on:
   push:
     branches: [main]
   pull_request:
+    # the scan is about dependencies and licences, so only build files and ORT's own config matter
+    paths:
+      - '**/pom.xml'
+      - '.ort.yml'
+      - '.github/workflows/ort.yaml'
+
+# a newer push to the same pull request replaces the run in progress; pushes to main always finish
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
