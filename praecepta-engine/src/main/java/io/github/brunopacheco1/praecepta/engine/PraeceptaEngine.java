@@ -32,6 +32,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
+import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
@@ -92,11 +93,19 @@ public final class PraeceptaEngine<I, O> {
     /** Reads a column from the input strategy's map; null with per-column bindings. */
     private final BitsetIndex.ColumnReader<Map<String, String>> mapReader;
 
+    private final OutputStrategy<O> outputStrategy;
+
     // Indexed by bit, i.e. by rule in the index's bit order (see bitToRule):
-    /** The rule's converted output. */
+    /** The rule's converted output; null if it names an input (see namedInputsByBit). */
     private final Object[] outputByBit;
-    /** The rule's output as a ready-made single-hit result, so that evaluation does not allocate one. */
+    /** The rule's output as a ready-made single-hit result, so that evaluation does not allocate one; null as above. */
     private final List<O>[] singleByBit;
+    /** The rule's outputs as written, for ANY when outputs name inputs. */
+    private final PraeceptaOutput[] ruleOutputByBit;
+    /** The rule's outputs that name an input, filled in on every evaluation; null if it names none. */
+    private final NamedInputs[] namedInputsByBit;
+    /** Whether some rule's output names an input. */
+    private final boolean namesInputs;
     /** The rule's identifier, for violation messages. */
     private final Integer[] idByBit;
     /** ANY only: the mask of the rules whose outputs equal this rule's. */
@@ -134,20 +143,32 @@ public final class PraeceptaEngine<I, O> {
         extractorReader = inputStrategy == null ? extractorReader(builder.bindings, evaluationOrder) : null;
         mapReader = inputStrategy == null ? null : mapReader(evaluationOrder);
 
+        outputStrategy = builder.outputStrategy;
         int ruleCount = rules.size();
         outputByBit = new Object[ruleCount];
         @SuppressWarnings({"rawtypes", "unchecked"}) // a generic array cannot be created otherwise
         List<O>[] singles = new List[ruleCount];
         singleByBit = singles;
+        namedInputsByBit = new NamedInputs[ruleCount];
+        ruleOutputByBit = new PraeceptaOutput[ruleCount];
         idByBit = new Integer[ruleCount];
+        boolean anyNamed = false;
         for (int bit = 0; bit < ruleCount; bit++) {
             var rule = rules.get(bitToRule[bit]);
-            var output = builder.outputStrategy.transform(rule.output());
-            outputByBit[bit] = output;
-            singleByBit[bit] = List.of(output);
             idByBit[bit] = rule.priority();
+            ruleOutputByBit[bit] = rule.output();
+            if (rule.output().references().isEmpty()) {
+                var output = outputStrategy.transform(rule.output());
+                outputByBit[bit] = output;
+                singleByBit[bit] = List.of(output);
+            } else {
+                namedInputsByBit[bit] = namedInputs(rule, evaluationOrder, builder.outputPriority.keySet());
+                anyNamed = true;
+            }
         }
-        sameOutputsByBit = hitPolicy == HitPolicy.ANY ? sameOutputMasks(rules, bitToRule, index.words()) : null;
+        namesInputs = anyNamed;
+        // with outputs that name inputs, ANY compares the outputs of each evaluation instead
+        sameOutputsByBit = hitPolicy == HitPolicy.ANY && !namesInputs ? sameOutputMasks(rules, bitToRule, index.words()) : null;
         reduce = reducer(builder.aggregation, builder.outputStrategy);
         count = builder.aggregation == AggregationOperator.COUNT ? builder.outputStrategy::count : null;
         noMatch = count == null ? List.of() : List.of(count.apply(0));
@@ -170,33 +191,35 @@ public final class PraeceptaEngine<I, O> {
      * @throws InvalidInputException       if a value is outside its column's declared input values, or
      *                                     not a valid value of the column's type
      */
-    @SuppressWarnings("unchecked")
     public List<O> evaluate(I input) {
-        long[] matches = inputStrategy == null
-                ? index.match(input, extractorReader)
-                : index.match(inputStrategy.transform(input).values(), mapReader);
+        return inputStrategy == null
+                ? evaluate(input, extractorReader)
+                : evaluate(inputStrategy.transform(input).values(), mapReader);
+    }
+
+    /** Evaluates an input read column by column with {@code reader}, which also fills in outputs that name inputs. */
+    @SuppressWarnings("unchecked")
+    private <T> List<O> evaluate(T input, BitsetIndex.ColumnReader<T> reader) {
+        long[] matches = index.match(input, reader);
         if (matches.length == 0) {
             return noMatch;
         }
         // the lowest set bit is the first matching rule in rule order, or the highest-priority one
         return switch (hitPolicy) {
-            case FIRST, PRIORITY -> singleByBit[BitsetIndex.first(matches)];
+            case FIRST, PRIORITY -> single(BitsetIndex.first(matches), input, reader);
             case UNIQUE -> {
                 int bit = BitsetIndex.first(matches);
                 if (BitsetIndex.next(matches, bit + 1) >= 0) {
                     throw violation(matches);
                 }
-                yield singleByBit[bit];
+                yield single(bit, input, reader);
             }
             case ANY -> {
                 int bit = BitsetIndex.first(matches);
-                var sameOutputs = sameOutputsByBit[bit];
-                for (int word = 0; word < matches.length; word++) {
-                    if ((matches[word] & ~sameOutputs[word]) != 0) {
-                        throw violation(matches);
-                    }
+                if (namesInputs ? !sameOutputs(matches, input, reader) : !BitsetIndex.isSubset(matches, sameOutputsByBit[bit])) {
+                    throw violation(matches);
                 }
-                yield singleByBit[bit];
+                yield single(bit, input, reader);
             }
             case RULE_ORDER, OUTPUT_ORDER, COLLECT -> {
                 if (count != null) {
@@ -205,7 +228,7 @@ public final class PraeceptaEngine<I, O> {
                 var selected = new Object[BitsetIndex.count(matches)];
                 int i = 0;
                 for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
-                    selected[i++] = outputByBit[bit];
+                    selected[i++] = namedInputsByBit[bit] == null ? outputByBit[bit] : outputStrategy.transform(output(bit, input, reader));
                 }
                 if (reduce != null) {
                     var total = (O) selected[0];
@@ -238,6 +261,94 @@ public final class PraeceptaEngine<I, O> {
         return report;
     }
 
+    // ---- outputs that name an input --------------------------------------------------------
+
+    /**
+     * A rule's outputs that name an input: its other outputs, and for each named one, the output
+     * column and the input column's position in the evaluation order. A class, not a record: it holds
+     * arrays and is never compared.
+     */
+    private static final class NamedInputs {
+        private final Map<String, String> values;
+        private final String[] outputs;
+        private final int[] columns;
+
+        NamedInputs(Map<String, String> values, String[] outputs, int[] columns) {
+            this.values = values;
+            this.outputs = outputs;
+            this.columns = columns;
+        }
+
+        Map<String, String> values() {
+            return values;
+        }
+
+        String[] outputs() {
+            return outputs;
+        }
+
+        int[] columns() {
+            return columns;
+        }
+    }
+
+    /**
+     * The outputs of {@code rule} that name an input, checked: each names an input column, and none is
+     * in an output priority list, where its place cannot be known before evaluation.
+     */
+    private static NamedInputs namedInputs(Praeceptum rule, List<String> evaluationOrder, Set<String> prioritised) {
+        var references = rule.output().references();
+        var outputs = new String[references.size()];
+        var columns = new int[references.size()];
+        int i = 0;
+        for (var reference : references.entrySet()) {
+            int column = evaluationOrder.indexOf(reference.getValue());
+            if (column < 0) {
+                throw new InvalidDecisionTableException("Rule %s: output '%s' names '%s', which is not an input column %s"
+                        .formatted(rule.priority(), reference.getKey(), reference.getValue(), evaluationOrder));
+            }
+            if (prioritised.contains(reference.getKey())) {
+                throw new InvalidDecisionTableException("Rule %s: output '%s' names input '%s', so it has no place in its priority list"
+                        .formatted(rule.priority(), reference.getKey(), reference.getValue()));
+            }
+            outputs[i] = reference.getKey();
+            columns[i++] = column;
+        }
+        return new NamedInputs(rule.output().values(), outputs, columns);
+    }
+
+    /** The single-hit result of the rule at {@code bit}: ready-made, unless it names inputs. */
+    private <T> List<O> single(int bit, T input, BitsetIndex.ColumnReader<T> reader) {
+        var ready = singleByBit[bit];
+        return ready != null ? ready : List.of(outputStrategy.transform(output(bit, input, reader)));
+    }
+
+    /** The outputs of a rule that names inputs, filled in with the text of the input's values. */
+    private <T> PraeceptaOutput output(int bit, T input, BitsetIndex.ColumnReader<T> reader) {
+        var named = namedInputsByBit[bit];
+        var values = new HashMap<>(named.values());
+        for (int i = 0; i < named.outputs().length; i++) {
+            int column = named.columns()[i];
+            var value = index.column(column).value(reader.read(input, column));
+            values.put(named.outputs()[i], value == null ? null : FeelLiterals.text(value));
+        }
+        return new PraeceptaOutput(values);
+    }
+
+    /** ANY, when outputs name inputs: whether every matching rule gives this input the same outputs. */
+    private <T> boolean sameOutputs(long[] matches, T input, BitsetIndex.ColumnReader<T> reader) {
+        PraeceptaOutput first = null;
+        for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
+            var output = namedInputsByBit[bit] == null ? ruleOutputByBit[bit] : output(bit, input, reader);
+            if (first == null) {
+                first = output;
+            } else if (!first.values().equals(output.values())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     // ---- hit policies ----------------------------------------------------------------------
 
     /**
@@ -265,6 +376,11 @@ public final class PraeceptaEngine<I, O> {
         int i = 0;
         for (var priorityList : outputPriority.entrySet()) {
             var output = priorityList.getKey();
+            var input = rule.output().references().get(output);
+            if (input != null) {
+                throw new InvalidDecisionTableException("Rule %s: output '%s' names input '%s', so it has no place in its priority list"
+                        .formatted(rule.priority(), output, input));
+            }
             var value = rule.output().values().get(output);
             int position = priorityList.getValue().indexOf(value);
             if (position < 0) {

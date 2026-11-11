@@ -84,6 +84,8 @@ final class ColumnIndex {
     final boolean hasAllowedValues;
     /** Enum-bound STRING column: mask per constant ordinal; null otherwise. */
     private final long[][] ordinalMasks;
+    /** Enum-bound STRING column: each constant's value, by ordinal; null otherwise. */
+    private final String[] enumValues;
 
     /**
      * @param enumValues for a STRING column bound to an enum: each constant's value, by ordinal; else null
@@ -135,6 +137,7 @@ final class ColumnIndex {
         }
         nullMask = masks[nullClass];
         ordinalMasks = enumValues == null ? null : masksByOrdinal(enumValues);
+        this.enumValues = enumValues == null ? null : enumValues.clone();
     }
 
     // ---- building the classes ---------------------------------------------------------------------
@@ -348,6 +351,21 @@ final class ColumnIndex {
         }
         int found = Arrays.binarySearch(boundaries, value, ColumnIndex::compare);
         return found >= 0 ? 2 * found + 1 : 2 * (-found - 1);
+    }
+
+    /**
+     * The value of a raw input, as {@link #maskFor} reads it: a String (an enum constant's value) for a
+     * STRING column, else the column's Java type; null if missing. The value has already been checked
+     * by {@link #maskFor}, when the input was matched.
+     */
+    Object value(Object raw) {
+        if (!isString) {
+            return convert(raw);
+        }
+        if (raw instanceof Enum<?> constant) {
+            return enumValues[constant.ordinal()];
+        }
+        return raw == null || ((String) raw).isBlank() ? null : raw;
     }
 
     // ---- converting raw values --------------------------------------------------------------------

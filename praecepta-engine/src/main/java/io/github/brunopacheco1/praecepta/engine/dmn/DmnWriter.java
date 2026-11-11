@@ -154,10 +154,22 @@ public final class DmnWriter {
         var outputs = table.outputs();
         for (int c = 0; c < outputs.size(); c++) {
             var output = outputs.get(c);
-            var value = outputLiteral(rule.output().values().get(output.name()), output.type(), where + ", output '" + output.name() + "'");
+            var outputWhere = where + ", output '" + output.name() + "'";
+            var input = rule.output().references().get(output.name());
+            var value = input != null
+                    ? namedInput(input, inputs, outputWhere)
+                    : outputLiteral(rule.output().values().get(output.name()), output.type(), outputWhere);
             expression(xml, "outputEntry", id("output_entry_" + r + "_" + c), value);
         }
         xml.append("      </rule>\n");
+    }
+
+    /** An output entry that names an input: the input's name, which must be one of the table's columns. */
+    private static String namedInput(String input, List<InputColumn> inputs, String where) {
+        if (inputs.stream().noneMatch(column -> column.name().equals(input))) {
+            throw new InvalidDecisionTableException("%s: names '%s', which is not an input of the table".formatted(where, input));
+        }
+        return input;
     }
 
     /** A line holding an element with a FEEL expression: {@code <tag attributes><text>expression</text></tag>}. */

@@ -161,6 +161,16 @@ final class BitsetIndex {
         }
     }
 
+    /** Whether every bit set in {@code mask} is also set in {@code of}. */
+    static boolean isSubset(long[] mask, long[] of) {
+        for (int w = 0; w < mask.length; w++) {
+            if ((mask[w] & ~of[w]) != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Whether the two masks share a set bit. */
     static boolean intersects(long[] a, long[] b) {
         for (int w = 0; w < a.length; w++) {

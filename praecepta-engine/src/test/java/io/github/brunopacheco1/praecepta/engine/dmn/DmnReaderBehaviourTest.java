@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
+import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 
 /** Pins how the reader names tables and columns, treats blank value lists and reads output entries. */
@@ -75,15 +76,27 @@ class DmnReaderBehaviourTest {
     }
 
     @Test
-    void output_entries_that_are_not_literals_are_rejected() {
+    void output_entries_that_are_neither_literals_nor_an_input_name_are_rejected() {
         var word = stream(model("", table("string", "PT")));
         Assertions.assertThatThrownBy(() -> DmnReader.read(word))
                 .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessage("Decision 'd', rule 1, output 'o': 'PT' is not supported; output entries must be literals (quote text)");
+                .hasMessage("Decision 'd', rule 1, output 'o': 'PT' is not supported; output entries must be literals (quote text) or name an input");
         var list = stream(model("", table("number", "1, 2")));
         Assertions.assertThatThrownBy(() -> DmnReader.read(list))
                 .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessage("Decision 'd', rule 1, output 'o': '1, 2' is not supported; output entries must be literals");
+                .hasMessage("Decision 'd', rule 1, output 'o': '1, 2' is not supported; output entries must be literals or name an input");
+    }
+
+    @Test
+    void an_output_entry_naming_an_input_refers_to_it() {
+        var table = DmnReader.read(stream(model("", table("string", " a "))));
+        Assertions.assertThat(table.rules().getFirst().output())
+                .isEqualTo(new PraeceptaOutput(Map.of(), Map.of("o", "a")));
+        // the input must be of the output's type; a string output takes any input as text
+        var mismatch = stream(model("", table("number", "a")));
+        Assertions.assertThatThrownBy(() -> DmnReader.read(mismatch))
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Decision 'd', rule 1, output 'o': names input 'a', a string, but the output is a number");
     }
 
     @Test
