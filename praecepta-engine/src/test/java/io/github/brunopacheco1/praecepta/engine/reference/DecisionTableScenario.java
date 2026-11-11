@@ -51,7 +51,9 @@ import net.jqwik.api.Tuple;
  * that both kinds of string column (with and without comparisons) are common, and string inputs
  * include values between and around the letters the cells mention. Values come from small domains, and dates are consecutive
  * days, so overlaps, boundaries and empty gaps between days are frequent; times and date-times step
- * by half an hour and twelve hours, and inputs fall on and between those steps. Half the time and
+ * by half an hour and twelve hours, and inputs fall on and between those steps (a zoned date-time input
+ * now and then falls instead on either side of a daylight saving change, where a local time is skipped or
+ * occurs twice). Half the time and
  * date-time columns take values with a time zone (bound with {@code offsetTimeInput} and
  * {@code zonedDateTimeInput}): the same instants, written at various offsets and zones, so that equal
  * instants written differently are frequent. One literal in five of a time or date-time column has the
@@ -62,7 +64,9 @@ import net.jqwik.api.Tuple;
  * missing lists, and now and then a list holding a missing element, which is invalid.
  *
  * <p>Every rule has outputs {@code id} (its 1-based position, unique), {@code out} (one of x/y/z,
- * often shared), {@code n} (a small number, for aggregation) and {@code echo}, which one time in four
+ * often shared), {@code n} (a small number, for aggregation, which one time in four is an output
+ * expression over a number column or literals, now and then a division by zero, which gives a missing
+ * output) and {@code echo}, which one time in four
  * names the input {@code c0} (so it takes that input's value), unless {@code c0} holds lists, one time
  * in four is an output expression over a string or number column (or over literals), and is otherwise
  * {@code "a"}, a value a string input may also have.
@@ -96,9 +100,25 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     /** The offsets times with a zone are written at. */
     private static final List<ZoneOffset> OFFSETS = List.of(ZoneOffset.UTC, ZoneOffset.ofHours(1), ZoneOffset.ofHours(-5),
             ZoneOffset.ofHoursMinutes(5, 30));
-    /** The zones date-times with a zone are written in: offsets, and zone ids with daylight saving time. */
+    /**
+     * The offsets input times with a zone are also written at. A time has no date, so at -12:00 the
+     * generated times (07:30 to 11:00 at offset zero) are evenings that lie after every time at the other
+     * offsets, more than a day after midnight at offset zero; at +12:00 they are evenings that keep their
+     * place. Cells do not use them, as their intervals would then start after they end.
+     */
+    private static final List<ZoneOffset> INPUT_OFFSETS = List.of(ZoneOffset.UTC, ZoneOffset.ofHours(1), ZoneOffset.ofHours(-5),
+            ZoneOffset.ofHoursMinutes(5, 30), ZoneOffset.ofHours(12), ZoneOffset.ofHours(-12));
+    /** The zones date-times with a zone are written in: offsets, the farthest ones, and zone ids with daylight saving time. */
     private static final List<ZoneId> ZONES = List.of(ZoneOffset.UTC, ZoneOffset.ofHours(1), ZoneOffset.ofHours(-5),
-            ZoneId.of("Europe/Paris"), ZoneId.of("America/New_York"));
+            ZoneId.of("Europe/Paris"), ZoneId.of("America/New_York"), ZoneOffset.ofHours(-12), ZoneId.of("Pacific/Kiritimati"));
+    /**
+     * Instants on either side of the 2025 daylight saving changes in Paris and New York: written in their
+     * zone, one falls just after a skipped hour, and the others on a local time that occurs twice.
+     */
+    private static final List<ZonedDateTime> DAYLIGHT_SAVING_CHANGES = List.of(
+            ZonedDateTime.of(2025, 3, 30, 1, 30, 0, 0, ZoneOffset.UTC), ZonedDateTime.of(2025, 10, 26, 0, 30, 0, 0, ZoneOffset.UTC),
+            ZonedDateTime.of(2025, 10, 26, 1, 30, 0, 0, ZoneOffset.UTC), ZonedDateTime.of(2025, 11, 2, 5, 30, 0, 0, ZoneOffset.UTC),
+            ZonedDateTime.of(2025, 11, 2, 6, 30, 0, 0, ZoneOffset.UTC));
 
     /**
      * Column definition: type (of its elements, for a list), string domain, declared input values (null
@@ -249,15 +269,33 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     /** What a rule's {@link #ECHO} output is. */
     private enum Echo { VALUE, INPUT, EXPRESSION }
 
-    /** @param expression which of the expression forms the {@link #ECHO} output takes, if it is one */
-    private record RuleRow(List<String> cells, String out, int number, Echo echo, int expression) {
+    /**
+     * @param expression       which of the expression forms the {@link #ECHO} output takes, if it is one
+     * @param numberExpression which of the expression forms the {@link #NUMBER} output takes, or -1 for its literal
+     */
+    private record RuleRow(List<String> cells, String out, int number, Echo echo, int expression, int numberExpression) {
     }
 
     private static Arbitrary<RuleRow> rule(List<Column> columns) {
         var cells = new ArrayList<Arbitrary<String>>();
         columns.forEach(column -> cells.add(cell(column)));
+        var numberExpression = Arbitraries.frequencyOf(Tuple.of(12, Arbitraries.just(-1)), Tuple.of(4, Arbitraries.integers().between(0, 3)));
         return Combinators.combine(Combinators.combine(cells).as(List::copyOf), Arbitraries.of(OUT_VALUES), Arbitraries.integers().between(1, 9),
-                Arbitraries.of(Echo.VALUE, Echo.VALUE, Echo.INPUT, Echo.EXPRESSION), Arbitraries.integers().between(0, 3)).as(RuleRow::new);
+                Arbitraries.of(Echo.VALUE, Echo.VALUE, Echo.INPUT, Echo.EXPRESSION), Arbitraries.integers().between(0, 3), numberExpression)
+                .as(RuleRow::new);
+    }
+
+    /**
+     * A number output expression over the first column of single numbers, or over literals if there is
+     * none; one form divides by zero, which gives a missing output.
+     */
+    private static String numberExpression(List<String> names, Map<String, ColumnType> types, Set<String> lists, int form) {
+        var number = names.stream().filter(name -> types.get(name) == ColumnType.NUMBER && !lists.contains(name)).findFirst();
+        if (number.isPresent()) {
+            var n = number.get();
+            return List.of(n + " * 2 - 1", "-(" + n + " + 1.50) / 4", n + " / 0", "1 + " + n + " * " + n).get(form);
+        }
+        return List.of("1 + 2 * 3", "(10 - 4) / 4", "1 / 0", "-2.50 * 2").get(form);
     }
 
     /**
@@ -446,15 +484,22 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             case DATE -> Arbitraries.integers().between(-1, 6).<Object>map(DAY0::plusDays);
             case BOOLEAN -> Arbitraries.<Object>of(true, false);
             // quarter steps: on every boundary and halfway between them; with a zone, the same instants in various zones
-            case TIME -> Combinators.combine(Arbitraries.integers().between(-2, 12), zone(ColumnType.TIME, column.zoned()))
+            case TIME -> Combinators.combine(Arbitraries.integers().between(-2, 12),
+                            column.zoned() ? Arbitraries.integers().between(0, INPUT_OFFSETS.size() - 1) : Arbitraries.just(-1))
                     .<Object>as((q, zone) -> {
                         var time = TIME0.plusMinutes(15L * q);
-                        return zone < 0 ? time : OffsetTime.of(time, ZoneOffset.UTC).withOffsetSameInstant(OFFSETS.get(zone));
+                        return zone < 0 ? time : OffsetTime.of(time, ZoneOffset.UTC).withOffsetSameInstant(INPUT_OFFSETS.get(zone));
                     });
-            case DATE_TIME -> Combinators.combine(Arbitraries.integers().between(-2, 12), zone(ColumnType.DATE_TIME, column.zoned()))
-                    .<Object>as((q, zone) -> {
+            case DATE_TIME -> Combinators.combine(Arbitraries.integers().between(-2, 12), zone(ColumnType.DATE_TIME, column.zoned()),
+                            Arbitraries.integers().between(0, 5 * DAYLIGHT_SAVING_CHANGES.size() - 1))
+                    .<Object>as((q, zone, change) -> {
                         var moment = MOMENT0.plusHours(6L * q);
-                        return zone < 0 ? moment : moment.atZone(ZoneOffset.UTC).withZoneSameInstant(ZONES.get(zone));
+                        if (zone < 0) {
+                            return moment;
+                        }
+                        // one time in five, an instant at a daylight saving change
+                        var instant = change < DAYLIGHT_SAVING_CHANGES.size() ? DAYLIGHT_SAVING_CHANGES.get(change) : moment.atZone(ZoneOffset.UTC);
+                        return instant.withZoneSameInstant(ZONES.get(zone));
                     });
             // half steps, negative ones included; periods are not normalised, so P12M must equal P1Y
             case DAY_TIME_DURATION -> Arbitraries.integers().between(-2, 12).<Object>map(h -> Duration.ofHours(3L * h));
@@ -490,13 +535,21 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             for (int c = 0; c < names.size(); c++) {
                 cells.put(names.get(c), row.cells().get(c));
             }
-            var outputs = new HashMap<>(Map.of(ID, String.valueOf(r + 1), OUT, row.out(), NUMBER, String.valueOf(row.number())));
+            var outputs = new HashMap<>(Map.of(ID, String.valueOf(r + 1), OUT, row.out()));
             // an output holds one value, so it never names a column that holds lists
             var echo = row.echo() == Echo.INPUT && lists.contains(names.getFirst()) ? Echo.VALUE : row.echo();
             Map<String, String> references = echo == Echo.INPUT ? Map.of(ECHO, names.getFirst()) : Map.of();
-            Map<String, String> expressions = echo == Echo.EXPRESSION ? Map.of(ECHO, expression(names, types, lists, row.expression())) : Map.of();
+            var expressions = new HashMap<String, String>();
+            if (echo == Echo.EXPRESSION) {
+                expressions.put(ECHO, expression(names, types, lists, row.expression()));
+            }
             if (echo == Echo.VALUE) {
                 outputs.put(ECHO, ECHO_VALUE);
+            }
+            if (row.numberExpression() < 0) {
+                outputs.put(NUMBER, String.valueOf(row.number()));
+            } else {
+                expressions.put(NUMBER, numberExpression(names, types, lists, row.numberExpression()));
             }
             rules.add(new Praeceptum(r + 1, new PraeceptaInput(cells), new PraeceptaOutput(Map.copyOf(outputs), references, expressions)));
         }
@@ -559,7 +612,21 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     }
 
     public ReferenceMatcher reference(List<Praeceptum> tableRules, HitPolicy policy, Map<String, List<String>> outputPriority) {
-        return new ReferenceMatcher(tableRules, policy, outputPriority, types, allowedValues, feelCells, zonedColumns, lists);
+        return reference(tableRules, policy, outputPriority, true);
+    }
+
+    /**
+     * @param perColumn whether the engine binds the inputs per column, so a time or date-time column's
+     *                  inputs are of one kind ({@link #zonedColumns}), or from text, which may hold either
+     */
+    public ReferenceMatcher reference(List<Praeceptum> tableRules, HitPolicy policy, Map<String, List<String>> outputPriority,
+            boolean perColumn) {
+        return new ReferenceMatcher(tableRules, policy, outputPriority, types, allowedValues, feelCells, zonedColumns, lists, !perColumn);
+    }
+
+    /** This scenario with its masks stored in {@code form}. */
+    public DecisionTableScenario withMaskForm(ForcedMaskForm form) {
+        return new DecisionTableScenario(columns, types, allowedValues, rules, inputs, feelCells, zonedColumns, lists, form);
     }
 
     public List<String> ids(List<PraeceptaOutput> outputs) {
@@ -582,9 +649,23 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                     if (rule.output().values().containsKey(ECHO)) {
                         values.put(ECHO, rule.output().values().get(ECHO));
                     }
+                    var expressions = new HashMap<>(rule.output().expressions());
+                    expressions.keySet().retainAll(Set.of(ECHO));
                     return new Praeceptum(rule.priority(), rule.input(),
-                            new PraeceptaOutput(Map.copyOf(values), rule.output().references(), rule.output().expressions()));
+                            new PraeceptaOutput(Map.copyOf(values), rule.output().references(), expressions));
                 })
+                .toList();
+    }
+
+    /**
+     * The rules with {@link #OUT} and {@link #ECHO} as their only outputs, as {@link #outOnly}, but with every
+     * {@code echo} the value {@code "a"}: no output reads an input, so ANY compares the outputs the engine
+     * converted when it was built, with the masks of the rules that have the same outputs.
+     */
+    public static List<Praeceptum> outOnlyValues(List<Praeceptum> rules) {
+        return rules.stream()
+                .map(rule -> new Praeceptum(rule.priority(), rule.input(),
+                        new PraeceptaOutput(Map.of(OUT, rule.output().values().get(OUT), ECHO, ECHO_VALUE))))
                 .toList();
     }
 

@@ -37,6 +37,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
@@ -74,10 +75,19 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  *                       against one without, makes it unknown). A name of such a column in another
  *                       column's cell asks whether the value is in the list. A list may hold no missing
  *                       element.
+ * @param bothKinds      whether the inputs of a time or date-time column may have a time zone or not, as
+ *                       map-based inputs read them from text; the static analysis then visits both kinds
+ *                       of values, whatever {@code zonedColumns} says
  */
 public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
         Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
-        Set<String> lists) {
+        Set<String> lists, boolean bothKinds) {
+
+    public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
+            Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
+            Set<String> lists) {
+        this(rules, hitPolicy, outputPriority, types, allowedValues, feelCells, zonedColumns, lists, false);
+    }
 
     public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
             Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells) {
@@ -170,8 +180,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     }
 
     /**
-     * DMN COLLECT with an aggregator over a single numeric output column, skipping missing outputs.
-     * COUNT counts the matching rules. No match → null (COUNT → 0).
+     * DMN COLLECT with an aggregator over a single numeric output column, skipping missing outputs (a
+     * computed output that names a missing input or divides by zero). COUNT counts the matching rules.
+     * No match, or no output that is not missing → null (COUNT → 0).
      */
     public BigDecimal aggregate(Map<String, ?> input, String output, Aggregator aggregator) {
         if (hitPolicy != HitPolicy.COLLECT) {
@@ -179,7 +190,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         }
         var matched = matches(input);
         var values = matched.stream()
-                .map(rule -> rule.output().values().get(output))
+                .map(rule -> output(rule, input).values().get(output))
                 .filter(Objects::nonNull)
                 .map(BigDecimal::new)
                 .toList();
@@ -204,7 +215,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         var values = new HashMap<>(rule.output().values());
         rule.output().references().forEach((output, column) -> {
             var value = value(input, column);
-            values.put(output, value == null ? null : FeelLiterals.text(value));
+            values.put(output, value == null ? null : text(value));
         });
         rule.output().expressions().forEach((output, expression) -> {
             var value = evaluate(OutputExpression.parse(expression), name -> value(input, name));
@@ -215,6 +226,21 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             });
         });
         return new PraeceptaOutput(values);
+    }
+
+    /**
+     * The text of an input's value, which must read back as the same value: a time or date-time with a
+     * zone as the same instant in the same zone (one in a zone's daylight saving overlap included). If it
+     * does not, the text is marked, so that it differs from whatever the engine gives.
+     */
+    private static String text(Object value) {
+        var text = FeelLiterals.text(value);
+        var readBack = switch (value) {
+            case OffsetTime time -> FeelTemporals.parseTime(text);
+            case ZonedDateTime dateTime -> FeelTemporals.parseDateTime(text);
+            default -> value;
+        };
+        return readBack.equals(value) ? text : "not read back as " + value + ": " + text;
     }
 
     /**
@@ -368,8 +394,16 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             case STRING -> values.addAll(stringRepresentatives(cells));
             // years and months durations as the Period a getter returns
             case YEAR_MONTH_DURATION -> orderedRepresentatives(type, cells, false).forEach(v -> values.add(((YearsAndMonths) v).toPeriod()));
-            // a column's times take a zone or none, as its getter does
-            default -> values.addAll(orderedRepresentatives(type, cells, zonedColumns.contains(column)));
+            // a column's times take a zone or none, as its getter does, or either if read from text
+            case TIME, DATE_TIME -> {
+                if (bothKinds || !zonedColumns.contains(column)) {
+                    values.addAll(orderedRepresentatives(type, cells, false));
+                }
+                if (bothKinds || zonedColumns.contains(column)) {
+                    values.addAll(orderedRepresentatives(type, cells, true));
+                }
+            }
+            default -> values.addAll(orderedRepresentatives(type, cells, false));
         }
         if (withMissing) {
             values.add(null);
@@ -479,13 +513,15 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                     around.add(LocalDateTime.ofInstant(start.plus(Duration.between(start, end).dividedBy(2)), ZoneOffset.UTC));
                 }
             }
-            // the generated times with a zone stay hours away from midnight, so a minute either side does not wrap around
+            // the generated times with a zone stay hours away from their local midnight, so a minute either side does not wrap
+            // around; a point between two at different offsets takes an offset that holds it without wrapping around
             case OffsetTime time -> {
                 around.add(time.minusMinutes(1));
                 around.add(time.plusMinutes(1));
                 if (next != null) {
                     var start = instant(time);
-                    around.add(OffsetTime.ofInstant(start.plus(Duration.between(start, instant((OffsetTime) next)).dividedBy(2)), time.getOffset()));
+                    var between = start.plus(Duration.between(start, instant((OffsetTime) next)).dividedBy(2));
+                    around.add(atInstant(between, time.getOffset(), ((OffsetTime) next).getOffset()));
                 }
             }
             case ZonedDateTime moment -> {
@@ -748,6 +784,17 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     private static boolean isZoned(Object value) {
         return value instanceof OffsetTime || value instanceof ZonedDateTime;
+    }
+
+    /** The time at the first offset whose local time on 1970-01-01 holds {@code instant}, so that it denotes that instant. */
+    private static OffsetTime atInstant(Instant instant, ZoneOffset... offsets) {
+        for (var offset : offsets) {
+            var time = OffsetTime.ofInstant(instant, offset);
+            if (instant(time).equals(instant)) {
+                return time;
+            }
+        }
+        throw new IllegalStateException("no offset holds " + instant);
     }
 
     /** A time with an offset as the instant it denotes on 1970-01-01. */

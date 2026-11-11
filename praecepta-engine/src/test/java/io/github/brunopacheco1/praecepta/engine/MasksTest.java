@@ -19,6 +19,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
+import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
@@ -195,6 +196,31 @@ class MasksTest {
         Assertions.assertThat(expected.get(1)).isEmpty();
         Assertions.assertThat(expected.get(2)).containsExactly("1"); // rule 1's flag is a wildcard
         Assertions.assertThat(expected.get(5)).isEmpty();             // rule 8 wants flag yes
+    }
+
+    @Test
+    void any_compares_rules_in_different_words_by_their_shared_output_masks() {
+        // rules 1-69 give "x" for code k<r>; rule 70 (in the second word) gives "y" for k3, and rule 71 "x" for k5
+        var praecepta = new ArrayList<Praeceptum>();
+        for (int r = 1; r <= 69; r++) {
+            praecepta.add(new Praeceptum(r, new PraeceptaInput(Map.of("code", "k" + r)), new PraeceptaOutput(Map.of("out", "x"))));
+        }
+        praecepta.add(new Praeceptum(70, new PraeceptaInput(Map.of("code", "k3")), new PraeceptaOutput(Map.of("out", "y"))));
+        praecepta.add(new Praeceptum(71, new PraeceptaInput(Map.of("code", "k5")), new PraeceptaOutput(Map.of("out", "x"))));
+        for (var form : Masks.Form.values()) {
+            var engine = PraeceptaEngine.<String, String>builder()
+                    .hitPolicy(HitPolicy.ANY)
+                    .rules(praecepta)
+                    .input("code", code -> code)
+                    .output(output -> output.values().get("out"))
+                    .maskForm(form)
+                    .build();
+            Assertions.assertThat(engine.evaluate("k5")).as("%s: rules 5 and 71 agree", form).containsExactly("x");
+            Assertions.assertThat(engine.evaluate("k10")).as("%s", form).containsExactly("x");
+            Assertions.assertThatThrownBy(() -> engine.evaluate("k3")).as("%s: rules 3 and 70 disagree", form)
+                    .isInstanceOf(HitPolicyViolationException.class)
+                    .hasMessage("ANY hit policy violated: matching rules [3, 70] have different outputs");
+        }
     }
 
     // ---- helpers -------------------------------------------------------------------------------

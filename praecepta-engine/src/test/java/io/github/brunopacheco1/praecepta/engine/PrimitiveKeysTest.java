@@ -89,6 +89,9 @@ class PrimitiveKeysTest {
                         ZonedDateTime.of(2025, 3, 30, 0, 59, 59, 999_999_999, ZoneOffset.UTC),
                         ZonedDateTime.of(2025, 10, 26, 2, 30, 0, 0, paris).withLaterOffsetAtOverlap(),
                         ZonedDateTime.of(2025, 10, 26, 0, 30, 0, 0, ZoneOffset.UTC), ZonedDateTime.of(1969, 1, 1, 0, 0, 0, 0, plusOne)));
+        // a zoned date-time beyond nanoseconds in a long (after 2262) declines, as LocalDateTime.MAX does
+        var keys = PrimitiveKeys.of(ColumnType.DATE_TIME, new Comparable<?>[] {ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, paris)});
+        Assertions.assertThat(keys.classOf(ZonedDateTime.of(3000, 1, 1, 0, 0, 0, 0, paris))).isEqualTo(-1);
     }
 
     private static void assertSameClasses(ColumnType type, List<? extends Comparable<?>> boundaryList, List<? extends Comparable<?>> values) {

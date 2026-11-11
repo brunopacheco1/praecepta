@@ -45,6 +45,16 @@ class DmnRoundTripPropertiesTest {
     }
 
     @Provide
+    Arbitrary<DecisionTableScenario> temporalScenarios() {
+        return DecisionTableScenario.temporal();
+    }
+
+    @Provide
+    Arbitrary<DecisionTableScenario> wideScenarios() {
+        return DecisionTableScenario.wide();
+    }
+
+    @Provide
     Arbitrary<List<String>> priorities() {
         return Arbitraries.shuffle(DecisionTableScenario.OUT_VALUES);
     }
@@ -52,6 +62,27 @@ class DmnRoundTripPropertiesTest {
     @Property(tries = 500, edgeCases = EdgeCasesMode.NONE)
     void tables_read_back_from_dmn_evaluate_like_the_originals(@ForAll("scenarios") DecisionTableScenario s,
             @ForAll HitPolicy policy, @ForAll("priorities") List<String> priority) {
+        assertRoundTrip(s, policy, priority);
+    }
+
+    /**
+     * Times and date-times with and without a zone, lists mixing both, and cells naming other temporal
+     * columns: the most DMN-specific rendering ({@code some x in ? satisfies x >= time("08:00:00Z")},
+     * {@code list contains(?, date and time("...@Europe/Paris"))}).
+     */
+    @Property(tries = 300, edgeCases = EdgeCasesMode.NONE)
+    void temporal_tables_read_back_from_dmn_evaluate_like_the_originals(@ForAll("temporalScenarios") DecisionTableScenario s,
+            @ForAll HitPolicy policy, @ForAll("priorities") List<String> priority) {
+        assertRoundTrip(s, policy, priority);
+    }
+
+    @Property(tries = 30, edgeCases = EdgeCasesMode.NONE)
+    void wide_tables_read_back_from_dmn_evaluate_like_the_originals(@ForAll("wideScenarios") DecisionTableScenario s,
+            @ForAll HitPolicy policy, @ForAll("priorities") List<String> priority) {
+        assertRoundTrip(s, policy, priority);
+    }
+
+    private static void assertRoundTrip(DecisionTableScenario s, HitPolicy policy, List<String> priority) {
         var rules = policy == HitPolicy.ANY ? DecisionTableScenario.outOnly(s.rules()) : s.rules();
         var original = table(s, rules, policy, priority);
 

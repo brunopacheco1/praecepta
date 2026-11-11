@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.Period;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -314,6 +315,72 @@ class TableCompilerTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Table 'mixed-times': input 'start' takes time values both with and without a time zone, "
                         + "but its generated record component holds one kind");
+    }
+
+    @Test
+    void outputs_naming_a_zoned_input_and_zoned_time_outputs_keep_their_zone() throws Exception {
+        var config = new TableConfig(table("appointments.dmn"), "Appointment", null, null, null, List.of(), List.of());
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("AppointmentInput")).contains("public record AppointmentInput(java.time.ZonedDateTime at)");
+        Assertions.assertThat(result.sources().get("AppointmentOutput"))
+                .contains("public record AppointmentOutput(java.time.ZonedDateTime confirmed, java.time.OffsetTime opens)");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".AppointmentInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Appointment").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            // 02:30 happens twice in Paris that night: the later one, at +01:00, keeps its instant
+            var later = ZonedDateTime.of(2025, 10, 26, 2, 30, 0, 0, ZoneId.of("Europe/Paris")).withLaterOffsetAtOverlap();
+            for (var at : List.of(later, later.withEarlierOffsetAtOverlap(), ZonedDateTime.of(2025, 6, 1, 8, 0, 0, 0, ZoneOffset.ofHours(-5)))) {
+                var output = ((Optional<?>) evaluate.invoke(null, constructor.newInstance(at))).orElseThrow();
+                Assertions.assertThat(output.getClass().getMethod("confirmed").invoke(output)).as("%s", at).isEqualTo(at);
+                Assertions.assertThat(output.getClass().getMethod("opens").invoke(output))
+                        .isEqualTo(OffsetTime.of(9, 0, 0, 0, ZoneOffset.ofHours(1)));
+            }
+        }
+    }
+
+    @Test
+    void inputs_a_cell_links_must_be_written_with_one_kind_of_time() {
+        var config = new TableConfig(table("linked-times.dmn"), "Linked", null, null, null, List.of(), List.of());
+        Assertions.assertThatThrownBy(() -> TableCompiler.compile(config, PACKAGE, Severity.ERROR))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Table 'linked': input 'start' takes time values both with and without a time zone, "
+                        + "but its generated record component holds one kind");
+    }
+
+    @Test
+    void a_time_output_that_is_not_a_time_is_rejected() {
+        var config = new TableConfig(table("bad-time-output.csv"), "Opening", null, HitPolicy.FIRST, null,
+                List.of(new ColumnConfig("start", ColumnType.TIME, null, List.of())),
+                List.of(new ColumnConfig("opens", ColumnType.TIME, null, List.of())));
+        Assertions.assertThatThrownBy(() -> TableCompiler.compile(config, PACKAGE, Severity.ERROR))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Table 'bad-time-output': output 'opens' value 'noon' is not a time");
+    }
+
+    @Test
+    void dmn_output_expressions_and_named_list_inputs_run_in_generated_code() throws Exception {
+        var config = new TableConfig(table("flu.dmn"), "Flu", null, null, null, List.of(), List.of());
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("FluInput"))
+                .contains("public record FluInput(String symptom, java.math.BigDecimal days, java.util.List<String> fluSymptoms)");
+        Assertions.assertThat(result.sources().get("FluOutput")).contains("public record FluOutput(String message, java.math.BigDecimal hours)");
+        Assertions.assertThat(result.sources().get("Flu")).contains(".listInput(\"Flu Symptoms\", FluInput::fluSymptoms)");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".FluInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Flu").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            var flu = List.of("fever", "cough");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("cough", new BigDecimal("2.5"), flu)))
+                    .get().hasToString("FluOutput[message=cough is in the list of Flu symptoms, hours=60]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("rash", new BigDecimal(2), flu)))
+                    .get().hasToString("FluOutput[message=rash is not a Flu symptom, hours=0]");
+            // a missing operand gives a missing output
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("fever", null, flu)))
+                    .get().hasToString("FluOutput[message=fever is in the list of Flu symptoms, hours=null]");
+        }
     }
 
     @Test

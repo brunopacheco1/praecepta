@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- modelled on the DMN TCK's 0039-dt-list-semantics: a cell naming a list input, and outputs that are expressions -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="flu" name="flu" namespace="https://example.com/flu">
+  <itemDefinition name="tSymptoms" isCollection="true"><typeRef>string</typeRef></itemDefinition>
+  <inputData id="symptoms" name="Flu Symptoms"><variable name="Flu Symptoms" typeRef="tSymptoms"/></inputData>
+  <decision id="flu" name="flu">
+    <decisionTable id="table" hitPolicy="FIRST">
+      <input id="symptom" label="Symptom"><inputExpression typeRef="string"><text>Symptom</text></inputExpression></input>
+      <input id="days" label="Days"><inputExpression typeRef="number"><text>Days</text></inputExpression></input>
+      <output id="message" name="message" typeRef="string"/>
+      <output id="hours" name="hours" typeRef="number"/>
+      <rule id="r1">
+        <inputEntry><text>Flu Symptoms</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>Symptom + " is in the list of Flu symptoms"</text></outputEntry>
+        <outputEntry><text>Days * 24</text></outputEntry>
+      </rule>
+      <rule id="r2">
+        <inputEntry><text>-</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>Symptom + " is not a Flu symptom"</text></outputEntry>
+        <outputEntry><text>0</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>
