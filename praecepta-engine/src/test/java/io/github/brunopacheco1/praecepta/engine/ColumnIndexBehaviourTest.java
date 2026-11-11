@@ -441,7 +441,7 @@ class ColumnIndexBehaviourTest {
     void comparing_string_classes_with_declared_values_and_an_enum() {
         var cells = cells(ColumnType.STRING, "< \"B\"", "> \"A\"");
         var allowed = CellParser.parse("\"A\",\"B\",\"C\"", ColumnType.STRING);
-        var column = new ColumnIndex("c", ColumnType.STRING, cells, allowed, 1, Zoning.LOCAL, null);
+        var column = new ColumnIndex("c", ColumnType.STRING, cells, allowed, 1, Zoning.LOCAL, null, Masks.Form.AUTO);
         Assertions.assertThat(dump(column)).isEqualTo("""
                 0 (-inf.."A") disallowed rules=[0] example=0 (String)
                 1 "A" rules=[0] example=A (String)
@@ -460,7 +460,7 @@ class ColumnIndexBehaviourTest {
                 'Ab' (String) -> Input c=Ab is not one of the column's allowed input values
                 'D' (String) -> Input c=D is not one of the column's allowed input values
                 """);
-        var byEnum = new ColumnIndex("letter", ColumnType.STRING, cells, allowed, 1, Zoning.LOCAL, new String[] {"A", "B", "C"});
+        var byEnum = new ColumnIndex("letter", ColumnType.STRING, cells, allowed, 1, Zoning.LOCAL, new String[] {"A", "B", "C"}, Masks.Form.AUTO);
         Assertions.assertThat(lookups(byEnum, null, Letter.A, Letter.B, Letter.C)).isEqualTo("""
                 null -> []
                 'A' (Letter) -> [0]
@@ -474,7 +474,7 @@ class ColumnIndexBehaviourTest {
         var cells = cells(ColumnType.STRING, "\"A\",\"B\"", "not(\"A\")", "null");
         var enumValues = new String[] {"A", "B", "C"};
         var column = new ColumnIndex("letter", ColumnType.STRING, cells, CellParser.parse("\"A\",\"B\",\"C\"", ColumnType.STRING), 1,
-                Zoning.LOCAL, enumValues);
+                Zoning.LOCAL, enumValues, Masks.Form.AUTO);
         Assertions.assertThat(lookups(column, null, Letter.A, Letter.B, Letter.C)).isEqualTo("""
                 null -> [1, 2]
                 'A' (Letter) -> [0]
@@ -482,18 +482,19 @@ class ColumnIndexBehaviourTest {
                 'C' (Letter) -> [1]
                 """);
         var withoutC = CellParser.parse("\"A\",\"B\"", ColumnType.STRING);
-        Assertions.assertThatThrownBy(() -> new ColumnIndex("letter", ColumnType.STRING, cells, withoutC, 1, Zoning.LOCAL, enumValues))
+        Assertions.assertThatThrownBy(() -> new ColumnIndex("letter", ColumnType.STRING, cells, withoutC, 1, Zoning.LOCAL, enumValues, Masks.Form.AUTO))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessage("Column 'letter': enum value 'C' is not one of the column's input values");
     }
 
+    /** A column whose masks are all sparse that can be: the classes and lookups do not depend on the form. */
     private static ColumnIndex column(ColumnType type, String allowed, String... cells) {
         return columnTaking(type, Zoning.LOCAL, allowed, cells);
     }
 
     private static ColumnIndex columnTaking(ColumnType type, Zoning zoning, String allowed, String... cells) {
         var allowedTests = allowed == null ? null : CellParser.parse(allowed, type);
-        return new ColumnIndex("c", type, cells(type, cells), allowedTests, BitsetIndex.wordsFor(cells.length), zoning, null);
+        return new ColumnIndex("c", type, cells(type, cells), allowedTests, BitsetIndex.wordsFor(cells.length), zoning, null, Masks.Form.SPARSE);
     }
 
     private static List<UnaryTests> cells(ColumnType type, String... cells) {
@@ -533,7 +534,9 @@ class ColumnIndexBehaviourTest {
         return lines.toString();
     }
 
-    private static List<Integer> bits(long[] mask) {
+    /** The bits of a mask in either form; these columns have fewer than 64 rules, so one word. */
+    private static List<Integer> bits(long[] stored) {
+        var mask = Masks.dense(stored, 1);
         var bits = new ArrayList<Integer>();
         for (int bit = BitsetIndex.first(mask); bit >= 0; bit = BitsetIndex.next(mask, bit + 1)) {
             bits.add(bit);

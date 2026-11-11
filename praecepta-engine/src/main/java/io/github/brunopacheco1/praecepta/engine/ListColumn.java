@@ -28,7 +28,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * {@code not(...)} cell that none of its tests accepts (an element is never missing, so no test is
  * unknown). One pass over the elements ORs, per rule, "some element passes a test"; the list's mask is
  * then the rules with {@code -}, the positive rules some element passes, and the negated rules none
- * passes: a few word operations per element.
+ * passes: a few word operations per element. The element masks may be dense or sparse ({@link Masks});
+ * the list masks are dense.
  */
 final class ListColumn {
 
@@ -62,7 +63,7 @@ final class ListColumn {
         }
         // a missing element's class: positive cells with null pass, comparisons are unknown; not(...) of an
         // unknown list is unknown, so no negated rule matches
-        missingMask = elements.masks[elements.nullClass].clone();
+        missingMask = Masks.dense(elements.masks[elements.nullClass], words).clone();
         BitsetIndex.andNot(missingMask, negatedRules);
         emptyMask = anyRules.clone();
         BitsetIndex.or(emptyMask, negatedRules);
@@ -88,8 +89,21 @@ final class ListColumn {
         var passed = new long[words];
         for (var value : values) {
             var mask = elements.maskFor(element(value, raw));
+            if (!Masks.isSparse(mask, words)) {
+                for (int w = 0; w < words; w++) {
+                    passed[w] |= mask[w] & positiveRules[w] | ~mask[w] & negatedRules[w];
+                }
+                continue;
+            }
+            // a sparse mask (see Masks): the words it leaves out are zero
+            int pair = 0;
             for (int w = 0; w < words; w++) {
-                passed[w] |= mask[w] & positiveRules[w] | ~mask[w] & negatedRules[w];
+                long bits = 0;
+                if (pair < mask.length && mask[pair] == w) {
+                    bits = mask[pair + 1];
+                    pair += 2;
+                }
+                passed[w] |= bits & positiveRules[w] | ~bits & negatedRules[w];
             }
         }
         for (int w = 0; w < words; w++) {

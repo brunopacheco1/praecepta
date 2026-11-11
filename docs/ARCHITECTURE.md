@@ -62,8 +62,20 @@ builds an engine once and calls it.
      `-` rules, the positive rules some element passes, and the negated rules none passes. A missing
      and an empty list have fixed masks. Two nationalities cost one more OR per mask word.
    - **Memory** grows with columns × classes × rules, never with the product of the values.
+   - **Compact masks** (`Masks`): a mask is stored dense (one bit per rule) unless at most a quarter
+     of its 64-bit words hold a set bit; it is then stored *sparse*, as the pairs (word, bits) of its
+     non-zero words, which takes at most half the memory and usually far less. Both forms are a
+     `long[]`, told apart by length, so evaluation pays one comparison per column. In a table of
+     thousands of rules where a column has a value per rule (a product code, say), each such mask
+     drops from rules / 8 bytes to a few longs, and that column's memory from classes × rules to
+     about the number of rules. A table of up to 192 rules (three words) stores only its empty masks
+     sparse, as one shared empty array. Under ANY, the per-rule masks of the rules with the same
+     outputs are stored the same way.
 3. **Evaluation.** `evaluate(input)` reads each column's value through the bound getter
-   (`InputStrategy`), finds its class, and ANDs the masks, 64 rules per machine word. The hit policy
+   (`InputStrategy`), finds its class, and ANDs the masks, 64 rules per machine word. Columns are
+   evaluated with the fewest wildcards first. Once a column's mask is sparse, the candidates are
+   confined to its few words: they are kept as (word, bits) pairs, and each later column intersects
+   only those, so a lookup by code touches a word or two instead of the whole table. The hit policy
    then reads the result: FIRST and PRIORITY take the lowest set bit (bits are numbered in rule or
    priority order), UNIQUE and ANY check their constraint, RULE ORDER, OUTPUT ORDER and COLLECT walk
    the set bits, and COLLECT aggregates with SUM, MIN, MAX or COUNT (`OutputStrategy`).

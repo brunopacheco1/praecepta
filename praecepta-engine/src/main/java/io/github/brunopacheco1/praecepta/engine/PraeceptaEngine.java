@@ -91,7 +91,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * ({@link PraeceptaOutput#expressions()}, such as {@code Symptom + " is listed"}) has its output
  * computed and converted again, into a new instance, on every evaluation that selects it. Matching
  * uses one bitmask per class of column values (the values the
- * rules cannot tell apart), so memory grows linearly with the table.
+ * rules cannot tell apart), so memory grows linearly with the table; the mask of a class that only a
+ * few rules accept, such as one product code among thousands, is stored compactly.
  *
  * @param <I> the input type
  * @param <O> the output type
@@ -162,9 +163,9 @@ public final class PraeceptaEngine<I, O> {
                     var columnCells = inBitOrder(cells.get(column), bitToRule);
                     var allowed = parseAllowedValues(column, type, allowedValues.get(column));
                     return lists.contains(column)
-                            ? ColumnIndex.ofLists(column, type, columnCells, allowed, words, zoning(builder, column))
+                            ? ColumnIndex.ofLists(column, type, columnCells, allowed, words, zoning(builder, column), builder.maskForm)
                             : new ColumnIndex(column, type, columnCells, allowed, words, zoning(builder, column),
-                                    enumValues.get(column));
+                                    enumValues.get(column), builder.maskForm);
                 })
                 .toList();
         index = new BitsetIndex(columnIndexes, bitToRule);
@@ -199,7 +200,9 @@ public final class PraeceptaEngine<I, O> {
         }
         namesInputs = anyNamed;
         // with outputs that read inputs, ANY compares the outputs of each evaluation instead
-        sameOutputsByBit = hitPolicy == HitPolicy.ANY && !namesInputs ? sameOutputMasks(rules, bitToRule, index.words()) : null;
+        sameOutputsByBit = hitPolicy == HitPolicy.ANY && !namesInputs
+                ? sameOutputMasks(rules, bitToRule, index.words(), builder.maskForm)
+                : null;
         reduce = reducer(builder.aggregation, builder.outputStrategy);
         count = builder.aggregation == AggregationOperator.COUNT ? builder.outputStrategy::count : null;
         noMatch = count == null ? List.of() : List.of(count.apply(0));
@@ -253,7 +256,7 @@ public final class PraeceptaEngine<I, O> {
             }
             case ANY -> {
                 int bit = BitsetIndex.first(matches);
-                if (namesInputs ? !sameOutputs(matches, input, reader) : !BitsetIndex.isSubset(matches, sameOutputsByBit[bit])) {
+                if (namesInputs ? !sameOutputs(matches, input, reader) : !Masks.isSubset(matches, sameOutputsByBit[bit])) {
                     throw violation(matches);
                 }
                 yield single(bit, input, reader);
@@ -641,12 +644,16 @@ public final class PraeceptaEngine<I, O> {
         return key;
     }
 
-    /** Per bit, the mask of the rules with the same outputs as the bit's rule; equal outputs share one mask. */
-    private static long[][] sameOutputMasks(List<Praeceptum> rules, int[] bitToRule, int words) {
+    /**
+     * Per bit, the mask of the rules with the same outputs as the bit's rule; equal outputs share one
+     * mask, stored in its form ({@link Masks}): a rule whose outputs no other rule has holds one bit.
+     */
+    private static long[][] sameOutputMasks(List<Praeceptum> rules, int[] bitToRule, int words, Masks.Form form) {
         var maskByOutput = new HashMap<Object, long[]>();
         for (int bit = 0; bit < bitToRule.length; bit++) {
             BitsetIndex.set(maskByOutput.computeIfAbsent(rules.get(bitToRule[bit]).output(), output -> new long[words]), bit);
         }
+        maskByOutput.replaceAll((output, mask) -> Masks.compact(mask, form));
         var masks = new long[bitToRule.length][];
         for (int bit = 0; bit < bitToRule.length; bit++) {
             masks[bit] = maskByOutput.get(rules.get(bitToRule[bit]).output());
@@ -901,6 +908,7 @@ public final class PraeceptaEngine<I, O> {
         private AggregationOperator aggregation;
         private List<Praeceptum> rules;
         private Severity failOn;
+        private Masks.Form maskForm = Masks.Form.AUTO;
 
         private final Map<String, Binding<I>> bindings = new LinkedHashMap<>();
         private InputStrategy<I> inputStrategy;
@@ -1155,6 +1163,12 @@ public final class PraeceptaEngine<I, O> {
         /** Fail {@link #build()} with an {@link InvalidDecisionTableException} if validation finds issues this severe. */
         public Builder<I, O> failOn(Severity severity) {
             this.failOn = Objects.requireNonNull(severity, "severity");
+            return this;
+        }
+
+        /** Test hook: stores the masks in this form instead of choosing by density ({@link Masks.Form#AUTO}). */
+        Builder<I, O> maskForm(Masks.Form form) {
+            this.maskForm = Objects.requireNonNull(form, "form");
             return this;
         }
 

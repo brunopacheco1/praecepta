@@ -66,9 +66,12 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * <p>A STRING column bound to an enum precomputes one mask per constant, so its lookup is an array
  * access by ordinal instead of a hash lookup (the int-coded input path).
  *
+ * <p>Each class mask is stored dense or, when few rules accept the class, sparse ({@link Masks}); the
+ * masks {@link #maskFor} returns are in either form.
+ *
  * <p>A column that holds lists ({@link #ofLists}) delegates its lookup to a {@link ListColumn}, which
  * classifies each element with an index of the kinds above; to the static analysis it is a single
- * class, "any list".
+ * class, "any list". The masks it returns are dense.
  */
 final class ColumnIndex {
 
@@ -97,7 +100,9 @@ final class ColumnIndex {
     /** The value classes, by class number. */
     private final List<ValueClass> classes;
     final int nullClass;
-    /** Per class, the rules (bits) accepting it. */
+    /** Words in a dense mask: the table's rules / 64, rounded up. */
+    private final int words;
+    /** Per class, the rules (bits) accepting it, dense or sparse ({@link Masks}). */
     final long[][] masks;
     /** Classes holding no value at all (see {@link OpenIntervals#isEmpty}). */
     final boolean[] empty;
@@ -115,10 +120,11 @@ final class ColumnIndex {
      * @param zoning     for a TIME or DATE_TIME column, whether its inputs come with a time zone, without
      *                   one or either way; ignored for other types
      * @param enumValues for a STRING column bound to an enum: each constant's value, by ordinal; else null
+     * @param form       the form each class mask is stored in
      * @throws InvalidDecisionTableException if an enum value is outside the declared input values
      */
     ColumnIndex(String name, ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues, int words, Zoning zoning,
-            String[] enumValues) {
+            String[] enumValues, Masks.Form form) {
         this.name = name;
         this.type = type;
         this.isString = type == ColumnType.STRING;
@@ -144,16 +150,20 @@ final class ColumnIndex {
         partition.add(new ValueClass.Missing());
         classes = List.copyOf(partition);
 
-        masks = new long[classes.size()][words];
+        this.words = words;
+        masks = new long[classes.size()][];
         empty = new boolean[classes.size()];
         allowed = new boolean[classes.size()];
         for (int k = 0; k < classes.size(); k++) {
             var valueClass = classes.get(k);
             empty[k] = valueClass instanceof ValueClass.Between(var low, var high, var zoned) && OpenIntervals.isEmpty(type, low, high, zoned);
             allowed[k] = allowedValues == null || valueClass instanceof ValueClass.Missing || accepts(allowedValues, valueClass);
+            // built dense one class at a time, then stored in its form: never all dense at once
+            var mask = new long[words];
             if (!empty[k]) {
-                markAcceptingRules(masks[k], cellsByBit, valueClass);
+                markAcceptingRules(mask, cellsByBit, valueClass);
             }
+            masks[k] = Masks.compact(mask, form);
         }
 
         if (isString) {
@@ -175,10 +185,12 @@ final class ColumnIndex {
      * apply to the elements. Its cells test elements, so the classes of single values say nothing about
      * which lists a rule matches: to the static analysis the column has one class, "any list", accepted
      * by every rule, and the engine leaves the rules that constrain it out of the analysis.
+     *
+     * @param form the form the class masks of single elements are stored in; the list masks are dense
      */
     static ColumnIndex ofLists(String name, ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues, int words,
-            Zoning zoning) {
-        var elements = new ColumnIndex(name, type, cellsByBit, allowedValues, words, zoning, null);
+            Zoning zoning, Masks.Form form) {
+        var elements = new ColumnIndex(name, type, cellsByBit, allowedValues, words, zoning, null, form);
         return new ColumnIndex(name, type, new ListColumn(name, type, elements, cellsByBit, words), cellsByBit.size(), words);
     }
 
@@ -200,6 +212,7 @@ final class ColumnIndex {
         for (int bit = 0; bit < rules; bit++) {
             BitsetIndex.set(all, bit);
         }
+        this.words = words;
         masks = new long[][] {all, all.clone()};
         empty = new boolean[2];
         allowed = new boolean[] {true, true};
@@ -387,6 +400,7 @@ final class ColumnIndex {
      * LocalDate, Boolean, LocalTime, OffsetTime, LocalDateTime, ZonedDateTime, Duration or Period) or its
      * text. Blank text counts as missing.
      *
+     * @return the class's mask, dense or sparse ({@link Masks}); shared, so never to be changed
      * @throws InvalidInputException if the value is outside the declared input values, or text that
      *                               is not a valid value of the column's type
      */
@@ -567,6 +581,11 @@ final class ColumnIndex {
 
     int classCount() {
         return masks.length;
+    }
+
+    /** Whether the rule owning {@code bit} accepts the class. */
+    boolean accepts(int valueClass, int bit) {
+        return Masks.get(masks[valueClass], words, bit);
     }
 
     /**

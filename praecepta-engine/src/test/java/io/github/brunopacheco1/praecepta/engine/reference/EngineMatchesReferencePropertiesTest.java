@@ -37,17 +37,27 @@ import net.jqwik.api.Provide;
  * {@link ReferenceMatcher}, an executable statement of strict DMN 1.3 semantics with FEEL unary tests.
  *
  * <p>{@code perColumn} alternates between the two ways of binding inputs: typed getters, and text
- * maps parsed per column type.
+ * maps parsed per column type. Each scenario also picks the form the engine stores its masks in
+ * (dense, chosen by density, sparse wherever possible, or a mix of both), and the wide scenarios have up to 200
+ * rules, so masks of several words, sparse and dense, are checked against the reference.
  */
 class EngineMatchesReferencePropertiesTest {
 
     private static final int TRIES = 1000;
     /** Static analysis is checked by brute force over every input region, so fewer tries. */
     private static final int ANALYSIS_TRIES = 300;
+    /** Tables of up to 200 rules: each try evaluates every hit policy. */
+    private static final int WIDE_TRIES = 200;
+    private static final int WIDE_ANALYSIS_TRIES = 50;
 
     @Provide
     Arbitrary<DecisionTableScenario> scenarios() {
         return DecisionTableScenario.arbitrary();
+    }
+
+    @Provide
+    Arbitrary<DecisionTableScenario> wideScenarios() {
+        return DecisionTableScenario.wide();
     }
 
     @Provide
@@ -133,11 +143,32 @@ class EngineMatchesReferencePropertiesTest {
         }
     }
 
+    // ---- tables of several words -----------------------------------------------------------------
+
+    @Property(tries = WIDE_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void wide_tables_match_the_reference_under_every_hit_policy(@ForAll("wideScenarios") DecisionTableScenario s,
+            @ForAll("priorities") List<String> priority, @ForAll boolean perColumn) {
+        for (var policy : HitPolicy.values()) {
+            var rules = policy == HitPolicy.ANY ? DecisionTableScenario.outOnly(s.rules()) : s.rules();
+            assertSameHits(s, rules, policy, priority, perColumn);
+        }
+    }
+
+    @Property(tries = WIDE_ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void wide_tables_validation_report_matches_the_reference(@ForAll("wideScenarios") DecisionTableScenario s,
+            @ForAll("priorities") List<String> priority) {
+        assertSameFindings(s, priority);
+    }
+
     // ---- static analysis ------------------------------------------------------------------------
 
     @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
     void validation_report_matches_the_reference(@ForAll("scenarios") DecisionTableScenario s,
             @ForAll("priorities") List<String> priority) {
+        assertSameFindings(s, priority);
+    }
+
+    private static void assertSameFindings(DecisionTableScenario s, List<String> priority) {
         for (var policy : List.of(HitPolicy.UNIQUE, HitPolicy.ANY, HitPolicy.FIRST, HitPolicy.PRIORITY)) {
             var rules = policy == HitPolicy.ANY ? DecisionTableScenario.outOnly(s.rules()) : s.rules();
             var engine = engine(s, rules, policy, priority, true);
@@ -224,6 +255,7 @@ class EngineMatchesReferencePropertiesTest {
     }
 
     private static <O> void configure(PraeceptaEngine.Builder<Map<String, Object>, O> builder, DecisionTableScenario s, boolean perColumn) {
+        s.applyMaskForm(builder);
         if (perColumn) {
             s.bindColumns(builder);
         } else {

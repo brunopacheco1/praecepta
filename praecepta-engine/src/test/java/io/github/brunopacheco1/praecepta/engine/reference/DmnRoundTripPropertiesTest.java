@@ -69,6 +69,7 @@ class DmnRoundTripPropertiesTest {
                 .table(read)
                 .output(output -> output);
         s.bindColumns(builder);
+        s.applyMaskForm(builder);
         var engine = builder.build();
 
         var reference = s.reference(rules, policy, DecisionTableScenario.outputPriority(policy, priority));

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import io.github.brunopacheco1.praecepta.engine.ForcedMaskForm;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
@@ -67,10 +68,11 @@ import net.jqwik.api.Tuple;
  *
  * @param zonedColumns the time and date-time columns whose inputs have a time zone
  * @param lists        the columns that hold lists
+ * @param maskForm     the form the engine stores its masks in
  */
 public record DecisionTableScenario(List<String> columns, Map<String, ColumnType> types, Map<String, String> allowedValues,
         List<Praeceptum> rules, List<Map<String, Object>> inputs, boolean feelCells, Set<String> zonedColumns,
-        Set<String> lists) {
+        Set<String> lists, ForcedMaskForm maskForm) {
 
     public static final String ID = "id";
     public static final String OUT = "out";
@@ -84,6 +86,10 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     static final LocalDate DAY0 = LocalDate.of(2025, 1, 1);
     static final LocalTime TIME0 = LocalTime.of(8, 0);
     static final LocalDateTime MOMENT0 = DAY0.atTime(6, 0);
+    /** Rules of a scenario: few, so that the reference's brute force stays quick and rules overlap often. */
+    private static final int MAX_RULES = 8;
+    /** Rules of a {@link #wide()} scenario: enough for masks of up to four words. */
+    private static final int MAX_WIDE_RULES = 200;
     /** String values: a column's domain is the first two to four; comparisons and intervals use all six. */
     private static final List<String> LETTERS = List.of("a", "b", "c", "d", "e", "f");
     /** The offsets times with a zone are written at. */
@@ -110,7 +116,15 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
 
     /** Scenarios in Praecepta's syntax, and as often in strict FEEL with cells naming other columns. */
     public static Arbitrary<DecisionTableScenario> arbitrary() {
-        return Arbitraries.oneOf(scenarios(false), scenarios(false).map(DecisionTableScenario::withVariableCells));
+        return Arbitraries.oneOf(scenarios(false, MAX_RULES), scenarios(false, MAX_RULES).map(DecisionTableScenario::withVariableCells));
+    }
+
+    /**
+     * Scenarios of up to {@link #MAX_WIDE_RULES} rules, as {@link #arbitrary()} makes them otherwise: their
+     * masks span several words, so a mask's words, and the edges between them, are exercised in every form.
+     */
+    public static Arbitrary<DecisionTableScenario> wide() {
+        return Arbitraries.oneOf(scenarios(false, MAX_WIDE_RULES), scenarios(false, MAX_WIDE_RULES).map(DecisionTableScenario::withVariableCells));
     }
 
     /**
@@ -137,7 +151,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             }
             rewritten.add(new Praeceptum(rule.priority(), new PraeceptaInput(cells), rule.output()));
         }
-        return new DecisionTableScenario(columns, types, allowedValues, List.copyOf(rewritten), inputs, true, zonedColumns, lists);
+        return new DecisionTableScenario(columns, types, allowedValues, List.copyOf(rewritten), inputs, true, zonedColumns, lists,
+                maskForm);
     }
 
     private String variableCell(ColumnType type, int r, int c) {
@@ -162,14 +177,15 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
 
     /** Scenarios where every string column declares its input values, so gaps are analysed. */
     public static Arbitrary<DecisionTableScenario> withStringValueLists() {
-        return scenarios(true);
+        return scenarios(true, MAX_RULES);
     }
 
-    private static Arbitrary<DecisionTableScenario> scenarios(boolean allStringsDeclared) {
+    private static Arbitrary<DecisionTableScenario> scenarios(boolean allStringsDeclared, int maxRules) {
         return column(allStringsDeclared).list().ofMinSize(1).ofMaxSize(3).flatMap(columns -> {
-            var rules = rule(columns).list().ofMinSize(1).ofMaxSize(8);
+            var rules = rule(columns).list().ofMinSize(1).ofMaxSize(maxRules);
             var inputs = input(columns).list().ofMinSize(1).ofMaxSize(12);
-            return Combinators.combine(rules, inputs).as((ruleRows, inputRows) -> build(columns, ruleRows, inputRows));
+            var forms = Arbitraries.of(ForcedMaskForm.values());
+            return Combinators.combine(rules, inputs, forms).as((ruleRows, inputRows, form) -> build(columns, ruleRows, inputRows, form));
         });
     }
 
@@ -410,7 +426,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         };
     }
 
-    private static DecisionTableScenario build(List<Column> columns, List<RuleRow> ruleRows, List<List<Object>> inputRows) {
+    private static DecisionTableScenario build(List<Column> columns, List<RuleRow> ruleRows, List<List<Object>> inputRows,
+            ForcedMaskForm maskForm) {
         var names = new ArrayList<String>();
         var types = new LinkedHashMap<String, ColumnType>();
         var allowed = new LinkedHashMap<String, String>();
@@ -456,7 +473,12 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             inputs.add(input);
         }
         return new DecisionTableScenario(List.copyOf(names), Map.copyOf(types), Map.copyOf(allowed), List.copyOf(rules), List.copyOf(inputs),
-                false, Set.copyOf(zoned), Set.copyOf(lists));
+                false, Set.copyOf(zoned), Set.copyOf(lists), maskForm);
+    }
+
+    /** Makes the builder store its masks in the scenario's form. */
+    public <O> void applyMaskForm(PraeceptaEngine.Builder<Map<String, Object>, O> builder) {
+        maskForm.applyTo(builder);
     }
 
     /**

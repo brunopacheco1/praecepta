@@ -81,6 +81,18 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   ([#70](https://github.com/brunopacheco1/praecepta/issues/70)).
 
 ### Changed
+- **Compact masks for large tables** ([#17](https://github.com/brunopacheco1/praecepta/issues/17)):
+  the mask of a column value that only a few rules accept is stored sparse, as its non-zero 64-bit
+  words, instead of one bit per rule. A mask is stored sparse only when at most a quarter of its
+  words hold a bit (so it takes at most half the memory), which never happens in tables of up to 192
+  rules except for empty masks; other masks stay dense, as before. When a column's mask is sparse,
+  evaluation intersects the later columns only on its words. Under ANY, the masks of rules with the
+  same outputs are stored the same way. There is no new dependency and no API change. On an Apple M2
+  Pro, with the new `lookup-<rules>` benchmark tables (a code per rule, as in a price list),
+  `lookup-10000` went from 17.6 to 4.6 MB of retained heap and from 676 to 387 ns/op
+  (`EvaluationBenchmark`); `mixed-10000` from 6.7 to 5.3 MB. `mixed-100`, `mixed-1000`,
+  `synthetic-1000` and `synthetic-10000` are unchanged within noise (331-353 ns/op against 331-336
+  before on `mixed-100`, 551-574 against 542-575 on `mixed-1000`, two runs each).
 - **Map-based inputs accept times and date-times with a time zone**, which they used to reject as
   invalid: they now match only the cells that accept any value (or test with zoned literals), and
   the validation report may list gaps among them for tables with time or date-time comparisons. Bind

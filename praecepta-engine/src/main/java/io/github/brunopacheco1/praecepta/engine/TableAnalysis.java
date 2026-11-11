@@ -156,9 +156,9 @@ final class TableAnalysis {
                 var masks = new ArrayList<long[]>();
                 var rest = coversRest[c + 1].clone();
                 for (int k = 0; k < col.classCount(); k++) {
-                    if (col.canOccur(k) && BitsetIndex.get(col.masks[k], bit)) {
+                    if (col.canOccur(k) && col.accepts(k, bit)) {
                         masks.add(col.masks[k]);
-                        BitsetIndex.and(rest, col.masks[k]);
+                        Masks.and(rest, col.masks[k]);
                     }
                 }
                 acceptedMasks[c] = masks.toArray(long[][]::new);
@@ -181,7 +181,7 @@ final class TableAnalysis {
             var nextStates = new LinkedHashSet<State>(); // classes leading to the same candidates are searched once
             for (var mask : acceptedMasks[column]) {
                 var next = candidates.clone();
-                BitsetIndex.and(next, mask);
+                Masks.and(next, mask);
                 if (BitsetIndex.isEmpty(next)) {
                     return false; // inputs of this class reach the rule
                 }
@@ -265,7 +265,7 @@ final class TableAnalysis {
     private boolean isConstrained(ColumnIndex col) {
         var all = index.allRules();
         for (int k = 0; k < col.classCount(); k++) {
-            if (!col.empty[k] && !Arrays.equals(col.masks[k], all)) {
+            if (!col.empty[k] && !Arrays.equals(Masks.dense(col.masks[k], all.length), all)) {
                 return true;
             }
         }
@@ -326,7 +326,7 @@ final class TableAnalysis {
                 continue;
             }
             var next = candidates.clone();
-            BitsetIndex.and(next, col.masks[k]);
+            Masks.and(next, col.masks[k]);
             byCandidates.computeIfAbsent(key(next), mask -> new Branch(next)).classes.add(k);
         }
         return byCandidates.values();

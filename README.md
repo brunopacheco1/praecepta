@@ -37,7 +37,9 @@ them when you build; evaluate them with a dependency-free engine.
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
   rules that can never be selected (FIRST, PRIORITY), and gaps (declared inputs no rule matches)
 - Bitset matching: memory grows linearly with the table (10,000 rules take 1.5 to 5 MB of heap,
-  against about 90 to 130 MB for Camunda and Drools) and most engines build in milliseconds
+  against about 90 to 130 MB for Camunda and Drools) and most engines build in milliseconds; the
+  mask of a value only a few rules accept, such as a product code, is stored compactly, so even a
+  column with a value per rule stays small
 - Enum inputs: lookups by ordinal instead of hashing
 - Immutable, thread-safe engines; no runtime dependencies
 - Rules from code, Excel, CSV or DMN files (DMN 1.1 to 1.5, as written by Camunda Modeler and
@@ -355,6 +357,9 @@ The tables (`-p table=...`) are:
 - `mixed-<rules>[x<columns>]`: generated tables mixing string, number and date columns, with
   comparisons, intervals and `not(...)` (COLLECT);
 - `unique-<rules>[x<columns>]`: generated string tables whose rules never overlap (UNIQUE);
+- `lookup-<rules>[x<columns>]`: generated string tables with many values per column, as in a price
+  list by product code: each rule has its own code, so most value classes hold a few rules
+  (COLLECT);
 - a suffix `-first`, `-priority`, `-ruleorder`, `-collect` or `-unique` changes only the hit
   policy: `mixed-1000-first` has the rules of `mixed-1000`.
 
