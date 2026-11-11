@@ -69,19 +69,20 @@ public record DecisionTable(
         for (var rule : rules) {
             for (var input : inputs) {
                 var cell = CellParser.parseFeel(rule.input().values().get(input.name()), input.type());
-                for (var name : UnaryTests.names(cell)) {
-                    if (columns.contains(name)) {
-                        continue;
-                    }
-                    var previous = named.putIfAbsent(name, input.type());
-                    if (previous != null && previous != input.type()) {
-                        throw new IllegalArgumentException("'%s' is compared with both a %s and a %s column"
-                                .formatted(name, previous.feelName(), input.type().feelName()));
-                    }
-                }
+                UnaryTests.names(cell).stream()
+                        .filter(name -> !columns.contains(name))
+                        .forEach(name -> nameInput(named, name, input.type()));
             }
         }
         return named;
+    }
+
+    private static void nameInput(Map<String, ColumnType> named, String name, ColumnType type) {
+        var previous = named.putIfAbsent(name, type);
+        if (previous != null && previous != type) {
+            throw new IllegalArgumentException("'%s' is compared with both a %s and a %s column"
+                    .formatted(name, previous.feelName(), type.feelName()));
+        }
     }
 
     /**

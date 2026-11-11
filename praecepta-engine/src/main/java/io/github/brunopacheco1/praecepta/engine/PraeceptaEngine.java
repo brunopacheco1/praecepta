@@ -308,20 +308,7 @@ public final class PraeceptaEngine<I, O> {
                 if (!cell.namesInputs()) {
                     continue;
                 }
-                var rule = rules.get(r);
-                for (var name : UnaryTests.names(cell)) {
-                    var type = types.get(column);
-                    var known = types.containsKey(name) ? types.get(name) : named.get(name);
-                    if (known == null && !mapInputs) {
-                        throw new InvalidDecisionTableException("Rule %s, column '%s': compares with '%s', which has no input binding"
-                                .formatted(rule.priority(), column, name));
-                    }
-                    if (known != null && known != type) {
-                        throw new InvalidDecisionTableException("Rule %s, column '%s': compares a %s with '%s', a %s"
-                                .formatted(rule.priority(), column, type.feelName(), name, known.feelName()));
-                    }
-                    named.putIfAbsent(name, type);
-                }
+                nameInputs(rules.get(r), column, cell, types, named, mapInputs);
                 byRule.computeIfAbsent(r, any -> new LinkedHashMap<>()).put(column, cell);
                 columnCells.set(r, new UnaryTests.Any());
             }
@@ -333,6 +320,27 @@ public final class PraeceptaEngine<I, O> {
             }
         });
         return byRule;
+    }
+
+    /**
+     * Adds to {@code named} the inputs {@code cell} compares with, checked: each has an input binding
+     * (or inputs are maps) and the type of {@code column}.
+     */
+    private static void nameInputs(Praeceptum rule, String column, UnaryTests cell, Map<String, ColumnType> types,
+            Map<String, ColumnType> named, boolean mapInputs) {
+        var type = types.get(column);
+        for (var name : UnaryTests.names(cell)) {
+            var known = types.containsKey(name) ? types.get(name) : named.get(name);
+            if (known == null && !mapInputs) {
+                throw new InvalidDecisionTableException("Rule %s, column '%s': compares with '%s', which has no input binding"
+                        .formatted(rule.priority(), column, name));
+            }
+            if (known != null && known != type) {
+                throw new InvalidDecisionTableException("Rule %s, column '%s': compares a %s with '%s', a %s"
+                        .formatted(rule.priority(), column, type.feelName(), name, known.feelName()));
+            }
+            named.putIfAbsent(name, type);
+        }
     }
 
     /** The variable cells by bit, with columns as positions in the evaluation order; null for rules without any. */
@@ -391,9 +399,31 @@ public final class PraeceptaEngine<I, O> {
 
     /**
      * A rule's outputs that name an input: its other outputs, and for each named one, the output
-     * column and the input column's position in the evaluation order.
+     * column and the input column's position in the evaluation order. A class, not a record: it holds
+     * arrays and is never compared.
      */
-    private record NamedInputs(Map<String, String> values, String[] outputs, int[] columns) {
+    private static final class NamedInputs {
+        private final Map<String, String> values;
+        private final String[] outputs;
+        private final int[] columns;
+
+        NamedInputs(Map<String, String> values, String[] outputs, int[] columns) {
+            this.values = values;
+            this.outputs = outputs;
+            this.columns = columns;
+        }
+
+        Map<String, String> values() {
+            return values;
+        }
+
+        String[] outputs() {
+            return outputs;
+        }
+
+        int[] columns() {
+            return columns;
+        }
     }
 
     /**
