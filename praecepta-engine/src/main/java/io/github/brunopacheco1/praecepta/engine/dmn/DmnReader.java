@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -139,20 +140,40 @@ public final class DmnReader {
 
         var rules = new ArrayList<Praeceptum>();
         var ruleElements = children(table, "rule");
+        var columns = new HashSet<String>();
+        inputs.forEach(input -> columns.add(input.name()));
+        var names = new ArrayList<NamedInput>();
         for (int i = 0; i < ruleElements.size(); i++) {
-            rules.add(rule(ruleElements.get(i), i + 1, inputs, lists, outputs, where));
+            rules.add(rule(ruleElements.get(i), i + 1, inputs, lists, outputs, where, columns, names));
         }
         // cells stay strict FEEL, where a name compares with another input
-        var read = new DecisionTable(name, hitPolicy, aggregation, inputs, outputs, rules, true, lists);
-        Map<String, ColumnType> named;
-        try {
-            named = read.namedInputs();
-        } catch (IllegalArgumentException e) {
-            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+        var named = namedInputs(names, where);
+        if (!named.isEmpty()) {
+            lists.addAll(namedListInputs(decision.getOwnerDocument().getDocumentElement(), named, types, where));
         }
-        lists.addAll(namedListInputs(decision.getOwnerDocument().getDocumentElement(), named, types, where));
         var checked = checkComputedOutputs(rules, inputs, named, lists, outputs, where);
         return new DecisionTable(name, hitPolicy, aggregation, inputs, outputs, checked, true, lists);
+    }
+
+    /** An input a cell compares with that is not a column of the table, with the type of the column whose cell names it. */
+    private record NamedInput(String name, ColumnType type) {
+    }
+
+    /**
+     * The inputs the cells compare with, as {@link DecisionTable#namedInputs} finds them, from the names the
+     * cells were found to hold when they were read: each with the type of the column that names it, in the
+     * order first named. Reading them here spares parsing every cell again.
+     */
+    private static Map<String, ColumnType> namedInputs(List<NamedInput> names, String where) {
+        var named = new LinkedHashMap<String, ColumnType>();
+        for (var input : names) {
+            var previous = named.putIfAbsent(input.name(), input.type());
+            if (previous != null && previous != input.type()) {
+                throw new InvalidDecisionTableException("%s: '%s' is compared with both a %s and a %s column"
+                        .formatted(where, input.name(), previous.feelName(), input.type().feelName()));
+            }
+        }
+        return named;
     }
 
     /**
@@ -272,10 +293,12 @@ public final class DmnReader {
     /**
      * A rule, with its input entries kept as written (once checked) and its output entries as plain text.
      *
-     * @param number the rule's number, from 1 in table order
+     * @param number  the rule's number, from 1 in table order
+     * @param columns the names of the table's columns
+     * @param names   where the inputs the rule's cells compare with, other than columns, are added
      */
     private static Praeceptum rule(Element rule, int number, List<InputColumn> inputs, Set<String> lists, List<OutputColumn> outputs,
-            String where) {
+            String where, Set<String> columns, List<NamedInput> names) {
         var ruleWhere = where + ", rule " + number;
         var inputEntries = children(rule, "inputEntry");
         var outputEntries = children(rule, "outputEntry");
@@ -289,9 +312,16 @@ public final class DmnReader {
             var text = textOf(inputEntries.get(c)).strip();
             var cellWhere = ruleWhere + ", column '" + column.name() + "'";
             if (lists.contains(column.name())) {
-                parseListCell(text, column.type(), cellWhere);
+                parseListCell(text, column.type(), cellWhere); // a list column's cells name no input
             } else {
-                parseCell(text, column.type(), cellWhere);
+                var cell = parseCell(text, column.type(), cellWhere);
+                if (cell.namesInputs()) {
+                    for (var name : UnaryTests.names(cell)) {
+                        if (!columns.contains(name)) {
+                            names.add(new NamedInput(name, column.type()));
+                        }
+                    }
+                }
             }
             cells.put(column.name(), text);
         }

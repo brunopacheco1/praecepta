@@ -129,7 +129,18 @@ public sealed interface UnaryTests {
      * be decided once that input's value is known.
      */
     default boolean namesInputs() {
-        return !names(this).isEmpty();
+        for (var test : tests()) {
+            boolean names = switch (test) {
+                case NullTest n -> false;
+                case Equals(var value) -> value instanceof Name;
+                case Compare(var operator, var value) -> value instanceof Name;
+                case Range(var low, var lowClosed, var high, var highClosed) -> low instanceof Name || high instanceof Name;
+            };
+            if (names) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

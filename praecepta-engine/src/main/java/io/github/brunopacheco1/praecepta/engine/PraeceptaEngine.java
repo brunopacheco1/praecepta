@@ -994,11 +994,13 @@ public final class PraeceptaEngine<I, O> {
         private Map<String, ColumnType> tableTypes;
         /** The inputs a {@link #table(DecisionTable)} declares as lists, checked against the bindings. */
         private Set<String> tableLists = Set.of();
+        /** The {@link #table(DecisionTable)}, whose cells name the inputs they compare with. */
+        private DecisionTable table;
         /**
-         * The inputs of a {@link #table(DecisionTable)} that hold single values: its columns, and the inputs
-         * its cells compare with, but for its lists; checked against the bindings.
+         * The inputs a {@link #table(DecisionTable)}'s cells compare with; null until a binding that is not
+         * one of its columns asks, since finding them parses every cell.
          */
-        private Set<String> tableSingles = Set.of();
+        private Set<String> tableNamedInputs;
         /** Output column types of a {@link #table(DecisionTable)}: its number outputs are compared by value. */
         private Map<String, ColumnType> tableOutputTypes = Map.of();
         /** With {@link #inputs(InputStrategy)}: the inputs that hold lists. */
@@ -1035,10 +1037,8 @@ public final class PraeceptaEngine<I, O> {
             }
             tableTypes = types;
             tableLists = table.listInputs();
-            var singles = new HashSet<>(types.keySet());
-            singles.addAll(namedInputs(table));
-            singles.removeAll(tableLists);
-            tableSingles = singles;
+            this.table = table;
+            tableNamedInputs = null;
             var outputTypes = new LinkedHashMap<String, ColumnType>();
             table.outputs().forEach(output -> outputTypes.put(output.name(), output.type()));
             tableOutputTypes = outputTypes;
@@ -1052,6 +1052,23 @@ public final class PraeceptaEngine<I, O> {
                 }
             }
             return this;
+        }
+
+        /**
+         * Whether an input holds single values in the {@link #table(DecisionTable)}: it is one of its
+         * columns, or an input its cells compare with, and not one of its lists.
+         */
+        private boolean tableHoldsSingles(String input) {
+            if (tableLists.contains(input)) {
+                return false;
+            }
+            if (tableTypes.containsKey(input)) {
+                return true;
+            }
+            if (tableNamedInputs == null) {
+                tableNamedInputs = namedInputs(table);
+            }
+            return tableNamedInputs.contains(input);
         }
 
         /** The inputs a table's cells compare with; none if a cell is invalid, which {@link #build()} reports. */
@@ -1313,7 +1330,7 @@ public final class PraeceptaEngine<I, O> {
             }
             if (inputStrategy != null) {
                 for (var column : listColumns) {
-                    require(!tableSingles.contains(column), "input '%s' holds single values in the table; listColumnType(...) cannot make it a list"
+                    require(!tableHoldsSingles(column), "input '%s' holds single values in the table; listColumnType(...) cannot make it a list"
                             .formatted(column));
                 }
                 return;
@@ -1328,7 +1345,7 @@ public final class PraeceptaEngine<I, O> {
             }
             bindings.forEach((input, binding) -> {
                 // the table's columns, and the inputs its cells compare with
-                if (tableSingles.contains(input) || tableLists.contains(input)) {
+                if (tableHoldsSingles(input) || tableLists.contains(input)) {
                     boolean list = tableLists.contains(input);
                     require(binding.list() == list, list
                             ? "input '%s' holds lists in the table; bind it with listInput(...)".formatted(input)

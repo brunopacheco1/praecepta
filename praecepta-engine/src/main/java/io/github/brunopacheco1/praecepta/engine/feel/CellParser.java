@@ -90,7 +90,10 @@ public final class CellParser {
      */
     public static boolean isName(String text) {
         int previous = '.'; // the text starts a part, as if after a dot
-        for (int c : text.codePoints().toArray()) {
+        int i = 0;
+        while (i < text.length()) {
+            int c = text.codePointAt(i);
+            i += Character.charCount(c);
             boolean separator = c == '.' || c == ' ';
             boolean afterSeparator = previous == '.' || previous == ' ';
             boolean valid = separator
