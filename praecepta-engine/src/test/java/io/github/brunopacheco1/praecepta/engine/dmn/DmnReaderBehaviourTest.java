@@ -86,7 +86,7 @@ class DmnReaderBehaviourTest {
         Assertions.assertThatThrownBy(() -> DmnReader.read(list))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessage("Decision 'd', rule 1, output 'o': '1, 2' is not supported; output entries must be literals, name an input, "
-                        + "or join literals and inputs with +, -, * and / ('1, 2' is not a supported output expression: unexpected ', 2')");
+                        + "or join literals and inputs with +, -, *, / and ** ('1, 2' is not a supported output expression: unexpected ', 2')");
     }
 
     @Test

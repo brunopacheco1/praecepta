@@ -34,7 +34,7 @@ them when you build; evaluate them with a dependency-free engine.
   cells from earlier versions keep working
 - Times and date-times with or without a time zone; those with one compare by instant, as in FEEL
 - List inputs, such as a customer's nationalities: a cell holds when some element passes it
-- DMN output entries that name an input or compute with `+`, `-`, `*` and `/`
+- DMN output entries that name an input or compute with `+`, `-`, `*`, `/` and `**`
   (`(price - discount) * 1.2`, `Symptom + " is listed"`), evaluated only for the rules that match
 - Optional DMN input value lists: values outside them are rejected
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
@@ -81,7 +81,7 @@ Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drool
 - **Full FEEL**: functions, contexts, `if`, and tests that compute (e.g. `income > 2 * rent`).
   Praecepta's input entries are FEEL *simple unary tests*: in DMN they may compare with another
   input (`> limit`) or test a list's elements, but not compute. Output entries may compute with `+`,
-  `-`, `*` and `/`, but call no functions.
+  `-`, `*`, `/` and `**`, but call no functions.
 - **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
   boxed expressions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)).
 - **A process engine, a modeller or a decision service** around the tables.
@@ -254,9 +254,9 @@ entries test the elements with FEEL's list functions (`list contains(?, "PT")`,
 `some x in ? satisfies x >= 18`, `? = null`, joined with `or`, and `not(...)`); entries that name a
 list input (`Flu Symptoms`, typed by its `inputData`), which hold when the value is in the list;
 output entries that are literals, name one of the table's inputs (`a` returns the input `a`), or
-compute their value from literals and inputs with `+`, `-`, `*`, `/` and parentheses
-(`Symptom + " is listed"`, `(price - discount) * 1.2`: `+` joins strings or adds numbers, a missing
-operand gives a missing output), where an input is a column or an input the cells compare with that
+compute their value from literals and inputs with `+`, `-`, `*`, `/`, `**` and parentheses
+(`Symptom + " is listed"`, `(price - discount) * 1.2`, `amount * (1 + rate) ** years`: `+` joins strings
+or adds numbers, results have FEEL's 34 digits, and a missing operand gives a missing output), where an input is a column or an input the cells compare with that
 holds single values; times and date-times with or without a time zone; every hit policy,
 with SUM, MIN, MAX and COUNT aggregation. Anything else (a time with a zone id, function calls such
 as `upper case(a)`, `if`, inputs computed by other decisions) is rejected with a message naming the

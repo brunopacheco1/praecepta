@@ -6,7 +6,6 @@
 package io.github.brunopacheco1.praecepta.engine.feel;
 
 import java.math.BigDecimal;
-import java.math.MathContext;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -16,13 +15,18 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 /**
  * An output entry that computes its value, as DMN allows any FEEL expression there: the subset
  * Praecepta supports joins string and number literals and the names of inputs with {@code +},
- * {@code -}, {@code *}, {@code /}, unary minus and parentheses, as in
- * {@code Symptom + " is in the list of Flu symptoms"} or {@code (price - discount) * 1.2}.
+ * {@code -}, {@code *}, {@code /}, {@code **}, unary minus and parentheses, as in
+ * {@code Symptom + " is in the list of Flu symptoms"}, {@code (price - discount) * 1.2} or
+ * {@code amount * (1 + rate) ** years}.
  *
- * <p>FEEL's semantics: {@code +} concatenates two strings or adds two numbers; the other operators take
- * numbers. Numbers are decimals, and a quotient is rounded to 34 digits (FEEL's decimal128). An
- * operand that is missing (null) makes the result missing, and so does a division by zero. A string
- * and a number never combine (FEEL gives null); {@link #type} rejects them before any evaluation.
+ * <p>FEEL's semantics (DMN 1.5, Tables 57, 59 and 60): {@code +} concatenates two strings or adds two
+ * numbers; the other operators take numbers. Numbers are decimals, and every result is rounded to 34
+ * digits (FEEL's decimal128), ties to the even neighbour. An operand that is missing (null) makes the
+ * result missing, and so does a result FEEL does not define: a division by zero, zero to a negative
+ * power, a negative number to a power that is not whole, an exponent beyond 999,999,999 either way, or a
+ * number too large or too small for a decimal128. As FEEL has it, unary minus binds tighter than
+ * {@code **}, so {@code -4 ** 2} is 16, and {@code **} associates to the left like the other operators.
+ * A string and a number never combine (FEEL gives null); {@link #type} rejects them before any evaluation.
  */
 public sealed interface OutputExpression {
 
@@ -44,7 +48,7 @@ public sealed interface OutputExpression {
 
     /** An arithmetic operator. */
     enum Operator {
-        ADD("+"), SUBTRACT("-"), MULTIPLY("*"), DIVIDE("/");
+        ADD("+"), SUBTRACT("-"), MULTIPLY("*"), DIVIDE("/"), POWER("**");
 
         private final String symbol;
 
@@ -134,7 +138,7 @@ public sealed interface OutputExpression {
 
     /**
      * The expression's value: a {@code String}, a {@code BigDecimal}, or null if an operand is missing
-     * or a divisor is zero. The expression must have passed {@link #type}.
+     * or FEEL defines no result (a division by zero, say). The expression must have passed {@link #type}.
      *
      * @param inputs the value of each input it names: a {@code String} or {@code BigDecimal}, or null if missing
      */
@@ -142,7 +146,7 @@ public sealed interface OutputExpression {
         return switch (this) {
             case Literal(var value) -> value;
             case Name(var name) -> inputs.apply(name);
-            case Negation(var operand) -> operand.evaluate(inputs) instanceof BigDecimal number ? number.negate() : null;
+            case Negation(var operand) -> operand.evaluate(inputs) instanceof BigDecimal number ? FeelNumbers.negate(number) : null;
             case Arithmetic(var operator, var left, var right) -> {
                 var a = left.evaluate(inputs);
                 var b = right.evaluate(inputs);
@@ -155,10 +159,11 @@ public sealed interface OutputExpression {
                 var x = (BigDecimal) a;
                 var y = (BigDecimal) b;
                 yield switch (operator) {
-                    case ADD -> x.add(y);
-                    case SUBTRACT -> x.subtract(y);
-                    case MULTIPLY -> x.multiply(y);
-                    case DIVIDE -> y.signum() == 0 ? null : x.divide(y, MathContext.DECIMAL128);
+                    case ADD -> FeelNumbers.add(x, y);
+                    case SUBTRACT -> FeelNumbers.subtract(x, y);
+                    case MULTIPLY -> FeelNumbers.multiply(x, y);
+                    case DIVIDE -> FeelNumbers.divide(x, y);
+                    case POWER -> FeelNumbers.power(x, y);
                 };
             }
         };

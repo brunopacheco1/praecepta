@@ -20,12 +20,19 @@ import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression.Operator;
  *
  * <pre>
  *   sum     = product { ("+" | "-") product }
- *   product = unary { ("*" | "/") unary }
+ *   product = power { ("*" | "/") power }
+ *   power   = unary { "**" unary }
  *   unary   = "-" unary | primary
  *   primary = string | number | name | "(" sum ")"
  * </pre>
  *
- * A name is a FEEL name ({@link CellParser#isName}): words of letters, digits, {@code _} and {@code ?},
+ * So unary minus binds tighter than {@code **}, and {@code **} associates to the left: {@code -4 ** 2} is
+ * 16 and {@code 3 ** 4 ** 5} is {@code (3 ** 4) ** 5} (DMN 1.5, 10.3.1.2). A number is FEEL's numeric
+ * literal (grammar rule 35), with an optional exponent as in {@code 1.2e3}; a string takes FEEL's escape
+ * sequences (rule 64): {@code \n}, {@code \r}, {@code \t}, {@code \'}, {@code \"}, {@code \\}, and a
+ * code point as a backslash, {@code u} and four hexadecimal digits or {@code U} and six.
+ *
+ * <p>A name is a FEEL name ({@link CellParser#isName}): words of letters, digits, {@code _} and {@code ?},
  * separated by single spaces or dots, as in {@code Credit Score} or {@code Applicant.age}. A name
  * followed by {@code (} is a function call, which is not supported. The number of operators and
  * parentheses is bounded, so that evaluating a parsed expression never runs out of stack.
@@ -77,24 +84,33 @@ final class ExpressionParser {
     }
 
     private OutputExpression product() {
-        var expression = unary();
+        var expression = power();
         while (true) {
             skipWhitespace();
             var operator = next('*', Operator.MULTIPLY, '/', Operator.DIVIDE);
             if (operator == null) {
                 return expression;
             }
-            expression = new Arithmetic(operator, expression, unary());
+            expression = new Arithmetic(operator, expression, power());
+        }
+    }
+
+    private OutputExpression power() {
+        var expression = unary();
+        while (true) {
+            skipWhitespace();
+            if (!text.startsWith("**", position)) {
+                return expression;
+            }
+            position += 2;
+            count();
+            expression = new Arithmetic(Operator.POWER, expression, unary());
         }
     }
 
     /** The operator at the current position, consumed, if it is one of the two; else null. */
     private Operator next(char first, Operator firstOperator, char second, Operator secondOperator) {
         if (position < text.length() && (text.charAt(position) == first || text.charAt(position) == second)) {
-            // ** is FEEL's exponentiation, which is not supported
-            if (text.startsWith("**", position)) {
-                throw unsupported("** is not supported");
-            }
             count();
             return text.charAt(position++) == first ? firstOperator : secondOperator;
         }
@@ -145,11 +161,12 @@ final class ExpressionParser {
         var value = new StringBuilder();
         int i = position + 1;
         while (i < text.length() && text.charAt(i) != '"') {
-            if (text.charAt(i) == '\\' && i + 1 < text.length()) {
-                i++;
+            char c = text.charAt(i++);
+            if (c != '\\') {
+                value.append(c);
+            } else if (i < text.length()) {
+                i = escape(i, value);
             }
-            value.append(text.charAt(i));
-            i++;
         }
         if (i == text.length()) {
             throw unsupported("a string is not terminated");
@@ -158,10 +175,52 @@ final class ExpressionParser {
         return value.toString();
     }
 
+    /**
+     * Appends the character an escape sequence stands for (FEEL's grammar rule 64).
+     *
+     * @param at the index just after the backslash
+     * @return the index just after the sequence
+     */
+    private int escape(int at, StringBuilder value) {
+        char kind = text.charAt(at);
+        switch (kind) {
+            case 'n' -> value.append('\n');
+            case 'r' -> value.append('\r');
+            case 't' -> value.append('\t');
+            case '\'', '"', '\\' -> value.append(kind);
+            case 'u', 'U' -> {
+                int digits = kind == 'u' ? 4 : 6;
+                int end = at + 1 + digits;
+                boolean hexadecimal = end <= text.length() && text.substring(at + 1, end).chars().allMatch(c -> Character.digit(c, 16) >= 0);
+                int codePoint = hexadecimal ? Integer.parseInt(text, at + 1, end, 16) : -1;
+                if (!Character.isValidCodePoint(codePoint)) {
+                    throw unsupported("\\" + kind + " is not followed by the " + digits + " hexadecimal digits of a character");
+                }
+                value.appendCodePoint(codePoint);
+                return end;
+            }
+            default -> throw unsupported("\\" + kind + " is not an escape sequence; write \\\\ for a backslash");
+        }
+        return at + 1;
+    }
+
+    /** FEEL's numeric literal: digits with an optional fraction, or a fraction alone, and an optional exponent ({@code 1.2e3}). */
     private BigDecimal number() {
         int start = position;
         while (position < text.length() && (Character.isDigit(text.charAt(position)) || text.charAt(position) == '.')) {
             position++;
+        }
+        if (position < text.length() && (text.charAt(position) == 'e' || text.charAt(position) == 'E')) {
+            int digit = position + 1;
+            if (digit < text.length() && (text.charAt(digit) == '+' || text.charAt(digit) == '-')) {
+                digit++;
+            }
+            if (digit < text.length() && Character.isDigit(text.charAt(digit))) {
+                position = digit;
+                while (position < text.length() && Character.isDigit(text.charAt(position))) {
+                    position++;
+                }
+            }
         }
         var digits = text.substring(start, position);
         try {

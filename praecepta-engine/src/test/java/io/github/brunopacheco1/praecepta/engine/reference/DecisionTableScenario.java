@@ -279,42 +279,48 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     private static Arbitrary<RuleRow> rule(List<Column> columns) {
         var cells = new ArrayList<Arbitrary<String>>();
         columns.forEach(column -> cells.add(cell(column)));
-        var numberExpression = Arbitraries.frequencyOf(Tuple.of(12, Arbitraries.just(-1)), Tuple.of(4, Arbitraries.integers().between(0, 3)));
+        var numberExpression = Arbitraries.frequencyOf(Tuple.of(12, Arbitraries.just(-1)), Tuple.of(4, Arbitraries.integers().between(0, 5)));
         return Combinators.combine(Combinators.combine(cells).as(List::copyOf), Arbitraries.of(OUT_VALUES), Arbitraries.integers().between(1, 9),
-                Arbitraries.of(Echo.VALUE, Echo.VALUE, Echo.INPUT, Echo.EXPRESSION), Arbitraries.integers().between(0, 3), numberExpression)
+                Arbitraries.of(Echo.VALUE, Echo.VALUE, Echo.INPUT, Echo.EXPRESSION), Arbitraries.integers().between(0, 5), numberExpression)
                 .as(RuleRow::new);
     }
 
     /**
      * A number output expression over the first column of single numbers, or over literals if there is
-     * none; one form divides by zero, which gives a missing output.
+     * none; one form divides by zero, which gives a missing output, and two raise to whole powers (unary
+     * minus first, then from left to right), one of them zero to a negative power when the input is zero.
      */
     private static String numberExpression(List<String> names, Map<String, ColumnType> types, Set<String> lists, int form) {
         var number = names.stream().filter(name -> types.get(name) == ColumnType.NUMBER && !lists.contains(name)).findFirst();
         if (number.isPresent()) {
-            var n = number.get();
-            return List.of(n + " * 2 - 1", "-(" + n + " + 1.50) / 4", n + " / 0", "1 + " + n + " * " + n).get(form);
+            return overNumber(number.get()).get(form);
         }
-        return List.of("1 + 2 * 3", "(10 - 4) / 4", "1 / 0", "-2.50 * 2").get(form);
+        return List.of("1 + 2 * 3", "(10 - 4) / 4", "1 / 0", "-2.50 * 2", "-3 ** 2 / 7", "0 ** -1 + 2.5E-1").get(form);
+    }
+
+    /** The number expressions over a number input. */
+    private static List<String> overNumber(String n) {
+        return List.of(n + " * 2 - 1", "-(" + n + " + 1.50) / 4", n + " / 0", "1 + " + n + " * " + n,
+                "-" + n + " ** 2 + 2 ** 3 ** 2", n + " ** -2 * 1.5e1");
     }
 
     /**
      * An output expression over the first column of single strings or numbers, or over literals if there
      * is none: concatenation, arithmetic with every operator, unary minus and parentheses, a name read
-     * twice, and a division by zero, which gives null.
+     * twice, a division by zero, which gives null, whole powers, numbers with an exponent and escape
+     * sequences in strings.
      */
     private static String expression(List<String> names, Map<String, ColumnType> types, Set<String> lists, int form) {
         var string = names.stream().filter(name -> types.get(name) == ColumnType.STRING && !lists.contains(name)).findFirst();
         var number = names.stream().filter(name -> types.get(name) == ColumnType.NUMBER && !lists.contains(name)).findFirst();
         if (number.isPresent() && (string.isEmpty() || form % 2 == 0)) {
-            var n = number.get();
-            return List.of(n + " * 2 - 1", "-(" + n + " + 1.50) / 4", n + " / 0", "1 + " + n + " * " + n).get(form);
+            return overNumber(number.get()).get(form);
         }
         if (string.isPresent()) {
             var s = string.get();
             return List.of(s + " + \"!\"", "\"<\" + " + s + " + \">\"", s + " + " + s, "\"a \\\"quoted\\\" \" + " + s).get(form);
         }
-        return List.of("\"x\" + \"y\"", "1 + 2 * 3", "(10 - 4) / 4", "-2.50 * 2").get(form);
+        return List.of("\"x\" + \"y\"", "1 + 2 * 3", "(10 - 4) / 4", "-2.50 * 2", "2 ** 3 ** 0", "(1 / 3) * 3 - 1e0").get(form);
     }
 
     @SuppressWarnings("unchecked")

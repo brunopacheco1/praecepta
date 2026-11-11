@@ -59,12 +59,18 @@ over the value types of a cell (`UnaryTests`), or feed map-based inputs to table
     out of the static analysis, as rules that compare with another input are: they never count as
     overlapping or hiding another rule, and gaps are not searched while there are any.
 - **Output entries that are expressions** ([#71](https://github.com/brunopacheco1/praecepta/issues/71)):
-  an output may compute its value from literals and inputs with `+`, `-`, `*`, `/`, unary minus and
-  parentheses, as in `Symptom + " is in the list of Flu symptoms"` or `(price - discount) * 1.2`
-  (`feel.OutputExpression`). `+` joins two strings or adds two numbers, the others take numbers;
-  numbers are decimals, a quotient keeps 34 digits (FEEL's decimal128), and a computed number is
-  given without trailing zeros (`12`, not `12.00`). A missing operand or a division by zero gives a
-  missing output, as in FEEL. `PraeceptaOutput` gains `expressions` (output column to the expression
+  an output may compute its value from literals and inputs with `+`, `-`, `*`, `/`, `**`, unary minus
+  and parentheses, as in `Symptom + " is in the list of Flu symptoms"`, `(price - discount) * 1.2` or
+  `amount * (1 + rate) ** years` (`feel.OutputExpression`). `+` joins two strings or adds two numbers,
+  the others take numbers; numbers are decimals, every result is rounded to 34 digits, ties to even
+  (FEEL's decimal128; DMN 1.5, Tables 57, 59 and 60), and a computed number is given without trailing
+  zeros (`12`, not `12.00`). As FEEL has it, unary minus binds tighter than `**` (`-4 ** 2` is 16) and
+  `**` associates to the left; an exponent may be any number, so `2 ** 0.5` is a square root. Number
+  literals may have an exponent (`1.2e3`), and strings take FEEL's escape sequences (`\n`, `\t`,
+  `\"`, `\\`, `é`, `\U01F40E`). A missing operand gives a missing output, and so does a result
+  FEEL does not define: a division by zero, zero to a negative power, a negative number to a power
+  that is not whole, an exponent beyond ±999,999,999, or a number out of a decimal128's range.
+  `PraeceptaOutput` gains `expressions` (output column to the expression
   as written). The engine parses each expression and checks the types of the inputs it names when it
   is built (a string and a number never combine; inputs of other types are rejected), and evaluates
   it only for the rules that match, as it does for outputs that name an input. Under ANY the evaluated

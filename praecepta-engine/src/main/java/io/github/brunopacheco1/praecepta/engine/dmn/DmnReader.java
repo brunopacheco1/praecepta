@@ -60,7 +60,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * lists; output entries that are literals or name one of the table's inputs (of the output's type, or
  * any input for a string output; an input is a column or an input the cells compare with, and holds single
  * values), or that join string and number literals and the table's inputs with
- * {@code +}, {@code -}, {@code *} and {@code /} ({@link OutputExpression}, kept as written in
+ * {@code +}, {@code -}, {@code *}, {@code /} and {@code **} ({@link OutputExpression}, kept as written in
  * {@link PraeceptaOutput#expressions()}); every hit policy; SUM, MIN, MAX and COUNT aggregation. Anything else is rejected with an
  * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered
  * from 1 in table order.
@@ -366,7 +366,7 @@ public final class DmnReader {
             return OutputExpression.parse(text);
         } catch (ExpressionSyntaxException e) {
             throw new InvalidDecisionTableException(("%s: '%s' is not supported; output entries must be literals, name an input, "
-                    + "or join literals and inputs with +, -, * and / (%s)").formatted(where, text, e.getMessage()));
+                    + "or join literals and inputs with +, -, *, / and ** (%s)").formatted(where, text, e.getMessage()));
         }
     }
 

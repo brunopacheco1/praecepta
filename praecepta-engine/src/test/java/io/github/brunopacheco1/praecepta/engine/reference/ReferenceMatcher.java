@@ -245,7 +245,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     /**
      * An output expression on concrete values, as FEEL defines it: a missing operand gives null, {@code +}
-     * joins strings or adds numbers, a division by zero gives null and a quotient has 34 digits.
+     * joins strings or adds numbers, a division by zero gives null and every result has 34 digits
+     * (DMN 1.5, Tables 57, 59 and 60). Exponents are whole numbers here.
      */
     private static Object evaluate(OutputExpression expression, Function<String, Object> inputs) {
         return switch (expression) {
@@ -267,13 +268,25 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                 var x = (BigDecimal) a;
                 var y = (BigDecimal) b;
                 yield switch (arithmetic.operator()) {
-                    case ADD -> x.add(y);
-                    case SUBTRACT -> x.subtract(y);
-                    case MULTIPLY -> x.multiply(y);
+                    case ADD -> x.add(y).round(MathContext.DECIMAL128);
+                    case SUBTRACT -> x.subtract(y).round(MathContext.DECIMAL128);
+                    case MULTIPLY -> x.multiply(y).round(MathContext.DECIMAL128);
                     case DIVIDE -> y.compareTo(BigDecimal.ZERO) == 0 ? null : x.divide(y, MathContext.DECIMAL128);
+                    case POWER -> power(x, y.intValueExact());
                 };
             }
         };
+    }
+
+    /**
+     * A number to a whole power, as FEEL defines it: multiplied out exactly, then rounded once to 34 digits;
+     * a negative power is one over the positive one, and zero to a negative power is null.
+     */
+    private static BigDecimal power(BigDecimal x, int n) {
+        if (n >= 0) {
+            return x.pow(n).round(MathContext.DECIMAL128);
+        }
+        return x.signum() == 0 ? null : BigDecimal.ONE.divide(x.pow(-n), MathContext.DECIMAL128);
     }
 
     // ---- static analysis, by brute force --------------------------------------------------------

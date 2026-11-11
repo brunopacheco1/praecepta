@@ -274,7 +274,7 @@ final class TckRunner {
             Map.entry("constrains a collection as a whole", "allowed values of a whole list"),
             Map.entry("is a collection", "list outputs"),
             Map.entry("is a time with a zone id", "times with a zone id, which have no fixed offset"),
-            Map.entry("output entries must be literals", "output expressions beyond +, -, * and / of literals and inputs"));
+            Map.entry("output entries must be literals", "output expressions beyond +, -, *, / and ** of literals and inputs"));
 
     /**
      * A short, stable name for what {@link DmnReader} rejected, used to group results. A message that
