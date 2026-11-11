@@ -16,6 +16,7 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -174,29 +175,91 @@ class ColumnIndexBehaviourTest {
     }
 
     @Test
-    void times_with_an_offset_are_ordered_by_instant_on_a_line_of_their_own() {
+    void times_with_an_offset_are_ordered_by_instant_among_cells_with_an_offset() {
         // 09:00+01:00 is the instant of 08:00Z, and 10:00-02:00 that of 12:00Z: each pair is one boundary, written as first seen
         var column = columnTaking(ColumnType.TIME, Zoning.ZONED, null, "< time(\"08:00:00Z\")", "time(\"09:00:00+01:00\")",
-                "> time(\"10:00:00-02:00\")", "> time(\"08:00:00\")", "not(time(\"08:00:00\"))", "-", "null, time(\"12:00:00Z\")");
+                "> time(\"10:00:00-02:00\")", "-", "null, time(\"12:00:00Z\")");
         Assertions.assertThat(dump(column)).isEqualTo("""
-                0 (-inf..time("08:00:00Z")) rules=[0, 5] example=07:00Z (OffsetTime)
-                1 time("08:00:00Z") rules=[1, 5] example=08:00Z (OffsetTime)
-                2 (time("08:00:00Z")..time("10:00:00-02:00")) rules=[5] example=10:00Z (OffsetTime)
-                3 time("10:00:00-02:00") rules=[5, 6] example=10:00-02:00 (OffsetTime)
-                4 (time("10:00:00-02:00")..+inf) rules=[2, 5] example=11:00-02:00 (OffsetTime)
-                5 null missing rules=[4, 5, 6] example=-
+                0 (-inf..time("08:00:00Z")) rules=[0, 3] example=07:00Z (OffsetTime)
+                1 time("08:00:00Z") rules=[1, 3] example=08:00Z (OffsetTime)
+                2 (time("08:00:00Z")..time("10:00:00-02:00")) rules=[3] example=10:00Z (OffsetTime)
+                3 time("10:00:00-02:00") rules=[3, 4] example=10:00-02:00 (OffsetTime)
+                4 (time("10:00:00-02:00")..+inf) rules=[2, 3] example=11:00-02:00 (OffsetTime)
+                5 null missing rules=[3, 4] example=-
                 """);
         Assertions.assertThat(column.describe(List.of(0, 1, 2, 3, 4))).containsExactly("(-inf..+inf)");
         Assertions.assertThat(lookups(column, null, OffsetTime.of(9, 0, 0, 0, ZoneOffset.ofHours(1)), "07:59:59.999999999Z",
                 "13:00:00+01:00", "12:00:00.000000001Z", "08:00", "08:00@Europe/Paris")).isEqualTo("""
-                null -> [4, 5, 6]
-                '09:00+01:00' (OffsetTime) -> [1, 5]
-                '07:59:59.999999999Z' (String) -> [0, 5]
-                '13:00:00+01:00' (String) -> [5, 6]
-                '12:00:00.000000001Z' (String) -> [2, 5]
+                null -> [3, 4]
+                '09:00+01:00' (OffsetTime) -> [1, 3]
+                '07:59:59.999999999Z' (String) -> [0, 3]
+                '13:00:00+01:00' (String) -> [3, 4]
+                '12:00:00.000000001Z' (String) -> [2, 3]
                 '08:00' (String) -> Input c=08:00 has no time zone, which the column's input binding requires
                 '08:00@Europe/Paris' (String) -> Input c=08:00@Europe/Paris is not a valid time
                 """);
+    }
+
+    @Test
+    void times_with_an_offset_have_an_instant_and_a_local_time_when_cells_of_both_kinds_test_them() {
+        // a cell with an offset looks at the instant, one without at the local time: a class is a pair of the two
+        var column = columnTaking(ColumnType.TIME, Zoning.ZONED, null, "< time(\"08:00:00Z\")", "time(\"09:00:00+01:00\")",
+                "> time(\"10:00:00-02:00\")", "> time(\"08:00:00\")", "not(time(\"08:00:00\"))", "-", "null, time(\"12:00:00Z\")");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..time("08:00:00Z")) at local time (-inf..time("08:00:00")) rules=[0, 4, 5] example=03:59Z (OffsetTime)
+                1 (-inf..time("08:00:00Z")) at local time time("08:00:00") rules=[0, 5] example=08:00+01:00 (OffsetTime)
+                2 (-inf..time("08:00:00Z")) at local time (time("08:00:00")..+inf) rules=[0, 3, 4, 5] example=08:30+01:00 (OffsetTime)
+                3 time("08:00:00Z") at local time (-inf..time("08:00:00")) rules=[1, 4, 5] example=07:00-01:00 (OffsetTime)
+                4 time("08:00:00Z") at local time time("08:00:00") rules=[1, 5] example=08:00Z (OffsetTime)
+                5 time("08:00:00Z") at local time (time("08:00:00")..+inf) rules=[1, 3, 4, 5] example=09:00+01:00 (OffsetTime)
+                6 (time("08:00:00Z")..time("10:00:00-02:00")) at local time (-inf..time("08:00:00")) rules=[4, 5] example=07:30-01:00 (OffsetTime)
+                7 (time("08:00:00Z")..time("10:00:00-02:00")) at local time time("08:00:00") rules=[5] example=08:00-01:00 (OffsetTime)
+                8 (time("08:00:00Z")..time("10:00:00-02:00")) at local time (time("08:00:00")..+inf) rules=[3, 4, 5] example=10:00Z (OffsetTime)
+                9 time("10:00:00-02:00") at local time (-inf..time("08:00:00")) rules=[4, 5, 6] example=07:00-05:00 (OffsetTime)
+                10 time("10:00:00-02:00") at local time time("08:00:00") rules=[5, 6] example=08:00-04:00 (OffsetTime)
+                11 time("10:00:00-02:00") at local time (time("08:00:00")..+inf) rules=[3, 4, 5, 6] example=12:00Z (OffsetTime)
+                12 (time("10:00:00-02:00")..+inf) at local time (-inf..time("08:00:00")) rules=[2, 4, 5] example=07:30-05:00 (OffsetTime)
+                13 (time("10:00:00-02:00")..+inf) at local time time("08:00:00") rules=[2, 5] example=08:00-05:00 (OffsetTime)
+                14 (time("10:00:00-02:00")..+inf) at local time (time("08:00:00")..+inf) rules=[2, 3, 4, 5] example=18:00Z (OffsetTime)
+                15 null missing rules=[4, 5, 6] example=-
+                """);
+        // instants taken with all their local times merge; the others are given with theirs
+        Assertions.assertThat(column.describe(List.of(0, 1, 2, 3, 4, 5, 7, 8)))
+                .containsExactly("(-inf..time(\"08:00:00Z\")]",
+                        "(time(\"08:00:00Z\")..time(\"10:00:00-02:00\")) at local time [time(\"08:00:00\")..+inf)");
+        Assertions.assertThat(column.describe(List.of(1, 4))).containsExactly(
+                "(-inf..time(\"08:00:00Z\")) at local time time(\"08:00:00\")", "time(\"08:00:00Z\") at local time time(\"08:00:00\")");
+        Assertions.assertThat(column.describe(IntStream.range(0, 15).boxed().toList())).containsExactly("(-inf..+inf)");
+        Assertions.assertThat(lookups(column, null, OffsetTime.of(9, 0, 0, 0, ZoneOffset.ofHours(1)), "07:59:59.999999999Z",
+                "13:00:00+01:00", "08:00:00-04:00", "08:00:00.000000001-04:00", "08:00")).isEqualTo("""
+                null -> [4, 5, 6]
+                '09:00+01:00' (OffsetTime) -> [1, 3, 4, 5]
+                '07:59:59.999999999Z' (String) -> [0, 4, 5]
+                '13:00:00+01:00' (String) -> [3, 4, 5, 6]
+                '08:00:00-04:00' (String) -> [5, 6]
+                '08:00:00.000000001-04:00' (String) -> [2, 3, 4, 5]
+                '08:00' (String) -> Input c=08:00 has no time zone, which the column's input binding requires
+                """);
+    }
+
+    @Test
+    void no_time_has_an_instant_and_a_local_time_more_than_18_hours_apart() {
+        var column = columnTaking(ColumnType.TIME, Zoning.ZONED, null, "< time(\"05:00:00\")", "> time(\"23:00:00Z\")", "< time(\"01:00:00Z\")");
+        // before 05:00 on the clock and after 23:00 at offset zero would be more than 18 hours behind it
+        Assertions.assertThat(column.describe(3)).isEqualTo("time(\"01:00:00Z\") at local time (-inf..time(\"05:00:00\"))");
+        Assertions.assertThat(column.empty[3]).isFalse();
+        Assertions.assertThat(column.describe(12)).isEqualTo("(time(\"23:00:00Z\")..+inf) at local time (-inf..time(\"05:00:00\"))");
+        Assertions.assertThat(column.empty[12]).isTrue();
+        Assertions.assertThat(column.describe(13)).isEqualTo("(time(\"23:00:00Z\")..+inf) at local time time(\"05:00:00\")");
+        Assertions.assertThat(column.empty[13]).isTrue();
+        // 05:00:00.000000001-18:00 is 23:00:00.000000001Z
+        Assertions.assertThat(column.empty[14]).isFalse();
+        Assertions.assertThat(column.representative(14)).isInstanceOfSatisfying(OffsetTime.class, time -> {
+            Assertions.assertThat(time.toLocalTime()).isAfter(LocalTime.of(5, 0));
+            Assertions.assertThat(PrimitiveKeys.utcNanos(time)).isGreaterThan(LocalTime.of(23, 0).toNanoOfDay());
+        });
+        // on the clock at 05:00 exactly and at 23:00 at offset zero exactly: 05:00-18:00
+        Assertions.assertThat(column.representative(10)).isEqualTo(OffsetTime.of(5, 0, 0, 0, ZoneOffset.MIN));
     }
 
     @Test
@@ -218,54 +281,85 @@ class ColumnIndexBehaviourTest {
     }
 
     @Test
-    void map_inputs_split_times_without_and_with_a_zone_into_two_lines() {
+    void map_inputs_take_times_without_a_zone_by_local_time_and_those_with_one_by_instant_and_local_time() {
         var column = columnTaking(ColumnType.TIME, Zoning.EITHER, null, "< time(\"12:00:00\")", ">= time(\"12:00:00+01:00\")", "not(null)",
                 "not(time(\"12:00:00\"))");
+        // a time without a zone takes the offset of 12:00+01:00, so that cell is ">= 12:00" to it
         Assertions.assertThat(dump(column)).isEqualTo("""
                 0 (-inf..time("12:00:00")) rules=[0, 2, 3] example=11:00 (LocalTime)
-                1 time("12:00:00") rules=[2] example=12:00 (LocalTime)
-                2 (time("12:00:00")..+inf) rules=[2, 3] example=13:00 (LocalTime)
-                3 (-inf..time("12:00:00+01:00")) rules=[2] example=11:00+01:00 (OffsetTime)
-                4 time("12:00:00+01:00") rules=[1, 2] example=12:00+01:00 (OffsetTime)
-                5 (time("12:00:00+01:00")..+inf) rules=[1, 2] example=13:00+01:00 (OffsetTime)
-                6 null missing rules=[3] example=-
+                1 time("12:00:00") rules=[1, 2] example=12:00 (LocalTime)
+                2 (time("12:00:00")..+inf) rules=[1, 2, 3] example=13:00 (LocalTime)
+                3 (-inf..time("12:00:00+01:00")) at local time (-inf..time("12:00:00")) rules=[0, 2, 3] example=05:29Z (OffsetTime)
+                4 (-inf..time("12:00:00+01:00")) at local time time("12:00:00") rules=[2] example=12:00+02:00 (OffsetTime)
+                5 (-inf..time("12:00:00+01:00")) at local time (time("12:00:00")..+inf) rules=[2, 3] example=12:30+02:00 (OffsetTime)
+                6 time("12:00:00+01:00") at local time (-inf..time("12:00:00")) rules=[0, 1, 2, 3] example=11:00Z (OffsetTime)
+                7 time("12:00:00+01:00") at local time time("12:00:00") rules=[1, 2] example=12:00+01:00 (OffsetTime)
+                8 time("12:00:00+01:00") at local time (time("12:00:00")..+inf) rules=[1, 2, 3] example=13:00+02:00 (OffsetTime)
+                9 (time("12:00:00+01:00")..+inf) at local time (-inf..time("12:00:00")) rules=[0, 1, 2, 3] example=11:30Z (OffsetTime)
+                10 (time("12:00:00+01:00")..+inf) at local time time("12:00:00") rules=[1, 2] example=12:00Z (OffsetTime)
+                11 (time("12:00:00+01:00")..+inf) at local time (time("12:00:00")..+inf) rules=[1, 2, 3] example=18:00Z (OffsetTime)
+                12 null missing rules=[3] example=-
                 """);
-        // runs never cross from one line to the other; a whole line says which it is
+        // runs never cross from one kind to the other; all of a kind says which it is
         Assertions.assertThat(column.describe(List.of(1, 2, 3)))
-                .containsExactly("[time(\"12:00:00\")..+inf)", "(-inf..time(\"12:00:00+01:00\"))");
-        Assertions.assertThat(column.describe(List.of(0, 1, 2, 4, 5)))
+                .containsExactly("[time(\"12:00:00\")..+inf)", "(-inf..time(\"12:00:00+01:00\")) at local time (-inf..time(\"12:00:00\"))");
+        Assertions.assertThat(column.describe(List.of(0, 1, 2, 6, 7, 8, 9, 10, 11)))
                 .containsExactly("any time without a time zone", "[time(\"12:00:00+01:00\")..+inf)");
+        Assertions.assertThat(column.describe(List.of(3, 4, 5, 6, 7, 8, 9, 10, 11))).containsExactly("any time with a time zone");
+        Assertions.assertThat(lookups(column, LocalTime.NOON, "11:00:00Z", "12:00", "11:00:00.000000001Z", "12:00:00+02:00")).isEqualTo("""
+                '12:00' (LocalTime) -> [1, 2]
+                '11:00:00Z' (String) -> [0, 1, 2, 3]
+                '12:00' (String) -> [1, 2]
+                '11:00:00.000000001Z' (String) -> [0, 1, 2, 3]
+                '12:00:00+02:00' (String) -> [2]
+                """);
+    }
+
+    @Test
+    void map_inputs_with_cells_without_a_zone_treat_both_kinds_alike() {
+        var column = columnTaking(ColumnType.TIME, Zoning.EITHER, null, "< time(\"12:00:00\")", "not(time(\"12:00:00\"))");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..time("12:00:00")) rules=[0, 1] example=11:00 (LocalTime)
+                1 time("12:00:00") rules=[] example=12:00 (LocalTime)
+                2 (time("12:00:00")..+inf) rules=[1] example=13:00 (LocalTime)
+                3 (-inf..time("12:00:00")) with a time zone rules=[0, 1] example=11:00Z (OffsetTime)
+                4 time("12:00:00") with a time zone rules=[] example=12:00Z (OffsetTime)
+                5 (time("12:00:00")..+inf) with a time zone rules=[1] example=13:00Z (OffsetTime)
+                6 null missing rules=[1] example=-
+                """);
+        // the same local times of both kinds are described once
+        Assertions.assertThat(column.describe(List.of(1, 2, 4, 5))).containsExactly("[time(\"12:00:00\")..+inf)");
+        Assertions.assertThat(column.describe(List.of(1, 2, 5))).containsExactly("[time(\"12:00:00\")..+inf)",
+                "(time(\"12:00:00\")..+inf) with a time zone");
+        Assertions.assertThat(column.describe(List.of(0, 1, 2, 3, 4, 5))).containsExactly("(-inf..+inf)");
+        Assertions.assertThat(column.describe(List.of(0, 1, 2))).containsExactly("any time without a time zone");
         Assertions.assertThat(column.describe(List.of(3, 4, 5))).containsExactly("any time with a time zone");
-        Assertions.assertThat(lookups(column, LocalTime.NOON, "11:00:00Z", "12:00", "11:00:00.000000001Z")).isEqualTo("""
-                '12:00' (LocalTime) -> [2]
-                '11:00:00Z' (String) -> [1, 2]
-                '12:00' (String) -> [2]
-                '11:00:00.000000001Z' (String) -> [1, 2]
+        Assertions.assertThat(lookups(column, "12:00", "12:00:00+09:00", "11:59:59-09:00")).isEqualTo("""
+                '12:00' (String) -> []
+                '12:00:00+09:00' (String) -> []
+                '11:59:59-09:00' (String) -> [0, 1]
                 """);
     }
 
     @Test
     void date_times_with_a_zone_are_ordered_by_instant_whatever_the_zone() {
-        var column = columnTaking(ColumnType.DATE_TIME, Zoning.EITHER,
-                "[date and time(\"2025-01-01T00:00:00Z\")..date and time(\"2026-01-01T00:00:00Z\")), date and time(\"2025-06-01T00:00:00\")",
+        var column = columnTaking(ColumnType.DATE_TIME, Zoning.ZONED,
+                "[date and time(\"2025-01-01T00:00:00Z\")..date and time(\"2026-01-01T00:00:00Z\"))",
                 "< date and time(\"2025-03-30T03:00:00@Europe/Paris\")", "date and time(\"2025-03-30T01:00:00Z\")",
                 "> date and time(\"2025-03-30T01:00:00.000000001Z\")");
         Assertions.assertThat(dump(column)).isEqualTo("""
-                0 (-inf..date and time("2025-06-01T00:00:00")) disallowed rules=[] example=2025-05-31T00:00 (LocalDateTime)
-                1 date and time("2025-06-01T00:00:00") rules=[] example=2025-06-01T00:00 (LocalDateTime)
-                2 (date and time("2025-06-01T00:00:00")..+inf) disallowed rules=[] example=2025-06-02T00:00 (LocalDateTime)
-                3 (-inf..date and time("2025-01-01T00:00:00Z")) disallowed rules=[0] example=2024-12-31T00:00Z (ZonedDateTime)
-                4 date and time("2025-01-01T00:00:00Z") rules=[0] example=2025-01-01T00:00Z (ZonedDateTime)
-                5 (date and time("2025-01-01T00:00:00Z")..date and time("2025-03-30T03:00:00@Europe/Paris")) rules=[0] \
+                0 (-inf..date and time("2025-01-01T00:00:00Z")) disallowed rules=[0] example=2024-12-31T00:00Z (ZonedDateTime)
+                1 date and time("2025-01-01T00:00:00Z") rules=[0] example=2025-01-01T00:00Z (ZonedDateTime)
+                2 (date and time("2025-01-01T00:00:00Z")..date and time("2025-03-30T03:00:00@Europe/Paris")) rules=[0] \
                 example=2025-02-14T00:30Z (ZonedDateTime)
-                6 date and time("2025-03-30T03:00:00@Europe/Paris") rules=[1] example=2025-03-30T03:00+02:00[Europe/Paris] (ZonedDateTime)
-                7 (date and time("2025-03-30T03:00:00@Europe/Paris")..date and time("2025-03-30T01:00:00.000000001Z")) empty rules=[]
-                8 date and time("2025-03-30T01:00:00.000000001Z") rules=[] example=2025-03-30T01:00:00.000000001Z (ZonedDateTime)
-                9 (date and time("2025-03-30T01:00:00.000000001Z")..date and time("2026-01-01T00:00:00Z")) rules=[2] \
+                3 date and time("2025-03-30T03:00:00@Europe/Paris") rules=[1] example=2025-03-30T03:00+02:00[Europe/Paris] (ZonedDateTime)
+                4 (date and time("2025-03-30T03:00:00@Europe/Paris")..date and time("2025-03-30T01:00:00.000000001Z")) empty rules=[]
+                5 date and time("2025-03-30T01:00:00.000000001Z") rules=[] example=2025-03-30T01:00:00.000000001Z (ZonedDateTime)
+                6 (date and time("2025-03-30T01:00:00.000000001Z")..date and time("2026-01-01T00:00:00Z")) rules=[2] \
                 example=2025-08-15T12:30Z (ZonedDateTime)
-                10 date and time("2026-01-01T00:00:00Z") disallowed rules=[2] example=2026-01-01T00:00Z (ZonedDateTime)
-                11 (date and time("2026-01-01T00:00:00Z")..+inf) disallowed rules=[2] example=2026-01-02T00:00Z (ZonedDateTime)
-                12 null missing rules=[] example=-
+                7 date and time("2026-01-01T00:00:00Z") disallowed rules=[2] example=2026-01-01T00:00Z (ZonedDateTime)
+                8 (date and time("2026-01-01T00:00:00Z")..+inf) disallowed rules=[2] example=2026-01-02T00:00Z (ZonedDateTime)
+                9 null missing rules=[] example=-
                 """);
         Assertions.assertThat(lookups(column, ZonedDateTime.of(2025, 3, 30, 3, 0, 0, 0, ZoneOffset.ofHours(2)), "2025-03-30T01:00:00Z",
                 "2025-03-30T03:00:00+02:00[Europe/Paris]", "2025-03-30T01:00:00@UTC", "2025-06-01T00:00", "2025-06-01T00:00:00+00:00",
@@ -274,10 +368,43 @@ class ColumnIndexBehaviourTest {
                 '2025-03-30T01:00:00Z' (String) -> [1]
                 '2025-03-30T03:00:00+02:00[Europe/Paris]' (String) -> [1]
                 '2025-03-30T01:00:00@UTC' (String) -> [1]
-                '2025-06-01T00:00' (String) -> []
+                '2025-06-01T00:00' (String) -> Input c=2025-06-01T00:00 has no time zone, which the column's input binding requires
                 '2025-06-01T00:00:00+00:00' (String) -> [2]
                 '2027-01-01T00:00Z' (String) -> Input c=2027-01-01T00:00Z is not one of the column's allowed input values
                 '2025-01-01T00:00@Mars/Olympus' (String) -> Input c=2025-01-01T00:00@Mars/Olympus is not a valid date and time
+                """);
+    }
+
+    @Test
+    void map_inputs_take_date_times_of_both_kinds_and_compare_across_them_by_local_time() {
+        // allowed: from 2025 to 2026 at offset zero, which a date-time without a zone is held to by its local time
+        var column = columnTaking(ColumnType.DATE_TIME, Zoning.EITHER,
+                "[date and time(\"2025-01-01T00:00:00Z\")..date and time(\"2026-01-01T00:00:00Z\")), date and time(\"2025-06-01T00:00:00\")",
+                "< date and time(\"2025-03-30T03:00:00@Europe/Paris\")", "date and time(\"2025-03-30T01:00:00Z\")",
+                "> date and time(\"2025-03-30T01:00:00.000000001Z\")");
+        // without a zone: split by the local time of every boundary (the Paris one is 03:00 on the clock)
+        Assertions.assertThat(column.describe(List.of(2, 3))).containsExactly(
+                "(date and time(\"2025-01-01T00:00:00\")..date and time(\"2025-03-30T01:00:00\")]");
+        Assertions.assertThat(column.describe(7)).isEqualTo("date and time(\"2025-03-30T03:00:00\")");
+        // with a zone: by instant, and by local time around the one boundary without a zone; no date-time is six months from its instant
+        Assertions.assertThat(column.describe(15)).isEqualTo(
+                "(-inf..date and time(\"2025-01-01T00:00:00Z\")) at local time (date and time(\"2025-06-01T00:00:00\")..+inf)");
+        Assertions.assertThat(column.empty[15]).isTrue();
+        Assertions.assertThat(column.representative(32)).isEqualTo(ZonedDateTime.of(2025, 6, 1, 0, 0, 0, 0, ZoneOffset.UTC));
+        Assertions.assertThat(lookups(column, ZonedDateTime.of(2025, 3, 30, 3, 0, 0, 0, ZoneOffset.ofHours(2)), "2025-03-30T01:00:00Z",
+                "2025-03-30T01:00:00", "2025-03-30T02:30:00", "2025-03-30T03:00:00", "2025-06-01T00:00", "2025-06-01T00:00:00+00:00",
+                "2025-12-31T23:00:00", "2025-12-31T23:00:00-05:00", "2024-12-31T23:00:00", "2027-01-01T00:00Z")).isEqualTo("""
+                '2025-03-30T03:00+02:00' (ZonedDateTime) -> [1]
+                '2025-03-30T01:00:00Z' (String) -> [1]
+                '2025-03-30T01:00:00' (String) -> [0, 1]
+                '2025-03-30T02:30:00' (String) -> [0, 2]
+                '2025-03-30T03:00:00' (String) -> [2]
+                '2025-06-01T00:00' (String) -> [2]
+                '2025-06-01T00:00:00+00:00' (String) -> [2]
+                '2025-12-31T23:00:00' (String) -> [2]
+                '2025-12-31T23:00:00-05:00' (String) -> Input c=2025-12-31T23:00-05:00 is not one of the column's allowed input values
+                '2024-12-31T23:00:00' (String) -> Input c=2024-12-31T23:00 is not one of the column's allowed input values
+                '2027-01-01T00:00Z' (String) -> Input c=2027-01-01T00:00Z is not one of the column's allowed input values
                 """);
     }
 

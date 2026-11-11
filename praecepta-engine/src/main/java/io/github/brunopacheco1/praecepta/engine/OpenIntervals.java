@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
@@ -38,6 +39,12 @@ final class OpenIntervals {
     private static final long EARLIEST_ZONED_TIME = -18 * NANOS_PER_HOUR;
     /** The latest time with an offset, by instant: {@code 23:59:59.999999999-18:00}. */
     private static final long LATEST_ZONED_TIME = NANOS_PER_DAY - 1 + 18 * NANOS_PER_HOUR;
+    private static final BigInteger NANOS_PER_SECOND = BigInteger.valueOf(1_000_000_000L);
+    private static final BigInteger NANOS_IN_A_DAY = BigInteger.valueOf(NANOS_PER_DAY);
+    /** Offsets run from -18:00 to +18:00, in whole seconds. */
+    private static final BigInteger MAX_OFFSET_SECONDS = BigInteger.valueOf(ZoneOffset.MAX.getTotalSeconds());
+    /** Offsets an example is given at when it can be: whole hours, else quarters of an hour, in seconds. */
+    private static final List<BigInteger> ROUND_OFFSETS = List.of(BigInteger.valueOf(3600), BigInteger.valueOf(900));
 
     private OpenIntervals() {
     }
@@ -89,6 +96,183 @@ final class OpenIntervals {
             // BOOLEAN intervals are always empty
             case BOOLEAN -> throw new IllegalStateException("no %s value between %s and %s".formatted(type, low, high));
         };
+    }
+
+    // ---- times and date-times with a time zone: an instant and a local time ---------------------
+
+    /**
+     * The values of one class of a line ({@link ColumnIndex}): a single boundary ({@code point}, with
+     * {@code low} and {@code high} both that boundary), or those strictly between two boundaries, null
+     * meaning unbounded.
+     */
+    record Span(Comparable<?> low, Comparable<?> high, boolean point) {
+        boolean unbounded() {
+            return low == null && high == null;
+        }
+    }
+
+    /**
+     * Whether no time or date-time with a time zone has its instant in {@code instants} and its local time
+     * in {@code localTimes}. A value's local time is its instant plus its offset, a whole number of seconds
+     * from -18:00 to +18:00, so the two spans must hold an instant and a local time that far apart.
+     */
+    static boolean isEmpty(ColumnType type, Span instants, Span localTimes) {
+        return new ZonedBox(type, instants, localTimes).offsetSeconds() == null;
+    }
+
+    /**
+     * A time or date-time with a time zone whose instant is in {@code instants} and whose local time is in
+     * {@code localTimes}, which are not {@linkplain #isEmpty(ColumnType, Span, Span) empty} together: as
+     * {@link #valueInside(ColumnType, Comparable, Comparable, boolean)} picks one when only one of the two
+     * is bounded (at offset zero for local times), else at offset zero if that fits, or at the nearest
+     * offset that does.
+     */
+    static Object valueInside(ColumnType type, Span instants, Span localTimes) {
+        if (localTimes.unbounded()) {
+            return instants.point() ? instants.low() : valueInside(type, instants.low(), instants.high(), true);
+        }
+        if (instants.unbounded()) {
+            var local = localTimes.point() ? localTimes.low() : valueInside(type, localTimes.low(), localTimes.high(), false);
+            return type == ColumnType.TIME ? OffsetTime.of((LocalTime) local, ZoneOffset.UTC) : ((LocalDateTime) local).atZone(ZoneOffset.UTC);
+        }
+        return new ZonedBox(type, instants, localTimes).value();
+    }
+
+    /**
+     * The instants and local times of a class of values with a time zone, as closed ranges of nanoseconds
+     * (null: unbounded): instants as {@link PrimitiveKeys} keys them, local times since midnight or, for
+     * date-times, since the epoch as if at offset zero.
+     */
+    private static final class ZonedBox {
+        private final ColumnType type;
+        private final BigInteger instantLow;
+        private final BigInteger instantHigh;
+        private final BigInteger localLow;
+        private final BigInteger localHigh;
+
+        ZonedBox(ColumnType type, Span instants, Span localTimes) {
+            this.type = type;
+            boolean time = type == ColumnType.TIME;
+            instantLow = max(lowest(instants), time ? BigInteger.valueOf(EARLIEST_ZONED_TIME) : null);
+            instantHigh = min(highest(instants), time ? BigInteger.valueOf(LATEST_ZONED_TIME) : null);
+            localLow = max(lowest(localTimes), time ? BigInteger.ZERO : null);
+            localHigh = min(highest(localTimes), time ? BigInteger.valueOf(NANOS_PER_DAY - 1) : null);
+        }
+
+        private static BigInteger lowest(Span span) {
+            return span.low() == null ? null : span.point() ? nanos(span.low()) : nanos(span.low()).add(BigInteger.ONE);
+        }
+
+        private static BigInteger highest(Span span) {
+            return span.high() == null ? null : span.point() ? nanos(span.high()) : nanos(span.high()).subtract(BigInteger.ONE);
+        }
+
+        private static BigInteger nanos(Object value) {
+            return switch (value) {
+                case LocalTime time -> BigInteger.valueOf(time.toNanoOfDay());
+                case OffsetTime time -> BigInteger.valueOf(PrimitiveKeys.utcNanos(time));
+                case LocalDateTime dateTime -> nanos(dateTime.toEpochSecond(ZoneOffset.UTC), dateTime.getNano());
+                case ZonedDateTime dateTime -> nanos(dateTime.toEpochSecond(), dateTime.getNano());
+                default -> throw new IllegalStateException("not a time or date-time: " + value);
+            };
+        }
+
+        private static BigInteger nanos(long epochSecond, int nano) {
+            return BigInteger.valueOf(epochSecond).multiply(NANOS_PER_SECOND).add(BigInteger.valueOf(nano));
+        }
+
+        /** The larger of two lower bounds; null is unbounded. */
+        private static BigInteger max(BigInteger a, BigInteger b) {
+            return a == null ? b : b == null ? a : a.max(b);
+        }
+
+        /** The smaller of two upper bounds; null is unbounded. */
+        private static BigInteger min(BigInteger a, BigInteger b) {
+            return a == null ? b : b == null ? a : a.min(b);
+        }
+
+        private static boolean empty(BigInteger low, BigInteger high) {
+            return low != null && high != null && low.compareTo(high) > 0;
+        }
+
+        /**
+         * An offset, in seconds, that some value of the box has: zero if one has it, else the nearest to
+         * zero. Null if the box holds no value. Local time minus instant spans every whole number of
+         * nanoseconds from {@code localLow - instantHigh} to {@code localHigh - instantLow}.
+         */
+        BigInteger offsetSeconds() {
+            if (empty(instantLow, instantHigh) || empty(localLow, localHigh)) {
+                return null;
+            }
+            var least = MAX_OFFSET_SECONDS.negate();
+            if (localLow != null && instantHigh != null) {
+                var difference = localLow.subtract(instantHigh);
+                var seconds = floorDiv(difference.add(NANOS_PER_SECOND).subtract(BigInteger.ONE)); // rounded up
+                least = least.max(seconds);
+            }
+            var most = MAX_OFFSET_SECONDS;
+            if (localHigh != null && instantLow != null) {
+                most = most.min(floorDiv(localHigh.subtract(instantLow)));
+            }
+            if (least.compareTo(most) > 0) {
+                return null;
+            }
+            if (least.signum() <= 0 && most.signum() >= 0) {
+                return BigInteger.ZERO;
+            }
+            // the nearest to zero that is a whole number of hours, else of quarters of an hour, else of seconds
+            for (var step : ROUND_OFFSETS) {
+                var round = least.signum() > 0
+                        ? floorDiv(least.add(step).subtract(BigInteger.ONE), step).multiply(step)
+                        : floorDiv(most.negate().add(step).subtract(BigInteger.ONE), step).multiply(step).negate();
+                if (round.compareTo(least) >= 0 && round.compareTo(most) <= 0) {
+                    return round;
+                }
+            }
+            return least.signum() > 0 ? least : most;
+        }
+
+        /** Whole seconds in a number of nanoseconds, rounded down. */
+        private static BigInteger floorDiv(BigInteger nanos) {
+            return floorDiv(nanos, NANOS_PER_SECOND);
+        }
+
+        private static BigInteger floorDiv(BigInteger number, BigInteger divisor) {
+            var parts = number.divideAndRemainder(divisor);
+            return parts[1].signum() < 0 ? parts[0].subtract(BigInteger.ONE) : parts[0];
+        }
+
+        /**
+         * A value of the box, which is not empty: at {@link #offsetSeconds}, in the middle of the local times
+         * that offset leaves (a day from their only bound, if they have one), on a whole minute or second if one is as near.
+         */
+        Object value() {
+            var offset = offsetSeconds();
+            var shift = offset.multiply(NANOS_PER_SECOND);
+            var low = max(localLow, instantLow == null ? null : instantLow.add(shift));
+            var high = min(localHigh, instantHigh == null ? null : instantHigh.add(shift));
+            // between two bounds, the middle; beyond a single one (date-times only: a time's day bounds it), a day away
+            var local = low == null ? high.subtract(NANOS_IN_A_DAY) : high == null ? low.add(NANOS_IN_A_DAY) : low.add(high).shiftRight(1);
+            for (var unit : List.of(NANOS_PER_SECOND.multiply(BigInteger.valueOf(60)), NANOS_PER_SECOND)) {
+                var whole = floorDiv(local, unit).multiply(unit);
+                if (low == null || whole.compareTo(low) >= 0) {
+                    local = whole;
+                    break;
+                }
+            }
+            var zone = ZoneOffset.ofTotalSeconds(offset.intValueExact());
+            if (type == ColumnType.TIME) {
+                return OffsetTime.of(LocalTime.ofNanoOfDay(local.longValueExact()), zone);
+            }
+            var parts = local.divideAndRemainder(NANOS_PER_SECOND);
+            long seconds = parts[0].longValueExact();
+            int nano = parts[1].intValueExact();
+            if (nano < 0) {
+                seconds--;
+                nano += 1_000_000_000;
+            }
+            return ZonedDateTime.of(LocalDateTime.ofEpochSecond(seconds, nano, ZoneOffset.UTC), zone);
+        }
     }
 
     /** A day beyond a single bound, zero when unbounded, else the midpoint (at least two nanoseconds apart, so inside). */

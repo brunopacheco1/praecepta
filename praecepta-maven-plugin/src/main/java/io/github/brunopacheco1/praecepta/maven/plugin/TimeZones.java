@@ -28,13 +28,14 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * <ul>
  * <li>an input takes values with a zone when the literals written for it (its cells and input value
  * list) all have one and there is at least one; for an input that holds lists, its elements do. Inputs that cells compare ({@code > other}) take the
- * same kind, since FEEL cannot compare values of different kinds, so the inputs linked by such cells
- * are decided together;</li>
+ * same kind, so that they are compared as written (two values with a zone by instant, two without by local time),
+ * and the inputs linked by such cells are decided together;</li>
  * <li>an output has values with a zone when its literal values all have one and so do the inputs its
  * rules name, and there is at least one of them.</li>
  * </ul>
- * A column, or a group of linked inputs, whose literals mix the two kinds is rejected: its generated
- * component could not hold them all.
+ * A column, or a group of linked inputs, whose literals mix the two kinds is rejected: FEEL compares a value with
+ * a zone and one without by local time, so the engine evaluates such a table, but the table does not say which
+ * kind its generated component should take.
  */
 final class TimeZones {
 

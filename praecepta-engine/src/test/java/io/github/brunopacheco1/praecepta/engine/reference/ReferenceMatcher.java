@@ -56,7 +56,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * evaluated here, directly on values, with FEEL's three-valued logic: a missing value fails
  * comparisons and intervals (unknown), equals only {@code null}, and so satisfies {@code not("A")}.
  * Blank strings count as missing. Times and date-times with a time zone compare by the instant they
- * denote, and comparing one with a value without a zone is unknown, equality included. The engine
+ * denote, and one without a zone takes the offset of the value it is compared with (DMN 1.5, Table 54),
+ * equality included. The engine
  * instead precomputes value classes and bitmasks.
  *
  * @param rules          rules in table order (DMN "rule order")
@@ -71,8 +72,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  *                       {@code list contains} and {@code some x in ? satisfies}: a positive cell holds
  *                       when some element passes one of its tests, or the list is missing and the cell
  *                       has {@code null}; {@code not(...)} holds when the list is there and every element
- *                       fails every test (an element whose test is unknown, such as a time with a zone
- *                       against one without, makes it unknown). A name of such a column in another
+ *                       fails every test. A name of such a column in another
  *                       column's cell asks whether the value is in the list. A list may hold no missing
  *                       element.
  * @param bothKinds      whether the inputs of a time or date-time column may have a time zone or not, as
@@ -467,21 +467,25 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     }
 
     /**
-     * The values the cells mention, the points around each and between neighbours, in order. Times and
-     * date-times only with a time zone if {@code zoned}, else only without one: the values of the other kind
-     * cannot be compared with the inputs, so they split nothing.
+     * The values the cells mention, the points around each and between neighbours, in order. For times and
+     * date-times, these are values without a time zone, which FEEL compares with every literal by local
+     * time: a literal with a zone counts as its local time. Values with a zone if {@code zoned}, see
+     * {@link #zonedRepresentatives}.
      */
     private static Collection<Object> orderedRepresentatives(ColumnType type, List<UnaryTests> cells, boolean zoned) {
+        if (zoned) {
+            return zonedRepresentatives(type, cells);
+        }
         var points = new TreeSet<Object>(ReferenceMatcher::compare);
-        cells.forEach(cell -> literals(cell).stream().filter(value -> isZoned(value) == zoned).forEach(points::add));
+        cells.forEach(cell -> literals(cell).stream().map(ReferenceMatcher::withoutZone).forEach(points::add));
         var sorted = new ArrayList<>(points);
         var around = new TreeSet<Object>(ReferenceMatcher::compare);
         around.addAll(sorted);
         if (sorted.isEmpty()) {
             around.add(switch (type) {
                 case NUMBER -> BigDecimal.ZERO;
-                case TIME -> zoned ? OffsetTime.of(LocalTime.NOON, ZoneOffset.UTC) : LocalTime.NOON;
-                case DATE_TIME -> zoned ? ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC) : LocalDateTime.of(2025, 1, 1, 0, 0);
+                case TIME -> LocalTime.NOON;
+                case DATE_TIME -> LocalDateTime.of(2025, 1, 1, 0, 0);
                 case DAY_TIME_DURATION -> Duration.ZERO;
                 case YEAR_MONTH_DURATION -> new YearsAndMonths(0);
                 default -> LocalDate.of(2025, 1, 1);
@@ -492,6 +496,93 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             addNeighbours(around, sorted.get(i), next);
         }
         return around;
+    }
+
+    private static final long NANOS_PER_SECOND = 1_000_000_000L;
+    private static final long NANOS_PER_DAY = 86_400 * NANOS_PER_SECOND;
+    /** A zone offset is a whole number of seconds from -18:00 to +18:00. */
+    private static final long MAX_OFFSET_SECONDS = 18 * 3600;
+
+    /**
+     * Times or date-times with a time zone that visit every region the cells distinguish among them. FEEL
+     * compares such a value with a literal with a zone by instant, and with one without by local time, so a
+     * region is a set of instants (on or between the literals with a zone) together with a set of local
+     * times (on or between those without). A value is an instant and an offset, and its local time their
+     * sum; for each offset, every region that has a value at it has one whose instant, or local time, is
+     * on or a nanosecond beside a literal, and a region with values has one at its lowest offset, which is
+     * -18:00 or among the first that bring a literal's local time past a literal's instant. So those instants at
+     * those offsets are tried, and one value is kept for each set of cells that accept it: to the cells,
+     * which do not name other inputs where the analysis looks, values accepted by the same ones are alike.
+     */
+    private static Collection<Object> zonedRepresentatives(ColumnType type, List<UnaryTests> cells) {
+        var instants = new TreeSet<Long>();
+        var localTimes = new TreeSet<Long>();
+        var written = new ArrayList<Object>();
+        cells.forEach(cell -> written.addAll(literals(cell)));
+        for (var literal : written) {
+            (isZoned(literal) ? instants : localTimes).add(nanos(literal));
+        }
+        var localBounds = new TreeSet<>(localTimes);
+        if (type == ColumnType.TIME) {
+            localBounds.add(0L); // a time's local time stays within its day
+            localBounds.add(NANOS_PER_DAY);
+        }
+        var offsets = new TreeSet<Long>(List.of(-MAX_OFFSET_SECONDS, 0L, MAX_OFFSET_SECONDS));
+        for (long local : localBounds) {
+            for (long instant : instants) {
+                long seconds = Math.floorDiv(local - instant, NANOS_PER_SECOND);
+                offsets.addAll(List.of(seconds, seconds + 1, seconds + 2));
+            }
+        }
+        offsets.removeIf(seconds -> Math.abs(seconds) > MAX_OFFSET_SECONDS);
+        var bySignature = new HashMap<List<Boolean>, Object>();
+        var values = new ArrayList<Object>();
+        for (long seconds : offsets) {
+            var candidates = new TreeSet<Long>(instants);
+            localBounds.forEach(local -> candidates.add(local - seconds * NANOS_PER_SECOND));
+            if (candidates.isEmpty()) {
+                candidates.add(type == ColumnType.TIME ? NANOS_PER_DAY / 2 : nanos(LocalDateTime.of(2025, 1, 1, 0, 0)));
+            }
+            for (long candidate : candidates) {
+                for (long instant = candidate - 1; instant <= candidate + 1; instant++) {
+                    var value = zoned(type, instant, seconds);
+                    if (value != null && bySignature.putIfAbsent(signature(value, cells), value) == null) {
+                        values.add(value);
+                    }
+                }
+            }
+        }
+        return values;
+    }
+
+    /** Which of the cells accept a value. */
+    private static List<Boolean> signature(Object value, List<UnaryTests> cells) {
+        return cells.stream().map(cell -> accepts(cell, value, name -> null)).toList();
+    }
+
+    /**
+     * A literal's place in time, in nanoseconds: an instant for one with a zone (since the epoch, or for a
+     * time since midnight at offset zero), a local time for one without (as if at offset zero).
+     */
+    private static long nanos(Object literal) {
+        return switch (literal) {
+            case LocalTime time -> time.toNanoOfDay();
+            case OffsetTime time -> time.toLocalTime().toNanoOfDay() - time.getOffset().getTotalSeconds() * NANOS_PER_SECOND;
+            case LocalDateTime moment -> moment.toEpochSecond(ZoneOffset.UTC) * NANOS_PER_SECOND + moment.getNano();
+            case ZonedDateTime moment -> moment.toEpochSecond() * NANOS_PER_SECOND + moment.getNano();
+            default -> throw new IllegalStateException("not a time or date-time: " + literal);
+        };
+    }
+
+    /** The time or date-time at an instant ({@link #nanos}) and an offset; null for a time whose local time leaves its day. */
+    private static Object zoned(ColumnType type, long instant, long offsetSeconds) {
+        var offset = ZoneOffset.ofTotalSeconds((int) offsetSeconds);
+        long local = instant + offsetSeconds * NANOS_PER_SECOND;
+        if (type == ColumnType.TIME) {
+            return local < 0 || local >= NANOS_PER_DAY ? null : OffsetTime.of(LocalTime.ofNanoOfDay(local), offset);
+        }
+        return ZonedDateTime.of(LocalDateTime.ofEpochSecond(Math.floorDiv(local, NANOS_PER_SECOND),
+                (int) Math.floorMod(local, NANOS_PER_SECOND), ZoneOffset.UTC), offset);
     }
 
     /** The values just below and above {@code point}, and halfway to {@code next} (null after the last point). */
@@ -665,7 +756,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     /**
      * Whether a value is in a list, as FEEL's {@code ? in list}: whether some element equals it, unknown
-     * (null) if none does but one cannot be compared with it. A missing value is in no list.
+     * (null) if none does but one is missing. A missing value is in no list.
      */
     private static Boolean in(Object value, List<?> list) {
         if (value == null) {
@@ -702,16 +793,6 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             return false;
         }
         if (test instanceof Compare c && c.value() == null || test instanceof Range r && (r.low() == null || r.high() == null)) {
-            return null;
-        }
-        // FEEL leaves comparing a time with a zone and one without undefined, equality included
-        boolean otherKind = switch (test) {
-            case NullTest n -> false;
-            case Equals e -> isZoned(e.value()) != isZoned(value);
-            case Compare c -> isZoned(c.value()) != isZoned(value);
-            case Range r -> isZoned(r.low()) != isZoned(value) || isZoned(r.high()) != isZoned(value);
-        };
-        if (otherKind) {
             return null;
         }
         return switch (test) {
@@ -785,13 +866,30 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         };
     }
 
-    /** Values of one kind: times and date-times with a zone by instant, the rest by their natural order. */
+    /**
+     * FEEL's order (DMN 1.5, Table 54): times and date-times by the instant they denote, where one
+     * without a time zone "uses the timezone offset of the other input"; two without a zone, and values of
+     * the other types, by their natural order.
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static int compare(Object a, Object b) {
         return switch (a) {
-            case OffsetTime time -> instant(time).compareTo(instant((OffsetTime) b));
-            case ZonedDateTime moment -> moment.toInstant().compareTo(((ZonedDateTime) b).toInstant());
+            case OffsetTime time -> instant(time)
+                    .compareTo(instant(b instanceof LocalTime local ? local.atOffset(time.getOffset()) : (OffsetTime) b));
+            case LocalTime time when b instanceof OffsetTime other -> instant(time.atOffset(other.getOffset())).compareTo(instant(other));
+            case ZonedDateTime moment -> moment.toInstant()
+                    .compareTo(b instanceof LocalDateTime local ? local.toInstant(moment.getOffset()) : ((ZonedDateTime) b).toInstant());
+            case LocalDateTime moment when b instanceof ZonedDateTime other -> moment.toInstant(other.getOffset()).compareTo(other.toInstant());
             default -> ((Comparable) a).compareTo(b);
+        };
+    }
+
+    /** A literal as a value without a time zone is compared with it: by its local time. */
+    private static Object withoutZone(Object value) {
+        return switch (value) {
+            case OffsetTime time -> time.toLocalTime();
+            case ZonedDateTime moment -> moment.toLocalDateTime();
+            default -> value;
         };
     }
 

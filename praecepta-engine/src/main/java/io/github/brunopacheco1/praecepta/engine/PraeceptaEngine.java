@@ -1096,8 +1096,9 @@ public final class PraeceptaEngine<I, O> {
         }
 
         /**
-         * Binds a TIME column to a getter returning a time of day without a zone. Cells with an offset
-         * ({@code time("08:30:00+01:00")}) cannot be compared with such times: they never match them.
+         * Binds a TIME column to a getter returning a time of day without a zone. A cell with an offset
+         * ({@code time("08:30:00+01:00")}) is compared with such a time by its local time, as FEEL does when only
+         * one of the two has an offset: it matches {@code 08:30}.
          */
         public Builder<I, O> timeInput(String column, Function<? super I, LocalTime> extractor) {
             return bind(column, ColumnType.TIME, extractor);
@@ -1105,17 +1106,17 @@ public final class PraeceptaEngine<I, O> {
 
         /**
          * Binds a TIME column to a getter returning a time of day with an offset, compared by instant
-         * ({@code 08:30+01:00} equals {@code 07:30Z}). Cells without a zone ({@code time("08:30:00")})
-         * cannot be compared with such times: they never match them.
+         * ({@code 08:30+01:00} equals {@code 07:30Z}). A cell without a zone ({@code time("08:30:00")}) is
+         * compared with the local time, so it matches {@code 08:30+01:00} and {@code 08:30Z}.
          */
         public Builder<I, O> offsetTimeInput(String column, Function<? super I, OffsetTime> extractor) {
             return bind(column, ColumnType.TIME, extractor, null, Zoning.ZONED, false);
         }
 
         /**
-         * Binds a DATE_TIME column to a getter returning a date and time without a zone. Cells with a zone
-         * ({@code date and time("2025-01-31T08:30:00Z")}) cannot be compared with such values: they never
-         * match them.
+         * Binds a DATE_TIME column to a getter returning a date and time without a zone. A cell with a zone
+         * ({@code date and time("2025-01-31T08:30:00Z")}) is compared with such a value by its local date and
+         * time, as FEEL does when only one of the two has a zone.
          */
         public Builder<I, O> dateTimeInput(String column, Function<? super I, LocalDateTime> extractor) {
             return bind(column, ColumnType.DATE_TIME, extractor);
@@ -1124,8 +1125,8 @@ public final class PraeceptaEngine<I, O> {
         /**
          * Binds a DATE_TIME column to a getter returning a date and time with an offset or a zone id,
          * compared by instant. An {@code OffsetDateTime} binds through {@code OffsetDateTime::toZonedDateTime}.
-         * Cells without a zone ({@code date and time("2025-01-31T08:30:00")}) cannot be compared with such
-         * values: they never match them.
+         * A cell without a zone ({@code date and time("2025-01-31T08:30:00")}) is compared with the local
+         * date and time, so it matches {@code 2025-01-31T08:30:00Z} and {@code 2025-01-31T08:30:00@Europe/Paris}.
          */
         public Builder<I, O> zonedDateTimeInput(String column, Function<? super I, ZonedDateTime> extractor) {
             return bind(column, ColumnType.DATE_TIME, extractor, null, Zoning.ZONED, false);

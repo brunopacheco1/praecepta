@@ -212,9 +212,11 @@ class TypedColumnsTest {
         Assertions.assertThatThrownBy(() -> engine.evaluate(notABoolean))
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("is not a valid boolean");
-        // a time with a zone cannot be compared with the rules' times, which have none: only "-" matches it
+        // a time with a zone is compared with the rules' times, which have none, by its local time (DMN 1.5, Table 54)
         Assertions.assertThat(engine.evaluate(Map.of("overtime", "false", "start", "23:00"))).containsExactly("night");
-        Assertions.assertThat(engine.evaluate(Map.of("overtime", "false", "start", "23:00:00Z"))).containsExactly("standard");
+        Assertions.assertThat(engine.evaluate(Map.of("overtime", "false", "start", "23:00:00Z"))).containsExactly("night");
+        Assertions.assertThat(engine.evaluate(Map.of("overtime", "false", "start", "23:00:00-05:00"))).containsExactly("night");
+        Assertions.assertThat(engine.evaluate(Map.of("overtime", "false", "start", "12:00:00+14:00"))).containsExactly("standard");
     }
 
     @Test

@@ -121,16 +121,58 @@ class ReferenceMatcherTest {
     }
 
     @Test
-    void an_element_feel_cannot_compare_leaves_a_list_test_unknown() {
-        // a time with an offset and one without: FEEL's comparison is null, so neither the test nor its not(...) holds
+    void an_element_with_an_offset_is_compared_with_a_literal_without_one_by_local_time() {
+        // DMN 1.5, Table 54: the literal takes the element's offset, so 08:00 equals 08:00 at any offset
         var rules = List.of(cell(1, "t", "time(\"08:00:00\")"), cell(2, "t", "not(time(\"08:00:00\"))"));
         var reference = new ReferenceMatcher(rules, HitPolicy.COLLECT, Map.of(), Map.of("t", ColumnType.TIME), Map.of(), false,
                 Set.of(), Set.of("t"));
         var zoned = OffsetTime.of(8, 0, 0, 0, ZoneOffset.UTC);
-        Assertions.assertThat(reference.matches(Map.of("t", List.of(zoned)))).isEmpty();
-        Assertions.assertThat(ids(reference.matches(Map.of("t", List.of(zoned, LocalTime.of(8, 0)))))).containsExactly("1");
-        Assertions.assertThat(ids(reference.matches(Map.of("t", List.of(zoned, LocalTime.of(9, 0)))))).isEmpty();
+        Assertions.assertThat(ids(reference.matches(Map.of("t", List.of(zoned))))).containsExactly("1");
+        Assertions.assertThat(ids(reference.matches(Map.of("t", List.of(OffsetTime.of(8, 0, 0, 0, ZoneOffset.ofHours(5))))))).containsExactly("1");
+        Assertions.assertThat(ids(reference.matches(Map.of("t", List.of(OffsetTime.of(9, 0, 0, 0, ZoneOffset.ofHours(1)))))))
+                .as("08:00Z, but 09:00 on the clock").containsExactly("2");
+        Assertions.assertThat(ids(reference.matches(Map.of("t", List.of(zoned, LocalTime.of(9, 0)))))).containsExactly("1");
         Assertions.assertThat(ids(reference.matches(Map.of("t", List.of(LocalTime.of(9, 0)))))).containsExactly("2");
+    }
+
+    @Test
+    void times_with_and_without_an_offset_compare_as_dmn_table_54_says() {
+        // one cell per comparison, on a column of single times
+        var rules = List.of(cell(1, "t", "< time(\"12:00:00+05:00\")"), cell(2, "t", "time(\"12:00:00+05:00\")"),
+                cell(3, "t", "> time(\"12:00:00+05:00\")"), cell(4, "t", "[time(\"11:00:00\")..time(\"12:00:00Z\")]"));
+        var reference = new ReferenceMatcher(rules, HitPolicy.COLLECT, Map.of(), Map.of("t", ColumnType.TIME), Map.of(), false);
+        // without an offset, a time takes the literal's: 12:00 is 12:00+05:00
+        Assertions.assertThat(ids(reference.matches(Map.of("t", LocalTime.of(11, 59))))).containsExactly("1", "4");
+        Assertions.assertThat(ids(reference.matches(Map.of("t", LocalTime.NOON)))).containsExactly("2", "4");
+        Assertions.assertThat(ids(reference.matches(Map.of("t", LocalTime.of(12, 1))))).containsExactly("3");
+        // with offsets on both sides, by instant: 12:00+05:00 is 07:00Z
+        Assertions.assertThat(ids(reference.matches(Map.of("t", OffsetTime.of(7, 0, 0, 0, ZoneOffset.UTC))))).containsExactly("2");
+        Assertions.assertThat(ids(reference.matches(Map.of("t", OffsetTime.of(12, 0, 0, 0, ZoneOffset.UTC))))).containsExactly("3", "4");
+        // 11:30+02:00 is 09:30Z: after 11:00 on the clock, and before 12:00Z by instant
+        Assertions.assertThat(ids(reference.matches(Map.of("t", OffsetTime.of(11, 30, 0, 0, ZoneOffset.ofHours(2)))))).containsExactly("3", "4");
+        Assertions.assertThat(ids(reference.matches(Map.of("t", OffsetTime.of(10, 30, 0, 0, ZoneOffset.ofHours(6)))))).containsExactly("1");
+    }
+
+    @Test
+    void zoned_representatives_visit_every_pair_of_instants_and_local_times_that_some_value_has() {
+        // instants: before, at and after 11:00Z; local times: before, at and after 12:00
+        var rules = List.of(cell(1, "t", "< time(\"12:00:00\")"), cell(2, "t", "time(\"12:00:00\")"), cell(3, "t", "< time(\"11:00:00Z\")"),
+                cell(4, "t", "time(\"11:00:00Z\")"));
+        var reference = new ReferenceMatcher(rules, HitPolicy.COLLECT, Map.of(), Map.of("t", ColumnType.TIME), Map.of(), false, Set.of("t"),
+                Set.of());
+        var regions = reference.representativeValues("t", false).stream()
+                .map(value -> String.join("", ids(reference.matches(Map.of("t", value)))))
+                .toList();
+        Assertions.assertThat(regions).containsExactlyInAnyOrder("13", "14", "1", "23", "24", "2", "3", "4", "");
+        // before 05:00 on the clock and after 23:00Z would be more than 18 hours behind: that region has no value
+        var apart = List.of(cell(1, "t", "< time(\"05:00:00\")"), cell(2, "t", "> time(\"23:00:00Z\")"));
+        var none = new ReferenceMatcher(apart, HitPolicy.COLLECT, Map.of(), Map.of("t", ColumnType.TIME), Map.of(), false, Set.of("t"), Set.of());
+        Assertions.assertThat(none.representativeValues("t", false).stream().map(value -> ids(none.matches(Map.of("t", value)))))
+                .contains(List.of("1"), List.of("2"), List.of()).doesNotContain(List.of("1", "2"));
+        var near = List.of(cell(1, "t", "< time(\"05:00:00\")"), cell(2, "t", "> time(\"22:59:59Z\")"));
+        var some = new ReferenceMatcher(near, HitPolicy.COLLECT, Map.of(), Map.of("t", ColumnType.TIME), Map.of(), false, Set.of("t"), Set.of());
+        Assertions.assertThat(some.representativeValues("t", false).stream().map(value -> ids(some.matches(Map.of("t", value)))))
+                .contains(List.of("1", "2"));
     }
 
     @Test
@@ -142,8 +184,11 @@ class ReferenceMatcherTest {
         var eight = LocalTime.of(8, 0);
         Assertions.assertThat(ids(reference.matches(Map.of("at", eight, "slots", List.of(LocalTime.of(9, 0), eight))))).containsExactly("1");
         Assertions.assertThat(ids(reference.matches(Map.of("at", eight, "slots", List.of(LocalTime.of(9, 0)))))).containsExactly("2");
-        // 08:00Z cannot be compared with 08:00: unknown, so neither holds
-        Assertions.assertThat(reference.matches(Map.of("at", eight, "slots", List.of(OffsetTime.of(8, 0, 0, 0, ZoneOffset.UTC))))).isEmpty();
+        // 08:00 takes the offset of the element it is compared with: it equals 08:00Z, and not 09:00+01:00
+        Assertions.assertThat(ids(reference.matches(Map.of("at", eight, "slots", List.of(OffsetTime.of(8, 0, 0, 0, ZoneOffset.UTC))))))
+                .containsExactly("1");
+        Assertions.assertThat(ids(reference.matches(Map.of("at", eight, "slots", List.of(OffsetTime.of(9, 0, 0, 0, ZoneOffset.ofHours(1)))))))
+                .containsExactly("2");
         var missing = new HashMap<String, Object>(Map.of("slots", List.of(eight)));
         missing.put("at", null);
         Assertions.assertThat(ids(reference.matches(missing))).containsExactly("2");

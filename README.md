@@ -32,7 +32,8 @@ them when you build; evaluate them with a dependency-free engine.
 - DMN FEEL cells on STRING, NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION and
   YEAR_MONTH_DURATION columns: lists, `not(...)`, comparisons, intervals, `null`; unquoted `PT,ES`
   cells from earlier versions keep working
-- Times and date-times with or without a time zone; those with one compare by instant, as in FEEL
+- Times and date-times with or without a time zone; two with one compare by instant, and one with
+  a zone compares with one without by local time, as in FEEL
 - List inputs, such as a customer's nationalities: a cell holds when some element passes it
 - DMN output entries that name an input or compute with `+`, `-`, `*`, `/` and `**`
   (`(price - discount) * 1.2`, `Symptom + " is listed"`), evaluated only for the rules that match
@@ -137,14 +138,16 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 
 Missing values follow FEEL: they fail comparisons and intervals, equal only `null`, and so satisfy
 `not("FR")`. Blank text counts as missing. Strings compare as Java's `String.compareTo` does,
-character by character and case-sensitively (`"Zed" < "apple"`).
+character by character and case-sensitively (`"Zed" < "apple"`). Where DMN 1.5 and its TCK leave a
+case open (`-` against a missing value, `=` between a time with a zone and one without), Praecepta's
+choice is recorded in [#86](https://github.com/brunopacheco1/praecepta/issues/86).
 
 Times may have an offset (`Z`, `+01:00`) and date-times an offset or a zone id (`@Europe/Paris`).
-As in FEEL, values with a time zone compare by the instant they denote (`time("09:00:00+01:00")`
-equals `time("08:00:00Z")`), and a value with a zone cannot be compared with one without: the test
-is unknown, like a comparison with a missing value, so neither `time("08:00:00")` nor
-`not(time("08:00:00"))` matches `08:00Z`. A time with a zone id (`time("08:00:00@Europe/Paris")`)
-is rejected, as it has no fixed offset.
+As in FEEL, two values with a time zone compare by the instant they denote (`time("09:00:00+01:00")`
+equals `time("08:00:00Z")`). When only one of the two has a zone, the other takes its offset (DMN 1.5,
+Table 54), so they compare by local time: `time("08:00:00")` matches `08:00`, `08:00Z` and
+`08:00+05:00`, `< time("12:00:00+01:00")` matches `11:59`, and an interval may have an end of each
+kind. A time with a zone id (`time("08:00:00@Europe/Paris")`) is rejected, as it has no fixed offset.
 
 ### Typed columns and input value lists
 ```java
@@ -173,11 +176,13 @@ declares its values or uses comparisons or intervals (any other string then fall
 With map-based inputs, declare non-string columns with `.columnType("age", ColumnType.NUMBER)`;
 their text is parsed. A time or date-time column then takes values with and without a time zone
 (`08:30`, `08:30Z`, `2025-01-31T08:30@Europe/Paris`), and its gaps are looked for among both, while
-a typed getter gives one kind only. So a table whose cells all lack a zone reports a gap such as
-`cutOff = any time with a time zone`: such an input really matches no rule. To keep the column to
-values without a zone, declare its input values without one
-(`.allowedValues("cutOff", "[time(\"00:00:00\")..time(\"23:59:59\")]")`), which makes a zoned value
-invalid input, or bind the inputs per column, with `timeInput` or `dateTimeInput` for such columns.
+a typed getter gives one kind only. To cells without a zone the zone makes no difference (`08:30Z`
+and `08:30+05:00` both count as `08:30`), so a table whose cells all lack one reports the same gaps
+either way, once; to cells with a zone, a value with a zone counts by its instant and one without
+by its local time, so gaps are reported for each kind (`cutOff in {[time("12:00:00")..+inf),
+[time("12:00:00Z")..+inf)}`). Declared input values are compared the same way. To keep a column to
+one kind, bind the inputs per column, with `timeInput` or `offsetTimeInput`, `dateTimeInput` or
+`zonedDateTimeInput`.
 
 Notes:
 - `PRIORITY` and `OUTPUT_ORDER` need DMN output value lists:
@@ -217,7 +222,7 @@ These are the semantics of FEEL's `list contains`: a missing list makes every te
 empty one passes none. Elements may not be missing, must be values of the element type (as its
 single-value getter returns them, or text), and declared input values apply to each element.
 The elements of a list of times or date-times may have a time zone or not; each is compared as a
-single value is, so an element FEEL cannot compare with a cell leaves that test unknown.
+single value is (by instant when the element and the cell both have a zone, else by local time).
 With map-based inputs, declare the column with `.listColumnType("nationalities", ColumnType.STRING)`
 and give a FEEL list as text: `["PT", "BR"]` (or `PT, BR`), `[]` for an empty list. Rules that test a
 list column are left out of the static analysis (overlaps, unreachable rules, gaps), since a list

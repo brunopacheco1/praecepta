@@ -34,11 +34,11 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   18, 2.5                  number literals (NUMBER columns)
  *   date("2025-01-31")       date literal (DATE columns; a bare 2025-01-31 is accepted as well)
  *   time("08:30:00")         time literal (TIME columns; a bare 08:30:00 is accepted as well)
- *   time("08:30:00+01:00")   time with an offset (Z, +01:00), compared by instant
+ *   time("08:30:00+01:00")   time with an offset (Z, +01:00), compared by instant with other such times
  *   date and time("2025-01-31T08:30:00")
  *                            date-time literal (DATE_TIME columns; a bare 2025-01-31T08:30:00 too)
  *   date and time("2025-01-31T08:30:00Z"), date and time("2025-01-31T08:30:00@Europe/Paris")
- *                            date-time with an offset or a zone id, compared by instant
+ *                            date-time with an offset or a zone id, compared by instant with other such date-times
  *   duration("P1DT2H")       days and time duration (DAY_TIME_DURATION columns; a bare P1DT2H too)
  *   duration("P1Y2M")        years and months duration (YEAR_MONTH_DURATION columns; a bare P1Y2M too)
  *   true, false              boolean literals (BOOLEAN columns)
@@ -52,8 +52,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  * Tests are separated by commas outside quotes and brackets. Surrounding whitespace is ignored.
  * Times and date-times may have a time zone ({@link FeelTemporals}): a time an offset, a date-time an
  * offset or a zone id. A time with a zone id ({@code time("08:30:00@Europe/Paris")}) is rejected, as it
- * has no fixed offset, and so is an interval with one end with a zone and one without, which FEEL
- * cannot compare.
+ * has no fixed offset. A value with a zone and one without compare by their local time, so an interval
+ * may have one end of each kind.
  *
  * <p>The same syntax serves columns that hold lists, whose cells test the elements. In strict FEEL such
  * a cell is written with FEEL's list functions instead, as in {@code list contains(?, "PT")}; see
@@ -356,9 +356,6 @@ public final class CellParser {
             var low = literal(text.substring(1, dots).strip());
             var high = literal(text.substring(dots + 2, text.length() - 1).strip());
             if (!(low instanceof UnaryTests.Name) && !(high instanceof UnaryTests.Name)) {
-                if (!FeelTemporals.comparable(low, high)) {
-                    throw new CellSyntaxException(cell, "interval has one end with a time zone and one without, which cannot be compared");
-                }
                 if (FeelTemporals.compare(low, high) > 0) {
                     throw new CellSyntaxException(cell, "interval starts after it ends");
                 }

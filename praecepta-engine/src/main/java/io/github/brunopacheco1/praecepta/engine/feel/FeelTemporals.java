@@ -22,8 +22,14 @@ import java.time.format.DateTimeParseException;
  * {@link ZonedDateTime} when it has an offset or a zone id ({@code 2018-07-30T16:12:00Z},
  * {@code 2018-07-30T16:12:00@Europe/Paris}). Values with a zone are ordered, and equal, by the instant
  * they denote, so {@code 16:12:00+01:00} equals {@code 15:12:00Z}; values without one by their fields.
- * A value with a zone and one without cannot be compared: FEEL leaves that comparison undefined (null),
- * which a unary test treats as unknown.
+ * When only one of two values has a zone, the other takes its offset (DMN 1.5, Table 54: "If one input
+ * has a null timezone offset, that input uses the timezone offset of the other input"), so the two
+ * compare by their local time: {@code 16:12:00} equals {@code 16:12:00+01:00} and is after
+ * {@code 15:12:00Z}. The table gives this rule for {@code <}; DMN 1.5 does not say how {@code =} treats such
+ * a pair (Table 53), and the DMN TCK has no case for it. Equality is kept consistent with the comparisons
+ * here, {@code <=} being defined as {@code <} or {@code =} (10.3.2.15): the two are equal exactly when
+ * neither is before the other. Two values with a zone are equal by instant, as the TCK expects
+ * ({@code 0068-feel-equality}), and a zone id counts by the offset it has at the value's date and time.
  */
 public final class FeelTemporals {
 
@@ -87,24 +93,30 @@ public final class FeelTemporals {
     }
 
     /**
-     * Whether FEEL can compare two values of one column type: always, unless one has a time zone and the
-     * other has none.
+     * A time or date-time without its time zone: the {@link LocalTime} of an {@link OffsetTime}, the
+     * {@link LocalDateTime} of a {@link ZonedDateTime}; any other value as it is. A value with a zone is
+     * compared by it when the other value has none.
      */
-    public static boolean comparable(Object a, Object b) {
-        return hasZone(a) == hasZone(b);
+    public static Object local(Object value) {
+        return switch (value) {
+            case OffsetTime time -> time.toLocalTime();
+            case ZonedDateTime dateTime -> dateTime.toLocalDateTime();
+            default -> value;
+        };
     }
 
     /**
-     * Orders two {@linkplain #comparable comparable} values of one column type as FEEL does: times and
-     * date-times with a zone by instant (so equal instants compare as 0, whatever their zones), every
-     * other value by its natural order.
-     *
-     * @throws IllegalArgumentException if one value has a time zone and the other has none
+     * Orders two values of one column type as FEEL does: times and date-times that both have a zone by
+     * instant (so equal instants compare as 0, whatever their zones); when only one has a zone, the
+     * other takes its offset, so the two are ordered by their {@linkplain #local local} time; every
+     * other value by its natural order. Across values with and without a zone this order is not
+     * transitive ({@code 08:00Z} is before {@code 08:30}, which is before {@code 09:00+02:00}, the
+     * instant before {@code 08:00Z}), so sort only values of one kind with it.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static int compare(Object a, Object b) {
-        if (!comparable(a, b)) {
-            throw new IllegalArgumentException("'%s' and '%s' cannot be compared: only one has a time zone".formatted(a, b));
+        if (hasZone(a) != hasZone(b)) {
+            return ((Comparable) local(a)).compareTo(local(b));
         }
         return switch (a) {
             case OffsetTime time -> {

@@ -37,6 +37,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
@@ -57,8 +58,9 @@ import net.jqwik.api.Tuple;
  * date-time columns take values with a time zone (bound with {@code offsetTimeInput} and
  * {@code zonedDateTimeInput}): the same instants, written at various offsets and zones, so that equal
  * instants written differently are frequent. One literal in five of a time or date-time column has the
- * other kind (a zone where the inputs have none, or none where they have one), which FEEL cannot compare
- * with the inputs. Some columns declare input values, and inputs include values outside them. One column
+ * other kind (a zone where the inputs have none, or none where they have one), which FEEL compares with
+ * the inputs by local time, and one interval in six has an end of each kind. Some columns declare input
+ * values, and inputs include values outside them. One column
  * in five holds lists ({@link #lists}): its inputs are lists of zero to three of the values a single
  * input could take (a list of times or date-times now and then mixes values with and without a zone),
  * missing lists, and now and then a list holding a missing element, which is invalid.
@@ -318,7 +320,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         }
         if (string.isPresent()) {
             var s = string.get();
-            return List.of(s + " + \"!\"", "\"<\" + " + s + " + \">\"", s + " + " + s, "\"a \\\"quoted\\\" \" + " + s).get(form);
+            return List.of(s + " + \"!\"", "\"<\" + " + s + " + \">\"", s + " + " + s, "\"a \\\"quoted\\\" \" + " + s,
+                    s + " + \"\\t\\u00e9\"", "\"\\\\ \" + " + s).get(form);
         }
         return List.of("\"x\" + \"y\"", "1 + 2 * 3", "(10 - 4) / 4", "-2.50 * 2", "2 ** 3 ** 0", "(1 / 3) * 3 - 1e0").get(form);
     }
@@ -409,7 +412,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         }
         var comparison = Combinators.combine(Arbitraries.of("<", "<=", ">", ">="), literal(column)).as((op, v) -> op + " " + v);
         var interval = column.type() == ColumnType.TIME || column.type() == ColumnType.DATE_TIME
-                ? Arbitraries.frequencyOf(Tuple.of(4, interval(column.type(), column.zoned())), Tuple.of(1, interval(column.type(), !column.zoned())))
+                ? Arbitraries.frequencyOf(Tuple.of(4, interval(column.type(), column.zoned())), Tuple.of(1, interval(column.type(), !column.zoned())),
+                        Tuple.of(1, mixedInterval(column.type())))
                 : interval(column.type(), false);
         return Arbitraries.oneOf(comparison, interval);
     }
@@ -420,6 +424,21 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 Arbitraries.of("[", "(", "]"), Arbitraries.of("]", ")", "["), zone(type, zoned), zone(type, zoned))
                 .as((a, b, open, close, lowZone, highZone) -> open + value(type, Math.min(a, b), lowZone) + ".."
                         + value(type, Math.max(a, b), highZone) + close);
+    }
+
+    /**
+     * An interval with one end with a zone and one without, which FEEL orders by local time: the ends are
+     * written in that order, so that the interval does not start after it ends.
+     */
+    private static Arbitrary<String> mixedInterval(ColumnType type) {
+        return Combinators.combine(Arbitraries.integers().between(0, 5), Arbitraries.integers().between(0, 5),
+                Arbitraries.of("[", "(", "]"), Arbitraries.of("]", ")", "["), zone(type, true))
+                .as((a, b, open, close, zone) -> {
+                    var local = temporal(type, a, -1);
+                    var zoned = temporal(type, b, zone);
+                    boolean localFirst = FeelTemporals.compare(local, zoned) <= 0;
+                    return open + FeelLiterals.literal(localFirst ? local : zoned) + ".." + FeelLiterals.literal(localFirst ? zoned : local) + close;
+                });
     }
 
     private static String value(ColumnType type, int i, int zone) {

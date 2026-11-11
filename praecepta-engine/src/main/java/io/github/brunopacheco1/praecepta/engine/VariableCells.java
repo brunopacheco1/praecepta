@@ -20,8 +20,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
 /**
  * Decides, on concrete values, a cell that compares with other inputs ({@code > dateE},
  * {@code [numB..numC]}), with FEEL's three-valued logic: a comparison with a missing value is unknown,
- * so it fails, and so does its {@code not(...)}; {@code = x} is true when both are missing. Comparing a
- * time or date-time with a time zone with one without, equality included, is unknown too. A plain
+ * so it fails, and so does its {@code not(...)}; {@code = x} is true when both are missing. A time or
+ * date-time with a time zone and one without compare by their local time ({@link FeelTemporals}). A plain
  * name whose input holds a list ({@code Flu Symptoms}) is true when the value is in that list, as in
  * DMN; the engine only lets list inputs be named that way.
  */
@@ -68,11 +68,11 @@ final class VariableCells {
                 if (value == null || other == null) {
                     yield value == other;
                 }
-                yield equal(value, other);
+                yield FeelTemporals.compare(value, other) == 0;
             }
             case Compare(var operator, var literal) -> {
                 var other = resolve(literal, inputs);
-                if (value == null || other == null || !FeelTemporals.comparable(value, other)) {
+                if (value == null || other == null) {
                     yield null;
                 }
                 int cmp = FeelTemporals.compare(value, other);
@@ -86,8 +86,7 @@ final class VariableCells {
             case Range(var low, var lowClosed, var high, var highClosed) -> {
                 var from = resolve(low, inputs);
                 var to = resolve(high, inputs);
-                if (value == null || from == null || to == null
-                        || !FeelTemporals.comparable(value, from) || !FeelTemporals.comparable(value, to)) {
+                if (value == null || from == null || to == null) {
                     yield null;
                 }
                 int above = FeelTemporals.compare(value, from);
@@ -97,31 +96,20 @@ final class VariableCells {
         };
     }
 
-    /** FEEL's equality: unknown (null) between a value with a time zone and one without. */
-    private static Boolean equal(Object value, Object other) {
-        return FeelTemporals.comparable(value, other) ? FeelTemporals.compare(value, other) == 0 : null;
-    }
-
     /**
      * Membership in a named list, as FEEL's {@code ? in list} tests it: true if an element equals the
-     * value; else unknown if one cannot be compared with it (a time with a zone and one without); else
-     * false. A list holds no missing value, so a missing value is in none.
+     * value, else false. A list holds no missing value, so a missing value is in none.
      */
     private static Boolean in(Object value, List<?> list) {
         if (value == null) {
             return Boolean.FALSE;
         }
-        Boolean result = Boolean.FALSE;
         for (var element : list) {
-            var equal = equal(value, element);
-            if (equal == Boolean.TRUE) {
+            if (FeelTemporals.compare(value, element) == 0) {
                 return Boolean.TRUE;
             }
-            if (equal == null) {
-                result = null;
-            }
         }
-        return result;
+        return Boolean.FALSE;
     }
 
     private static Object resolve(Comparable<?> literal, Function<String, Object> inputs) {

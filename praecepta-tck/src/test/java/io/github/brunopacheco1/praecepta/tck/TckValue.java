@@ -125,7 +125,7 @@ sealed interface TckValue {
 
     /** Equal as FEEL compares times and date-times: with a zone by instant; never one with a zone and one without. */
     private static boolean sameTemporal(Object expected, Object actual) {
-        return FeelTemporals.comparable(expected, actual) && FeelTemporals.compare(expected, actual) == 0;
+        return FeelTemporals.hasZone(expected) == FeelTemporals.hasZone(actual) && FeelTemporals.compare(expected, actual) == 0;
     }
 
     private static boolean sameItems(List<TckValue> expected, List<TckValue> actual, boolean ordered) {

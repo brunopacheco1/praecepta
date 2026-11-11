@@ -18,8 +18,12 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.IntFunction;
+import java.util.function.IntPredicate;
+import java.util.stream.IntStream;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
@@ -51,13 +55,15 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * character U+0000) is marked empty.</li>
  * <li>BOOLEAN: ordered like the others with {@code false < true}, both always boundaries, so the
  * classes are {@code [false]}, {@code [true]} and a missing value (the intervals are all empty).</li>
- * <li>TIME and DATE_TIME values with a time zone lie on a line of their own, ordered by instant, which
- * the boundaries with a zone split as above; those without a zone lie on the other line, split by the
- * boundaries without one. FEEL cannot compare values across the lines, so a test with a literal from
- * the other line is unknown for every class of a line. A column has the lines its input binding can
- * give values on ({@link Zoning}): the line without a zone first, then the one with a zone. An
- * interval on the line with a zone is empty when no instant lies in it: between instants a nanosecond
- * apart, and for times, below the earliest time of day at offset +18:00 or above the latest at -18:00.</li>
+ * <li>TIME and DATE_TIME columns take values with and without a time zone, as their input binding gives
+ * them ({@link Zoning}). FEEL compares two values with a zone by instant, and any other pair by local
+ * time (a value without a zone takes the other's offset). So a value without a zone lies on the line of
+ * local times, which the local time of every boundary splits, with or without a zone. A value with a zone
+ * has two coordinates: its instant, on a line split by the boundaries with a zone, and its local time, on
+ * a line split by the boundaries without one; its class is the pair of their classes, and a test looks at
+ * the coordinate of its literal's kind. A pair is empty when no value has both coordinates: a local time
+ * and an instant are a whole number of seconds apart, from -18:00 to +18:00. The classes of values
+ * without a zone come first, then the pairs, instant by instant.</li>
  * </ul>
  *
  * Membership is decided per class with FEEL's three-valued logic: a missing value fails comparisons
@@ -95,8 +101,12 @@ final class ColumnIndex {
      * columns, and for TIME and DATE_TIME columns whose inputs all have a zone.
      */
     private final Line localLine;
-    /** TIME and DATE_TIME columns whose inputs may have a time zone: the line of those values; else null. */
+    /** TIME and DATE_TIME columns whose inputs may have a time zone: the line of their instants; else null. */
     private final Line zonedLine;
+    /** With {@link #zonedLine}: the line of the local times of values with a zone, split by the boundaries without one. */
+    private final Line wallLine;
+    /** The number of the first class of values with a time zone: the classes of {@link #localLine} come before. */
+    private final int zonedBase;
     /** The value classes, by class number. */
     private final List<ValueClass> classes;
     final int nullClass;
@@ -141,11 +151,25 @@ final class ColumnIndex {
             partition.add(new ValueClass.OtherString());
             localLine = null;
             zonedLine = null;
+            wallLine = null;
         } else {
-            localLine = !temporal || zoning.takesLocal() ? line(type, cellsByBit, allowedValues, false, partition) : null;
-            zonedLine = temporal && zoning.takesZoned() ? line(type, cellsByBit, allowedValues, true, partition) : null;
+            if (!temporal || zoning.takesLocal()) {
+                localLine = new Line(sortedBoundaries(type, cellsByBit, allowedValues, Boundaries.LOCAL_TIMES), type);
+                partition.addAll(orderedClasses(localLine.boundaries, false));
+            } else {
+                localLine = null;
+            }
+            if (temporal && zoning.takesZoned()) {
+                zonedLine = new Line(sortedBoundaries(type, cellsByBit, allowedValues, Boundaries.WITH_ZONE), type);
+                wallLine = new Line(sortedBoundaries(type, cellsByBit, allowedValues, Boundaries.WITHOUT_ZONE), type);
+                addZonedClasses(zonedLine.boundaries, wallLine.boundaries, partition);
+            } else {
+                zonedLine = null;
+                wallLine = null;
+            }
             stringClasses = isString ? boundaryClasses(localLine.boundaries) : null;
         }
+        zonedBase = localLine == null ? 0 : localLine.classCount();
         nullClass = partition.size();
         partition.add(new ValueClass.Missing());
         classes = List.copyOf(partition);
@@ -156,7 +180,7 @@ final class ColumnIndex {
         allowed = new boolean[classes.size()];
         for (int k = 0; k < classes.size(); k++) {
             var valueClass = classes.get(k);
-            empty[k] = valueClass instanceof ValueClass.Between(var low, var high, var zoned) && OpenIntervals.isEmpty(type, low, high, zoned);
+            empty[k] = isEmpty(valueClass);
             allowed[k] = allowedValues == null || valueClass instanceof ValueClass.Missing || accepts(allowedValues, valueClass);
             // built dense one class at a time, then stored in its form: never all dense at once
             var mask = new long[words];
@@ -206,6 +230,8 @@ final class ColumnIndex {
         disallowedStrings = null;
         localLine = null;
         zonedLine = null;
+        wallLine = null;
+        zonedBase = 0;
         classes = List.of(new ValueClass.AnyList(), new ValueClass.Missing());
         nullClass = 1;
         var all = new long[words];
@@ -274,20 +300,28 @@ final class ColumnIndex {
         return Map.copyOf(byValue);
     }
 
-    /** Ordered columns: adds the classes of the line with or without a time zone, and returns the line. */
-    private static Line line(ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues, boolean zoned,
-            List<ValueClass> into) {
-        var boundaries = sortedBoundaries(type, cellsByBit, allowedValues, zoned);
-        var line = new Line(boundaries, PrimitiveKeys.of(type, boundaries), into.size());
-        addOrderedClasses(boundaries, zoned, into);
-        return line;
+    /** Which of the values the cells and the allowed values compare against split a line. */
+    private enum Boundaries {
+        /** Every value, by its local time: the line of values without a time zone, and of the types that have none. */
+        LOCAL_TIMES,
+        /** The values with a time zone, by instant. */
+        WITH_ZONE,
+        /** The values without a time zone: the local times a value with a zone is compared with. */
+        WITHOUT_ZONE;
+
+        /** The boundary a value is on this line, or null if it is none. */
+        Comparable<?> of(Comparable<?> value) {
+            return switch (this) {
+                case LOCAL_TIMES -> (Comparable<?>) FeelTemporals.local(value);
+                case WITH_ZONE -> FeelTemporals.hasZone(value) ? value : null;
+                case WITHOUT_ZONE -> FeelTemporals.hasZone(value) ? null : value;
+            };
+        }
     }
 
-    /**
-     * Ordered columns: the distinct values the cells and the allowed values compare against, sorted,
-     * that have a time zone or, if not {@code zoned}, have none.
-     */
-    private static Comparable<?>[] sortedBoundaries(ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues, boolean zoned) {
+    /** Ordered columns: the distinct boundaries of a line, sorted. */
+    private static Comparable<?>[] sortedBoundaries(ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues,
+            Boundaries which) {
         var values = new ArrayList<Comparable<?>>();
         if (type == ColumnType.BOOLEAN) {
             values.add(Boolean.FALSE);
@@ -297,9 +331,9 @@ final class ColumnIndex {
         if (allowedValues != null) {
             collectBoundaries(allowedValues, values);
         }
-        // values with and without a zone cannot be compared, so each line sorts only its own
+        // a line sorts values of one kind only: across the kinds, FEEL's order is not transitive
         var points = new TreeSet<Comparable<?>>(ColumnIndex::compare);
-        values.stream().filter(value -> FeelTemporals.hasZone(value) == zoned).forEach(points::add);
+        values.stream().map(which::of).filter(Objects::nonNull).forEach(points::add);
         return points.toArray(Comparable<?>[]::new);
     }
 
@@ -311,20 +345,50 @@ final class ColumnIndex {
         }
     }
 
-    /** Adds the values of every test; values from both lines go into one set, so it compares them only within a line. */
+    /** Adds the values of every test; with or without a time zone; each line then takes its own. */
     private static void collectBoundaries(UnaryTests cell, List<Comparable<?>> into) {
         cell.tests().forEach(test -> into.addAll(UnaryTests.values(test)));
     }
 
-    /** Ordered columns: the interval before each boundary, the boundary itself, and the interval after the last one. */
-    private static void addOrderedClasses(Comparable<?>[] boundaries, boolean zoned, List<ValueClass> into) {
+    /** A line's classes: the interval before each boundary, the boundary itself, and the interval after the last one. */
+    private static List<ValueClass> orderedClasses(Comparable<?>[] boundaries, boolean zoned) {
+        var classes = new ArrayList<ValueClass>();
         Comparable<?> low = null;
         for (var boundary : boundaries) {
-            into.add(new ValueClass.Between(low, boundary, zoned));
-            into.add(new ValueClass.Point(boundary));
+            classes.add(new ValueClass.Between(low, boundary, zoned));
+            classes.add(new ValueClass.Point(boundary));
             low = boundary;
         }
-        into.add(new ValueClass.Between(low, null, zoned));
+        classes.add(new ValueClass.Between(low, null, zoned));
+        return classes;
+    }
+
+    /** The classes of values with a time zone: each class of instants paired with each class of local times. */
+    private static void addZonedClasses(Comparable<?>[] instants, Comparable<?>[] localTimes, List<ValueClass> into) {
+        var walls = orderedClasses(localTimes, false);
+        for (var instant : orderedClasses(instants, true)) {
+            for (var wall : walls) {
+                into.add(new ValueClass.Zoned(instant, wall));
+            }
+        }
+    }
+
+    /** Whether no value lies in the class (see {@link OpenIntervals}). */
+    private boolean isEmpty(ValueClass valueClass) {
+        return switch (valueClass) {
+            case ValueClass.Between(var low, var high, var zoned) -> OpenIntervals.isEmpty(type, low, high, zoned);
+            case ValueClass.Zoned(var instant, var wall) -> OpenIntervals.isEmpty(type, span(instant), span(wall));
+            default -> false;
+        };
+    }
+
+    /** A class of one line as the values it spans: a boundary alone, or the open interval between two. */
+    private static OpenIntervals.Span span(ValueClass part) {
+        return switch (part) {
+            case ValueClass.Point(var value) -> new OpenIntervals.Span(value, value, true);
+            case ValueClass.Between(var low, var high, var zoned) -> new OpenIntervals.Span(low, high, false);
+            default -> throw new IllegalStateException("not an ordered class");
+        };
     }
 
     /** Sets the bit of every rule whose cell accepts the class. */
@@ -448,13 +512,17 @@ final class ColumnIndex {
             return localLine.classOf(value);
         }
         boolean zoned = FeelTemporals.hasZone(value);
-        var line = zoned ? zonedLine : localLine;
-        if (line == null) { // only a getter that breaks its declared type can get here
+        if ((zoned ? zonedLine : localLine) == null) { // only a getter that breaks its declared type can get here
             throw new InvalidInputException(name, value, zoned
                     ? "has a time zone, which the column's input binding does not take"
                     : "has no time zone, which the column's input binding requires");
         }
-        return line.classOf(value);
+        if (!zoned) {
+            return localLine.classOf(value);
+        }
+        // a boundary with a zone is compared with the value's instant, one without with its local time
+        int wall = wallLine.boundaries.length == 0 ? 0 : wallLine.classOf(FeelTemporals.local(value));
+        return zonedBase + zonedLine.classOf(value) * wallLine.classCount() + wall;
     }
 
     /**
@@ -585,83 +653,159 @@ final class ColumnIndex {
 
     /** A human-readable description of a class, for validation reports. */
     String describe(int valueClass) {
-        return switch (classes.get(valueClass)) {
-            case ValueClass.Point(var value) -> FeelLiterals.literal(value);
-            case ValueClass.Between between -> interval(valueClass, valueClass);
-            case ValueClass.OtherString other -> "any other value";
-            case ValueClass.AnyList list -> "any list";
-            case ValueClass.Missing missing -> "null";
-        };
+        return describe(List.of(valueClass)).getFirst();
     }
 
     /**
      * Describes a set of distinct classes for a report. For ordered columns with comparisons (numbers,
      * dates, times and comparing strings), adjacent classes merge into intervals, e.g.
      * {@code [18], (18..65), [65]} becomes {@code [18..65]}. Empty classes do not break a run.
+     *
+     * <p>In a TIME or DATE_TIME column that takes values with and without a time zone, the classes of
+     * those with a zone are described after the others: by their instants, when no boundary lacks a zone;
+     * not at all when no boundary has one and the same local times are already described for values
+     * without a zone (the zone then makes no difference); else instant by instant, with the local times.
      */
     List<String> describe(List<Integer> valueClasses) {
         if (localLine == null && zonedLine == null || !type.supportsComparisons()) { // no intervals to merge
-            return valueClasses.stream().map(this::describe).toList();
+            return valueClasses.stream().map(k -> plain(classes.get(k))).toList();
         }
-        var sorted = valueClasses.stream().sorted().toList();
+        var local = new ArrayList<Integer>();
+        var zoned = new ArrayList<Integer>(); // numbered from the first class with a zone
+        boolean missing = false;
+        for (int k : valueClasses.stream().sorted().toList()) {
+            if (k == nullClass) {
+                missing = true;
+            } else if (zonedLine != null && k >= zonedBase) {
+                zoned.add(k - zonedBase);
+            } else {
+                local.add(k);
+            }
+        }
+        boolean bothKinds = localLine != null && zonedLine != null;
+        // without boundaries with a zone, the classes with a zone mirror those without: same local times, same rules
+        boolean mirrored = bothKinds && zonedLine.boundaries.length == 0 && zoned.equals(local);
+        var parts = new ArrayList<String>();
+        if (!local.isEmpty()) {
+            parts.addAll(runs(local, classes::get, k -> empty[k], localLine.classCount(), bothKinds && !mirrored ? whole(false) : null));
+        }
+        if (!zoned.isEmpty() && !mirrored) {
+            parts.addAll(zonedRuns(zoned, bothKinds ? whole(true) : null));
+        }
+        if (missing) {
+            parts.add(plain(classes.get(nullClass)));
+        }
+        return parts;
+    }
+
+    /** How every value of one kind is described in a column that takes both: {@code any time with a time zone}. */
+    private String whole(boolean zoned) {
+        return "any " + type.feelName() + (zoned ? " with" : " without") + " a time zone";
+    }
+
+    /** A class on its own. */
+    private static String plain(ValueClass valueClass) {
+        return switch (valueClass) {
+            case ValueClass.Point(var value) -> FeelLiterals.literal(value);
+            case ValueClass.OtherString other -> "any other value";
+            case ValueClass.AnyList list -> "any list";
+            case ValueClass.Missing missing -> "null";
+            case ValueClass.Between between -> run(between, between);
+            case ValueClass.Zoned zoned -> throw new IllegalStateException("classes with a time zone are described as runs");
+        };
+    }
+
+    /**
+     * The classes of values with a time zone, numbered from the first one, as runs.
+     *
+     * @param whole how all of them are described, or null to describe them as an interval
+     */
+    private List<String> zonedRuns(List<Integer> zoned, String whole) {
+        int walls = wallLine.classCount();
+        if (walls == 1) { // no boundary without a zone: instants only
+            return runs(zoned, i -> instantPart(i * walls), i -> empty[zonedBase + i], zonedLine.classCount(), whole);
+        }
+        if (zonedLine.boundaries.length == 0) { // no boundary with a zone: local times only
+            var runs = runs(zoned, this::wallPart, w -> empty[zonedBase + w], walls, whole);
+            return whole == null ? runs : runs.stream().map(run -> run.equals(whole) ? run : run + " with a time zone").toList();
+        }
+        // both: the instants taken with all their local times merge into runs; the others are given with their local times
+        var wholeInstants = new ArrayList<Integer>();
+        var partial = new ArrayList<String>();
+        int at = 0;
+        while (at < zoned.size()) {
+            int instant = zoned.get(at) / walls;
+            var localTimes = new ArrayList<Integer>();
+            while (at < zoned.size() && zoned.get(at) / walls == instant) {
+                localTimes.add(zoned.get(at++) % walls);
+            }
+            int row = zonedBase + instant * walls;
+            if (coversAll(localTimes, w -> empty[row + w], walls)) {
+                wholeInstants.add(instant);
+            } else {
+                var instants = run(instantPart(instant * walls), instantPart(instant * walls));
+                runs(localTimes, this::wallPart, w -> empty[row + w], walls, null)
+                        .forEach(localRun -> partial.add(instants + " at local time " + localRun));
+            }
+        }
+        var runs = new ArrayList<String>();
+        if (!wholeInstants.isEmpty()) {
+            IntPredicate noValueAt = instant -> IntStream.range(0, walls).allMatch(w -> empty[zonedBase + instant * walls + w]);
+            runs.addAll(runs(wholeInstants, i -> instantPart(i * walls), noValueAt, zonedLine.classCount(), whole));
+        }
+        runs.addAll(partial);
+        return runs;
+    }
+
+    /** The instants of a class with a time zone, numbered from the first one. */
+    private ValueClass instantPart(int zonedClass) {
+        return ((ValueClass.Zoned) classes.get(zonedBase + zonedClass)).instant();
+    }
+
+    /** The local times of a class with a time zone, numbered from the first one (any instant has the same). */
+    private ValueClass wallPart(int zonedClass) {
+        return ((ValueClass.Zoned) classes.get(zonedBase + zonedClass)).wall();
+    }
+
+    /**
+     * Sorted classes of one line as runs: each maximal series with only empty classes in between becomes one
+     * interval, such as {@code [18..65)}, or a single value.
+     *
+     * @param part    the class at a number of the line
+     * @param isEmpty whether the class at a number holds no value
+     * @param count   the number of classes of the line
+     * @param whole   how a run that leaves out only empty classes is described, or null for {@code (-inf..+inf)}
+     */
+    private static List<String> runs(List<Integer> sorted, IntFunction<ValueClass> part, IntPredicate isEmpty, int count, String whole) {
+        if (whole != null && coversAll(sorted, isEmpty, count)) {
+            return List.of(whole);
+        }
         var runs = new ArrayList<String>();
         int start = sorted.getFirst();
         int end = start;
         for (int next : sorted.subList(1, sorted.size())) {
-            if (!adjacent(end, next)) {
-                runs.add(run(start, end));
+            if (!IntStream.range(end + 1, next).allMatch(isEmpty)) {
+                runs.add(run(part.apply(start), part.apply(end)));
                 start = next;
             }
             end = next;
         }
-        runs.add(run(start, end));
+        runs.add(run(part.apply(start), part.apply(end)));
         return runs;
     }
 
-    /** Whether class {@code to} comes after class {@code from}, on the same line, with only empty classes between them. */
-    private boolean adjacent(int from, int to) {
-        if (to <= from || lineOfClass(from) != lineOfClass(to)) {
-            return false;
-        }
-        for (int k = from + 1; k < to; k++) {
-            if (!empty[k]) {
-                return false;
-            }
-        }
-        return true;
+    /** Whether the classes left out of {@code sorted}, among {@code count}, are all empty. */
+    private static boolean coversAll(List<Integer> sorted, IntPredicate isEmpty, int count) {
+        var covered = new HashSet<>(sorted);
+        return IntStream.range(0, count).allMatch(k -> covered.contains(k) || isEmpty.test(k));
     }
 
-    /** The classes {@code first} to {@code last}: one class as {@link #describe(int)}, a run as one interval. */
-    private String run(int first, int last) {
-        return first == last ? describe(first) : interval(first, last);
-    }
-
-    /**
-     * The classes {@code first} to {@code last} of one line as an interval, such as {@code [18..65)}. When the
-     * column has both lines and the classes cover one of them, {@code (-inf..+inf)} would not say which:
-     * they are then {@code any time with a time zone} or {@code any date and time without a time zone}.
-     */
-    private String interval(int first, int last) {
-        if (localLine != null && zonedLine != null && coversLine(first, last)) {
-            return "any " + type.feelName() + (lineOfClass(first) == zonedLine ? " with" : " without") + " a time zone";
+    /** The classes from {@code first} to {@code last} of a line: one value, or an interval such as {@code [18..65)}. */
+    private static String run(ValueClass first, ValueClass last) {
+        if (first == last && first instanceof ValueClass.Point(var value)) {
+            return FeelLiterals.literal(value);
         }
-        return lowEnd(classes.get(first)) + ".." + highEnd(classes.get(last));
-    }
-
-    /** Whether the classes of the line outside {@code first} to {@code last} are all empty. */
-    private boolean coversLine(int first, int last) {
-        var line = lineOfClass(first);
-        for (int k = line.base; k <= line.last(); k++) {
-            if ((k < first || k > last) && !empty[k]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /** The line of an ordered column's class (not the missing class). */
-    private Line lineOfClass(int valueClass) {
-        return zonedLine != null && valueClass >= zonedLine.base ? zonedLine : localLine;
+        return lowEnd(first) + ".." + highEnd(last);
     }
 
     /** How an interval starting with the class opens: {@code [18} at a value, {@code (18} or {@code (-inf} after one. */
@@ -690,6 +834,7 @@ final class ColumnIndex {
         return switch (classes.get(valueClass)) {
             case ValueClass.Point(var value) -> bindable(value);
             case ValueClass.Between(var low, var high, var zoned) -> bindable(OpenIntervals.valueInside(type, low, high, zoned));
+            case ValueClass.Zoned(var instant, var wall) -> OpenIntervals.valueInside(type, span(instant), span(wall));
             case ValueClass.OtherString other -> null;
             case ValueClass.AnyList list -> List.of();
             case ValueClass.Missing missing -> null;
@@ -737,68 +882,57 @@ final class ColumnIndex {
                 case Range r -> null;
             };
         }
-        if (!sameLine(test, valueClass)) {
-            return null; // a time with a zone compared with one without: FEEL leaves it undefined
-        }
         return switch (test) {
             case NullTest n -> false;
-            case Equals(var literal) -> switch (valueClass) {
-                case ValueClass.Point(var value) -> compare(value, literal) == 0;
-                default -> false; // literals are boundaries / written values, never inside other classes
+            // literals are boundaries / written values, never inside other classes
+            case Equals(var literal) -> coordinate(valueClass, literal) instanceof ValueClass.Point(var value) && compare(value, literal) == 0;
+            case Compare(var operator, var literal) -> switch (operator) {
+                case LT -> below(coordinate(valueClass, literal), literal, false);
+                case LE -> below(coordinate(valueClass, literal), literal, true);
+                case GT -> above(coordinate(valueClass, literal), literal, false);
+                case GE -> above(coordinate(valueClass, literal), literal, true);
             };
-            case Compare c -> switch (valueClass) {
-                case ValueClass.Point(var value) -> satisfies(value, c);
-                case ValueClass.Between(var low, var high, var zoned) -> switch (c.operator()) {
-                    // c.value() is a boundary, so it lies entirely on one side of the open interval
-                    case LT, LE -> high != null && compare(high, c.value()) <= 0;
-                    case GT, GE -> low != null && compare(low, c.value()) >= 0;
-                };
-                default -> false;
-            };
-            case Range r -> switch (valueClass) {
-                case ValueClass.Point(var value) -> inRange(value, r);
-                case ValueClass.Between(var low, var high, var zoned) -> low != null && high != null
-                        && compare(r.low(), low) <= 0 && compare(r.high(), high) >= 0;
-                default -> false;
-            };
+            case Range(var low, var lowClosed, var high, var highClosed) -> above(coordinate(valueClass, low), low, lowClosed)
+                    && below(coordinate(valueClass, high), high, highClosed);
         };
     }
 
-    /** Whether the test's literal and the class's values are both with a time zone or both without; true for {@code null}. */
-    private static boolean sameLine(Test test, ValueClass valueClass) {
-        Comparable<?> literal = switch (test) {
-            case NullTest n -> null;
-            case Equals(var value) -> value;
-            case Compare c -> c.value();
-            case Range r -> r.low(); // both ends are on one line, which the parser checks
-        };
-        boolean zonedClass = switch (valueClass) {
-            case ValueClass.Point(var value) -> FeelTemporals.hasZone(value);
-            case ValueClass.Between between -> between.zoned();
-            case ValueClass.OtherString other -> false;
-            case ValueClass.AnyList anyList -> false;
-            case ValueClass.Missing missing -> false;
-        };
-        return literal == null || FeelTemporals.hasZone(literal) == zonedClass;
+    /**
+     * What a class is compared with a literal by. A class of values with a time zone has two coordinates:
+     * FEEL compares its instants with a literal that has a zone, and its local times with one that has
+     * none. Any other class is compared as it is; {@link #compare} then takes a literal with a zone by
+     * its local time against values without one.
+     */
+    private static ValueClass coordinate(ValueClass valueClass, Comparable<?> literal) {
+        if (valueClass instanceof ValueClass.Zoned(var instant, var wall)) {
+            return FeelTemporals.hasZone(literal) ? instant : wall;
+        }
+        return valueClass;
     }
 
-    private static boolean satisfies(Comparable<?> value, Compare c) {
-        int cmp = compare(value, c.value());
-        return switch (c.operator()) {
-            case LT -> cmp < 0;
-            case LE -> cmp <= 0;
-            case GT -> cmp > 0;
-            case GE -> cmp >= 0;
+    /** Whether every value of a line's class is above the bound, or equal to it if {@code closed}. */
+    private static boolean above(ValueClass part, Comparable<?> bound, boolean closed) {
+        return switch (part) {
+            case ValueClass.Point(var value) -> compare(value, bound) > (closed ? -1 : 0);
+            // the bound is a boundary of the line, so it lies entirely on one side of the open interval
+            case ValueClass.Between(var low, var high, var zoned) -> low != null && compare(low, bound) >= 0;
+            default -> false;
         };
     }
 
-    private static boolean inRange(Comparable<?> value, Range r) {
-        int low = compare(value, r.low());
-        int high = compare(value, r.high());
-        return (low > 0 || (low == 0 && r.lowClosed())) && (high < 0 || (high == 0 && r.highClosed()));
+    /** Whether every value of a line's class is below the bound, or equal to it if {@code closed}. */
+    private static boolean below(ValueClass part, Comparable<?> bound, boolean closed) {
+        return switch (part) {
+            case ValueClass.Point(var value) -> compare(value, bound) < (closed ? 1 : 0);
+            case ValueClass.Between(var low, var high, var zoned) -> high != null && compare(high, bound) <= 0;
+            default -> false;
+        };
     }
 
-    /** FEEL's order: by instant for values with a time zone; only called within a line. */
+    /**
+     * FEEL's order ({@link FeelTemporals#compare}): by instant for two values with a time zone, by local
+     * time when only one has a zone.
+     */
     private static int compare(Object a, Object b) {
         return FeelTemporals.compare(a, b);
     }
@@ -810,8 +944,15 @@ final class ColumnIndex {
         record Point(Comparable<?> value) implements ValueClass {
         }
 
-        /** Open interval between two boundaries of a line, with or without a time zone; null means unbounded. */
+        /** Open interval between two boundaries of a line, of instants ({@code zoned}) or not; null means unbounded. */
         record Between(Comparable<?> low, Comparable<?> high, boolean zoned) implements ValueClass {
+        }
+
+        /**
+         * Times or date-times with a time zone: those whose instant is in one class of the line of instants
+         * and whose local time is in one class of the line of local times (each a {@link Point} or a {@link Between}).
+         */
+        record Zoned(ValueClass instant, ValueClass wall) implements ValueClass {
         }
 
         /** STRING: every value not written in the rules or declared. */
@@ -828,19 +969,17 @@ final class ColumnIndex {
 
     /**
      * An ordered line of values, split by its sorted distinct boundaries {@code b0 < ... < bk} into the
-     * classes {@code (-inf, b0), [b0], ..., (bk, +inf)}, numbered from {@code base}: boundary {@code i} is
-     * class {@code base + 2i + 1}. A class, not a record: it holds an array and is never compared.
+     * classes {@code (-inf, b0), [b0], ..., (bk, +inf)}, numbered from 0: boundary {@code i} is class
+     * {@code 2i + 1}. A class, not a record: it holds an array and is never compared.
      */
     private static final class Line {
         final Comparable<?>[] boundaries;
         /** The boundaries as primitive keys, searched first; null for strings, booleans, or boundaries that do not fit. */
         final PrimitiveKeys keys;
-        final int base;
 
-        Line(Comparable<?>[] boundaries, PrimitiveKeys keys, int base) {
+        Line(Comparable<?>[] boundaries, ColumnType type) {
             this.boundaries = boundaries;
-            this.keys = keys;
-            this.base = base;
+            this.keys = PrimitiveKeys.of(type, boundaries);
         }
 
         /** The class of a value of the line (see {@link #classOfSearch}). */
@@ -848,15 +987,14 @@ final class ColumnIndex {
             if (keys != null) {
                 int byKey = keys.classOf(value);
                 if (byKey >= 0) {
-                    return base + byKey;
+                    return byKey;
                 }
             }
-            return base + classOfSearch(Arrays.binarySearch(boundaries, value, ColumnIndex::compare));
+            return classOfSearch(Arrays.binarySearch(boundaries, value, ColumnIndex::compare));
         }
 
-        /** The line's last class: the interval above its last boundary. */
-        int last() {
-            return base + 2 * boundaries.length;
+        int classCount() {
+            return 2 * boundaries.length + 1;
         }
     }
 }

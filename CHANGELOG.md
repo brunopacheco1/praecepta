@@ -36,9 +36,8 @@ over the value types of a cell (`UnaryTests`), or feed map-based inputs to table
   test, and so every `not(...)`. Elements may not be missing, must be of the Java types a getter of
   a single value returns (or text), and declared input values apply to them; a table's input of single
   values cannot be bound as a list. The elements of a TIME or DATE_TIME list may have a time zone or
-  not, each compared as a single value of its kind is: an element that cannot be compared with a
-  cell's literal leaves its test unknown, so a `not(...)` holds only when every element is known to
-  fail. The index ORs the masks of the elements' values, a few word operations per element (only on
+  not, each compared as a single value of its kind is: by instant when the element and the cell's
+  literal both have a zone, else by local time. The index ORs the masks of the elements' values, a few word operations per element (only on
   an element's own words when its mask is sparse and no cell of the column is a `not(...)`), then
   ANDs across columns as usual, list columns after the others with as many `-` cells. `DecisionTable` gains `listInputs`, and `DecisionTable.cell(rule, column)` parses a cell as
   the table holds it.
@@ -87,24 +86,33 @@ over the value types of a cell (`UnaryTests`), or feed map-based inputs to table
   TIME columns also take times with an offset (`time("16:12:00+01:00")`, `16:12:00Z`), held as
   `OffsetTime`, and DATE_TIME columns date-times with an offset or a zone id
   (`date and time("2018-07-30T16:12:00Z")`, `date and time("2018-07-30T16:12:00@Europe/Paris")`),
-  held as `ZonedDateTime`. As in FEEL, they compare by the instant they denote, so
-  `time("09:00:00+01:00")` equals `time("08:00:00Z")`, and comparing one with a value without a zone
-  is undefined: the test is unknown, so neither `time("08:00:00")` nor its `not(...)` matches
-  `08:00Z`. The builder gains `offsetTimeInput` and `zonedDateTimeInput` (bind an `OffsetDateTime`
+  held as `ZonedDateTime`. As in FEEL, two of them compare by the instant they denote, so
+  `time("09:00:00+01:00")` equals `time("08:00:00Z")`. When only one of two values has a zone, the
+  other takes its offset (DMN 1.5, Table 54, on `<`: "If one input has a null timezone offset, that input uses
+  the timezone offset of the other input"), so the two compare by local time. DMN 1.5 does not say how
+  `=` treats such a pair (Table 53) and the DMN TCK has no case for it, so equality is kept consistent
+  with the comparisons, `<=` being defined as `<` or `=` (10.3.2.15): the two are equal exactly when
+  neither is before the other. So the cell `time("08:00:00")` matches the inputs `08:00`, `08:00Z` and `08:00+05:00`, the
+  cell `< time("12:00:00+01:00")` matches `11:59`, and an interval may have an end of each kind
+  (`[time("09:00:00")..time("17:00:00Z")]`). The builder gains `offsetTimeInput` and `zonedDateTimeInput` (bind an `OffsetDateTime`
   through `toZonedDateTime()`); map-based inputs read both kinds from text, including the
   `[Europe/Paris]` form `ZonedDateTime.toString()` writes. A zoned date-time is written as FEEL
   writes it (`2025-12-24T09:00:00@Europe/Paris`), except the later of two equal local times when
   clocks go back, which also takes its offset (`2025-10-26T02:30:00+01:00[Europe/Paris]`, and in a
-  FEEL literal `date and time("2025-10-26T02:30:00+01:00")`), so it reads back as the same instant. In the index, values with a zone lie on a
-  line of their own, ordered by instant and keyed in `PrimitiveKeys` by nanoseconds, and a column
-  has only the lines its binding can give, so gap analysis stays exact: a typed getter's column
-  is searched for gaps among its own kind only, a map-based one among both (a gap there reads, for
-  example, `start = any time with a time zone`). `DmnReader` and `DmnWriter` read and write the
+  FEEL literal `date and time("2025-10-26T02:30:00+01:00")`), so it reads back as the same instant. In the index, a value
+  without a zone is classified by its local time among the local times of every literal; a value with
+  a zone has two coordinates, its instant among the literals with a zone (keyed in `PrimitiveKeys` by
+  nanoseconds) and its local time among those without, and its class is the pair. A column has only
+  the classes its binding can give, and a pair that no value has (an instant and a local time more
+  than 18 hours apart, or not a whole number of seconds apart) is empty, so gap analysis stays exact:
+  a typed getter's column is searched for gaps among its own kind only, a map-based one among both
+  (`cutOff in (-inf..time("11:00:00Z")) at local time [time("12:00:00")..+inf)` is a gap among times
+  with a zone). `DmnReader` and `DmnWriter` read and write the
   zoned literals, and the new `feel.FeelTemporals` parses FEEL time text and orders values as FEEL
   does. The Maven plugin generates `OffsetTime` and `ZonedDateTime` components for columns whose
   values are all written with a zone (and for the inputs their cells compare with), and fails the
   build for a column that mixes both kinds. A time with a zone id (`time("16:12:00@Europe/Paris")`)
-  is still rejected, as it has no fixed offset. With it, the three checks of the DMN TCK's
+  is still rejected, as it has no fixed offset ([#82](https://github.com/brunopacheco1/praecepta/issues/82)). With it, the three checks of the DMN TCK's
   `0036-dt-variable-input` that use zoned inputs pass.
 
 ### Changed
@@ -129,15 +137,12 @@ over the value types of a cell (`UnaryTests`), or feed map-based inputs to table
   columns, and `FeelLiterals` writes them: code that switches over the value types of a cell needs
   these cases.
 - **Map-based inputs accept times and date-times with a time zone**, which they used to reject as
-  invalid: they now match only the cells that accept any value (or test with zoned literals), and
-  the validation report may list gaps among them for tables with time or date-time comparisons
-  (`cutOff = any time with a time zone`), so a table built with `failOn(WARNING)` in 0.3 may now
-  fail. The warning is real: a zoned input matches no rule whose cells all lack a zone. To keep a
-  map-based column to values without a zone, declare its input values without one, such as
-  `allowedValues("cutOff", "[time(\"00:00:00\")..time(\"23:59:59\")]")`: zoned values are then
-  invalid input, and no gap is searched among them. Otherwise bind the inputs with typed getters,
-  `timeInput` or `dateTimeInput` for such columns (`inputs(...)` does not mix with per-column
-  bindings, so every input is then bound per column).
+  invalid. Against cells and declared input values without a zone they count by their local time, as
+  FEEL compares them (`08:30Z` and `08:30+05:00` match `time("08:30:00")`), so a table whose cells
+  all lack a zone matches them as it matches the same times without one, and its validation report
+  does not change. To keep a column to one kind, bind the inputs with typed getters, `timeInput` or
+  `dateTimeInput` for values without a zone (`inputs(...)` does not mix with per-column bindings, so
+  every input is then bound per column).
 - **`DmnReader` reads columns typed by a collection** instead of rejecting them; an output of a
   collection type, a collection of collections, and allowed values on a collection itself are still
   rejected.

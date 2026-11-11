@@ -50,24 +50,28 @@ builds an engine once and calls it.
      cells compare (`< "N"`, `["A".."M"]`) is split the same way; a value the rules mention is
      still found by hash, and only other values need the binary search. Booleans are the same with
      `false < true`, both always boundaries, so they get one class each.
-   - **Times and date-times with a time zone** (`OffsetTime`, `ZonedDateTime`) lie on a line of
-     their own, ordered by instant and keyed in `PrimitiveKeys` by nanoseconds at offset zero, which
-     the boundaries with a zone split as above; values without a zone lie on the other line. FEEL
-     cannot compare across the lines, so a cell's test with a literal of the other kind is unknown on
-     every class of a line. A column has only the lines its input can reach (`Zoning`): `timeInput`
-     and `dateTimeInput` give values without a zone, `offsetTimeInput` and `zonedDateTimeInput` with
-     one, and map-based inputs, read from text, either; so the analysis looks for gaps among the
-     values that can really occur, and reports a map-based column whose cells all lack a zone as
-     leaving every zoned value unmatched (declared input values without a zone remove that line).
+   - **Times and date-times with a time zone** (`OffsetTime`, `ZonedDateTime`). FEEL compares two
+     values with a zone by instant, and any other pair by local time: the value without a zone takes
+     the other's offset (DMN 1.5, Table 54). So a value without a zone lies on the line of local
+     times, split by the local time of every boundary, with or without a zone. A value with a zone
+     has two coordinates: its instant, on a line split by the boundaries with a zone (keyed in
+     `PrimitiveKeys` by nanoseconds at offset zero), and its local time, on a line split by the
+     boundaries without one. Its class is the pair of the two classes, and a test reads the
+     coordinate of its literal's kind (an interval with an end of each kind reads both). When the
+     cells of a column are all of one kind, one coordinate has a single class and the pairs are as
+     many as the classes of the other. A pair is empty when no value has both coordinates: an
+     instant and a local time are a whole number of seconds apart, at most 18 hours. A column has
+     only the classes its input can reach (`Zoning`): `timeInput` and `dateTimeInput` give values
+     without a zone, `offsetTimeInput` and `zonedDateTimeInput` with one, and map-based inputs,
+     read from text, either; so the analysis looks for gaps among the values that can really occur.
    - **Lists** (`ListColumn`): an ordinary column index over the same cells classifies one element.
      For each element, its class mask gives the positive cells it passes and the `not(...)` cells it
      breaks; ORing those over the elements gives "some element passes", and the list's mask is the
      `-` rules, the positive rules some element passes, and the negated rules none passes. A missing
      and an empty list have fixed masks. Two nationalities cost one more OR per mask word. The
      element index stores its masks in either form (see below), and the list masks it gives are
-     dense. Elements of a time or date-time list may have a zone or not: the element index has
-     both lines, and an element on the other line than a cell's literal makes that test unknown,
-     which, as in FEEL's `or`, keeps the `not(...)` cells from matching.
+     dense. Elements of a time or date-time list may have a zone or not: the element index takes
+     both kinds, and classifies each element as it does a single value.
    - **Memory** grows with columns × classes × rules, never with the product of the values.
    - **Compact masks** (`Masks`): a mask is stored dense (one bit per rule) unless at most a quarter
      of its 64-bit words hold a set bit; it is then stored *sparse*, as the pairs (word, bits) of its

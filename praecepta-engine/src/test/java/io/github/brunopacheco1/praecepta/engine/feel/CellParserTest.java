@@ -236,7 +236,7 @@ class CellParserTest {
             "DATE_TIME; date and time(\"2025-01-01T10:00:00@Mars/Olympus\"); invalid date and time",
             "DATE_TIME; date and time(\"2025-01-01T10:00:00-0500\"); invalid date and time",
             "DATE_TIME; date and time(\"2025-10-26T02:30+01:00[Europe/Paris]\"); write a zone id as @Europe/Paris",
-            "TIME;   [time(\"10:00:00\")..time(\"11:00:00Z\")]; one end with a time zone and one without",
+            "TIME;   [time(\"11:00:00\")..time(\"10:00:00+05:00\")]; starts after it ends",
             "TIME;   [time(\"10:00:00Z\")..time(\"10:00:00+01:00\")]; starts after it ends",
             "DATE_TIME; 2025-01-01;   is not a date and time",
             "DATE_TIME; date and time(\"2025-01-31\"); invalid date and time",

@@ -73,14 +73,32 @@ class FeelTemporalsTest {
     }
 
     @Test
-    void values_with_and_without_a_zone_cannot_be_compared() {
-        var local = LocalTime.of(8, 0);
-        var zoned = OffsetTime.of(8, 0, 0, 0, ZoneOffset.UTC);
-        Assertions.assertThat(FeelTemporals.comparable(local, zoned)).isFalse();
-        Assertions.assertThat(FeelTemporals.comparable(zoned, zoned)).isTrue();
-        Assertions.assertThat(FeelTemporals.comparable(local, local)).isTrue();
-        Assertions.assertThatThrownBy(() -> FeelTemporals.compare(local, zoned))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("only one has a time zone");
+    void a_value_without_a_zone_takes_the_offset_of_the_one_it_is_compared_with() {
+        // DMN 1.5, Table 54: "If one input has a null timezone offset, that input uses the timezone offset of the other input"
+        var eight = LocalTime.of(8, 0);
+        Assertions.assertThat(FeelTemporals.compare(eight, OffsetTime.of(8, 0, 0, 0, ZoneOffset.UTC))).isZero();
+        Assertions.assertThat(FeelTemporals.compare(eight, OffsetTime.of(8, 0, 0, 0, ZoneOffset.ofHours(5)))).isZero();
+        Assertions.assertThat(FeelTemporals.compare(OffsetTime.of(8, 0, 0, 0, ZoneOffset.ofHours(-5)), eight)).isZero();
+        Assertions.assertThat(FeelTemporals.compare(eight, OffsetTime.of(9, 0, 0, 0, ZoneOffset.ofHours(5))))
+                .as("09:00+05:00 is 04:00 at offset zero, but 08:00 is taken at +05:00 too").isNegative();
+        Assertions.assertThat(FeelTemporals.compare(OffsetTime.of(9, 0, 0, 0, ZoneOffset.ofHours(5)), eight)).isPositive();
+
+        var noon = LocalDateTime.of(2025, 7, 1, 12, 0);
+        var noonInParis = ZonedDateTime.of(2025, 7, 1, 12, 0, 0, 0, ZoneId.of("Europe/Paris"));
+        Assertions.assertThat(FeelTemporals.compare(noon, noonInParis)).isZero();
+        Assertions.assertThat(FeelTemporals.compare(noonInParis, noon)).isZero();
+        Assertions.assertThat(FeelTemporals.compare(noon, noonInParis.withZoneSameInstant(ZoneOffset.UTC)))
+                .as("the same instant is 10:00 at offset zero").isPositive();
+        Assertions.assertThat(FeelTemporals.compare(noon.plusNanos(1), noonInParis)).isPositive();
+        Assertions.assertThat(FeelTemporals.compare(noonInParis, noon.plusNanos(1))).isNegative();
+    }
+
+    @Test
+    void a_value_with_a_zone_is_local_without_it() {
+        Assertions.assertThat(FeelTemporals.local(OffsetTime.of(8, 0, 0, 0, ZoneOffset.ofHours(5)))).isEqualTo(LocalTime.of(8, 0));
+        Assertions.assertThat(FeelTemporals.local(ZonedDateTime.of(2025, 7, 1, 12, 0, 0, 0, ZoneId.of("Europe/Paris"))))
+                .isEqualTo(LocalDateTime.of(2025, 7, 1, 12, 0));
+        Assertions.assertThat(FeelTemporals.local(LocalTime.NOON)).isEqualTo(LocalTime.NOON);
+        Assertions.assertThat(FeelTemporals.local("text")).isEqualTo("text");
     }
 }

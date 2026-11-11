@@ -54,15 +54,17 @@ class FeatureInteractionsTest {
                 .output(output -> output.values().get("id"))
                 .rules(SLOT_RULES)
                 .build();
-        // by instant: 09:00+01:00 is 08:00Z; not(08:00) cannot compare a time with a zone, so it is unknown
+        // two times with a zone by instant: 09:00+01:00 is 08:00Z; against 08:00 without one, 08:00Z counts as 08:00
         Assertions.assertThat(engine.evaluate(slots(EIGHT_UTC))).containsExactly("eight-utc");
-        Assertions.assertThat(engine.evaluate(slots(OffsetTime.of(10, 30, 0, 0, ZoneOffset.ofHours(2))))).isEmpty();
+        // 10:30+02:00 is 08:30Z, and its local time is not 08:00
+        Assertions.assertThat(engine.evaluate(slots(OffsetTime.of(10, 30, 0, 0, ZoneOffset.ofHours(2))))).containsExactly("not-local-eight");
         // some element passes the inner test, so the not(...) fails
         Assertions.assertThat(engine.evaluate(slots(EIGHT_UTC, LocalTime.of(8, 0)))).containsExactly("eight-utc");
-        Assertions.assertThat(engine.evaluate(slots(LocalTime.of(9, 0)))).containsExactly("not-local-eight");
-        // an element that cannot be compared leaves "some element passes" unknown, unless another passes
+        // a time without a zone takes the literal's offset: 09:00 equals 09:00+01:00, and is before 12:00Z
+        Assertions.assertThat(engine.evaluate(slots(LocalTime.of(9, 0)))).containsExactly("eight-utc", "not-local-eight");
         Assertions.assertThat(engine.evaluate(slots(LocalTime.of(9, 0), OffsetTime.of(13, 0, 0, 0, ZoneOffset.UTC))))
-                .containsExactly("afternoon");
+                .containsExactly("eight-utc", "not-local-eight", "afternoon");
+        Assertions.assertThat(engine.evaluate(slots(LocalTime.of(12, 0)))).containsExactly("not-local-eight", "afternoon");
     }
 
     @Test
@@ -75,15 +77,16 @@ class FeatureInteractionsTest {
                 .rules(SLOT_RULES)
                 .build();
         Assertions.assertThat(engine.evaluate(Map.of("slots", "[time(\"10:00:00+02:00\"), 13:00:00Z]")))
-                .containsExactly("eight-utc", "afternoon");
-        Assertions.assertThat(engine.evaluate(Map.of("slots", "[09:00:00]"))).containsExactly("not-local-eight");
+                .containsExactly("eight-utc", "not-local-eight", "afternoon");
+        Assertions.assertThat(engine.evaluate(Map.of("slots", "[09:00:00]"))).containsExactly("eight-utc", "not-local-eight");
+        Assertions.assertThat(engine.evaluate(Map.of("slots", "[08:00:00-03:00]"))).isEmpty();
     }
 
     record Visit(OffsetTime start, List<Object> openHours) {
     }
 
     @Test
-    void a_value_with_a_zone_is_in_a_named_list_only_if_some_element_equals_it() {
+    void a_value_with_a_zone_is_in_a_named_list_if_some_element_equals_it_as_feel_compares_them() {
         //   Start               → id
         // 1 Open Hours             open
         // 2 not(Open Hours)        closed
@@ -102,8 +105,9 @@ class FeatureInteractionsTest {
                 .containsExactly("open");
         Assertions.assertThat(engine.evaluate(new Visit(EIGHT_UTC, List.of(OffsetTime.of(9, 0, 0, 0, ZoneOffset.UTC)))))
                 .containsExactly("closed");
-        // 08:00 without a zone cannot be compared with 08:00Z: membership is unknown, so neither rule matches
-        Assertions.assertThat(engine.evaluate(new Visit(EIGHT_UTC, List.of(LocalTime.of(8, 0))))).isEmpty();
+        // 08:00 without a zone takes the offset of 08:00Z, so they are equal; 09:00 is not
+        Assertions.assertThat(engine.evaluate(new Visit(EIGHT_UTC, List.of(LocalTime.of(8, 0))))).containsExactly("open");
+        Assertions.assertThat(engine.evaluate(new Visit(EIGHT_UTC, List.of(LocalTime.of(9, 0))))).containsExactly("closed");
         Assertions.assertThat(engine.evaluate(new Visit(EIGHT_UTC, List.of(LocalTime.of(8, 0), EIGHT_UTC)))).containsExactly("open");
     }
 
