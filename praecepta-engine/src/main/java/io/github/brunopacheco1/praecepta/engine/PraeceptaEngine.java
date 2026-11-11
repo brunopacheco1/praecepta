@@ -280,18 +280,6 @@ public final class PraeceptaEngine<I, O> {
             this.outputs = outputs;
             this.columns = columns;
         }
-
-        Map<String, String> values() {
-            return values;
-        }
-
-        String[] outputs() {
-            return outputs;
-        }
-
-        int[] columns() {
-            return columns;
-        }
     }
 
     /**
@@ -328,11 +316,11 @@ public final class PraeceptaEngine<I, O> {
     /** The outputs of a rule that names inputs, filled in with the text of the input's values. */
     private <T> PraeceptaOutput output(int bit, T input, BitsetIndex.ColumnReader<T> reader) {
         var named = namedInputsByBit[bit];
-        var values = new HashMap<>(named.values());
-        for (int i = 0; i < named.outputs().length; i++) {
-            int column = named.columns()[i];
+        var values = new HashMap<>(named.values);
+        for (int i = 0; i < named.outputs.length; i++) {
+            int column = named.columns[i];
             var value = index.column(column).value(reader.read(input, column));
-            values.put(named.outputs()[i], value == null ? null : FeelLiterals.text(value));
+            values.put(named.outputs[i], value == null ? null : FeelLiterals.text(value));
         }
         return new PraeceptaOutput(values);
     }
