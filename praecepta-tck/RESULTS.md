@@ -21,13 +21,13 @@ same models (literal expressions, contexts, invocations) are outside Praecepta's
 is *not supported* when the table uses a feature Praecepta does not have (the DMN reader
 rejects it), or the inputs are of a kind it does not take.
 
-**81 of 86 checks pass (94.2 %).** Of the 81 checks Praecepta supports, 81 pass (100.0 %).
+**83 of 86 checks pass (96.5 %).** Of the 83 checks Praecepta supports, 83 pass (100.0 %).
 
 | Outcome | Checks |
 |---|---:|
-| Passed | 81 |
+| Passed | 83 |
 | Failed | 0 |
-| Not supported | 5 |
+| Not supported | 3 |
 
 ## By test case
 
@@ -54,7 +54,7 @@ rejects it), or the inputs are of a kind it does not take.
 | [compliance-level-3/0008-listGen](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0008-listGen) | 2 | 0 | 0 |  |
 | [compliance-level-3/0017-tableTests](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0017-tableTests) | 4 | 0 | 0 |  |
 | [compliance-level-3/0036-dt-variable-input](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0036-dt-variable-input) | 24 | 0 | 0 |  |
-| [compliance-level-3/0039-dt-list-semantics](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0039-dt-list-semantics) | 0 | 0 | 2 | output entries that are expressions (#71) |
+| [compliance-level-3/0039-dt-list-semantics](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0039-dt-list-semantics) | 2 | 0 | 0 |  |
 | [compliance-level-3/0087-chapter-11-example](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0087-chapter-11-example) | 0 | 0 | 2 | inputs computed by other decisions (decision requirement graphs, #14) |
 
 ## Not supported
@@ -64,4 +64,3 @@ What the unsupported checks need, by number of checks:
 | Feature | Checks |
 |---|---:|
 | inputs computed by other decisions (decision requirement graphs, #14) | 3 |
-| output entries that are expressions (#71) | 2 |
