@@ -43,6 +43,7 @@ import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.integration.Decisions;
 import io.github.brunopacheco1.praecepta.integration.DecisionsException;
 import io.github.brunopacheco1.praecepta.integration.TableLocations;
+import jakarta.inject.Named;
 
 @ExtendWith(OutputCaptureExtension.class)
 class PraeceptaAutoConfigurationTest {
@@ -143,14 +144,33 @@ class PraeceptaAutoConfigurationTest {
                     Assertions.assertThat(context.getBean(Decisions.class).isEmpty()).isTrue();
                     Assertions.assertThat(context.getBeanNamesForType(PraeceptaEngine.class)).isEmpty();
                 });
-        Assertions.assertThat(output).contains("No decision tables found at [classpath*:rules/**/*.dmn]");
+        Assertions.assertThat(output).contains("No decision tables found at classpath*:rules/**/*.dmn");
     }
 
     @Test
     void a_location_set_explicitly_that_finds_nothing_stops_startup_naming_it() {
         runner.withPropertyValues("praecepta.locations=classpath:rules/*.dmn,classpath:nowhere/*.dmn,file:/nowhere/rules.dmn")
                 .run(context -> Assertions.assertThat(problems(context))
-                        .containsExactly("classpath:nowhere/*.dmn: no DMN file found", "file:/nowhere/rules.dmn: no DMN file found"));
+                        .containsExactly("classpath:nowhere/*.dmn: no DMN file matches this location",
+                                "file:/nowhere/rules.dmn: no DMN file matches this location"));
+    }
+
+    @Test
+    void locations_set_to_nothing_stop_startup() {
+        runner.withPropertyValues("praecepta.locations= , ")
+                .run(context -> Assertions.assertThat(problems(context))
+                        .containsExactly("praecepta.locations is set but names no location"));
+    }
+
+    @Test
+    void engines_are_injected_with_named_as_in_the_other_integrations() {
+        runner.withUserConfiguration(NamedPricingConfiguration.class).run(context -> {
+            Assertions.assertThat(context).hasNotFailed();
+            var pricing = context.getBean(Pricing.class);
+            var decisions = context.getBean(Decisions.class);
+            Assertions.assertThat(pricing.discount()).isSameAs(decisions.engine("Discount"));
+            Assertions.assertThat(pricing.carrier()).isSameAs(decisions.engine("Carrier"));
+        });
     }
 
     @Test
@@ -159,7 +179,7 @@ class PraeceptaAutoConfigurationTest {
                 "praecepta.fail-on=sometimes").run(context -> {
                     var problems = problems(context);
                     Assertions.assertThat(problems).hasSize(4);
-                    Assertions.assertThat(problems.get(0)).isEqualTo("praecepta.fail-on: fail-on must be ERROR, WARNING or NONE, not sometimes");
+                    Assertions.assertThat(problems.get(0)).isEqualTo("praecepta.fail-on must be ERROR, WARNING or NONE, not sometimes");
                     Assertions.assertThat(problems.get(1)).isEqualTo("Location 'http://example.com/rules.dmn': expected classpath:, classpath*: or file:");
                     Assertions.assertThat(problems.get(2)).endsWith("tables/no-table.dmn: no decision table");
                     Assertions.assertThat(problems.get(3)).contains("tables/overlapping.dmn: decision 'Tier' has validation issues at ERROR or above")
@@ -246,6 +266,18 @@ class PraeceptaAutoConfigurationTest {
         @Bean
         Pricing pricing(@Qualifier("Discount") PraeceptaEngine<Map<String, String>, Map<String, String>> discount,
                 @Qualifier("Carrier") PraeceptaEngine<Map<String, String>, Map<String, String>> carrier,
+                ObjectProvider<PraeceptaEngine<String, String>> typed) {
+            return new Pricing(discount, carrier, typed);
+        }
+    }
+
+    /** The same beans injected with JSR-330's {@code @Named}, as the Micronaut and Quarkus integrations inject them. */
+    @Configuration(proxyBeanMethods = false)
+    static class NamedPricingConfiguration {
+
+        @Bean
+        Pricing pricing(@Named("Discount") PraeceptaEngine<Map<String, String>, Map<String, String>> discount,
+                @Named("Carrier") PraeceptaEngine<Map<String, String>, Map<String, String>> carrier,
                 ObjectProvider<PraeceptaEngine<String, String>> typed) {
             return new Pricing(discount, carrier, typed);
         }

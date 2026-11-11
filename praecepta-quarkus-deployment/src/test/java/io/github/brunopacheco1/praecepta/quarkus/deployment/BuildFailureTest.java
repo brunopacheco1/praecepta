@@ -30,7 +30,7 @@ class BuildFailureTest {
                 Assertions.assertThat(failure.getClass().getName()).isEqualTo(DecisionsException.class.getName());
                 Assertions.assertThat(failure.getMessage())
                         .startsWith("Cannot load decision tables (6 problems):")
-                        .contains("\n- classpath:missing/*.dmn: no DMN file matches this location (quarkus.praecepta.locations)")
+                        .contains("\n- classpath:missing/*.dmn: no DMN file matches this location\n")
                         .contains("quarkus.praecepta.tables.\"pricing\": Table source ")
                         .contains("'hit-policy' is required for Excel and CSV tables")
                         .contains("quarkus.praecepta.tables.\"nowhere\": Table source ")

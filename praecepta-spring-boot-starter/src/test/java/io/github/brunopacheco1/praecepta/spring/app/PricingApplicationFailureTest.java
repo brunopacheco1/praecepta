@@ -29,7 +29,7 @@ class PricingApplicationFailureTest {
         Assertions.assertThat(output)
                 .contains("APPLICATION FAILED TO START")
                 .contains("Praecepta could not load the decision tables:")
-                .contains("- classpath:nowhere/*.dmn: no DMN file found")
+                .contains("- classpath:nowhere/*.dmn: no DMN file matches this location")
                 .contains("tables/overlapping.dmn: decision 'Tier' has validation issues at ERROR or above:")
                 .contains("    ERROR rules [1, 2] both match some inputs (UNIQUE)")
                 .contains("praecepta.fail-on the validation severity that stops startup");

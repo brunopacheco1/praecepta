@@ -78,13 +78,13 @@ public class PraeceptaProcessor {
     @BuildStep
     PraeceptaTablesBuildItem validate(PraeceptaBuildTimeConfig config, ApplicationArchivesBuildItem archives,
             CurateOutcomeBuildItem curateOutcome, BuildProducer<HotDeploymentWatchedFileBuildItem> watched) {
-        Severity failOn;
+        var problems = new ArrayList<String>();
+        var failOn = Severity.ERROR;
         try {
             failOn = Decisions.failOn(config.failOn());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("quarkus.praecepta." + e.getMessage(), e);
+            problems.add("quarkus.praecepta." + e.getMessage());
         }
-        var problems = new ArrayList<String>();
         var tables = new ArrayList<Table>();
         findDmnFiles(config, classPath(archives, curateOutcome), watched, problems, tables);
         compileDeclaredTables(config, projectDirectory(curateOutcome), watched, problems, tables);
@@ -162,7 +162,8 @@ public class PraeceptaProcessor {
                 location = Location.parse(pattern);
                 matches = finder.find(location);
             } catch (IllegalArgumentException | UncheckedIOException e) {
-                problems.add(pattern + ": " + e.getMessage());
+                // the message names the location or the file
+                problems.add(e.getMessage());
                 continue;
             }
             if (location.classpath()) {
@@ -173,7 +174,7 @@ public class PraeceptaProcessor {
             }
             if (matches.isEmpty()) {
                 if (explicit) {
-                    problems.add(pattern + ": no DMN file matches this location (quarkus.praecepta.locations)");
+                    problems.add(pattern + ": no DMN file matches this location");
                 } else {
                     LOG.infof("No decision tables found at %s", pattern);
                 }

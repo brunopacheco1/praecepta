@@ -83,6 +83,12 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- engines are injected with @Named too, as in Micronaut and Quarkus; the version is Spring Boot's -->
+        <dependency>
+            <groupId>jakarta.inject</groupId>
+            <artifactId>jakarta.inject-api</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

@@ -44,10 +44,10 @@ import io.micronaut.core.util.StringUtils;
  *
  * The DMN files are those {@code praecepta.locations} finds with the application's class loader; every
  * decision table in them becomes one decision. A file that cannot be read, a table the engine cannot build,
- * two decisions with one name, a location set explicitly that finds no file, and validation issues at
- * {@code praecepta.fail-on} or above stop the application from starting, with every problem listed in one
- * {@link DecisionsException}. Issues below it are logged as warnings, one line per issue, prefixed with the
- * decision's name.
+ * two decisions with one name, a location set explicitly that finds no file, a {@code praecepta.fail-on}
+ * that is not a severity, and validation issues at {@code praecepta.fail-on} or above stop the application
+ * from starting, with every problem listed in one {@link DecisionsException}. Issues below it are logged as
+ * warnings, one line per issue, prefixed with the decision's name.
  */
 @Factory
 @Requires(property = PraeceptaConfiguration.ENABLED, notEquals = StringUtils.FALSE)
@@ -62,9 +62,7 @@ public class PraeceptaFactory {
      * Loads the decisions and registers an engine bean per decision. Created first among the context-scoped
      * beans, so that every bean of the application can inject the engines.
      *
-     * @throws DecisionsException       listing every problem with the tables or the locations
-     * @throws IllegalArgumentException if {@code praecepta.fail-on} is not {@code ERROR}, {@code WARNING} or
-     *                                  {@code NONE}
+     * @throws DecisionsException listing every problem with the settings, the locations or the tables
      */
     @Context
     @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -82,17 +80,17 @@ public class PraeceptaFactory {
 
     /** Finds and loads the configured tables, collecting every problem before failing. */
     static Decisions load(PraeceptaConfiguration configuration, ClassLoader loader) {
-        Severity failOn;
+        var problems = new ArrayList<String>();
+        var failOn = Severity.ERROR;
         try {
             failOn = Decisions.failOn(configuration.getFailOn());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(PraeceptaConfiguration.PREFIX + "." + e.getMessage(), e);
+            problems.add(PraeceptaConfiguration.PREFIX + "." + e.getMessage());
         }
         boolean explicit = configuration.getLocations() != null;
         var patterns = explicit
                 ? configuration.getLocations().stream().flatMap(location -> TableLocations.split(location).stream()).toList()
                 : List.of(TableLocations.DEFAULT);
-        var problems = new ArrayList<String>();
         if (patterns.isEmpty()) {
             problems.add(PraeceptaConfiguration.PREFIX + ".locations is set but names no location");
         }
@@ -118,7 +116,7 @@ public class PraeceptaFactory {
             throw new DecisionsException(problems);
         }
         if (decisions.isEmpty()) {
-            LOG.info("No DMN files found at {}; no decisions loaded", String.join(", ", patterns));
+            LOG.info("No decision tables found at {}", String.join(", ", patterns));
         } else {
             LOG.info("Loaded {} decision(s) from {} DMN file(s): {}", decisions.names().size(), sources.size(),
                     String.join(", ", decisions.all().stream().map(Decision::name).toList()));

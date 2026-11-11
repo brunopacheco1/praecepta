@@ -12,6 +12,52 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 ## [Unreleased]
 
 ### Added
+- **Gradle plugin** ([#18](https://github.com/brunopacheco1/praecepta/issues/18)), id
+  `io.github.brunopacheco1.praecepta`: does for Gradle builds what the Maven plugin does, through
+  `praecepta-compiler`, so the generated classes and DMN resources are the Maven plugin's byte for byte
+  (but for the tool they name). The `praecepta` extension takes the Maven plugin's settings
+  (`tables { register("discount") { source = file(...); hitPolicy = "FIRST"; inputs { column("age")
+  { type = "NUMBER" } } } }`), except that a table's generated class is named by `className`, since
+  `name` is the name it is registered under. The `generatePraecepta` task feeds the `main` source set, is
+  cacheable (across machines: tables count by name and content) and works with the configuration cache.
+  It runs on Gradle 8.5 and later with Java 21+, and is published to Maven Central with its plugin marker
+  (`io.github.brunopacheco1.praecepta:io.github.brunopacheco1.praecepta.gradle.plugin`), not to the Gradle
+  Plugin Portal.
+- **`praecepta-spring-boot-starter`** ([#20](https://github.com/brunopacheco1/praecepta/issues/20)):
+  Spring Boot 4 auto-configuration. At startup it loads the DMN files at `praecepta.locations`
+  (`classpath*:rules/**/*.dmn` by default), registers a `Decisions` bean (`praeceptaDecisions`) and one
+  engine bean per decision table, `PraeceptaEngine<Map<String, String>, Map<String, String>>` injected with
+  `@Qualifier("<decision name>")` (or `@Named`, as in Micronaut and Quarkus), and stops the application,
+  listing every problem, when a table cannot be loaded or has validation issues at `praecepta.fail-on`
+  (`ERROR` by default); other issues are logged as warnings. With Actuator, the endpoint `praecepta` reports each decision's columns and validation
+  issues. `praecepta.enabled=false` turns it off. Configuration metadata gives IDEs the keys.
+- **`praecepta-micronaut`** ([#77](https://github.com/brunopacheco1/praecepta/issues/77)): Micronaut 4
+  applications get their DMN decision tables as beans. At startup the module loads the files
+  `praecepta.locations` finds (`classpath*:rules/**/*.dmn` by default) into a `Decisions` bean and
+  registers one engine per decision, injected with `@Named("Discount")`. Unreadable or invalid tables,
+  and validation issues at `praecepta.fail-on` (`ERROR` by default), stop startup with every problem
+  listed; other issues are logged as warnings. With `micronaut-management`, the `praecepta` endpoint
+  reports every decision and its validation issues (`/praecepta`, `/praecepta/{name}`). Micronaut is
+  `provided`, and the module needs no reflection. `praecepta.enabled=false` turns it off.
+- **Quarkus extension** ([#76](https://github.com/brunopacheco1/praecepta/issues/76)):
+  `praecepta-quarkus` (with its build-time module, `praecepta-quarkus-deployment`), for Quarkus 3.40 and
+  later. While Quarkus builds the application, it finds the DMN files under `rules/` on the class path
+  (`quarkus.praecepta.locations`), compiles the Excel and CSV tables declared under
+  `quarkus.praecepta.tables."<key>"` with the Maven plugin's settings in kebab-case, validates them and
+  fails the build on the configured issues (`quarkus.praecepta.fail-on`), listing every problem at once.
+  The application gets a `Decisions` bean and one map-based engine bean per decision, injected with
+  `@Identifier("Discount")` (or `@Named`), with the validation reports at runtime. In dev mode a changed
+  table restarts the application. Apache POI stays in the build; the extension uses no reflection, but
+  the native-image workflow does not build a Quarkus application yet.
+- **GraalVM native images** ([#19](https://github.com/brunopacheco1/praecepta/issues/19)): applications
+  using the engine, `praecepta-integration`, `CsvLoader` and the classes the Maven and Gradle plugins
+  generate build as native executables with no configuration for Praecepta. The jars carry their reachability metadata
+  (`META-INF/native-image/io.github.brunopacheco1/<artifactId>/resource-config.json`): the engine keeps the
+  JDK XML parser's messages, without which a malformed DMN file failed natively with a
+  `MissingResourceException`, and the integration core registers the default location's files
+  (`rules/**/*.dmn`). `ExcelLoader` does not work in native images (Apache POI); compile Excel tables at
+  build time instead. A `Native image` workflow builds and runs a test application with GraalVM for JDK 21
+  and 25. See [Native images](README.md#native-images).
 - **`praecepta-compiler`**: the build-time core of the Maven plugin (`TableCompiler`, and the source
   generation it drives) as a module of its own, independent of Maven, so the Gradle plugin
   ([#18](https://github.com/brunopacheco1/praecepta/issues/18)) and the Quarkus extension
@@ -35,52 +81,6 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 - `PraeceptaEngine.Builder.defaultOutput(PraeceptaOutput)`, `DecisionTable.defaultOutput()` and
   `DecisionTable.OutputColumn.defaultValue()`: the output when no rule matches (see *Fixed*,
   [#79](https://github.com/brunopacheco1/praecepta/issues/79)).
-- **GraalVM native images** ([#19](https://github.com/brunopacheco1/praecepta/issues/19)): applications
-  using the engine, `praecepta-integration`, `CsvLoader` and the classes the Maven plugin generates build
-  as native executables with no configuration for Praecepta. The jars carry their reachability metadata
-  (`META-INF/native-image/io.github.brunopacheco1/<artifactId>/resource-config.json`): the engine keeps the
-  JDK XML parser's messages, without which a malformed DMN file failed natively with a
-  `MissingResourceException`, and the integration core registers the default location's files
-  (`rules/**/*.dmn`). `ExcelLoader` does not work in native images (Apache POI); compile Excel tables at
-  build time instead. A `Native image` workflow builds and runs a test application with GraalVM for JDK 21
-  and 25. See [Native images](README.md#native-images).
-- **`praecepta-spring-boot-starter`** ([#20](https://github.com/brunopacheco1/praecepta/issues/20)):
-  Spring Boot 4 auto-configuration. At startup it loads the DMN files at `praecepta.locations`
-  (`classpath*:rules/**/*.dmn` by default), registers a `Decisions` bean (`praeceptaDecisions`) and one
-  engine bean per decision table, `PraeceptaEngine<Map<String, String>, Map<String, String>>` injected with
-  `@Qualifier("<decision name>")`, and stops the application, listing every problem, when a table cannot
-  be loaded or has validation issues at `praecepta.fail-on` (`ERROR` by default); other issues are logged
-  as warnings. With Actuator, the endpoint `praecepta` reports each decision's columns and validation
-  issues. `praecepta.enabled=false` turns it off. Configuration metadata gives IDEs the keys.
-- **`praecepta-micronaut`** ([#77](https://github.com/brunopacheco1/praecepta/issues/77)): Micronaut 4
-  applications get their DMN decision tables as beans. At startup the module loads the files
-  `praecepta.locations` finds (`classpath*:rules/**/*.dmn` by default) into a `Decisions` bean and
-  registers one engine per decision, injected with `@Named("Discount")`. Unreadable or invalid tables,
-  and validation issues at `praecepta.fail-on` (`ERROR` by default), stop startup with every problem
-  listed; other issues are logged as warnings. With `micronaut-management`, the `praecepta` endpoint
-  reports every decision and its validation issues (`/praecepta`, `/praecepta/{name}`). Micronaut is
-  `provided`, and the module needs no reflection. `praecepta.enabled=false` turns it off.
-- **Quarkus extension** ([#76](https://github.com/brunopacheco1/praecepta/issues/76)):
-  `praecepta-quarkus` (with its build-time module, `praecepta-quarkus-deployment`), for Quarkus 3.40 and
-  later. While Quarkus builds the application, it finds the DMN files under `rules/` on the class path
-  (`quarkus.praecepta.locations`), compiles the Excel and CSV tables declared under
-  `quarkus.praecepta.tables."<key>"` with the Maven plugin's settings in kebab-case, validates them and
-  fails the build on the configured issues (`quarkus.praecepta.fail-on`), listing every problem at once.
-  The application gets a `Decisions` bean and one map-based engine bean per decision, injected with
-  `@Identifier("Discount")` (or `@Named`), with the validation reports at runtime. In dev mode a changed
-  table restarts the application. Apache POI stays in the build; the extension uses no reflection, but
-  native images are not tested yet ([#19](https://github.com/brunopacheco1/praecepta/issues/19)).
-- **Gradle plugin** ([#18](https://github.com/brunopacheco1/praecepta/issues/18)), id
-  `io.github.brunopacheco1.praecepta`: does for Gradle builds what the Maven plugin does, through
-  `praecepta-compiler`, so the generated classes and DMN resources are the Maven plugin's byte for byte
-  (but for the tool they name). The `praecepta` extension takes the Maven plugin's settings
-  (`tables { register("discount") { source = file(...); hitPolicy = "FIRST"; inputs { column("age")
-  { type = "NUMBER" } } } }`), except that a table's generated class is named by `className`, since
-  `name` is the name it is registered under. The `generatePraecepta` task feeds the `main` source set, is
-  cacheable (across machines: tables count by name and content) and works with the configuration cache.
-  It runs on Gradle 8.5 and later with Java 21+, and is published to Maven Central with its plugin marker
-  (`io.github.brunopacheco1.praecepta:io.github.brunopacheco1.praecepta.gradle.plugin`), not to the Gradle
-  Plugin Portal.
 
 ### Changed
 - The release publishes every module but the benchmarks and the TCK runner, found by the build rather

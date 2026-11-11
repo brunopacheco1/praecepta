@@ -190,8 +190,8 @@ class PraeceptaFactoryTest {
     void a_fail_on_that_is_not_a_severity_stops_startup() {
         var properties = Map.<String, Object>of("praecepta.fail-on", "sometimes");
 
-        Assertions.assertThatThrownBy(() -> ApplicationContext.run(properties).close())
-                .hasStackTraceContaining("praecepta.fail-on must be ERROR, WARNING or NONE, not sometimes");
+        Assertions.assertThat(startupFailure(properties).problems())
+                .containsExactly("praecepta.fail-on must be ERROR, WARNING or NONE, not sometimes");
     }
 
     @Test
@@ -209,7 +209,7 @@ class PraeceptaFactoryTest {
         try (var context = builder.start()) {
             Assertions.assertThat(context.getBean(Decisions.class).isEmpty()).isTrue();
             Assertions.assertThat(context.getBeansOfType(PraeceptaFactory.ENGINE)).isEmpty();
-            Assertions.assertThat(messages(Level.INFO)).containsExactly("No DMN files found at classpath*:rules/**/*.dmn; no decisions loaded");
+            Assertions.assertThat(messages(Level.INFO)).containsExactly("No decision tables found at classpath*:rules/**/*.dmn");
         }
         var explicit = ApplicationContext.builder().classLoader(new WithoutRules(getClass().getClassLoader()))
                 .properties(Map.of("praecepta.locations", "classpath*:rules/**/*.dmn"));

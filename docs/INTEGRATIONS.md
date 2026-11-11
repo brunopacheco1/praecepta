@@ -142,6 +142,16 @@ The same keys everywhere: Spring Boot and Micronaut read them under `praecepta`,
 
 A pattern that matches nothing is an error when `praecepta.locations` was set explicitly (the message
 names the pattern); with the default, finding nothing gives an empty `Decisions` and an INFO log line.
+The three frameworks word these problems alike and list them in the one `DecisionsException`, together
+with the tables' problems:
+- `<pattern>: no DMN file matches this location` for an explicit pattern that finds nothing;
+- `praecepta.locations is set but names no location` (Spring Boot and Micronaut; Quarkus reads an empty
+  value as unset);
+- `Location '<pattern>': expected classpath:, classpath*: or file:` for a malformed pattern;
+- `praecepta.fail-on must be ERROR, WARNING or NONE, not <value>` (`quarkus.praecepta.fail-on` in
+  Quarkus); the tables are then still loaded and checked at `ERROR`, so their problems are listed too.
+
+The INFO line is `No decision tables found at <patterns>`.
 Integrations add no other key without updating this table. The Quarkus extension adds one: build-time
 declarations of Excel and CSV tables under `quarkus.praecepta.tables."<key>"`, mirroring
 `TableDefinition` in kebab-case (`source`, `decision`, `hit-policy`, `aggregation`, and
@@ -162,13 +172,15 @@ project's directory.
   `PraeceptaEngine<Map<String, String>, Map<String, String>>`, qualified by the decision's name:
   - Spring Boot: injected with `@Qualifier("Discount")`; the bean is named `praecepta.Discount` (so a
     table cannot clash with another bean) and carries the qualifier `Discount`, with its generic type set
-    (`ResolvableType`).
+    (`ResolvableType`). It carries `jakarta.inject.Named` with the same value too, so `@Named("Discount")`
+    works when the application has `jakarta.inject-api`.
   - Micronaut: `@Named("Discount")` (`Qualifiers.byName`), registered before the application's beans are
     created; if Micronaut cannot do that for files found at runtime, the module offers only `Decisions`
     and says so in its README section.
   - Quarkus: `@Identifier("Discount")` on `@Singleton` synthetic beans produced at build time (`@Named`
     works too). `PraeceptaEngine` is a final class, so it cannot have the client proxy a normal scope such
     as `@ApplicationScoped` needs; engines are immutable, so a singleton behaves the same.
+- So `@Named("Discount")` injects an engine in all three frameworks.
 - Nothing is registered for typed records or generated classes (see above).
 
 ## Reports and failures
@@ -259,12 +271,16 @@ with `fail-on` already enforced, so it cannot fail differently at runtime.
   repository has no entry for Apache POI. Spreadsheets reach a native executable as DMN, compiled at build
   time, as principle 3 already has it.
 - **No reflection:** the engine needs none. Framework modules keep to that.
-- For Quarkus, `native.yml` should also build a small Quarkus application with `praecepta-quarkus`
-  (a DMN file under `src/main/resources/rules/` and a declared CSV table) with `-Dnative` (Quarkus'
-  `quarkus-maven-plugin`, `quarkus.native.container-build` off inside the GraalVM image) and run its
-  `@QuarkusIntegrationTest`, or call the executable, to check that an injected engine evaluates. The
-  extension reads the tables while the image is built (static init) and keeps the engines in the image
-  heap; this has not been built natively yet.
+- **Framework modules are not built natively yet.** `native.yml` covers what goes into every native
+  executable (the engine, the CSV loader, the integration core and generated classes); the Spring Boot,
+  Micronaut and Quarkus modules use no reflection and rely on the integration core's metadata for the
+  default location, but no CI job builds an application with them. The next step for each is a small
+  application built by its own tooling in `native.yml`, kept out of the default `mvn verify`: Spring
+  Boot's AOT processing (`process-aot`, which runs `DecisionsRegistrar` at build time and must be able to
+  write its instance suppliers as code), Micronaut's `native-image` packaging, and Quarkus' `-Dnative`
+  with `quarkus.native.container-build=false` on the runner's GraalVM, running a
+  `@QuarkusIntegrationTest` or the executable to check that an injected engine evaluates (the extension
+  reads the tables during static init, so the engines live in the image heap).
 
 ### Spring Boot starter (#20)
 - One module, `praecepta-spring-boot-starter` (auto-configuration and starter together), package

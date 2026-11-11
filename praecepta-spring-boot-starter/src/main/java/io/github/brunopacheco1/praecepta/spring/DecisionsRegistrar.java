@@ -48,6 +48,9 @@ final class DecisionsRegistrar implements ImportBeanDefinitionRegistrar {
     /** {@code PraeceptaEngine<Map<String, String>, Map<String, String>>}, the type of every engine bean. */
     static final ResolvableType ENGINE_TYPE = ResolvableType.forClassWithGenerics(PraeceptaEngine.class, MAP_OF_TEXT, MAP_OF_TEXT);
 
+    /** JSR-330's {@code @Named}, by name, so that the starter does not need {@code jakarta.inject}. */
+    private static final String NAMED = "jakarta.inject.Named";
+
     private final Environment environment;
     private final ResourceLoader resourceLoader;
 
@@ -69,6 +72,8 @@ final class DecisionsRegistrar implements ImportBeanDefinitionRegistrar {
             engineBean.setTargetType(ENGINE_TYPE);
             engineBean.setInstanceSupplier(decision::engine);
             engineBean.addQualifier(new AutowireCandidateQualifier(Qualifier.class, decision.name()));
+            // @Named("Discount") too, as in the Micronaut and Quarkus integrations (when jakarta.inject is present)
+            engineBean.addQualifier(new AutowireCandidateQualifier(NAMED, decision.name()));
             engineBean.setLazyInit(false);
             engineBean.setDependsOn(PraeceptaAutoConfiguration.DECISIONS_BEAN);
             registry.registerBeanDefinition(PraeceptaAutoConfiguration.ENGINE_BEAN_PREFIX + decision.name(), engineBean);
@@ -92,15 +97,18 @@ final class DecisionsRegistrar implements ImportBeanDefinitionRegistrar {
         try {
             failOn = Decisions.failOn(properties.getFailOn());
         } catch (IllegalArgumentException e) {
-            problems.add(PraeceptaProperties.PREFIX + ".fail-on: " + e.getMessage());
+            problems.add(PraeceptaProperties.PREFIX + "." + e.getMessage());
         }
         var locations = properties.getLocations().stream().map(String::strip).filter(location -> !location.isEmpty()).toList();
+        if (explicit && locations.isEmpty()) {
+            problems.add(PraeceptaProperties.PREFIX + ".locations is set but names no location");
+        }
         var sources = new TreeMap<String, TableSource>();
         for (var location : locations) {
             try {
                 var found = find(location, resolver);
                 if (found.isEmpty() && explicit) {
-                    problems.add(location + ": no DMN file found");
+                    problems.add(location + ": no DMN file matches this location");
                 }
                 found.forEach(source -> sources.putIfAbsent(source.location(), source));
             } catch (IllegalArgumentException e) {
@@ -121,7 +129,7 @@ final class DecisionsRegistrar implements ImportBeanDefinitionRegistrar {
         }
 
         if (decisions.isEmpty()) {
-            LOG.info("No decision tables found at " + locations);
+            LOG.info("No decision tables found at " + String.join(", ", locations));
         } else {
             LOG.info("Loaded %d decision(s) from %d file(s): %s".formatted(decisions.names().size(), sources.size(), decisions.names()));
         }
