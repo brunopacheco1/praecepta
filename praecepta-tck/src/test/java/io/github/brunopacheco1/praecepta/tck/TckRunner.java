@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 
 import io.github.brunopacheco1.praecepta.engine.OutputStrategy;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
+import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
@@ -28,6 +29,7 @@ import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.tck.TckSuite.Check;
 import io.github.brunopacheco1.praecepta.tck.TckValue.Components;
 import io.github.brunopacheco1.praecepta.tck.TckValue.Items;
@@ -121,20 +123,26 @@ final class TckRunner {
     /** The test case's inputs as text, by column and named input; missing and null inputs are left out. */
     private static Map<String, String> inputValues(Check check, DecisionTable table) {
         var values = new LinkedHashMap<String, String>();
-        var columns = new ArrayList<String>();
-        table.inputs().forEach(column -> columns.add(column.name()));
-        columns.addAll(table.namedInputs().keySet()); // the inputs cells compare with
-        for (var column : columns) {
-            var value = input(check, column);
+        var columns = new LinkedHashMap<String, ColumnType>();
+        table.inputs().forEach(column -> columns.put(column.name(), column.type()));
+        columns.putAll(table.namedInputs()); // the inputs cells compare with
+        columns.forEach((column, type) -> {
+            var value = input(check, column, table.listInputs().contains(column) ? type : null);
             if (value != null) {
                 values.put(column, value);
             }
-        }
+        });
         return values;
     }
 
-    /** The text of an input column, or null. A qualified column ({@code applicant.age}) reads a component. */
-    private static String input(Check check, String column) {
+    /**
+     * The text of an input column, or null. A qualified column ({@code applicant.age}) reads a component.
+     * An input that holds lists takes a FEEL list, {@code ["fever", "cough"]}.
+     *
+     * @param listOf the type of the input's elements if it holds lists, else null
+     */
+    private static String input(Check check, String column, ColumnType listOf) {
+        var type = listOf;
         var path = column.split("\\.");
         TckValue value = check.inputs().get(path[0]);
         if (value == null && check.model().decisions().contains(path[0])) {
@@ -143,13 +151,33 @@ final class TckRunner {
         for (int i = 1; i < path.length && value != null; i++) {
             value = value instanceof Components components ? components.values().get(path[i]) : null;
         }
+        if (type != null && value instanceof Items items) {
+            return listText(items, type);
+        }
         return switch (value) {
             case null -> null;
             case Nil nil -> null;
-            case Items items -> throw new Unsupported("list inputs (#25)");
+            case Items items -> throw new Unsupported("lists given to an input of single values");
             case Components components -> throw new Unsupported("structured inputs compared as a whole");
             case Simple simple -> text(simple);
         };
+    }
+
+    /**
+     * A list of simple values as FEEL writes it: strings quoted, other values as their text, {@code null}
+     * for a missing one.
+     */
+    private static String listText(Items items, ColumnType type) {
+        var elements = new ArrayList<String>();
+        for (var item : items.values()) {
+            elements.add(switch (item) {
+                case Nil nil -> "null";
+                case Simple simple when type == ColumnType.STRING -> FeelLiterals.literal(simple.text());
+                case Simple simple -> text(simple);
+                default -> throw new Unsupported("lists of lists or of structured values");
+            });
+        }
+        return "[" + String.join(", ", elements) + "]";
     }
 
     private static String text(Simple simple) {
@@ -242,7 +270,9 @@ final class TckRunner {
      */
     private static final List<Map.Entry<String, String>> PHRASES = List.of(
             Map.entry("is a structured item definition", "columns of a structured type"),
-            Map.entry("is a collection", "list inputs (#25)"),
+            Map.entry("is a collection of collections", "lists of lists"),
+            Map.entry("constrains a collection as a whole", "allowed values of a whole list"),
+            Map.entry("is a collection", "list outputs"),
             Map.entry("is a time with a zone id", "times with a zone id, which have no fixed offset"),
             Map.entry("output entries must be literals", "output entries that are expressions (#71)"));
 

@@ -33,6 +33,35 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   is still rejected, as it has no fixed offset. The DMN TCK now passes 81 of its 86 checks (was 78):
   the rest need chained decisions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) or
   output entries that are expressions ([#71](https://github.com/brunopacheco1/praecepta/issues/71)).
+- **Inputs that hold lists** ([#25](https://github.com/brunopacheco1/praecepta/issues/25)): a column
+  may hold several values, such as a customer's nationalities. Bind it with
+  `listInput("nationalities", Customer::nationalities)` (strings) or
+  `listInput("ages", ColumnType.NUMBER, Customer::ages)`, or with map-based inputs declare it with
+  `listColumnType(column, type)` and pass a FEEL list as text (`["PT", "BR"]`, or `PT, BR`). A cell
+  of a list column holds when **some element** passes one of its tests: `"PT","ES"` matches a list
+  holding `"PT"` or `"ES"`, `>= 18` one with an element of at least 18. `not(...)` holds when **no
+  element** does, so `not("PT")` reads "without PT". As in FEEL's `list contains`, a missing (null)
+  list makes every test unknown, so it matches only `-` and `null`, while an empty list matches no
+  test, and so every `not(...)`. Elements may not be missing, and declared input values apply to the
+  elements. The index ORs the masks of the elements' values, a few word operations per element, then
+  ANDs across columns as usual. `DecisionTable` gains `listInputs`, and
+  `DecisionTable.cell(rule, column)` parses a cell as the table holds it.
+  - **DMN:** strict FEEL compares a list as a whole (`"PT"` never equals `["PT","BR"]`), so a list
+    column's entries are written with FEEL's list functions, joined with `or`:
+    `list contains(?, "PT")`, `some x in ? satisfies x >= 18`, `some x in ? satisfies x in [18..65)`,
+    `? = null`, and `not(...)` around them (`CellParser.parseFeelList`, `DmnWriter.renderList`).
+    `DmnReader` reads columns typed by a collection item definition (`isCollection="true"`), with
+    allowed values on the item type, and `DmnWriter` writes them back so.
+  - **A cell that names a list input** holds when the column's value is in that list, as DMN reads
+    `Flu Symtoms` in the TCK's `0039-dt-list-semantics` (and `not(...)` when it is not). `DmnReader`
+    takes the list from the named input's `inputData` type. Comparisons with a list (`> limits`) are
+    rejected, since FEEL never orders a value against a list.
+  - **The Maven plugin** declares a list column with `<list>true</list>` and generates a
+    `java.util.List` component for it (also for named list inputs of a DMN table).
+  - **Validation:** a list's matches cannot be read from the classes of single values (rules `"PT"`
+    and `"BR"` overlap on `["PT","BR"]`), so rules whose cell in a list column is not `-` are left
+    out of the static analysis, as rules that compare with another input are: they never count as
+    overlapping or hiding another rule, and gaps are not searched while there are any.
 
 ### Changed
 - **Map-based inputs accept times and date-times with a time zone**, which they used to reject as
@@ -45,6 +74,13 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   these cases.
 - **The Maven plugin validates a table with getters of the generated Java types** instead of
   map-based inputs, so the build-time analysis matches what the generated code can evaluate.
+- **`DecisionTable` gains a component, `listInputs`.** Its former constructors remain, but record
+  patterns that deconstruct it need the new component.
+- **`DmnWriter` writes an `inputData` for every input the cells compare with**, not only for the
+  table's columns, so a list input keeps its type and Drools can bind every input.
+- **`DmnReader` reads columns typed by a collection** instead of rejecting them; an output of a
+  collection type, a collection of collections, and allowed values on a collection itself are still
+  rejected.
 
 ## [0.3.0] - 2026-11-11
 

@@ -16,7 +16,9 @@ import java.time.Period;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -62,13 +64,22 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * @param allowedValues  declared input values per column, as unary tests of the column's type
  * @param feelCells      whether cells are strict FEEL, where a name compares with another input
  * @param zonedColumns   the time and date-time columns whose inputs have a time zone; the others have none
+ * @param lists          the columns whose values are lists (of their type). Their cells follow FEEL's
+ *                       {@code list contains} and {@code some x in ? satisfies}: a positive cell holds
+ *                       when some element passes one of its tests, or the list is missing and the cell
+ *                       has {@code null}; {@code not(...)} holds when the list is there and every element
+ *                       fails every test (an element whose test is unknown, such as a time with a zone
+ *                       against one without, makes it unknown). A name of such a column in another
+ *                       column's cell asks whether the value is in the list. A list may hold no missing
+ *                       element.
  */
 public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
-        Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns) {
+        Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
+        Set<String> lists) {
 
     public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
             Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells) {
-        this(rules, hitPolicy, outputPriority, types, allowedValues, feelCells, Set.of());
+        this(rules, hitPolicy, outputPriority, types, allowedValues, feelCells, Set.of(), Set.of());
     }
 
     public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy) {
@@ -112,12 +123,24 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return matches;
     }
 
-    /** The first column whose (non-missing) value is outside its declared input values, or null. */
+    /**
+     * The first column whose (non-missing) value is outside its declared input values, or, for a list,
+     * that holds a missing element or one outside them; null if there is none.
+     */
     public String invalidColumn(Map<String, ?> input) {
+        for (var list : lists) {
+            if (value(input, list) instanceof List<?> elements && elements.stream().anyMatch(Objects::isNull)) {
+                return list;
+            }
+        }
         for (var declared : allowedValues.entrySet()) {
+            var allowed = CellParser.parse(declared.getValue(), type(declared.getKey()));
             var value = value(input, declared.getKey());
-            if (value != null && !accepts(CellParser.parse(declared.getValue(), type(declared.getKey())), value, name -> null)) {
-                return declared.getKey();
+            var values = value instanceof List<?> elements ? elements : Collections.singletonList(value);
+            for (var element : values) {
+                if (element != null && !accepts(allowed, element, name -> null)) {
+                    return declared.getKey();
+                }
             }
         }
         return null;
@@ -287,6 +310,10 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      */
     public List<Object> representativeValues(String column, boolean withMissing) {
         var type = type(column);
+        if (lists.contains(column)) {
+            // the analysis leaves out the rules that test lists, so to the others every list is alike
+            return withMissing ? Arrays.asList(List.of(), null) : List.of(List.of());
+        }
         var cells = new ArrayList<UnaryTests>();
         rules.forEach(rule -> cells.add(parse(rule.input().values().get(column), column)));
         if (allowedValues.containsKey(column)) {
@@ -446,23 +473,72 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     private boolean ruleAccepts(Praeceptum rule, Map<String, ?> input) {
         for (var cell : rule.input().values().entrySet()) {
-            if (!accepts(parse(cell.getValue(), cell.getKey()), value(input, cell.getKey()), name -> value(input, name))) {
+            var parsed = parse(cell.getValue(), cell.getKey());
+            var value = value(input, cell.getKey());
+            boolean accepted = lists.contains(cell.getKey())
+                    ? acceptsList(parsed, (List<?>) value)
+                    : accepts(parsed, value, name -> value(input, name));
+            if (!accepted) {
                 return false;
             }
         }
         return true;
     }
 
-    /** Whether a cell compares with another input ({@code > dateE}), which the engine's index cannot see. */
-    private boolean isVariable(Praeceptum rule) {
-        return rule.input().values().entrySet().stream().anyMatch(cell -> parse(cell.getValue(), cell.getKey()).namesInputs());
+    /**
+     * A list column's cell, as FEEL evaluates {@code list contains(?, v) or some x in ? satisfies x < v or ? = null}
+     * and its {@code not(...)}: on a missing list every element test is unknown, so only {@code null}
+     * holds and a negated cell is unknown.
+     */
+    private static boolean acceptsList(UnaryTests cell, List<?> list) {
+        if (cell instanceof UnaryTests.Any) {
+            return true;
+        }
+        Boolean some;
+        if (list == null) {
+            some = tests(cell).stream().anyMatch(NullTest.class::isInstance) ? Boolean.TRUE : null;
+        } else {
+            some = some(tests(cell), list);
+        }
+        return cell instanceof UnaryTests.Negated ? some == Boolean.FALSE : some == Boolean.TRUE;
     }
 
-    /** What the engine's index sees of a rule: its cells, with those naming inputs taken as "any value". */
+    /**
+     * Whether some element of a list passes one of the tests, with FEEL's three-valued {@code or}: true if
+     * one passes; else unknown (null) if one is unknown; else false.
+     */
+    private static Boolean some(List<Test> tests, List<?> list) {
+        Boolean some = Boolean.FALSE;
+        for (var test : tests) {
+            for (var element : list) {
+                var outcome = test(test, element);
+                if (outcome == Boolean.TRUE) {
+                    return Boolean.TRUE;
+                }
+                if (outcome == null) {
+                    some = null;
+                }
+            }
+        }
+        return some;
+    }
+
+    /**
+     * Whether the engine's index cannot see what a rule matches: a cell compares with another input
+     * ({@code > dateE}), or tests a column that holds lists.
+     */
+    private boolean isVariable(Praeceptum rule) {
+        return rule.input().values().entrySet().stream().anyMatch(cell -> {
+            var parsed = parse(cell.getValue(), cell.getKey());
+            return parsed.namesInputs() || lists.contains(cell.getKey()) && !(parsed instanceof UnaryTests.Any);
+        });
+    }
+
+    /** What the engine's index sees of a rule: its cells, with those naming inputs or testing lists taken as "any value". */
     private boolean staticallyAccepts(Praeceptum rule, Map<String, ?> input) {
         for (var cell : rule.input().values().entrySet()) {
             var parsed = parse(cell.getValue(), cell.getKey());
-            if (!parsed.namesInputs() && !accepts(parsed, value(input, cell.getKey()), name -> null)) {
+            if (!parsed.namesInputs() && !lists.contains(cell.getKey()) && !accepts(parsed, value(input, cell.getKey()), name -> null)) {
                 return false;
             }
         }
@@ -482,7 +558,10 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     private static Boolean any(List<Test> tests, Object value, Function<String, Object> inputs) {
         boolean unknown = false;
         for (var test : tests) {
-            var outcome = test(resolve(test, inputs), value);
+            // a name of an input that holds a list: whether the value is in it (FEEL's ? in list)
+            var outcome = test instanceof Equals(UnaryTests.Name(var name)) && inputs.apply(name) instanceof List<?> list
+                    ? (value == null ? Boolean.FALSE : some(list.stream().<Test>map(element -> new Equals((Comparable<?>) element)).toList(), List.of(value)))
+                    : test(resolve(test, inputs), value);
             if (outcome == null) {
                 unknown = true;
             } else if (outcome) {
@@ -577,19 +656,29 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     }
 
     private UnaryTests parse(String cell, String column) {
-        return feelCells ? CellParser.parseFeel(cell, type(column)) : CellParser.parse(cell, type(column));
+        if (!feelCells) {
+            return CellParser.parse(cell, type(column));
+        }
+        return lists.contains(column) ? CellParser.parseFeelList(cell, type(column)) : CellParser.parseFeel(cell, type(column));
     }
 
     private ColumnType type(String column) {
         return types.getOrDefault(column, ColumnType.STRING);
     }
 
-    /** An input value; blank text counts as missing, and a period is compared by its years and months. */
+    /**
+     * An input value; blank text counts as missing, and a period is compared by its years and months. A
+     * list's elements are read the same way.
+     */
     private static Object value(Map<String, ?> input, String column) {
-        return switch (input.get(column)) {
+        return input.get(column) instanceof List<?> list ? list.stream().map(ReferenceMatcher::single).toList() : single(input.get(column));
+    }
+
+    private static Object single(Object value) {
+        return switch (value) {
             case String s when s.isBlank() -> null;
             case Period period -> YearsAndMonths.of(period);
-            case null, default -> input.get(column);
+            case null, default -> value;
         };
     }
 

@@ -33,7 +33,10 @@ builds an engine once and calls it.
    column value (lists, `not(...)`, comparisons, intervals, `null`, "any"). In a DMN table (strict
    FEEL) a cell may also compare with another input (`> limit`); the index sees such a cell as "any
    value", and the engine checks it on the rules the index leaves, with the inputs' values. The
-   analysis then never counts those rules as overlapping or hiding others, and skips gaps.
+   analysis then never counts those rules as overlapping or hiding others, and skips gaps. A column
+   may also hold **lists** (`DecisionTable.listInputs`): its cells keep the same syntax and hold when
+   some element passes a test (`not(...)`: when none does), as FEEL's `list contains` would; a cell
+   that names a list input asks whether the value is in that list.
 2. **The bitset index** (`BitsetIndex`, `ColumnIndex`). Every rule owns one bit. Each column splits
    its values into *classes* that no rule can tell apart, and each class carries a mask: the rules
    that accept it.
@@ -53,6 +56,11 @@ builds an engine once and calls it.
      and `dateTimeInput` give values without a zone, `offsetTimeInput` and `zonedDateTimeInput` with
      one, and map-based inputs, read from text, either; so the analysis looks for gaps among the
      values that can really occur.
+   - **Lists** (`ListColumn`): an ordinary column index over the same cells classifies one element.
+     For each element, its class mask gives the positive cells it passes and the `not(...)` cells it
+     breaks; ORing those over the elements gives "some element passes", and the list's mask is the
+     `-` rules, the positive rules some element passes, and the negated rules none passes. A missing
+     and an empty list have fixed masks. Two nationalities cost one more OR per mask word.
    - **Memory** grows with columns × classes × rules, never with the product of the values.
 3. **Evaluation.** `evaluate(input)` reads each column's value through the bound getter
    (`InputStrategy`), finds its class, and ANDs the masks, 64 rules per machine word. The hit policy
@@ -62,7 +70,9 @@ builds an engine once and calls it.
 4. **Validation** (`TableAnalysis`, `ValidationReport`), when the engine is built: overlapping rules
    (UNIQUE), conflicting outputs (ANY), rules that can never fire (FIRST, PRIORITY), and gaps
    (declared inputs that no rule covers, with an example). The analysis is exact, because it searches
-   the same column classes the index uses.
+   the same column classes the index uses. The classes of single values cannot say which lists a rule
+   matches (rules `"PT"` and `"BR"` overlap on `["PT","BR"]`), so a list column shows the analysis
+   one class, and the rules that constrain it are left out like rules that compare with other inputs.
 
 An engine is **immutable** once built: any number of threads may share it without locks.
 
@@ -71,7 +81,10 @@ An engine is **immutable** once built: any number of threads may share it withou
   `DmnWriter`) into a `DecisionTable`: hit policy, aggregation, column types, value lists and rules.
   It uses the JDK's XML parser with DTDs and external entities disabled. Anything it does not
   support (a time with a zone id, computed expressions, function calls) is rejected
-  with an error naming the decision, rule and column.
+  with an error naming the decision, rule and column. Strict FEEL compares a list with a unary test
+  as a whole, so a list column's entries are written with FEEL's list functions
+  (`list contains(?, "PT") or some x in ? satisfies x >= 18`); `CellParser.parseFeelList` reads
+  exactly those forms back into the same tests Praecepta's own syntax writes `"PT", >= 18`.
 - `DmnWriter` writes a `DecisionTable` as standard DMN 1.3, which `DmnReader` reads back unchanged
   and which Camunda 8 and Drools evaluate identically (the benchmarks check this).
 
@@ -95,3 +108,24 @@ The main decisions and their reasons (strict DMN semantics, bitsets instead of a
 code, the Java baseline, DMN as the exchange format, the licence) are recorded in
 [MODERNISATION.md](MODERNISATION.md). Security design is described in
 [SECURITY-ASSURANCE.md](SECURITY-ASSURANCE.md).
+
+### List inputs (#25)
+- **Declared beside the type, not as new types.** A list column keeps its element type
+  (`ColumnType.STRING`) and is named in `DecisionTable.listInputs`; it is bound with
+  `listInput(...)`, or `listColumnType(...)` for map inputs. New `ColumnType` constants would have
+  doubled the enum and broken every exhaustive switch over it, for what is one flag.
+- **"Some element passes" for cells, "no element passes" for `not(...)`.** This is what
+  `list contains(?, "PT")` means in FEEL, so a table means the same in Praecepta and, once written as
+  DMN, in Camunda or Drools. `not("PT")` reads "without PT"; "some element is not PT" would match
+  nearly every list. "Every element passes" is not offered: no DMN form needs it yet.
+- **Missing and empty lists follow FEEL**, not the "an empty list is a missing value" first
+  sketched in the issue: `list contains(null, x)` is null, so a missing list matches only `-` and
+  `null`; `list contains([], x)` is false, so an empty list matches every `not(...)`. Elements may
+  not be missing, since `list contains` and `some` would make a null element unknown.
+- **DMN keeps strict semantics.** A plain `"PT"` against a list column would compare the whole list
+  in other engines, so list entries are written with `list contains` and `some ... satisfies`, and
+  only those forms are read back for a list column.
+- **The analysis leaves out rules that test lists**, as it does for cells that compare with another
+  input: the classes of single values cannot describe sets of values, and an analysis over sets of
+  classes would grow exponentially. Findings stay sound (nothing false is reported); some overlaps
+  and gaps go unreported.

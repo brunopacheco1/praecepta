@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -47,9 +48,12 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * {@code string}, {@code number} (or {@code integer}, {@code long}, {@code double}), {@code date},
  * {@code boolean}, {@code time}, {@code dateTime} (or {@code date and time}), {@code dayTimeDuration} and
  * {@code yearMonthDuration} (or their FEEL names) columns, times and date-times with or without a time zone
- * (but no time with a zone id, which has no fixed offset); columns typed by an item definition of one of those types, whose allowed values become the
- * input value list unless the input declares its own; input entries in Praecepta's FEEL subset
- * (lists, {@code not(...)}, {@code null}, comparisons, intervals, {@code -}); input and output value
+ * (but no time with a zone id, which has no fixed offset); columns typed by an item definition of one of
+ * those types, whose allowed values become the input value list unless the input declares its own;
+ * columns typed by a collection of those ({@code isCollection="true"}), which hold lists and whose
+ * entries test the elements ({@code list contains(?, "PT")}, see {@link CellParser#parseFeelList}), and
+ * named inputs whose {@code inputData} is such a collection (see {@link DecisionTable#listInputs}); input
+ * entries in Praecepta's FEEL subset (lists, {@code not(...)}, {@code null}, comparisons, intervals, {@code -}); input and output value
  * lists; output entries that are literals or name one of the table's inputs (of the output's type, or
  * any input for a string output); every hit policy; SUM, MIN, MAX and COUNT aggregation. Anything else is rejected with an
  * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered
@@ -117,7 +121,8 @@ public final class DmnReader {
         var hitPolicy = hitPolicy(table.getAttribute("hitPolicy"), where);
         var aggregation = aggregation(table.getAttribute("aggregation"), where);
 
-        var inputs = children(table, "input").stream().map(input -> inputColumn(input, types, where)).toList();
+        var lists = new HashSet<String>();
+        var inputs = children(table, "input").stream().map(input -> inputColumn(input, types, lists, where)).toList();
         var outputElements = children(table, "output");
         if (outputElements.isEmpty()) {
             throw new InvalidDecisionTableException(where + ": the decision table has no output");
@@ -129,10 +134,53 @@ public final class DmnReader {
         var rules = new ArrayList<Praeceptum>();
         var ruleElements = children(table, "rule");
         for (int i = 0; i < ruleElements.size(); i++) {
-            rules.add(rule(ruleElements.get(i), i + 1, inputs, outputs, where));
+            rules.add(rule(ruleElements.get(i), i + 1, inputs, lists, outputs, where));
         }
         // cells stay strict FEEL, where a name compares with another input
-        return new DecisionTable(name, hitPolicy, aggregation, inputs, outputs, rules, true);
+        var read = new DecisionTable(name, hitPolicy, aggregation, inputs, outputs, rules, true, lists);
+        var namedLists = namedListInputs(decision.getOwnerDocument().getDocumentElement(), read, types, where);
+        if (namedLists.isEmpty()) {
+            return read;
+        }
+        lists.addAll(namedLists);
+        return new DecisionTable(name, hitPolicy, aggregation, inputs, outputs, rules, true, lists);
+    }
+
+    /**
+     * The inputs the cells compare with that hold lists: those whose {@code inputData} has a collection
+     * type of the type of the column that names them, as {@code Flu Symptoms} in
+     * {@code Flu Symptoms} (a cell that holds when the column's value is in that list).
+     */
+    private static List<String> namedListInputs(Element root, DecisionTable table, ItemDefinitions types, String where) {
+        Map<String, ColumnType> named;
+        try {
+            named = table.namedInputs();
+        } catch (IllegalArgumentException e) {
+            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+        }
+        var lists = new ArrayList<String>();
+        for (var inputData : descendants(root, "inputData")) {
+            var variable = child(inputData, "variable");
+            var inputName = inputData.getAttribute("name").strip();
+            var typeRef = variable == null ? "" : variable.getAttribute(TYPE_REF);
+            if (!named.containsKey(inputName) || typeRef.isBlank()) {
+                continue;
+            }
+            Type type;
+            try {
+                type = types.resolve(typeRef, where + ", input '" + inputName + "'");
+            } catch (InvalidDecisionTableException e) {
+                continue; // a type Praecepta cannot hold, which no input value can be bound to either
+            }
+            if (type.list()) {
+                if (type.columnType() != named.get(inputName)) {
+                    throw new InvalidDecisionTableException("%s: a %s column compares with '%s', a list of %s".formatted(
+                            where, named.get(inputName).feelName(), inputName, type.columnType().feelName()));
+                }
+                lists.add(inputName);
+            }
+        }
+        return lists;
     }
 
     private static HitPolicy hitPolicy(String value, String where) {
@@ -162,7 +210,11 @@ public final class DmnReader {
 
     // ---- columns and rules -----------------------------------------------------------------------
 
-    private static InputColumn inputColumn(Element input, ItemDefinitions types, String where) {
+    /**
+     * A column; one whose type is a collection is added to {@code lists}, and its allowed values (those of
+     * its item type) apply to the list's elements.
+     */
+    private static InputColumn inputColumn(Element input, ItemDefinitions types, Set<String> lists, String where) {
         var expression = child(input, "inputExpression");
         var column = expression == null ? "" : textOf(expression).strip();
         if (column.isEmpty()) {
@@ -175,6 +227,13 @@ public final class DmnReader {
         var typeRef = expression == null ? "" : expression.getAttribute(TYPE_REF);
         var type = types.resolve(typeRef, where + ", input '" + column + "'");
         var values = nonBlankText(input, "inputValues");
+        if (type.list()) {
+            if (values != null) {
+                throw new InvalidDecisionTableException(("%s, input '%s': input values of a list are not supported; "
+                        + "declare the allowed values of its items in their item definition").formatted(where, column));
+            }
+            lists.add(column);
+        }
         if (values == null) {
             return new InputColumn(column, type.columnType(), type.allowedValues());
         }
@@ -192,7 +251,12 @@ public final class DmnReader {
             throw new InvalidDecisionTableException(where + ": every output of a multi-output table needs a name");
         }
         var outputWhere = where + ", output '" + column + "'";
-        var type = types.resolve(output.getAttribute(TYPE_REF), outputWhere).columnType();
+        var resolved = types.resolve(output.getAttribute(TYPE_REF), outputWhere);
+        if (resolved.list()) {
+            throw new InvalidDecisionTableException("%s: type '%s' is a collection, which is not supported for outputs"
+                    .formatted(outputWhere, output.getAttribute(TYPE_REF)));
+        }
+        var type = resolved.columnType();
         var valueList = nonBlankText(output, "outputValues");
         if (valueList == null) {
             return new OutputColumn(column, type, List.of());
@@ -207,7 +271,8 @@ public final class DmnReader {
      *
      * @param number the rule's number, from 1 in table order
      */
-    private static Praeceptum rule(Element rule, int number, List<InputColumn> inputs, List<OutputColumn> outputs, String where) {
+    private static Praeceptum rule(Element rule, int number, List<InputColumn> inputs, Set<String> lists, List<OutputColumn> outputs,
+            String where) {
         var ruleWhere = where + ", rule " + number;
         var inputEntries = children(rule, "inputEntry");
         var outputEntries = children(rule, "outputEntry");
@@ -219,7 +284,12 @@ public final class DmnReader {
         for (int c = 0; c < inputs.size(); c++) {
             var column = inputs.get(c);
             var text = textOf(inputEntries.get(c)).strip();
-            parseCell(text, column.type(), ruleWhere + ", column '" + column.name() + "'");
+            var cellWhere = ruleWhere + ", column '" + column.name() + "'";
+            if (lists.contains(column.name())) {
+                parseListCell(text, column.type(), cellWhere);
+            } else {
+                parseCell(text, column.type(), cellWhere);
+            }
             cells.put(column.name(), text);
         }
         Map<String, String> values = new HashMap<>();
@@ -229,6 +299,9 @@ public final class DmnReader {
             var text = textOf(outputEntries.get(c)).strip();
             var outputWhere = ruleWhere + ", output '" + column.name() + "'";
             var input = namedInput(text, inputs, column, outputWhere);
+            if (input != null && lists.contains(input.name())) {
+                throw new InvalidDecisionTableException("%s: names input '%s', a list, which outputs cannot hold".formatted(outputWhere, text));
+            }
             if (input != null) {
                 references.put(column.name(), input.name());
             } else {
@@ -262,6 +335,15 @@ public final class DmnReader {
     private static UnaryTests parseCell(String text, ColumnType type, String where) {
         try {
             return CellParser.parseFeel(text, type);
+        } catch (CellSyntaxException e) {
+            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+        }
+    }
+
+    /** Parses the cell of a list column ({@code list contains(?, "PT")}), naming {@code where} it is if it is invalid. */
+    private static void parseListCell(String text, ColumnType type, String where) {
+        try {
+            CellParser.parseFeelList(text, type);
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }
@@ -377,16 +459,16 @@ public final class DmnReader {
     // ---- types -----------------------------------------------------------------------------------
 
     /**
-     * A column's type: a built-in type, and the allowed values of the item definitions it was reached
-     * through (the most derived one that declares any), or null.
+     * A column's type: a built-in type, the allowed values of the item definitions it was reached
+     * through (the most derived one that declares any), or null, and whether it is a list of that type.
      */
-    private record Type(ColumnType columnType, String allowedValues) {
+    private record Type(ColumnType columnType, String allowedValues, boolean list) {
     }
 
     /**
      * The model's item definitions, by name. A column may name one whose base type is a built-in type
-     * or another such item definition; structured types (with item components), collections and
-     * function types are rejected.
+     * or another such item definition, or a collection of one; structured types (with item components),
+     * collections of collections and function types are rejected.
      */
     private static final class ItemDefinitions {
         private final Map<String, Element> byName = new HashMap<>();
@@ -397,11 +479,14 @@ public final class DmnReader {
 
         /**
          * Follows the chain of item definitions to a built-in type, one step at a time, so a long chain
-         * costs no stack. The allowed values are those of the most derived definition that has any.
+         * costs no stack. The allowed values are those of the most derived definition that has any; one
+         * link of the chain may be a collection, whose items are of the type it names, and the allowed
+         * values then apply to the items (they must come after the collection).
          */
         Type resolve(String typeRef, String where) {
             String allowedValues = null;
             String allowedBy = null;
+            boolean list = false;
             var seen = new HashSet<String>();
             var ref = typeRef;
             var builtIn = builtInType(ref);
@@ -413,6 +498,17 @@ public final class DmnReader {
                     throw new InvalidDecisionTableException("%s: item definition '%s' is defined in terms of itself".formatted(where, name));
                 }
                 var allowed = nonBlankText(definition, "allowedValues");
+                if (Boolean.parseBoolean(definition.getAttribute("isCollection").strip())) {
+                    if (list) {
+                        throw new InvalidDecisionTableException("%s: type '%s' is a collection of collections, which is not supported"
+                                .formatted(where, name));
+                    }
+                    if (allowed != null || allowedValues != null) {
+                        throw new InvalidDecisionTableException(("%s: type '%s' constrains a collection as a whole, which is not supported; "
+                                + "declare the allowed values of its items in their item definition").formatted(where, name));
+                    }
+                    list = true;
+                }
                 if (allowedValues == null && allowed != null) {
                     allowedValues = allowed.strip();
                     allowedBy = name;
@@ -424,19 +520,16 @@ public final class DmnReader {
             if (allowedValues != null) {
                 parseCell(allowedValues, type, where + ", allowed values of type '" + allowedBy + "'");
             }
-            return new Type(type, allowedValues);
+            return new Type(type, allowedValues, list);
         }
 
-        /** The item definition of that name, if it is a simple type: one with a base type and no components. */
+        /** The item definition of that name, if it is a simple type or a collection: one with a base type and no components. */
         private Element itemDefinition(String name, String typeRef, String where) {
             var definition = byName.get(name);
             if (definition == null) {
                 throw new InvalidDecisionTableException(
                         "%s: type '%s' is not supported (string, number, date, boolean, time, dateTime, dayTimeDuration, yearMonthDuration and item definitions of them are)"
                                 .formatted(where, typeRef));
-            }
-            if (Boolean.parseBoolean(definition.getAttribute("isCollection").strip())) {
-                throw new InvalidDecisionTableException("%s: type '%s' is a collection, which is not supported".formatted(where, name));
             }
             if (!children(definition, "itemComponent").isEmpty()) {
                 throw new InvalidDecisionTableException(

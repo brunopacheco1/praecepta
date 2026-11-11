@@ -32,6 +32,7 @@ them when you build; evaluate them with a dependency-free engine.
 - DMN FEEL cells on STRING, NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION and
   YEAR_MONTH_DURATION columns: lists, `not(...)`,
   comparisons, intervals, `null`; unquoted `PT,ES` cells from earlier versions keep working
+- List inputs, such as a customer's nationalities: a cell holds when some element passes it
 - Optional DMN input value lists: values outside them are rejected
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
   rules that can never be selected (FIRST, PRIORITY), and gaps (declared inputs no rule matches)
@@ -179,6 +180,35 @@ Notes:
   input value list. Each constant stands for its `name()`, or pass a function such as
   `Country::code`.
 
+### List inputs
+A column may hold several values, such as a customer's nationalities. Its cells are written as
+usual, and hold when **some element** passes one of the tests; `not(...)` holds when **no element**
+does:
+
+```java
+var engine = PraeceptaEngine.<Customer, String>builder()
+        .hitPolicy(HitPolicy.FIRST)
+        .listInput("nationalities", Customer::nationalities)        // a Collection<String>
+        .listInput("ages", ColumnType.NUMBER, Customer::childrenAges) // a Collection of numbers
+        .output(output -> output.values().get("offer"))
+        .rules(rules)
+        .build();
+```
+
+| Cell | `["PT","BR"]` | `["BR"]` | `[]` (empty) | `null` (missing) |
+|---|---|---|---|---|
+| `"PT","ES"` (holds PT or ES) | yes | | | |
+| `not("PT")` (holds no PT) | | yes | yes | |
+| `null` (no list) | | | | yes |
+| `-` | yes | yes | yes | yes |
+
+These are the semantics of FEEL's `list contains`: a missing list makes every test unknown, while an
+empty one passes none. Elements may not be missing, and declared input values apply to each element.
+With map-based inputs, declare the column with `.listColumnType("nationalities", ColumnType.STRING)`
+and give a FEEL list as text: `["PT", "BR"]` (or `PT, BR`), `[]` for an empty list. Rules that test a
+list column are left out of the static analysis (overlaps, unreachable rules, gaps), since a list
+can match rules whose values never meet in a single value.
+
 ### DMN
 `DmnReader` loads a decision table from a DMN file (DMN 1.1 to 1.5), including its hit policy,
 column types and value lists. `Builder.table(...)` applies all of it; inputs are bound as usual,
@@ -205,6 +235,10 @@ with allowed values, which become the input value list); input entries in the ce
 written with `date(...)`, `time(...)` and `date and time(...)`); input entries that compare with
 another input (`> limit`, `[floor..limit]`, `not(home)`), which then becomes an input of the engine,
 bound like a column (with map-based inputs it is read with the type of the column that names it);
+columns typed by a collection (`isCollection="true"`, with allowed values on the item type), whose
+entries test the elements with FEEL's list functions (`list contains(?, "PT")`,
+`some x in ? satisfies x >= 18`, `? = null`, joined with `or`, and `not(...)`); entries that name a
+list input (`Flu Symptoms`, typed by its `inputData`), which hold when the value is in the list;
 output entries that are literals
 or name one of the table's inputs (`a` returns the input `a`); times and date-times with or without a time zone;
 every hit policy, with SUM, MIN, MAX and COUNT aggregation. Anything else (a time with a
@@ -246,7 +280,9 @@ A string column with a value list becomes an enum in the input record, using the
 Numbers are `BigDecimal` and dates `LocalDate`. Times and date-times are `LocalTime` and
 `LocalDateTime`, or `OffsetTime` and `ZonedDateTime` when every value written for the column has a
 time zone (an input compared with such a column in a cell, as in `> limit`, takes a zone too); a
-column that mixes both kinds fails the build. At runtime the generated code needs only
+column that mixes both kinds fails the build. An input declared with `<list>true</list>` (or typed
+by a collection in a DMN file) becomes a `java.util.List` of its type. At runtime the generated code
+needs only
 `praecepta-engine`; Apache POI stays a build-time dependency.
 
 ```xml

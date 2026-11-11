@@ -9,7 +9,9 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
@@ -34,8 +36,11 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * Writes a {@link DecisionTable} as a DMN 1.3 model with one decision. Cells are parsed and written
  * back as standard FEEL (quoted strings, plain numbers, {@code date("...")}, {@code time("...")},
  * {@code date and time("...")}, {@code duration("...")}, {@code true} / {@code false}), so tables written in
- * Praecepta's shorter syntax ({@code PT,ES}) become portable. Each input also gets an
- * {@code inputData} element, which Drools needs to bind input values.
+ * Praecepta's shorter syntax ({@code PT,ES}) become portable. Each input, column or input the cells
+ * compare with, also gets an {@code inputData} element, which Drools needs to bind input values. An
+ * input that holds lists is typed by a collection item definition (of an item type with its input
+ * values, if it declares any), and a list column's cells are written with FEEL's list functions
+ * ({@link #renderList}).
  *
  * <p>The result is read back unchanged by {@link DmnReader}, and is evaluated identically by
  * Camunda 8 and Drools (checked by the benchmark module).
@@ -57,11 +62,18 @@ public final class DmnWriter {
         var xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         xml.append("<definitions").append(attribute("xmlns", NAMESPACE)).append(idAndName("definitions_" + id, table.name()))
            .append(attribute("namespace", "https://github.com/brunopacheco1/praecepta/" + id)).append(">\n");
-        var inputs = table.inputs();
-        for (int c = 0; c < inputs.size(); c++) {
-            inputData(xml, c, inputs.get(c));
+        // the table's columns, then the inputs its cells compare with, each with its inputData
+        var variables = new ArrayList<>(table.inputs());
+        namedInputs(table).forEach((name, type) -> variables.add(new InputColumn(name, type)));
+        for (int v = 0; v < variables.size(); v++) {
+            if (table.listInputs().contains(variables.get(v).name())) {
+                listItemDefinitions(xml, v, variables.get(v));
+            }
         }
-        decision(xml, id, table);
+        for (int v = 0; v < variables.size(); v++) {
+            inputData(xml, v, variables.get(v), table);
+        }
+        decision(xml, id, table, variables.size());
         xml.append("</definitions>\n");
         return xml.toString();
     }
@@ -75,21 +87,72 @@ public final class DmnWriter {
         };
     }
 
+    /**
+     * Standard FEEL text for the cell of a column that holds lists, which tests the list's elements:
+     * {@code "PT", >= 18, null} becomes
+     * {@code list contains(?, "PT") or some x in ? satisfies x >= 18 or ? = null}, read back by
+     * {@code CellParser#parseFeelList}.
+     */
+    public static String renderList(UnaryTests tests) {
+        return switch (tests) {
+            case UnaryTests.Any() -> "-";
+            case UnaryTests.Positive(var positive) -> joinList(positive);
+            case UnaryTests.Negated(var negated) -> "not(" + joinList(negated) + ")";
+        };
+    }
+
+    /**
+     * The inputs the table's cells compare with, or none if a cell is invalid: writing the rules then
+     * reports that cell, naming its rule and column.
+     */
+    private static Map<String, ColumnType> namedInputs(DecisionTable table) {
+        try {
+            return table.namedInputs();
+        } catch (IllegalArgumentException e) {
+            return Map.of();
+        }
+    }
+
     // ---- elements, one method per DMN element ----------------------------------------------------
 
+    /**
+     * The item definitions of a list input: a collection of its type or, if it declares input values,
+     * of an item definition that allows only those (DMN constrains a list's items through their type).
+     */
+    private static void listItemDefinitions(StringBuilder xml, int v, InputColumn input) {
+        var items = typeName(input.type());
+        if (input.allowedValues() != null) {
+            items = "input_" + v + "_item";
+            var values = standardFeel(input.allowedValues(), input.type(), false, false, "input values of column '" + input.name() + "'");
+            xml.append("  <itemDefinition").append(attribute("name", items)).append(">\n")
+               .append("    <typeRef>").append(typeName(input.type())).append("</typeRef>\n")
+               .append("    <allowedValues><text>").append(escapeText(values)).append("</text></allowedValues>\n")
+               .append("  </itemDefinition>\n");
+        }
+        xml.append("  <itemDefinition").append(attribute("name", listTypeName(v))).append(attribute("isCollection", "true")).append(">\n")
+           .append("    <typeRef>").append(escapeText(items)).append("</typeRef>\n")
+           .append("  </itemDefinition>\n");
+    }
+
+    /** The name of the item definition of the list input at {@code v}. */
+    private static String listTypeName(int v) {
+        return "input_" + v + "_list";
+    }
+
     /** The {@code inputData} of an input, which Drools needs to bind its value. */
-    private static void inputData(StringBuilder xml, int c, InputColumn input) {
-        xml.append("  <inputData").append(idAndName("input_data_" + c, input.name())).append(">\n")
-           .append("    <variable").append(idAndName("input_variable_" + c, input.name())).append(typed(input.type())).append("/>\n")
+    private static void inputData(StringBuilder xml, int v, InputColumn input, DecisionTable table) {
+        xml.append("  <inputData").append(idAndName("input_data_" + v, input.name())).append(">\n")
+           .append("    <variable").append(idAndName("input_variable_" + v, input.name())).append(typed(input, v, table)).append("/>\n")
            .append("  </inputData>\n");
     }
 
-    private static void decision(StringBuilder xml, String id, DecisionTable table) {
+    /** @param variables the number of inputData elements, which the decision requires */
+    private static void decision(StringBuilder xml, String id, DecisionTable table, int variables) {
         xml.append("  <decision").append(idAndName("decision_" + id, table.name())).append(">\n")
            .append("    <variable").append(idAndName("decision_variable", table.name())).append("/>\n");
-        for (int c = 0; c < table.inputs().size(); c++) {
-            xml.append("    <informationRequirement").append(id("requirement_" + c)).append(">")
-               .append("<requiredInput").append(attribute("href", "#input_data_" + c)).append("/></informationRequirement>\n");
+        for (int v = 0; v < variables; v++) {
+            xml.append("    <informationRequirement").append(id("requirement_" + v)).append(">")
+               .append("<requiredInput").append(attribute("href", "#input_data_" + v)).append("/></informationRequirement>\n");
         }
         decisionTable(xml, table);
         xml.append("  </decision>\n");
@@ -105,7 +168,7 @@ public final class DmnWriter {
         xml.append(">\n");
         var inputs = table.inputs();
         for (int c = 0; c < inputs.size(); c++) {
-            input(xml, c, inputs.get(c));
+            input(xml, c, inputs.get(c), table);
         }
         var outputs = table.outputs();
         for (int c = 0; c < outputs.size(); c++) {
@@ -118,11 +181,12 @@ public final class DmnWriter {
         xml.append("    </decisionTable>\n");
     }
 
-    private static void input(StringBuilder xml, int c, InputColumn input) {
+    /** A column; a list column's input values are those of its item type instead (see {@link #listItemDefinitions}). */
+    private static void input(StringBuilder xml, int c, InputColumn input, DecisionTable table) {
         xml.append("      <input").append(id("input_" + c)).append(attribute("label", input.name())).append(">\n");
-        expression(xml, "inputExpression", id("input_expression_" + c) + typed(input.type()), input.name());
-        if (input.allowedValues() != null) {
-            var values = standardFeel(input.allowedValues(), input.type(), false, "input values of column '" + input.name() + "'");
+        expression(xml, "inputExpression", id("input_expression_" + c) + typed(input, c, table), input.name());
+        if (input.allowedValues() != null && !table.listInputs().contains(input.name())) {
+            var values = standardFeel(input.allowedValues(), input.type(), false, false, "input values of column '" + input.name() + "'");
             expression(xml, "inputValues", id("input_values_" + c), values);
         }
         xml.append("      </input>\n");
@@ -150,7 +214,8 @@ public final class DmnWriter {
         for (int c = 0; c < inputs.size(); c++) {
             var input = inputs.get(c);
             var text = rule.input().values().get(input.name());
-            var cell = standardFeel(text, input.type(), table.feelCells(), where + ", column '" + input.name() + "'");
+            var cell = standardFeel(text, input.type(), table.feelCells(), table.listInputs().contains(input.name()),
+                    where + ", column '" + input.name() + "'");
             expression(xml, "inputEntry", id("input_entry_" + r + "_" + c), cell);
         }
         var outputs = table.outputs();
@@ -182,9 +247,16 @@ public final class DmnWriter {
 
     // ---- cells and values as FEEL ----------------------------------------------------------------
 
-    /** A cell in Praecepta's syntax, or already strict FEEL (a DMN table's), as standard FEEL. */
-    private static String standardFeel(String cell, ColumnType type, boolean feel, String where) {
+    /**
+     * A cell in Praecepta's syntax, or already strict FEEL (a DMN table's), as standard FEEL.
+     *
+     * @param list whether the column holds lists, whose cells test the elements
+     */
+    private static String standardFeel(String cell, ColumnType type, boolean feel, boolean list, String where) {
         try {
+            if (list) {
+                return renderList(feel ? CellParser.parseFeelList(cell, type) : CellParser.parse(cell, type));
+            }
             return render(feel ? CellParser.parseFeel(cell, type) : CellParser.parse(cell, type));
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException(where + ": " + e.getMessage());
@@ -193,6 +265,20 @@ public final class DmnWriter {
 
     private static String join(List<Test> tests) {
         return tests.stream().map(DmnWriter::test).collect(Collectors.joining(", "));
+    }
+
+    private static String joinList(List<Test> tests) {
+        return tests.stream().map(DmnWriter::listTest).collect(Collectors.joining(" or "));
+    }
+
+    /** A test of a list column's cell, applied to the list's elements. */
+    private static String listTest(Test test) {
+        return switch (test) {
+            case NullTest() -> "? = null";
+            case Equals(var value) -> "list contains(?, " + literal(value) + ")";
+            case Compare c -> "some x in ? satisfies x " + test(c);
+            case Range r -> "some x in ? satisfies x in " + test(r);
+        };
     }
 
     private static String test(Test test) {
@@ -262,7 +348,17 @@ public final class DmnWriter {
 
     /** The attribute {@code typeRef="..."} of a column type. */
     private static String typed(ColumnType type) {
-        return attribute("typeRef", switch (type) {
+        return attribute("typeRef", typeName(type));
+    }
+
+    /** The attribute {@code typeRef="..."} of the input at {@code v}: its list type if it holds lists. */
+    private static String typed(InputColumn input, int v, DecisionTable table) {
+        return table.listInputs().contains(input.name()) ? attribute("typeRef", listTypeName(v)) : typed(input.type());
+    }
+
+    /** A column type's name in DMN. */
+    private static String typeName(ColumnType type) {
+        return switch (type) {
             case STRING -> "string";
             case NUMBER -> "number";
             case DATE -> "date";
@@ -271,7 +367,7 @@ public final class DmnWriter {
             case DATE_TIME -> "dateTime";
             case DAY_TIME_DURATION -> "dayTimeDuration";
             case YEAR_MONTH_DURATION -> "yearMonthDuration";
-        });
+        };
     }
 
     /** An attribute, with a leading space and its value escaped: {@code  name="value"}. */

@@ -274,8 +274,12 @@ class DmnReaderTest {
     @CsvSource(delimiter = '|', value = {
             "structured type      | <itemDefinition name=\"tT\"><itemComponent name=\"a\"><typeRef>string</typeRef></itemComponent></itemDefinition> "
                     + "| type 'tT' is a structured item definition",
-            "collection           | <itemDefinition name=\"tT\" isCollection=\"true\"><typeRef>string</typeRef></itemDefinition> "
-                    + "| type 'tT' is a collection",
+            "list of lists        | <itemDefinition name=\"tT\" isCollection=\"true\"><typeRef>tU</typeRef></itemDefinition>"
+                    + "<itemDefinition name=\"tU\" isCollection=\"true\"><typeRef>string</typeRef></itemDefinition> "
+                    + "| type 'tU' is a collection of collections",
+            "constrained list     | <itemDefinition name=\"tT\" isCollection=\"true\"><typeRef>string</typeRef>"
+                    + "<allowedValues><text>\"a\"</text></allowedValues></itemDefinition> "
+                    + "| type 'tT' constrains a collection as a whole",
             "no base type         | <itemDefinition name=\"tT\"/> | type 'tT' is not supported; its item definition has no base type",
             "unsupported base     | <itemDefinition name=\"tT\"><typeRef>context</typeRef></itemDefinition> "
                     + "| type 'context' is not supported",

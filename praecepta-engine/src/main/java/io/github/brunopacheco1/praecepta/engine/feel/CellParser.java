@@ -127,6 +127,32 @@ public final class CellParser {
     }
 
     /**
+     * Parses a cell of a column that holds lists, as a DMN file holds it. Strict FEEL compares a list
+     * with a unary test as a whole ({@code "PT"} never equals {@code ["PT", "BR"]}), so there such a
+     * cell tests the elements with FEEL's list functions instead, joined with {@code or}:
+     *
+     * <pre>
+     *   list contains(?, "PT")                  some element is "PT"
+     *   some x in ? satisfies x &gt;= 18          some element compares that way
+     *   some x in ? satisfies x in [18..65)     some element lies in the interval
+     *   ? = null                                the list is missing
+     *   not(...)                                none of these holds
+     *   -                                       any list
+     * </pre>
+     *
+     * The result holds the tests that Praecepta's syntax writes {@code "PT", >= 18, [18..65), null},
+     * which a list column reads the same way: some element passes one of the tests (see
+     * {@code DecisionTable#listInputs}). A list column's cells test its elements against literals, never
+     * against another input.
+     *
+     * @param type the type of the list's elements
+     * @throws CellSyntaxException if a part of the cell is none of these forms, or a value is not valid for the type
+     */
+    public static UnaryTests parseFeelList(String cell, ColumnType type) {
+        return new Parser(type, cell, true).parseList();
+    }
+
+    /**
      * One cell being parsed for a column type; {@code strictFeel} turns off Praecepta's shorter forms.
      * The cell is split into tests, each test is read as {@code null}, a comparison, an interval or a
      * literal, and each literal as a value of the column type. The scanners that find where a test
@@ -145,6 +171,139 @@ public final class CellParser {
                 return new UnaryTests.Negated(tests(text.substring("not(".length(), text.length() - 1)));
             }
             return new UnaryTests.Positive(tests(text));
+        }
+
+        // ---- list columns ------------------------------------------------------------------------
+
+        /** A list column's cell: {@code list contains(?, v)} and the other forms of {@link #parseFeelList}. */
+        UnaryTests parseList() {
+            var text = cell == null ? "" : cell.strip();
+            if (text.isEmpty() || text.equals("-")) {
+                return new UnaryTests.Any();
+            }
+            if (text.startsWith("not(") && text.endsWith(")")) {
+                return new UnaryTests.Negated(listTests(text.substring("not(".length(), text.length() - 1)));
+            }
+            return new UnaryTests.Positive(listTests(text));
+        }
+
+        private List<Test> listTests(String text) {
+            var tests = new ArrayList<Test>();
+            for (var part : splitDisjunction(text)) {
+                var test = listTest(part.strip());
+                var names = UnaryTests.names(new UnaryTests.Positive(List.of(test)));
+                if (!names.isEmpty()) {
+                    throw new CellSyntaxException(cell, "a list column's cells test its elements against literals, not against '"
+                            + names.getFirst() + "'");
+                }
+                tests.add(test);
+            }
+            return tests;
+        }
+
+        /** One disjunct of a list column's cell, as the test it applies to each element. */
+        private Test listTest(String text) {
+            var contains = after(text, "list contains(");
+            if (contains != null && contains.endsWith(")")) {
+                var argument = after(after(contains.substring(0, contains.length() - 1), "?"), ",");
+                if (argument != null && !argument.isEmpty()) {
+                    return new Equals(literal(argument));
+                }
+            }
+            if ("null".equals(after(after(text, "?"), "="))) {
+                return new NullTest();
+            }
+            var some = after(text, "some");
+            var element = some == null ? "" : firstWord(some);
+            if (isName(element) && !KEYWORDS.contains(element)) {
+                var test = after(after(after(after(after(some, element), "in"), "?"), "satisfies"), element);
+                if (test != null) {
+                    var interval = after(test, "in");
+                    if (interval != null && !interval.isEmpty() && isBracketed(interval) && topLevelDots(interval) > 0) {
+                        return interval(interval, topLevelDots(interval));
+                    }
+                    if (OPERATORS.stream().anyMatch(operator -> test.startsWith(operator.symbol()))) {
+                        return test(test);
+                    }
+                }
+            }
+            throw new CellSyntaxException(cell, "'" + text + "' does not test a list's elements; write list contains(?, value), "
+                    + "some x in ? satisfies x < value, some x in ? satisfies x in [low..high] or ? = null");
+        }
+
+        /** The text up to its first whitespace. */
+        private static String firstWord(String text) {
+            int end = 0;
+            while (end < text.length() && !Character.isWhitespace(text.charAt(end))) {
+                end++;
+            }
+            return text.substring(0, end);
+        }
+
+        /**
+         * The text after {@code prefix}, both stripped, or null if the text is null or does not start with
+         * it. A prefix ending in a letter must end a word: {@code in} does not match {@code inside}.
+         */
+        private static String after(String text, String prefix) {
+            if (text == null) {
+                return null;
+            }
+            var stripped = text.strip();
+            if (!stripped.startsWith(prefix)) {
+                return null;
+            }
+            var rest = stripped.substring(prefix.length());
+            boolean word = Character.isLetterOrDigit(prefix.charAt(prefix.length() - 1));
+            if (word && !rest.isEmpty() && !Character.isWhitespace(rest.charAt(0))) {
+                return null;
+            }
+            return rest.strip();
+        }
+
+        /**
+         * Splits a list column's cell at each {@code or} outside strings, parentheses and intervals.
+         * Intervals are skipped as units, since their brackets need not pair up ({@code (1..2]}); a
+         * parenthesis right after a letter opens a call ({@code list contains(}), any other one an interval.
+         */
+        private List<String> splitDisjunction(String text) {
+            var parts = new ArrayList<String>();
+            int depth = 0;
+            int start = 0;
+            int i = 0;
+            while (i < text.length()) {
+                char c = text.charAt(i);
+                if (c == '"') {
+                    i = closingQuote(text, i);
+                    if (i == text.length()) {
+                        throw new CellSyntaxException(cell, "unterminated string");
+                    }
+                } else if (c == '[' || c == ']' || c == '(' && !afterLetter(text, i)) {
+                    i = endOfInterval(text, i);
+                } else if (c == '(') {
+                    depth++;
+                } else if (c == ')') {
+                    depth--;
+                } else if (depth == 0 && isOr(text, i)) {
+                    parts.add(text.substring(start, i));
+                    start = i + 3;
+                    i = start;
+                    continue;
+                }
+                i++;
+            }
+            parts.add(text.substring(start));
+            return parts;
+        }
+
+        /** Whether the character just before {@code i} is a letter, as in {@code contains(}; {@code in (1..2]} is an interval. */
+        private static boolean afterLetter(String text, int i) {
+            return i > 0 && Character.isLetter(text.charAt(i - 1));
+        }
+
+        /** Whether {@code or} with whitespace on both sides starts at the whitespace at {@code i}. */
+        private static boolean isOr(String text, int i) {
+            return Character.isWhitespace(text.charAt(i)) && text.startsWith("or", i + 1) && i + 3 < text.length()
+                    && Character.isWhitespace(text.charAt(i + 3));
         }
 
         // ---- tests and literals ------------------------------------------------------------------

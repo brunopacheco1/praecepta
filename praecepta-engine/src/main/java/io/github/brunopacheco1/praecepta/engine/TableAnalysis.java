@@ -35,7 +35,9 @@ import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
  * it matches is also matched by a rule with a lower bit (earlier, or higher priority): a search over
  * the rule's own classes, pruned as soon as a candidate covers what is left.</li>
  * <li>Rules with cells that compare with another input match inputs known only when evaluating, so
- * they take part only as rules that may be unreachable themselves (judged on their other cells).</li>
+ * they take part only as rules that may be unreachable themselves (judged on their other cells). So
+ * do rules that test a column holding lists, whose matches the classes of single values cannot
+ * describe; such a column shows the analysis a single class.</li>
  * <li>Gaps are regions of declared input values that no rule matches. They are only searched when
  * every string column the rules constrain has declared input values; otherwise every unknown string
  * would be a gap. Missing values are not part of the searched domain.</li>
@@ -49,9 +51,9 @@ final class TableAnalysis {
     private final BitsetIndex index;
     private final List<Praeceptum> rules;
     /**
-     * Rules with cells that compare with another input, which the index sees as "any value": the
-     * inputs they match are known only when evaluating, so they never count as overlapping, never cover
-     * another rule, and while there are any, gaps are not searched.
+     * Rules with cells that compare with another input, which the index sees as "any value", or that
+     * test a column holding lists: the inputs they match are known only when evaluating, so they never
+     * count as overlapping, never cover another rule, and while there are any, gaps are not searched.
      */
     private final long[] variableRules;
 

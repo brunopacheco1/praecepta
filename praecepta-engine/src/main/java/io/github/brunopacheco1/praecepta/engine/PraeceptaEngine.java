@@ -15,11 +15,13 @@ import java.time.Period;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -64,7 +66,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  *
  * <p>Cells are DMN FEEL unary tests, parsed per column type: {@code "PT","ES"} (or unquoted
  * {@code PT,ES}), {@code not("FR")}, {@code >= 18}, {@code [18..65)}, {@code < date("2025-01-01")},
- * {@code null}, and {@code -} or blank for any value. See {@code CellParser}.
+ * {@code null}, and {@code -} or blank for any value. See {@code CellParser}. A column bound with
+ * {@link Builder#listInput(String, Function)} holds lists, and its cells hold when some element passes
+ * them.
  *
  * <p>A whole DMN decision table (hit policy, column types, value lists and rules) can be loaded with
  * {@code DmnReader} and passed to {@link Builder#table}; inputs are then bound as usual:
@@ -136,9 +140,10 @@ public final class PraeceptaEngine<I, O> {
         var rules = List.copyOf(builder.rules);
 
         var types = columnTypes(builder, rules);
-        var cells = parseCells(rules, types, builder.feelCells);
+        var lists = listInputs(builder);
+        var cells = parseCells(rules, types, builder.feelCells, lists);
         // cells that compare with another input are decided when evaluating; the index sees "any value"
-        var variableCells = takeVariableCells(rules, types, cells, builder.inputStrategy != null);
+        var variableCells = takeVariableCells(rules, types, cells, builder.inputStrategy != null, lists);
         var allowedValues = allowedValues(builder, types.keySet());
         inputs = List.copyOf(types.keySet());
         var evaluationOrder = orderByWildcards(inputs, cells);
@@ -147,9 +152,15 @@ public final class PraeceptaEngine<I, O> {
         int words = BitsetIndex.wordsFor(rules.size());
         var enumValues = enumValuesByColumn(builder.bindings);
         var columnIndexes = evaluationOrder.stream()
-                .map(column -> new ColumnIndex(column, types.get(column), inBitOrder(cells.get(column), bitToRule),
-                        parseAllowedValues(column, types.get(column), allowedValues.get(column)), words, zoning(builder, column),
-                        enumValues.get(column)))
+                .map(column -> {
+                    var type = types.get(column);
+                    var columnCells = inBitOrder(cells.get(column), bitToRule);
+                    var allowed = parseAllowedValues(column, type, allowedValues.get(column));
+                    return lists.contains(column)
+                            ? ColumnIndex.ofLists(column, type, columnCells, allowed, words, zoning(builder, column))
+                            : new ColumnIndex(column, type, columnCells, allowed, words, zoning(builder, column),
+                                    enumValues.get(column));
+                })
                 .toList();
         index = new BitsetIndex(columnIndexes, bitToRule);
 
@@ -177,7 +188,7 @@ public final class PraeceptaEngine<I, O> {
                 outputByBit[bit] = output;
                 singleByBit[bit] = List.of(output);
             } else {
-                namedInputsByBit[bit] = namedInputs(rule, evaluationOrder);
+                namedInputsByBit[bit] = namedInputs(rule, evaluationOrder, lists);
                 anyNamed = true;
             }
         }
@@ -190,7 +201,10 @@ public final class PraeceptaEngine<I, O> {
         variableCellsByBit = variableCellsByBit(variableCells, bitToRule, evaluationOrder);
         variableRules = variableRules(variableCellsByBit, words);
         hasVariableCells = !BitsetIndex.isEmpty(variableRules);
-        report = validate(index, rules, hitPolicy, variableRules, builder.failOn);
+        // rules that test a list column match lists the index's classes cannot describe: the analysis leaves them out too
+        var unseenRules = listRules(index);
+        BitsetIndex.or(unseenRules, variableRules);
+        report = validate(index, rules, hitPolicy, unseenRules, builder.failOn);
     }
 
     /** Starts configuring an engine. */
@@ -300,7 +314,7 @@ public final class PraeceptaEngine<I, O> {
      * @param cells cells by column; changed in place, and given an all-"any" column for each added input
      */
     private static Map<Integer, Map<String, UnaryTests>> takeVariableCells(List<Praeceptum> rules, Map<String, ColumnType> types,
-            Map<String, List<UnaryTests>> cells, boolean mapInputs) {
+            Map<String, List<UnaryTests>> cells, boolean mapInputs, Set<String> lists) {
         var byRule = new LinkedHashMap<Integer, Map<String, UnaryTests>>();
         var named = new LinkedHashMap<String, ColumnType>();
         for (var column : List.copyOf(cells.keySet())) {
@@ -311,6 +325,7 @@ public final class PraeceptaEngine<I, O> {
                     continue;
                 }
                 nameInputs(rules.get(r), column, cell, types, named, mapInputs);
+                rejectComparisonsWithLists(rules.get(r), column, cell, lists);
                 byRule.computeIfAbsent(r, any -> new LinkedHashMap<>()).put(column, cell);
                 columnCells.set(r, new UnaryTests.Any());
             }
@@ -343,6 +358,45 @@ public final class PraeceptaEngine<I, O> {
             }
             named.putIfAbsent(name, type);
         }
+    }
+
+    /**
+     * A cell may name an input that holds a list only as a whole test, {@code Flu Symptoms} or
+     * {@code not(Flu Symptoms)}, which asks whether the value is in the list: FEEL compares no value with a
+     * list, so {@code > limits} or {@code [low..limits]} would never hold.
+     */
+    private static void rejectComparisonsWithLists(Praeceptum rule, String column, UnaryTests cell, Set<String> lists) {
+        var tests = switch (cell) {
+            case UnaryTests.Any any -> List.<UnaryTests.Test>of();
+            case UnaryTests.Positive(var positive) -> positive;
+            case UnaryTests.Negated(var negated) -> negated;
+        };
+        for (var test : tests) {
+            if (test instanceof UnaryTests.Equals) {
+                continue;
+            }
+            for (var name : UnaryTests.names(new UnaryTests.Positive(List.of(test)))) {
+                if (lists.contains(name)) {
+                    throw new InvalidDecisionTableException(("Rule %s, column '%s': compares with '%s', which holds lists; "
+                            + "a cell can only ask whether the value is in it, as '%s' does").formatted(rule.priority(), column, name, name));
+                }
+            }
+        }
+    }
+
+    /** The rules (bits) whose cell in a column that holds lists is not "any value". */
+    private static long[] listRules(BitsetIndex index) {
+        var rules = new long[index.words()];
+        var all = index.allRules();
+        for (int c = 0; c < index.columnCount(); c++) {
+            var column = index.column(c);
+            if (column.holdsLists()) {
+                var constrained = all.clone();
+                BitsetIndex.andNot(constrained, column.rulesAcceptingAnyList());
+                BitsetIndex.or(rules, constrained);
+            }
+        }
+        return rules;
     }
 
     /** The variable cells by bit, with columns as positions in the evaluation order; null for rules without any. */
@@ -431,7 +485,7 @@ public final class PraeceptaEngine<I, O> {
      * The outputs of {@code rule} that name an input, checked: each names an input column, and none is
      * in an output priority list, where its place cannot be known before evaluation.
      */
-    private static NamedInputs namedInputs(Praeceptum rule, List<String> evaluationOrder) {
+    private static NamedInputs namedInputs(Praeceptum rule, List<String> evaluationOrder, Set<String> lists) {
         var references = rule.output().references();
         var outputs = new String[references.size()];
         var columns = new int[references.size()];
@@ -441,6 +495,10 @@ public final class PraeceptaEngine<I, O> {
             if (column < 0) {
                 throw new InvalidDecisionTableException("Rule %s: output '%s' names '%s', which is not an input column %s"
                         .formatted(rule.priority(), reference.getKey(), reference.getValue(), evaluationOrder));
+            }
+            if (lists.contains(reference.getValue())) {
+                throw new InvalidDecisionTableException("Rule %s: output '%s' names '%s', which holds lists; an output holds one value"
+                        .formatted(rule.priority(), reference.getKey(), reference.getValue()));
             }
             outputs[i] = reference.getKey();
             columns[i++] = column;
@@ -579,6 +637,23 @@ public final class PraeceptaEngine<I, O> {
     }
 
     /**
+     * The inputs that hold lists: those bound with {@code listInput(...)} or, with an {@link InputStrategy},
+     * those the table or {@code listColumnType(...)} declare.
+     */
+    private static Set<String> listInputs(Builder<?, ?> builder) {
+        if (builder.inputStrategy != null) {
+            return Set.copyOf(builder.listColumns);
+        }
+        var lists = new HashSet<String>();
+        builder.bindings.forEach((column, binding) -> {
+            if (binding.list()) {
+                lists.add(column);
+            }
+        });
+        return lists;
+    }
+
+    /**
      * The input value list of each column: the declared ones and, for an enum-bound column without
      * one, its constants. An enum is a closed set of values.
      */
@@ -644,17 +719,26 @@ public final class PraeceptaEngine<I, O> {
         }
     }
 
-    /** Parsed cells per column, in rule order: strict FEEL for a DMN table, else Praecepta's syntax. */
-    private static Map<String, List<UnaryTests>> parseCells(List<Praeceptum> rules, Map<String, ColumnType> types, boolean feel) {
+    /**
+     * Parsed cells per column, in rule order: strict FEEL for a DMN table (a list column's with
+     * {@code list contains(?, ...)}), else Praecepta's syntax.
+     */
+    private static Map<String, List<UnaryTests>> parseCells(List<Praeceptum> rules, Map<String, ColumnType> types, boolean feel,
+            Set<String> lists) {
         var cells = new LinkedHashMap<String, List<UnaryTests>>();
-        types.forEach((column, type) -> cells.put(column, rules.stream().map(rule -> parseCell(rule, column, type, feel)).toList()));
+        types.forEach((column, type) -> cells.put(column, rules.stream()
+                .map(rule -> parseCell(rule, column, type, feel, lists.contains(column)))
+                .toList()));
         return cells;
     }
 
-    private static UnaryTests parseCell(Praeceptum rule, String column, ColumnType type, boolean feel) {
+    private static UnaryTests parseCell(Praeceptum rule, String column, ColumnType type, boolean feel, boolean list) {
         try {
             var cell = rule.input().values().get(column);
-            return feel ? CellParser.parseFeel(cell, type) : CellParser.parse(cell, type);
+            if (!feel) {
+                return CellParser.parse(cell, type);
+            }
+            return list ? CellParser.parseFeelList(cell, type) : CellParser.parseFeel(cell, type);
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException("Rule %s, column '%s': %s".formatted(rule.priority(), column, e.getMessage()));
         }
@@ -763,6 +847,10 @@ public final class PraeceptaEngine<I, O> {
         private final Map<String, String> allowedValues = new LinkedHashMap<>();
         /** Column types of a {@link #table(DecisionTable)}, checked against the bindings. */
         private Map<String, ColumnType> tableTypes;
+        /** The inputs a {@link #table(DecisionTable)} declares as lists, checked against the bindings. */
+        private Set<String> tableLists = Set.of();
+        /** With {@link #inputs(InputStrategy)}: the inputs that hold lists. */
+        private final Set<String> listColumns = new LinkedHashSet<>();
         /** Whether the rules' cells are strict FEEL, as a DMN table's are. */
         private boolean feelCells;
 
@@ -776,8 +864,8 @@ public final class PraeceptaEngine<I, O> {
          * Takes the hit policy, aggregation, rules, input value lists and (for PRIORITY and
          * OUTPUT_ORDER) output value lists from a decision table, e.g. one read by {@code DmnReader}.
          * Inputs are still bound with {@code input(...)} and its typed variants, which must cover every
-         * column of the table with its type, or with {@link #inputs(InputStrategy)}, in which case the
-         * table's column types apply.
+         * column of the table with its type ({@code listInput(...)} for the table's list inputs), or with
+         * {@link #inputs(InputStrategy)}, in which case the table's column types and list inputs apply.
          */
         public Builder<I, O> table(DecisionTable table) {
             Objects.requireNonNull(table, "table");
@@ -794,6 +882,8 @@ public final class PraeceptaEngine<I, O> {
                 }
             }
             tableTypes = types;
+            tableLists = table.listInputs();
+            listColumns.addAll(table.listInputs());
             feelCells = table.feelCells();
             if (usesOutputPriority(table.hitPolicy())) {
                 for (var output : table.outputs()) {
@@ -851,7 +941,7 @@ public final class PraeceptaEngine<I, O> {
          * cannot be compared with such times: they never match them.
          */
         public Builder<I, O> offsetTimeInput(String column, Function<? super I, OffsetTime> extractor) {
-            return bind(column, ColumnType.TIME, extractor, null, Zoning.ZONED);
+            return bind(column, ColumnType.TIME, extractor, null, Zoning.ZONED, false);
         }
 
         /**
@@ -870,7 +960,7 @@ public final class PraeceptaEngine<I, O> {
          * values: they never match them.
          */
         public Builder<I, O> zonedDateTimeInput(String column, Function<? super I, ZonedDateTime> extractor) {
-            return bind(column, ColumnType.DATE_TIME, extractor, null, Zoning.ZONED);
+            return bind(column, ColumnType.DATE_TIME, extractor, null, Zoning.ZONED, false);
         }
 
         /** Binds a DAY_TIME_DURATION column to a getter returning a duration, compared by length. */
@@ -902,7 +992,30 @@ public final class PraeceptaEngine<I, O> {
             Objects.requireNonNull(type, "type");
             Objects.requireNonNull(value, "value");
             var values = Arrays.stream(type.getEnumConstants()).map(value).toList();
-            return bind(column, ColumnType.STRING, extractor, values, Zoning.LOCAL);
+            return bind(column, ColumnType.STRING, extractor, values, Zoning.LOCAL, false);
+        }
+
+        /**
+         * Binds a column that holds lists of strings, such as a customer's nationalities, to a getter. A
+         * cell holds when some element passes one of its tests: {@code "PT","ES"} matches a list holding
+         * {@code "PT"} or {@code "ES"}, and {@code not("PT")} a list without {@code "PT"}. A missing (null)
+         * list matches only {@code -} and {@code null}; an empty one matches no test, so every
+         * {@code not(...)}. Elements may not be null or blank. Input values, if declared, apply to the
+         * elements. A cell of another column that names this input ({@code Flu Symptoms}, in a DMN table)
+         * holds when that column's value is in the list.
+         */
+        public Builder<I, O> listInput(String column, Function<? super I, ? extends Collection<String>> extractor) {
+            return bind(column, ColumnType.STRING, extractor, null, Zoning.LOCAL, true);
+        }
+
+        /**
+         * {@link #listInput(String, Function)} for lists of {@code elementType}, whose elements are what the
+         * getter of a single value of that type returns ({@code Number}, {@code LocalDate}, {@code Period}...).
+         * The elements of a TIME or DATE_TIME list may come with a time zone ({@code OffsetTime},
+         * {@code ZonedDateTime}) or without one, each compared as a single value of its kind is.
+         */
+        public Builder<I, O> listInput(String column, ColumnType elementType, Function<? super I, ? extends Collection<?>> extractor) {
+            return bind(column, Objects.requireNonNull(elementType, "elementType"), extractor, null, Zoning.EITHER, true);
         }
 
         /**
@@ -919,6 +1032,18 @@ public final class PraeceptaEngine<I, O> {
         /** With {@link #inputs(InputStrategy)}: the type of a column, parsed from its text value. */
         public Builder<I, O> columnType(String column, ColumnType type) {
             columnTypes.put(Objects.requireNonNull(column, COLUMN), Objects.requireNonNull(type, "type"));
+            return this;
+        }
+
+        /**
+         * With {@link #inputs(InputStrategy)}: the column (or an input the cells compare with) holds lists
+         * of {@code elementType}, matched as {@link #listInput(String, Function)} describes. Its text is a
+         * FEEL list such as {@code ["PT", "BR"]} or {@code [1, 2.5]}, whose brackets may be left out
+         * ({@code PT, BR}); {@code []} is an empty list, and null or blank text a missing one.
+         */
+        public Builder<I, O> listColumnType(String column, ColumnType elementType) {
+            columnType(column, elementType);
+            listColumns.add(column);
             return this;
         }
 
@@ -989,14 +1114,14 @@ public final class PraeceptaEngine<I, O> {
         }
 
         private Builder<I, O> bind(String column, ColumnType type, Function<? super I, ?> extractor) {
-            return bind(column, type, extractor, null, Zoning.LOCAL);
+            return bind(column, type, extractor, null, Zoning.LOCAL, false);
         }
 
         private Builder<I, O> bind(String column, ColumnType type, Function<? super I, ?> extractor, List<String> enumValues,
-                Zoning zoning) {
+                Zoning zoning, boolean list) {
             Objects.requireNonNull(column, COLUMN);
             Objects.requireNonNull(extractor, "extractor");
-            if (bindings.putIfAbsent(column, new Binding<>(type, extractor, enumValues, zoning)) != null) {
+            if (bindings.putIfAbsent(column, new Binding<>(type, extractor, enumValues, zoning, list)) != null) {
                 throw new IllegalArgumentException("Input column '%s' is declared twice".formatted(column));
             }
             return this;
@@ -1006,7 +1131,7 @@ public final class PraeceptaEngine<I, O> {
             require(bindings.isEmpty() != (inputStrategy == null),
                     "bind inputs either per column with input(...) or with inputs(...), not both and not neither");
             require(columnTypes.isEmpty() || inputStrategy != null,
-                    "columnType(...) only applies with inputs(...); per-column bindings carry their type");
+                    "columnType(...) and listColumnType(...) only apply with inputs(...); per-column bindings carry their type");
             if (tableTypes == null || inputStrategy != null) {
                 return;
             }
@@ -1018,6 +1143,15 @@ public final class PraeceptaEngine<I, O> {
                 require(binding.type() == type, "column '%s' is a %s column in the table but is bound as %s"
                         .formatted(column, type, binding.type()));
             }
+            bindings.forEach((input, binding) -> {
+                // the table's columns, and the inputs its cells compare with
+                if (tableTypes.containsKey(input) || tableLists.contains(input)) {
+                    boolean list = tableLists.contains(input);
+                    require(binding.list() == list, list
+                            ? "input '%s' holds lists in the table; bind it with listInput(...)".formatted(input)
+                            : "input '%s' holds single values in the table but is bound with listInput(...)".formatted(input));
+                }
+            });
         }
 
         private void checkHitPolicyOptions() {
@@ -1040,10 +1174,13 @@ public final class PraeceptaEngine<I, O> {
         }
 
         /**
+         * @param type       the column's type, or its elements' for a list
          * @param enumValues for an enum-bound column, each constant's value by ordinal; else null
-         * @param zoning     whether the getter's times and date-times have a time zone
+         * @param zoning     whether the getter's times and date-times (or a list's elements) have a time zone
+         * @param list       whether the getter returns lists ({@code listInput(...)})
          */
-        private record Binding<I>(ColumnType type, Function<? super I, ?> extractor, List<String> enumValues, Zoning zoning) {
+        private record Binding<I>(ColumnType type, Function<? super I, ?> extractor, List<String> enumValues, Zoning zoning,
+                boolean list) {
         }
     }
 }

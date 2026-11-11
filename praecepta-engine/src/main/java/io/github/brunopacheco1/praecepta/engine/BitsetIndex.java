@@ -8,7 +8,6 @@ package io.github.brunopacheco1.praecepta.engine;
 import java.util.Arrays;
 import java.util.List;
 
-import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 
 /**
@@ -85,11 +84,11 @@ final class BitsetIndex {
 
     /**
      * Checks declared input values (and parsability) for the columns from {@code from} on. A STRING
-     * column without declared input values accepts any value, so it is skipped.
+     * column of single values without declared input values accepts any value, so it is skipped.
      */
     private <T> void validate(T input, ColumnReader<T> reader, int from) {
         for (int c = from; c < columns.length; c++) {
-            if (columns[c].hasAllowedValues || columns[c].type != ColumnType.STRING) {
+            if (columns[c].checksValues()) {
                 columns[c].maskFor(reader.read(input, c));
             }
         }

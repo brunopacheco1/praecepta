@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.OutputStrategy;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
@@ -115,7 +116,11 @@ final class TableCompiler {
                 ? new CsvLoader(stream, fileName, inputNames, outputNames).getPraecepta()
                 : new ExcelLoader(stream, fileName, inputNames, outputNames).getPraecepta();
         var tableName = fileName.substring(0, fileName.lastIndexOf('.'));
-        return new DecisionTable(tableName, config.hitPolicy, config.aggregation, inputs, outputs, rules);
+        var lists = config.inputs.stream().filter(column -> column.list).map(column -> column.name).collect(Collectors.toSet());
+        if (config.outputs.stream().anyMatch(column -> column.list)) {
+            throw new IllegalArgumentException(where + ": <list> only applies to inputs");
+        }
+        return new DecisionTable(tableName, config.hitPolicy, config.aggregation, inputs, outputs, rules, false, lists);
     }
 
     private static void checkSpreadsheetConfig(TableConfig config, String where) {

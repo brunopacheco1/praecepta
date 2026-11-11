@@ -60,6 +60,7 @@ class DmnRoundTripPropertiesTest {
 
         Assertions.assertThat(DmnWriter.write(read)).as("writing is stable").isEqualTo(xml);
         Assertions.assertThat(read.hitPolicy()).isEqualTo(policy);
+        Assertions.assertThat(read.listInputs()).as("list inputs").isEqualTo(s.lists());
         Assertions.assertThat(read.inputs()).extracting(DecisionTable.InputColumn::name, DecisionTable.InputColumn::type)
                 .containsExactlyElementsOf(original.inputs().stream()
                         .map(input -> Assertions.tuple(input.name(), input.type())).toList());
@@ -100,6 +101,6 @@ class DmnRoundTripPropertiesTest {
         }
         // a string output, which takes the value of any input it names
         outputs.add(new DecisionTable.OutputColumn(DecisionTableScenario.ECHO, ColumnType.STRING));
-        return new DecisionTable("round_trip", policy, null, inputs, outputs, rules, s.feelCells());
+        return new DecisionTable("round_trip", policy, null, inputs, outputs, rules, s.feelCells(), s.lists());
     }
 }

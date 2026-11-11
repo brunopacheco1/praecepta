@@ -29,7 +29,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
  * {@code LocalDateTime} or {@code ZonedDateTime} (see {@link TimeZones}), {@code Duration} or
  * {@code Period}), and one per other input the cells compare with;
  * a string column with a value list gets a nested enum,
- * bound to the engine's int-coded path;</li>
+ * bound to the engine's int-coded path, and an input that holds lists a {@code java.util.List} of its type;</li>
  * <li>{@code DiscountOutput}: a record with one component per output column;</li>
  * <li>{@code Discount}: loads {@code Discount.dmn} from the classpath once and evaluates it.</li>
  * </ul>
@@ -240,7 +240,8 @@ final class SourceGenerator {
         this.inputs = new ArrayList<>();
         for (int c = 0; c < inputColumns.size(); c++) {
             var column = inputColumns.get(c);
-            inputs.add(InputField.of(column, inputMembers.get(c), zoned.inputs().contains(column.name())));
+            inputs.add(InputField.of(column, inputMembers.get(c), zoned.inputs().contains(column.name()),
+                    table.listInputs().contains(column.name())));
         }
     }
 
@@ -343,6 +344,13 @@ final class SourceGenerator {
     private String inputBinding(InputField input) {
         var column = stringLiteral(input.column().name());
         var getter = inputType + "::" + input.member();
+        if (input.list()) {
+            var type = input.column().type();
+            return type == ColumnType.STRING
+                    ? BINDING_LINE + ".listInput(%s, %s)".formatted(column, getter)
+                    : BINDING_LINE + ".listInput(%s, io.github.brunopacheco1.praecepta.engine.beans.ColumnType.%s, %s)"
+                            .formatted(column, type.name(), getter);
+        }
         if (!input.isEnum()) {
             return BINDING_LINE + ".%s(%s, %s)".formatted(input.converter().binding(), column, getter);
         }
@@ -433,13 +441,15 @@ final class SourceGenerator {
      * @param member     its component in the input record
      * @param enumName   for a string column with a value list, its nested enum; else null
      * @param enumValues the values of that enum's constants, in order; else empty
-     * @param zoned      for a time or date-time, whether its values have a time zone
+     * @param zoned      for a time or date-time, whether its values (a list's elements) have a time zone
+     * @param list       whether it holds lists, a {@code java.util.List} component (of strings, even with a value list)
      */
-    private record InputField(InputColumn column, String member, String enumName, List<String> enumValues, boolean zoned) {
+    private record InputField(InputColumn column, String member, String enumName, List<String> enumValues, boolean zoned,
+            boolean list) {
 
-        static InputField of(InputColumn column, String member, boolean zoned) {
-            var values = valueListOf(column);
-            return new InputField(column, member, values.isEmpty() ? null : JavaNames.type(column.name()), values, zoned);
+        static InputField of(InputColumn column, String member, boolean zoned, boolean list) {
+            var values = list ? List.<String>of() : valueListOf(column);
+            return new InputField(column, member, values.isEmpty() ? null : JavaNames.type(column.name()), values, zoned, list);
         }
 
         Converter converter() {
@@ -467,6 +477,9 @@ final class SourceGenerator {
         }
 
         String javaType() {
+            if (list) {
+                return "java.util.List<" + converter().javaType() + ">";
+            }
             return isEnum() ? enumName : converter().javaType();
         }
     }

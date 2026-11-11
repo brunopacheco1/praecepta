@@ -65,6 +65,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  *
  * <p>A STRING column bound to an enum precomputes one mask per constant, so its lookup is an array
  * access by ordinal instead of a hash lookup (the int-coded input path).
+ *
+ * <p>A column that holds lists ({@link #ofLists}) delegates its lookup to a {@link ListColumn}, which
+ * classifies each element with an index of the kinds above; to the static analysis it is a single
+ * class, "any list".
  */
 final class ColumnIndex {
 
@@ -104,6 +108,8 @@ final class ColumnIndex {
     private final long[][] ordinalMasks;
     /** Enum-bound STRING column: each constant's value, by ordinal; null otherwise. */
     private final String[] enumValues;
+    /** A column whose values are lists: how they match; null for a column of single values. */
+    private final ListColumn lists;
 
     /**
      * @param zoning     for a TIME or DATE_TIME column, whether its inputs come with a time zone, without
@@ -118,6 +124,7 @@ final class ColumnIndex {
         this.isString = type == ColumnType.STRING;
         this.temporal = type == ColumnType.TIME || type == ColumnType.DATE_TIME;
         this.hasAllowedValues = allowedValues != null;
+        this.lists = null;
 
         var partition = new ArrayList<ValueClass>();
         Map<String, Integer> stringClasses;
@@ -161,6 +168,62 @@ final class ColumnIndex {
         nullMask = masks[nullClass];
         ordinalMasks = enumValues == null ? null : masksByOrdinal(enumValues);
         this.enumValues = enumValues == null ? null : enumValues.clone();
+    }
+
+    /**
+     * A column whose values are lists of {@code type} (see {@link ListColumn}); {@code allowedValues}
+     * apply to the elements. Its cells test elements, so the classes of single values say nothing about
+     * which lists a rule matches: to the static analysis the column has one class, "any list", accepted
+     * by every rule, and the engine leaves the rules that constrain it out of the analysis.
+     */
+    static ColumnIndex ofLists(String name, ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues, int words,
+            Zoning zoning) {
+        var elements = new ColumnIndex(name, type, cellsByBit, allowedValues, words, zoning, null);
+        return new ColumnIndex(name, type, new ListColumn(name, type, elements, cellsByBit, words), cellsByBit.size(), words);
+    }
+
+    private ColumnIndex(String name, ColumnType type, ListColumn lists, int rules, int words) {
+        this.name = name;
+        this.type = type;
+        this.lists = lists;
+        isString = false;
+        temporal = false;
+        hasAllowedValues = false;
+        stringMasks = null;
+        otherMask = null;
+        disallowedStrings = null;
+        localLine = null;
+        zonedLine = null;
+        classes = List.of(new ValueClass.AnyList(), new ValueClass.Missing());
+        nullClass = 1;
+        var all = new long[words];
+        for (int bit = 0; bit < rules; bit++) {
+            BitsetIndex.set(all, bit);
+        }
+        masks = new long[][] {all, all.clone()};
+        empty = new boolean[2];
+        allowed = new boolean[] {true, true};
+        nullMask = masks[nullClass];
+        ordinalMasks = null;
+        enumValues = null;
+    }
+
+    /** Whether the column holds lists. */
+    boolean holdsLists() {
+        return lists != null;
+    }
+
+    /** A column that holds lists: the rules whose cell is {@code -}, which accept every list. */
+    long[] rulesAcceptingAnyList() {
+        return lists.anyRules();
+    }
+
+    /**
+     * Whether a value can be rejected even when no rule is left to match it: the column declares its
+     * input values, parses its values (all but STRING), or holds lists, whose elements must be values.
+     */
+    boolean checksValues() {
+        return hasAllowedValues || type != ColumnType.STRING || lists != null;
     }
 
     // ---- building the classes ---------------------------------------------------------------------
@@ -328,6 +391,9 @@ final class ColumnIndex {
      *                               is not a valid value of the column's type
      */
     long[] maskFor(Object raw) {
+        if (lists != null) {
+            return lists.maskFor(raw);
+        }
         if (isString) {
             if (ordinalMasks != null) {
                 // int-coded path: enum constants were checked against the declared values when built
@@ -409,6 +475,9 @@ final class ColumnIndex {
      * by {@link #maskFor}, when the input was matched.
      */
     Object value(Object raw) {
+        if (lists != null) {
+            return lists.values(raw);
+        }
         if (!isString) {
             return convert(raw);
         }
@@ -449,7 +518,8 @@ final class ColumnIndex {
         // and a years and months duration is bound as a Period
         return switch (type) {
             case NUMBER -> number((Number) raw);
-            case YEAR_MONTH_DURATION -> yearsAndMonths((Period) raw);
+            // a list's elements read from text are already years and months
+            case YEAR_MONTH_DURATION -> raw instanceof YearsAndMonths duration ? duration : yearsAndMonths((Period) raw);
             default -> raw;
         };
     }
@@ -518,6 +588,7 @@ final class ColumnIndex {
             case ValueClass.Point(var value) -> FeelLiterals.literal(value);
             case ValueClass.Between between -> interval(valueClass, valueClass);
             case ValueClass.OtherString other -> "any other value";
+            case ValueClass.AnyList list -> "any list";
             case ValueClass.Missing missing -> "null";
         };
     }
@@ -619,6 +690,7 @@ final class ColumnIndex {
             case ValueClass.Point(var value) -> bindable(value);
             case ValueClass.Between(var low, var high, var zoned) -> bindable(OpenIntervals.valueInside(type, low, high, zoned));
             case ValueClass.OtherString other -> null;
+            case ValueClass.AnyList list -> List.of();
             case ValueClass.Missing missing -> null;
         };
     }
@@ -703,6 +775,7 @@ final class ColumnIndex {
             case ValueClass.Point(var value) -> FeelTemporals.hasZone(value);
             case ValueClass.Between between -> between.zoned();
             case ValueClass.OtherString other -> false;
+            case ValueClass.AnyList anyList -> false;
             case ValueClass.Missing missing -> false;
         };
         return literal == null || FeelTemporals.hasZone(literal) == zonedClass;
@@ -742,6 +815,10 @@ final class ColumnIndex {
 
         /** STRING: every value not written in the rules or declared. */
         record OtherString() implements ValueClass {
+        }
+
+        /** A column that holds lists, to the static analysis: every list that is not missing. */
+        record AnyList() implements ValueClass {
         }
 
         record Missing() implements ValueClass {

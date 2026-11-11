@@ -132,6 +132,39 @@ class TableCompilerTest {
     }
 
     @Test
+    void list_columns_become_lists_matched_element_by_element() throws Exception {
+        var config = new TableConfig(table("nationalities.csv"), "Offer", null, HitPolicy.FIRST, null,
+                List.of(ColumnConfig.listInput("nationalities", ColumnType.STRING, "\"PT\",\"ES\",\"BR\""),
+                        ColumnConfig.listInput("ages", ColumnType.NUMBER, null)),
+                List.of(new ColumnConfig("offer", ColumnType.STRING, null, List.of())));
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+
+        Assertions.assertThat(result.sources().get("OfferInput"))
+                .contains("public record OfferInput(java.util.List<String> nationalities, java.util.List<java.math.BigDecimal> ages)");
+        Assertions.assertThat(result.sources().get("Offer"))
+                .contains(".listInput(\"nationalities\", OfferInput::nationalities)",
+                        ".listInput(\"ages\", io.github.brunopacheco1.praecepta.engine.beans.ColumnType.NUMBER, OfferInput::ages)");
+        Assertions.assertThat(result.dmn()).contains("list contains(?, \"PT\") or list contains(?, \"ES\")", "isCollection=\"true\"");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".OfferInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Offer").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(List.of("BR", "ES"), List.of())))
+                    .get().hasToString("OfferOutput[offer=iberian]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(List.of("BR"), List.of(new BigDecimal(70)))))
+                    .get().hasToString("OfferOutput[offer=senior]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(null, null)))
+                    .get().hasToString("OfferOutput[offer=standard]");
+            // the value list applies to the elements
+            var unknown = constructor.newInstance(List.of("FR"), null);
+            Assertions.assertThatThrownBy(() -> evaluate.invoke(null, unknown))
+                    .isInstanceOf(InvocationTargetException.class)
+                    .cause().hasMessageContaining("nationalities=FR");
+        }
+    }
+
+    @Test
     void duration_columns_become_durations_and_periods() throws Exception {
         var config = new TableConfig(table("waits.csv"), "Wait", null, HitPolicy.FIRST, null,
                 List.of(new ColumnConfig("delay", ColumnType.DAY_TIME_DURATION, null, List.of()),
