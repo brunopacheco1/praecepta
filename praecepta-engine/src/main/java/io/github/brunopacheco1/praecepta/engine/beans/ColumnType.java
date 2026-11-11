@@ -12,7 +12,7 @@ public enum ColumnType {
     /**
      * Text, compared exactly. Cells: literals ({@code "PT"} or legacy {@code PT}), lists, {@code not(...)},
      * and comparisons and intervals ({@code < "N"}, {@code ["A".."M"]}), which order strings as
-     * {@link String#compareTo} does (character by character, by UTF-16 code unit).
+     * FEEL does: character by character, by Unicode code point (see {@code FeelStrings#compare}).
      */
     STRING,
     /** Decimal numbers, compared by value ({@code 1.0} equals {@code 1}). Cells add comparisons and intervals. */

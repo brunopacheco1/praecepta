@@ -8,12 +8,39 @@ package io.github.brunopacheco1.praecepta.engine.feel;
 import java.util.function.Function;
 
 /**
- * FEEL strings: their escape sequences, read the same way in cells ({@link CellParser}) and output
- * expressions ({@link ExpressionParser}), and written back by {@link FeelLiterals#literal}.
+ * FEEL strings: their order, by character, and their escape sequences, read the same way in cells
+ * ({@link CellParser}) and output expressions ({@link OutputExpression}), and written back by
+ * {@link FeelLiterals#literal}.
+ *
+ * <p>A FEEL string is a sequence of Unicode characters, that is of code points (DMN 1.5, 10.3.2.3.2), and
+ * strings are ordered lexicographically by character (Table 54). Java's {@link String#compareTo} orders
+ * them by UTF-16 code unit instead, which differs where a character beyond U+FFFF, written as two
+ * surrogates (U+D800 to U+DFFF), meets one from U+E000 to U+FFFF: {@code "🐎"} (U+1F40E) comes after
+ * {@code "～"} (U+FF5E) by character, but before it by code unit.
  */
-final class FeelStrings {
+public final class FeelStrings {
 
     private FeelStrings() {
+    }
+
+    /**
+     * Orders two strings as FEEL does: lexicographically by code point, so a string comes before every
+     * longer string it starts. An unpaired surrogate counts as the code point of its value.
+     *
+     * @return a negative number, zero or a positive number as {@code a} is before, equal to or after {@code b}
+     */
+    public static int compare(String a, String b) {
+        int length = Math.min(a.length(), b.length());
+        int i = 0;
+        while (i < length) {
+            int x = a.codePointAt(i);
+            int y = b.codePointAt(i);
+            if (x != y) {
+                return Integer.compare(x, y);
+            }
+            i += Character.charCount(x);
+        }
+        return Integer.compare(a.length() - i, b.length() - i);
     }
 
     /**

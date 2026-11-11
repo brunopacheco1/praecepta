@@ -377,6 +377,24 @@ class PraeceptaEngineBehaviourTest {
             Assertions.assertThat(engine.evaluate(Map.of("country", "a\\tb"))).containsExactly("BACKSLASH");
         }
 
+        /** DMN 1.5, Table 54: strings are ordered by character, a code point, so U+1F40E comes after U+FF5E (#83). */
+        @Test
+        void comparisons_order_strings_by_code_point() {
+            var engine = byColumn(HitPolicy.FIRST, rule(1, Map.of("country", "< \"～\""), "BEFORE"),
+                    rule(2, Map.of("country", "> \"～\""), "AFTER")).build();
+            Assertions.assertThat(engine.evaluate(Map.of("country", "🐎"))).containsExactly("AFTER");
+            Assertions.assertThat(engine.evaluate(Map.of("country", "z"))).containsExactly("BEFORE");
+            // an interval from U+FF5E to U+1F40E is in order, and holds U+FFFF
+            var interval = byColumn(HitPolicy.FIRST, rule(1, Map.of("country", "[\"～\"..\"🐎\"]"), "IN")).build();
+            Assertions.assertThat(interval.evaluate(Map.of("country", String.valueOf((char) 0xFFFF)))).containsExactly("IN");
+            Assertions.assertThat(interval.evaluate(Map.of("country", "🐎"))).containsExactly("IN");
+            Assertions.assertThat(interval.evaluate(Map.of("country", "😀"))).isEmpty();
+            var backwards = byColumn(HitPolicy.FIRST, rule(2, Map.of("country", "[\"🐎\"..\"～\"]"), "IN"));
+            Assertions.assertThatThrownBy(backwards::build)
+                    .isExactlyInstanceOf(InvalidDecisionTableException.class)
+                    .hasMessageContaining("interval starts after it ends");
+        }
+
         @Test
         void a_quoted_cell_with_a_backslash_before_another_character_is_rejected() {
             var builder = byColumn(HitPolicy.FIRST, rule(4, Map.of("country", "\"P\\T\""), "A"));

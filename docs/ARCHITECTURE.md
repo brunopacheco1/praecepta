@@ -54,7 +54,8 @@ configuration keys, bean names, reports, failures) is in [INTEGRATIONS.md](INTEG
    - **Numbers, dates, times, date-times and durations:** the boundaries the rules mention split the
      line into intervals and points; lookup is a binary search, over `long` keys when the values have
      them (`PrimitiveKeys`: epoch days, nanoseconds, months, scaled numbers). A string column whose
-     cells compare (`< "N"`, `["A".."M"]`) is split the same way; a value the rules mention is
+     cells compare (`< "N"`, `["A".."M"]`) is split the same way, in FEEL's order by code point
+     (`FeelStrings.compare`, not `String.compareTo`, which orders by UTF-16 code unit); a value the rules mention is
      still found by hash, and only other values need the binary search. Booleans are the same with
      `false < true`, both always boundaries, so they get one class each.
    - **Times and date-times with a time zone** (`OffsetTime`, `ZonedDateTime`). FEEL compares two

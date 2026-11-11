@@ -868,8 +868,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     /**
      * FEEL's order (DMN 1.5, Table 54): times and date-times by the instant they denote, where one
-     * without a time zone "uses the timezone offset of the other input"; two without a zone, and values of
-     * the other types, by their natural order.
+     * without a time zone "uses the timezone offset of the other input"; two without a zone by their natural
+     * order; strings lexicographically by character, a Unicode code point (Table 54; 10.3.2.3.2), not by
+     * UTF-16 code unit as {@link String#compareTo} does; values of the other types by their natural order.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static int compare(Object a, Object b) {
@@ -880,6 +881,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             case ZonedDateTime moment -> moment.toInstant()
                     .compareTo(b instanceof LocalDateTime local ? local.toInstant(moment.getOffset()) : ((ZonedDateTime) b).toInstant());
             case LocalDateTime moment when b instanceof ZonedDateTime other -> moment.toInstant(other.getOffset()).compareTo(other.toInstant());
+            case String text -> Arrays.compare(text.codePoints().toArray(), ((String) b).codePoints().toArray());
             default -> ((Comparable) a).compareTo(b);
         };
     }

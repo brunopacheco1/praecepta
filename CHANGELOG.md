@@ -30,6 +30,8 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   reports as plain maps for management endpoints. The design shared by the integrations is in
   [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 - `DmnReader.readAll(InputStream)` reads every decision table of a DMN model, in document order.
+- `feel.FeelStrings.compare(String, String)`: FEEL's order of strings, by code point (see *Fixed*,
+  [#83](https://github.com/brunopacheco1/praecepta/issues/83)).
 
 ### Changed
 - The release publishes every module but the benchmarks and the TCK runner, found by the build rather
@@ -48,6 +50,14 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   needs its backslashes doubled (`"C:\\temp"`); unquoted words keep their backslashes. `FeelLiterals.literal`,
   and so `DmnWriter`, writes a line feed, a carriage return and a tab as `\n`, `\r` and `\t` (and the other
   vertical space, U+000B and U+000C, as code points), since a FEEL string literal may not hold a line break.
+- **Strings are ordered by character** ([#83](https://github.com/brunopacheco1/praecepta/issues/83)):
+  comparisons and intervals of strings (`< "N"`, `["A".."M"]`) used Java's `String.compareTo`, which
+  compares UTF-16 code units, while FEEL orders strings lexicographically by character, a Unicode code
+  point (DMN 1.5, Table 54 and 10.3.2.3.2). The two differ when a character beyond U+FFFF (an emoji, many
+  CJK ideographs), which UTF-16 writes as two surrogates, meets one from U+E000 to U+FFFF: the cell
+  `< "～"` (U+FF5E) matched `"🐎"` (U+1F40E), and `["～".."🐎"]` was rejected as starting after it ended.
+  The new `feel.FeelStrings.compare` orders strings by code point; the index, the validation report's
+  examples and `FeelTemporals.compare` use it. Other strings compare as before.
 
 ## [0.4.0] - 2026-11-11
 

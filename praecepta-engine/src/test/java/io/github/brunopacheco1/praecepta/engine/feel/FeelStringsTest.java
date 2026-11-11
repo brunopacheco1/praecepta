@@ -5,6 +5,7 @@
  */
 package io.github.brunopacheco1.praecepta.engine.feel;
 
+import java.util.Arrays;
 import java.util.List;
 
 import org.assertj.core.api.Assertions;
@@ -21,9 +22,44 @@ import net.jqwik.api.Provide;
 /**
  * String literals as FEEL reads and writes them (DMN 1.5, grammar rules 33, 62 and 64, and 10.3.1.1): every
  * way of escaping a character reads back as that character, in cells and in output expressions, and
- * {@link FeelLiterals#literal} writes a literal that holds no vertical space and reads back as the string.
+ * {@link FeelLiterals#literal} writes a literal that holds no vertical space and reads back as the string;
+ * and strings are ordered by code point (Table 54).
  */
 class FeelStringsTest {
+
+    /** DMN 1.5, Table 54 and 10.3.2.3.2: strings are ordered lexicographically by character, a Unicode code point. */
+    @Test
+    void strings_are_ordered_by_code_point_not_by_utf16_code_unit() {
+        var tilde = "～"; // U+FF5E
+        var horse = "🐎"; // U+1F40E, the code units U+D83D U+DC0E
+        Assertions.assertThat(horse.compareTo(tilde)).as("Java's order").isNegative();
+        Assertions.assertThat(FeelStrings.compare(horse, tilde)).isPositive();
+        Assertions.assertThat(FeelStrings.compare(tilde, horse)).isNegative();
+        Assertions.assertThat(FeelStrings.compare(String.valueOf((char) 0xE000), horse)).isNegative();
+        Assertions.assertThat(FeelStrings.compare("a" + horse, "a" + tilde + "z")).isPositive();
+        // otherwise as Java orders strings: by character, a prefix first, case-sensitively
+        Assertions.assertThat(FeelStrings.compare(horse, horse)).isZero();
+        Assertions.assertThat(FeelStrings.compare("ab", "abc")).isNegative();
+        Assertions.assertThat(FeelStrings.compare(horse, horse + "a")).isNegative();
+        Assertions.assertThat(FeelStrings.compare("Zed", "apple")).isNegative();
+        Assertions.assertThat(FeelStrings.compare("", "")).isZero();
+        Assertions.assertThat(FeelTemporals.compare(horse, tilde)).as("FEEL's order of all values").isPositive();
+    }
+
+    @Provide
+    Arbitrary<String> anyStrings() {
+        return codePoints().map(points -> points.stream()
+                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append).toString());
+    }
+
+    /** The order is the lexicographic order of the strings' code points, written independently here. */
+    @Property(tries = 3000, edgeCases = EdgeCasesMode.MIXIN)
+    void the_order_of_strings_is_that_of_their_code_points(@ForAll("anyStrings") String a, @ForAll("anyStrings") String b) {
+        int expected = Integer.signum(Arrays.compare(a.codePoints().toArray(), b.codePoints().toArray()));
+        Assertions.assertThat(Integer.signum(FeelStrings.compare(a, b))).as("%s vs %s", a, b).isEqualTo(expected);
+        Assertions.assertThat(Integer.signum(FeelStrings.compare(b, a))).isEqualTo(-expected);
+        Assertions.assertThat(Integer.signum(FeelStrings.compare(a + b, a))).isEqualTo(b.isEmpty() ? 0 : 1);
+    }
 
     @Test
     void literals_escape_quotes_backslashes_and_the_characters_a_literal_may_not_hold() {

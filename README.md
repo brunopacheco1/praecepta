@@ -143,8 +143,10 @@ backslashes as they are. `DmnWriter` writes line breaks and tabs back as `\n`, `
 string literal may not hold a line break.
 
 Missing values follow FEEL: they fail comparisons and intervals, equal only `null`, and so satisfy
-`not("FR")`. Blank text counts as missing. Strings compare as Java's `String.compareTo` does,
-character by character and case-sensitively (`"Zed" < "apple"`). Where DMN 1.5 and its TCK leave a
+`not("FR")`. Blank text counts as missing. Strings compare as FEEL orders them, character by
+character by Unicode code point and case-sensitively (`"Zed" < "apple"`), so a character beyond U+FFFF,
+such as an emoji, comes after every other (`"🐎" > "～"`), where Java's `String.compareTo` would put it
+before U+E000 to U+FFFF. Where DMN 1.5 and its TCK leave a
 case open (`-` against a missing value, `=` between a time with a zone and one without), Praecepta's
 choice is recorded in [#86](https://github.com/brunopacheco1/praecepta/issues/86).
 

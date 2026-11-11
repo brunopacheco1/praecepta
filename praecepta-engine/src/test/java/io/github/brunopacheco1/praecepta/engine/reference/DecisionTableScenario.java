@@ -50,7 +50,8 @@ import net.jqwik.api.Tuple;
  * and legacy unquoted, with escape sequences, function and bare forms), lists, comparisons, intervals with every bracket
  * style, {@code not(...)} and {@code null}. String columns compare less often than the others, so
  * that both kinds of string column (with and without comparisons) are common, and string inputs
- * include values between and around the letters the cells mention. Values come from small domains, and dates are consecutive
+ * include values between and around the letters the cells mention, among them characters beyond U+FFFF and
+ * from U+E000 up, which FEEL orders by code point and UTF-16 would order otherwise. Values come from small domains, and dates are consecutive
  * days, so overlaps, boundaries and empty gaps between days are frequent; times and date-times step
  * by half an hour and twelve hours, and inputs fall on and between those steps (a zoned date-time input
  * now and then falls instead on either side of a daylight saving change, where a local time is skipped or
@@ -97,8 +98,14 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     private static final int MAX_RULES = 8;
     /** Rules of a {@link #wide()} scenario: enough for masks of up to four words. */
     private static final int MAX_WIDE_RULES = 200;
-    /** String values: a column's domain is the first two to four; comparisons and intervals use all six. */
-    private static final List<String> LETTERS = List.of("a", "b", "c", "d", "e", "f");
+    /**
+     * String values, in FEEL's order (by code point): a column's domain is the first two to four;
+     * comparisons and intervals use all six. The last two tell FEEL's order from UTF-16's: U+FF5E, and
+     * U+1F40E, which UTF-16 writes as two surrogates (U+D83D U+DC0E) and so puts before U+FF5E.
+     */
+    private static final List<String> LETTERS = List.of("a", "b", "c", "d", "～", "🐎");
+    /** A character from U+E000 up: after U+1F40E's first surrogate in UTF-16, before U+1F40E by code point. */
+    private static final String PRIVATE_USE = String.valueOf((char) 0xE000);
     /** The offsets times with a zone are written at. */
     private static final List<ZoneOffset> OFFSETS = List.of(ZoneOffset.UTC, ZoneOffset.ofHours(1), ZoneOffset.ofHours(-5),
             ZoneOffset.ofHoursMinutes(5, 30));
@@ -504,10 +511,15 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 if (blank) {
                     options.add(" ");
                 }
-                // around and between the letters, for comparisons: below "a", between "a" and "b", "e"
+                // around and between the letters, for comparisons: below "a", between "a" and "b", "e"; and
+                // the characters that FEEL's order by code point and UTF-16's order place differently
                 options.add("A");
                 options.add("ab");
                 options.add("e");
+                options.add(LETTERS.get(4));
+                options.add(LETTERS.get(5));
+                options.add(LETTERS.get(5) + "a");
+                options.add(PRIVATE_USE);
                 yield Arbitraries.of(options);
             }
             case NUMBER -> Arbitraries.integers().between(-2, 12).<Object>map(half -> BigDecimal.valueOf(half).divide(BigDecimal.TWO));
