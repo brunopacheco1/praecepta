@@ -107,9 +107,14 @@ mvn -Prelease clean package -pl praecepta-engine,praecepta-loader,praecepta-mave
 [Reproducible Central](https://github.com/jvm-repo-rebuild/reproducible-central) rebuilds releases
 independently and compares them with Maven Central. Its `.buildspec` for a release uses the same
 command and replaces the version with
-`execBefore="perl -pi -e 's|<version>X.Y.Z-SNAPSHOT</version>|<version>X.Y.Z</version>|' pom.xml */pom.xml"`.
-0.2.0 is the exception: its workflow still stamped the time of the release run, so its `.buildspec`
-also sets `project.build.outputTimestamp` to `2026-11-08T20:08:06Z`.
+`execBefore="perl -pi -e 's|<version>${version}-SNAPSHOT</version>|<version>${version}</version>|' pom.xml */pom.xml"`,
+where `${version}` is the buildspec's own `version=`. Written that way, the buildspec does not name
+its release, so Reproducible Central's tooling can add the next release on its own: it notices new
+versions on Maven Central and copies the previous buildspec, changing only `version=` (and `jdk=` if
+the jars name another JDK). Nothing needs doing per release unless the rebuild command changes; a
+pull request adding `praecepta-X.Y.Z.buildspec` there only makes it sooner. 0.2.0 is the exception:
+its workflow still stamped the time of the release run, so its `.buildspec` names 0.2.0 and also sets
+`project.build.outputTimestamp` to `2026-11-08T20:08:06Z`.
 
 If publishing fails after the tag is pushed, fix the cause, delete the tag (locally and with
 `git push origin :refs/tags/vX.Y.Z`), and tag again. Maven Central never accepts the same version
