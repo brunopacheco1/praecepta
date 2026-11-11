@@ -11,10 +11,12 @@ import java.util.Optional;
 
 /**
  * A parsed table cell: the subset of DMN FEEL "simple unary tests" Praecepta supports. Every test
- * looks at a single column value, which is what lets rules be indexed with bitmasks.
+ * looks at a single column value, which is what lets rules be indexed with bitmasks; a test that
+ * compares with another input ({@link Name}, strict FEEL only) is decided when evaluating instead.
  *
- * <p>Values are {@code String}, {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime} or
- * {@code LocalDateTime}, depending on the column type.
+ * <p>Values are {@code String}, {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime},
+ * {@code LocalDateTime}, {@code Duration} or {@link YearsAndMonths}, depending on the column type, or a
+ * {@link Name}.
  *
  * <p>A missing (null) value follows FEEL's three-valued logic: {@code null} is true for it, a literal is
  * false, and a comparison or an interval is unknown, which is neither a match nor a mismatch.

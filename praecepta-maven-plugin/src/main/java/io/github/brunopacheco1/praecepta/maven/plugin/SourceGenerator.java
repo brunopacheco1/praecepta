@@ -25,7 +25,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
  * Generates, for a table {@code Discount}:
  * <ul>
  * <li>{@code DiscountInput}: a record with one component per input column ({@code String},
- * {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime} or {@code LocalDateTime});
+ * {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime}, {@code LocalDateTime},
+ * {@code Duration} or {@code Period}), and one per other input the cells compare with;
  * a string column with a value list gets a nested enum,
  * bound to the engine's int-coded path;</li>
  * <li>{@code DiscountOutput}: a record with one component per output column;</li>

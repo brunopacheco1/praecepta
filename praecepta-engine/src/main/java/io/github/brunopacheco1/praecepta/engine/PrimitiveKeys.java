@@ -44,6 +44,9 @@ final class PrimitiveKeys {
 
     /** The keys of an ordered column's boundaries, or null if its type has none or a boundary does not fit. */
     static PrimitiveKeys of(ColumnType type, Comparable<?>[] boundaries) {
+        if (type == ColumnType.STRING || type == ColumnType.BOOLEAN) {
+            return null;
+        }
         int scale = 0;
         if (type == ColumnType.NUMBER) {
             for (var boundary : boundaries) {
@@ -59,7 +62,7 @@ final class PrimitiveKeys {
                 keys[i] = switch (type) {
                     case NUMBER -> ((BigDecimal) boundaries[i]).setScale(scale).unscaledValue().longValueExact();
                     case DATE, TIME, DATE_TIME, DAY_TIME_DURATION, YEAR_MONTH_DURATION -> key(boundaries[i]);
-                    case STRING, BOOLEAN -> throw new ArithmeticException("no key");
+                    case STRING, BOOLEAN -> throw new IllegalStateException("no keys for " + type);
                 };
             }
         } catch (ArithmeticException e) {
@@ -94,8 +97,7 @@ final class PrimitiveKeys {
     }
 
     private int exact(long key) {
-        int found = Arrays.binarySearch(keys, key);
-        return found >= 0 ? 2 * found + 1 : 2 * (-found - 1);
+        return ColumnIndex.classOfSearch(Arrays.binarySearch(keys, key));
     }
 
     /** A value strictly between {@code key} and the next key. */

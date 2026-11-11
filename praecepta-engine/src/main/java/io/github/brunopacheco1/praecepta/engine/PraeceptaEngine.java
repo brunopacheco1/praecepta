@@ -78,7 +78,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  *
  * <p>Instances are immutable and safe to share between threads. Outputs are converted once, when the
  * engine is built, and the same instances are returned by every evaluation, so output types should be
- * immutable. Matching uses one bitmask per column value, so memory grows linearly with the table.
+ * immutable; only a rule whose output names an input has its output converted again, into a new
+ * instance, on every evaluation. Matching uses one bitmask per class of column values (the values the
+ * rules cannot tell apart), so memory grows linearly with the table.
  *
  * @param <I> the input type
  * @param <O> the output type
@@ -134,7 +136,7 @@ public final class PraeceptaEngine<I, O> {
         var types = columnTypes(builder, rules);
         var cells = parseCells(rules, types, builder.feelCells);
         // cells that compare with another input are decided when evaluating; the index sees "any value"
-        var variableCells = variableCells(rules, types, cells, builder.inputStrategy != null);
+        var variableCells = takeVariableCells(rules, types, cells, builder.inputStrategy != null);
         var allowedValues = allowedValues(builder, types.keySet());
         inputs = List.copyOf(types.keySet());
         var evaluationOrder = orderByWildcards(inputs, cells);
@@ -172,7 +174,7 @@ public final class PraeceptaEngine<I, O> {
                 outputByBit[bit] = output;
                 singleByBit[bit] = List.of(output);
             } else {
-                namedInputsByBit[bit] = namedInputs(rule, evaluationOrder, builder.outputPriority.keySet());
+                namedInputsByBit[bit] = namedInputs(rule, evaluationOrder);
                 anyNamed = true;
             }
         }
@@ -183,12 +185,7 @@ public final class PraeceptaEngine<I, O> {
         count = builder.aggregation == AggregationOperator.COUNT ? builder.outputStrategy::count : null;
         noMatch = count == null ? List.of() : List.of(count.apply(0));
         variableCellsByBit = variableCellsByBit(variableCells, bitToRule, evaluationOrder);
-        variableRules = new long[words];
-        for (int bit = 0; bit < ruleCount; bit++) {
-            if (variableCellsByBit[bit] != null) {
-                BitsetIndex.set(variableRules, bit);
-            }
-        }
+        variableRules = variableRules(variableCellsByBit, words);
         hasVariableCells = !BitsetIndex.isEmpty(variableRules);
         report = validate(index, rules, hitPolicy, variableRules, builder.failOn);
     }
@@ -219,10 +216,7 @@ public final class PraeceptaEngine<I, O> {
     @SuppressWarnings("unchecked")
     private <T> List<O> evaluate(T input, BitsetIndex.ColumnReader<T> reader) {
         long[] matches = index.match(input, reader);
-        if (matches.length != 0 && hasVariableCells && !keepVariableMatches(matches, input, reader)) {
-            return noMatch;
-        }
-        if (matches.length == 0) {
+        if (matches.length == 0 || hasVariableCells && !keepVariableMatches(matches, input, reader)) {
             return noMatch;
         }
         // the lowest set bit is the first matching rule in rule order, or the highest-priority one
@@ -271,7 +265,8 @@ public final class PraeceptaEngine<I, O> {
     /**
      * Input column names: the bound columns in the order they were bound or, with an {@link InputStrategy},
      * the table's columns, then the other columns the rules test (in alphabetical order), then any other
-     * columns named by input value lists and column types (in the order they were declared).
+     * columns named by input value lists and column types (in the order they were declared), then the
+     * inputs that cells compare with and that are not columns (in the order first named).
      */
     public List<String> inputs() {
         return inputs;
@@ -296,8 +291,12 @@ public final class PraeceptaEngine<I, O> {
      * returns them by rule (index in rule order) and column. Each named input becomes an input of the
      * engine: bound by its own getter, or with map-based inputs, read with the type of the column that
      * names it.
+     *
+     * @param types column types; named inputs that are not columns yet are added, so callers must read
+     *              the inputs from it only after this call
+     * @param cells cells by column; changed in place, and given an all-"any" column for each added input
      */
-    private static Map<Integer, Map<String, UnaryTests>> variableCells(List<Praeceptum> rules, Map<String, ColumnType> types,
+    private static Map<Integer, Map<String, UnaryTests>> takeVariableCells(List<Praeceptum> rules, Map<String, ColumnType> types,
             Map<String, List<UnaryTests>> cells, boolean mapInputs) {
         var byRule = new LinkedHashMap<Integer, Map<String, UnaryTests>>();
         var named = new LinkedHashMap<String, ColumnType>();
@@ -363,6 +362,17 @@ public final class PraeceptaEngine<I, O> {
         return byBit;
     }
 
+    /** The rules with cells that compare with another input, as a mask. */
+    private static long[] variableRules(VariableCell[][] variableCellsByBit, int words) {
+        var mask = new long[words];
+        for (int bit = 0; bit < variableCellsByBit.length; bit++) {
+            if (variableCellsByBit[bit] != null) {
+                BitsetIndex.set(mask, bit);
+            }
+        }
+        return mask;
+    }
+
     /**
      * Clears the matches whose cells that compare with other inputs fail for this input.
      *
@@ -373,7 +383,7 @@ public final class PraeceptaEngine<I, O> {
         for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
             var cells = variableCellsByBit[bit];
             if (cells != null && !acceptsAll(cells, input, reader)) {
-                matches[bit >>> 6] &= ~(1L << bit);
+                BitsetIndex.clear(matches, bit);
             } else {
                 any = true;
             }
@@ -418,7 +428,7 @@ public final class PraeceptaEngine<I, O> {
      * The outputs of {@code rule} that name an input, checked: each names an input column, and none is
      * in an output priority list, where its place cannot be known before evaluation.
      */
-    private static NamedInputs namedInputs(Praeceptum rule, List<String> evaluationOrder, Set<String> prioritised) {
+    private static NamedInputs namedInputs(Praeceptum rule, List<String> evaluationOrder) {
         var references = rule.output().references();
         var outputs = new String[references.size()];
         var columns = new int[references.size()];
@@ -428,10 +438,6 @@ public final class PraeceptaEngine<I, O> {
             if (column < 0) {
                 throw new InvalidDecisionTableException("Rule %s: output '%s' names '%s', which is not an input column %s"
                         .formatted(rule.priority(), reference.getKey(), reference.getValue(), evaluationOrder));
-            }
-            if (prioritised.contains(reference.getKey())) {
-                throw new InvalidDecisionTableException("Rule %s: output '%s' names input '%s', so it has no place in its priority list"
-                        .formatted(rule.priority(), reference.getKey(), reference.getValue()));
             }
             outputs[i] = reference.getKey();
             columns[i++] = column;
@@ -450,8 +456,7 @@ public final class PraeceptaEngine<I, O> {
         var named = namedInputsByBit[bit];
         var values = new HashMap<>(named.values);
         for (int i = 0; i < named.outputs.length; i++) {
-            int column = named.columns[i];
-            var value = index.column(column).value(reader.read(input, column));
+            var value = valueOf(named.columns[i], input, reader);
             values.put(named.outputs[i], value == null ? null : FeelLiterals.text(value));
         }
         return new PraeceptaOutput(values);

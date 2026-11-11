@@ -53,8 +53,8 @@ rejects it), or the inputs are of a kind it does not take.
 | [compliance-level-3/0004-lending](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0004-lending) | 0 | 0 | 1 | inputs computed by other decisions (decision requirement graphs, #14) |
 | [compliance-level-3/0008-listGen](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0008-listGen) | 2 | 0 | 0 |  |
 | [compliance-level-3/0017-tableTests](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0017-tableTests) | 4 | 0 | 0 |  |
-| [compliance-level-3/0036-dt-variable-input](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0036-dt-variable-input) | 21 | 0 | 3 | times and date-times with a time zone |
-| [compliance-level-3/0039-dt-list-semantics](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0039-dt-list-semantics) | 0 | 0 | 2 | output entries that are expressions (#53) |
+| [compliance-level-3/0036-dt-variable-input](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0036-dt-variable-input) | 21 | 0 | 3 | times and date-times with a time zone (#70) |
+| [compliance-level-3/0039-dt-list-semantics](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0039-dt-list-semantics) | 0 | 0 | 2 | output entries that are expressions (#71) |
 | [compliance-level-3/0087-chapter-11-example](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0087-chapter-11-example) | 0 | 0 | 2 | inputs computed by other decisions (decision requirement graphs, #14) |
 
 ## Not supported
@@ -64,5 +64,5 @@ What the unsupported checks need, by number of checks:
 | Feature | Checks |
 |---|---:|
 | inputs computed by other decisions (decision requirement graphs, #14) | 3 |
-| times and date-times with a time zone | 3 |
-| output entries that are expressions (#53) | 2 |
+| times and date-times with a time zone (#70) | 3 |
+| output entries that are expressions (#71) | 2 |

@@ -34,7 +34,9 @@ import io.github.brunopacheco1.praecepta.loader.excel.ExcelLoader;
 final class TableCompiler {
 
     /**
+     * @param table      the table as loaded
      * @param className  simple name of the generated decision class
+     * @param report     the engine's static analysis of the table
      * @param dmn        the table as DMN, to ship as {@code <className>.dmn} next to the classes
      * @param sources    generated Java sources by simple class name
      */

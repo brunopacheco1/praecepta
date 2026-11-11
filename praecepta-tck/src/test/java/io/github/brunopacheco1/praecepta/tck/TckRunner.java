@@ -158,7 +158,7 @@ final class TckRunner {
                  "duration", "dayTimeDuration", "yearMonthDuration" -> simple.text();
             case "time", "dateTime" -> {
                 if (ZONED.matcher(simple.text().strip()).matches()) {
-                    throw new Unsupported("times and date-times with a time zone");
+                    throw new Unsupported("times and date-times with a time zone (#70)");
                 }
                 yield simple.text();
             }
@@ -243,12 +243,6 @@ final class TckRunner {
     private static final Pattern ZONED = Pattern.compile(".*\\d([Zz]|[+-]\\d{2}:?\\d{2}|@.+)");
     private static final Pattern AGGREGATION = Pattern.compile("aggregation '([^']*)' is not supported");
     private static final Pattern EXPRESSION = Pattern.compile("input expression '([^']*)' is not supported");
-    /**
-     * A cell naming a variable where a literal is expected, e.g. {@code > otherDate},
-     * {@code Complex.aString} or {@code < Another number}.
-     */
-    private static final Pattern REFERENCE = Pattern.compile(
-            "'[\\p{L}_?][\\p{L}\\p{N}_?. ]*' (is a FEEL name|is not a (number|date|boolean|time|date and time|days and time duration|years and months duration))");
 
     /**
      * Reader messages recognised by a fixed phrase, and the feature each one names. They are tried in
@@ -257,8 +251,8 @@ final class TckRunner {
     private static final List<Map.Entry<String, String>> PHRASES = List.of(
             Map.entry("is a structured item definition", "columns of a structured type"),
             Map.entry("is a collection", "list inputs (#25)"),
-            Map.entry("has a time zone", "times and date-times with a time zone"),
-            Map.entry("output entries must be literals", "output entries that are expressions (#53)"));
+            Map.entry("has a time zone", "times and date-times with a time zone (#70)"),
+            Map.entry("output entries must be literals", "output entries that are expressions (#71)"));
 
     /**
      * A short, stable name for what {@link DmnReader} rejected, used to group results. A message that
@@ -275,9 +269,6 @@ final class TckRunner {
         }
         if (EXPRESSION.matcher(message).find()) {
             return "input expressions other than a variable name";
-        }
-        if (REFERENCE.matcher(message).find()) {
-            return "cells that compare with another input (#51)";
         }
         for (var phrase : PHRASES) {
             if (message.contains(phrase.getKey())) {

@@ -102,7 +102,7 @@ public final class CellParser {
 
     /**
      * Parses a cell in Praecepta's syntax, as Excel, CSV and code tables write it: FEEL simple unary
-     * tests, plus unquoted words as string literals and bare ISO dates and times.
+     * tests, plus unquoted words as string literals and bare ISO dates, times and durations.
      *
      * @throws CellSyntaxException if the cell is not valid for the column type
      */
@@ -235,7 +235,7 @@ public final class CellParser {
                 return quoted(text);
             }
             if (strictFeel) {
-                throw new CellSyntaxException(cell, "'" + text + "' is a FEEL name (a variable), which is not supported; quote string literals");
+                throw new CellSyntaxException(cell, "'" + text + "' is not a string literal; quote it");
             }
             if (hasFeelSyntax(text)) {
                 throw new CellSyntaxException(cell, "unexpected characters in '" + text + "'; quote the text");

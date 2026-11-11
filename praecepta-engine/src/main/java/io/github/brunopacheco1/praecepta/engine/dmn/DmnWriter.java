@@ -34,7 +34,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 /**
  * Writes a {@link DecisionTable} as a DMN 1.3 model with one decision. Cells are parsed and written
  * back as standard FEEL (quoted strings, plain numbers, {@code date("...")}, {@code time("...")},
- * {@code date and time("...")}, {@code true} / {@code false}), so tables written in
+ * {@code date and time("...")}, {@code duration("...")}, {@code true} / {@code false}), so tables written in
  * Praecepta's shorter syntax ({@code PT,ES}) become portable. Each input also gets an
  * {@code inputData} element, which Drools needs to bind input values.
  *

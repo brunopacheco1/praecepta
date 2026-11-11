@@ -145,6 +145,10 @@ final class BitsetIndex {
         mask[bit >>> 6] |= 1L << bit;
     }
 
+    static void clear(long[] mask, int bit) {
+        mask[bit >>> 6] &= ~(1L << bit);
+    }
+
     static boolean get(long[] mask, int bit) {
         return (mask[bit >>> 6] & (1L << bit)) != 0;
     }

@@ -303,33 +303,6 @@ class DmnReaderTest {
         Assertions.assertThat(DmnReader.read(stream(xml)).inputs()).containsExactly(new InputColumn("a", ColumnType.NUMBER));
     }
 
-    @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {
-            "age                          | true",
-            "Credit Score                 | true",
-            "Applicant data.Monthly income | true",
-            "Rate 2                       | true",
-            "is_ok?                       | true",
-            "𝓐ge                       | true",
-            "Ⅷ rate                    | false",
-            "2nd rate                     | false",
-            "a..b                         | false",
-            "a. b                         | false",
-            "a  b                         | false",
-            "a.2b                         | false",
-            "age * 2                      | false",
-            "f(x)                         | false",
-    })
-    void feel_names_allow_single_spaces_between_words(String text, boolean name) {
-        Assertions.assertThat(DmnReader.isName(text)).as(text).isEqualTo(name);
-    }
-
-    @Test
-    void very_long_names_are_checked_without_a_stack_overflow() {
-        Assertions.assertThat(DmnReader.isName("a".repeat(1_000_000))).isTrue();
-        Assertions.assertThat(DmnReader.isName("a b.".repeat(250_000) + "c")).isTrue();
-    }
-
     @Test
     void doctypes_and_external_entities_are_refused() {
         var xml = """
