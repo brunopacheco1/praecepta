@@ -52,6 +52,14 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   be loaded or has validation issues at `praecepta.fail-on` (`ERROR` by default); other issues are logged
   as warnings. With Actuator, the endpoint `praecepta` reports each decision's columns and validation
   issues. `praecepta.enabled=false` turns it off. Configuration metadata gives IDEs the keys.
+- **`praecepta-micronaut`** ([#77](https://github.com/brunopacheco1/praecepta/issues/77)): Micronaut 4
+  applications get their DMN decision tables as beans. At startup the module loads the files
+  `praecepta.locations` finds (`classpath*:rules/**/*.dmn` by default) into a `Decisions` bean and
+  registers one engine per decision, injected with `@Named("Discount")`. Unreadable or invalid tables,
+  and validation issues at `praecepta.fail-on` (`ERROR` by default), stop startup with every problem
+  listed; other issues are logged as warnings. With `micronaut-management`, the `praecepta` endpoint
+  reports every decision and its validation issues (`/praecepta`, `/praecepta/{name}`). Micronaut is
+  `provided`, and the module needs no reflection. `praecepta.enabled=false` turns it off.
 
 ### Changed
 - The release publishes every module but the benchmarks and the TCK runner, found by the build rather
