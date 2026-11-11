@@ -100,9 +100,14 @@ it was built with (in the jar manifests' `Build-Jdk-Spec`; 25 for the current wo
 
 ```bash
 git checkout vX.Y.Z
-mvn versions:set -DnewVersion=X.Y.Z -DgenerateBackupPoms=false -DprocessAllModules -DupdateBuildOutputTimestampPolicy=never
-mvn -Prelease clean package -pl praecepta-engine,praecepta-loader,praecepta-maven-plugin -am -DskipTests -Dinvoker.skip -Dgpg.skip
+./mvnw versions:set -DnewVersion=X.Y.Z -DgenerateBackupPoms=false -DprocessAllModules -DupdateBuildOutputTimestampPolicy=never
+./mvnw -Prelease clean package -pl praecepta-engine,praecepta-loader,praecepta-maven-plugin -am -DskipTests -Dinvoker.skip -Dgpg.skip
 ```
+
+The release workflow builds with the Maven Wrapper (`./mvnw`), which pins the Maven version in
+`.mvn/wrapper/maven-wrapper.properties` (3.9.15, checked by its SHA-256). Releases before 0.4.0 used
+the runner's Maven (3.9.15 for 0.3.0). If you change the wrapper's Maven version, the next release's
+`.buildspec` needs `tool=mvn-<version>` to match.
 
 [Reproducible Central](https://github.com/jvm-repo-rebuild/reproducible-central) rebuilds releases
 independently and compares them with Maven Central. Its `.buildspec` for a release uses the same

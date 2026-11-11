@@ -59,7 +59,7 @@ jobs:
         # keep project.build.outputTimestamp as committed, so the release can be rebuilt from its
         # tag with nothing but the version changed (versions:set would otherwise stamp the time now)
         run: >
-          mvn -B versions:set -DnewVersion="${VERSION}" -DgenerateBackupPoms=false -DprocessAllModules
+          ./mvnw -B versions:set -DnewVersion="${VERSION}" -DgenerateBackupPoms=false -DprocessAllModules
           -DupdateBuildOutputTimestampPolicy=never
       - name: Build, test, sign and publish
         env:
@@ -67,8 +67,9 @@ jobs:
           MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           MAVEN_GPG_KEY: ${{ secrets.RELEASE_GPG_KEY }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
-        # the benchmarks are not published
-        run: mvn -B -P release -pl praecepta-engine,praecepta-loader,praecepta-maven-plugin -am deploy
+        # the benchmarks are not published. The Maven Wrapper pins Maven (.mvn/wrapper), so the
+        # release is built with the same Maven that Reproducible Central's buildspec names (tool=)
+        run: ./mvnw -B -P release -pl praecepta-engine,praecepta-loader,praecepta-maven-plugin -am deploy
       - name: Third-party notices
         run: >
           python3 .github/scripts/third_party_notices.py "${VERSION}"
