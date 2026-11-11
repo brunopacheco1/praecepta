@@ -1,0 +1,37 @@
+<!--
+
+    SPDX-FileCopyrightText: Bruno Pacheco
+
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.brunopacheco1</groupId>
+        <artifactId>praecepta</artifactId>
+        <version>0.5.0-SNAPSHOT</version>
+    </parent>
+    <!--
+        The Gradle plugin marker: Gradle resolves `plugins { id("io.github.brunopacheco1.praecepta") version "..." }`
+        to the module <id>:<id>.gradle.plugin, which depends on the plugin's jar. Publishing it to Maven Central lets
+        builds find the plugin there (pluginManagement { repositories { mavenCentral() } }) without the Gradle
+        Plugin Portal. Gradle dictates these coordinates.
+    -->
+    <groupId>io.github.brunopacheco1.praecepta</groupId>
+    <artifactId>io.github.brunopacheco1.praecepta.gradle.plugin</artifactId>
+    <packaging>pom</packaging>
+    <name>praecepta-gradle-plugin-marker</name>
+    <description>
+        Gradle plugin marker for the plugin id io.github.brunopacheco1.praecepta, so that Gradle resolves
+        praecepta-gradle-plugin from Maven Central.
+    </description>
+    <dependencies>
+        <dependency>
+            <groupId>io.github.brunopacheco1</groupId>
+            <artifactId>praecepta-gradle-plugin</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+</project>

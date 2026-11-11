@@ -35,9 +35,18 @@ JDK and enable the `native` profile; it takes a few minutes, and CI does it in t
 mvn -pl praecepta-maven-plugin -am verify -Pnative
 ```
 
+The Gradle plugin's functional tests build small Gradle projects with Gradle TestKit, which downloads
+a Gradle distribution, so they run only when asked for, on a Java that Gradle version runs on:
+
+```
+mvn -pl praecepta-gradle-plugin -am verify -P gradle-functional [-Dpraecepta.gradle.version=8.5]
+```
+
 The code targets **Java 21** (`--release 21`): newer language features or APIs fail to compile.
-CI builds and tests on Java 21, 25 and 27, and runs the plugin's integration tests on Maven 3.9,
-3.10 and 4.0 (on pull requests only when the plugin, the engine or a POM changes). A newer push to a
+CI builds and tests on Java 21, 25 and 27, runs the Maven plugin's integration tests on Maven 3.9,
+3.10 and 4.0 (on pull requests only when the plugin, the engine or a POM changes), and the Gradle
+plugin's functional tests on Gradle 8.5, 8.14 and 9 (on pull requests only when that plugin, the
+compiler, loader or engine changes). A newer push to a
 pull request cancels the checks still running for the previous one.
 
 ## Code style

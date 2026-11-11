@@ -100,6 +100,15 @@
         <!-- Quarkus extension (#76): the BOM, imported by praecepta-quarkus and praecepta-quarkus-deployment
              only, and the extension's build plugin and annotation processor, released with it -->
         <quarkus.version>3.40.1.2</quarkus.version>
+
+        <!-- Gradle plugin (#18) -->
+        <!-- the Gradle API the plugin compiles against, redistributed on Maven Central by gradleplugins.dev
+             (its last release); the plugin uses only API that Gradle 8.5 to 9 share -->
+        <gradle-api.version>8.11.1</gradle-api.version>
+        <!-- the Groovy that Gradle ${gradle-api.version} bundles; its in-process tests need more of it than the API -->
+        <groovy.version>3.0.22</groovy.version>
+        <!-- the Gradle version the functional tests run (-P gradle-functional); gradle-versions.yml sets others -->
+        <gradle-functional.version>9.9.1</gradle-functional.version>
     </properties>
 
     <modules>
@@ -108,6 +117,8 @@
         <module>praecepta-compiler</module>
         <module>praecepta-integration</module>
         <module>praecepta-maven-plugin</module>
+        <module>praecepta-gradle-plugin</module>
+        <module>praecepta-gradle-plugin-marker</module>
         <module>praecepta-spring-boot-starter</module>
         <module>praecepta-micronaut</module>
         <module>praecepta-quarkus</module>
@@ -151,6 +162,61 @@
                 <groupId>com.code-intelligence</groupId>
                 <artifactId>jazzer-junit</artifactId>
                 <version>${jazzer.version}</version>
+            </dependency>
+            <!-- Gradle plugin (#18): the Gradle API (provided) and TestKit (test). Their POMs also ask for
+                 groovy-all and kotlin-stdlib at runtime, which Gradle itself provides: the plugin compiles
+                 against the API and Groovy (which its signatures mention), and its in-process tests
+                 (ProjectBuilder) run with kotlin-stdlib too. -->
+            <dependency>
+                <groupId>dev.gradleplugins</groupId>
+                <artifactId>gradle-api</artifactId>
+                <version>${gradle-api.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.codehaus.groovy</groupId>
+                        <artifactId>groovy-all</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.jetbrains.kotlin</groupId>
+                        <artifactId>kotlin-stdlib</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>dev.gradleplugins</groupId>
+                <artifactId>gradle-test-kit</artifactId>
+                <version>${gradle-api.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.codehaus.groovy</groupId>
+                        <artifactId>groovy-all</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.codehaus.groovy</groupId>
+                <artifactId>groovy-json</artifactId>
+                <version>${groovy.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.codehaus.groovy</groupId>
+                <artifactId>groovy-ant</artifactId>
+                <version>${groovy.version}</version>
+                <exclusions>
+                    <!-- Ant's JUnit and ANTLR tasks and Groovydoc; a Gradle project needs only Ant itself -->
+                    <exclusion>
+                        <groupId>org.apache.ant</groupId>
+                        <artifactId>ant-junit</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.ant</groupId>
+                        <artifactId>ant-antlr</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.codehaus.groovy</groupId>
+                        <artifactId>groovy-groovydoc</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
         </dependencies>
     </dependencyManagement>

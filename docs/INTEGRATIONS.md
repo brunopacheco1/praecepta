@@ -42,8 +42,8 @@ describe modules that do not exist yet; their authors update them as they land.
 | `praecepta-compiler` | `praecepta-compiler` | engine, loader | 0.5 (moved out of the Maven plugin) |
 | `praecepta-integration` | `praecepta-integration` | engine | 0.5 |
 | `praecepta-maven-plugin` | `praecepta-maven-plugin` | compiler; Maven API (`provided`) | released |
-| `praecepta-gradle-plugin` | `praecepta-gradle-plugin` | compiler; Gradle API (`provided`) | planned (#18) |
-| `io.github.brunopacheco1.praecepta.gradle.plugin` (groupId `io.github.brunopacheco1.praecepta`) | `praecepta-gradle-plugin-marker` | gradle plugin (pom only) | planned (#18) |
+| `praecepta-gradle-plugin` | `praecepta-gradle-plugin` | compiler; Gradle API (`provided`) | 0.5 (#18) |
+| `io.github.brunopacheco1.praecepta.gradle.plugin` (groupId `io.github.brunopacheco1.praecepta`) | `praecepta-gradle-plugin-marker` | gradle plugin (pom only) | 0.5 (#18) |
 | `praecepta-spring-boot-starter` | `praecepta-spring-boot-starter` | integration; Spring Boot (`provided`) | 0.5 (#20) |
 | `praecepta-micronaut` | `praecepta-micronaut` | integration; Micronaut 4 (`provided`) | 0.5 (#77) |
 | `praecepta-quarkus` | `praecepta-quarkus` | integration; `quarkus-arc` (`provided`) | 0.5 (#76) |
@@ -91,7 +91,8 @@ Rules for every build tool:
   golden files that differ only in that name.
 - Configuration names follow the Maven plugin's: `packageName`, `failOn` (`ERROR`, `WARNING`, `NONE`),
   `fileHeader`, `skip`, and per table `source`, `name`, `decision`, `hitPolicy`, `aggregation`,
-  `inputs`/`outputs` with `name`, `type`, `allowedValues`, `priority`, `list`.
+  `inputs`/`outputs` with `name`, `type`, `allowedValues`, `priority`, `list`. Where a tool's own
+  conventions take one of these words, it says so (the Gradle plugin's `className`, below).
 
 ## praecepta-integration: the runtime core
 `praecepta-integration` (engine only, no framework) turns DMN files into engines the way every framework
@@ -188,18 +189,39 @@ application as generated resources, `META-INF/praecepta/tables/<n>.dmn`, registe
 with `fail-on` already enforced, so it cannot fail differently at runtime.
 
 ## Per integration
-### Gradle plugin (#18, planned)
+### Gradle plugin (#18)
 - Plugin id `io.github.brunopacheco1.praecepta`, class `io.github.brunopacheco1.praecepta.gradle.PraeceptaPlugin`,
-  extension `praecepta { packageName; failOn; fileHeader; tables { register("discount") { source; name;
-  decision; hitPolicy; aggregation; inputs { ... }; outputs { ... } } } }` (the Maven plugin's names),
-  task `generatePraecepta` (cacheable, inputs: the table files and settings; outputs:
+  extension `praecepta { packageName; failOn; fileHeader; skip; tables { register("discount") { source;
+  className; decision; hitPolicy; aggregation; inputs { column("country") { type; allowedValues; list } };
+  outputs { column("tier") { type; priority } } } } }`, task `generatePraecepta` (type `GeneratePraecepta`,
+  cacheable, inputs: the table files by name and content and the settings; outputs:
   `build/generated/sources/praecepta/java/main` and `build/generated/resources/praecepta/main`, added to
-  the `main` source set so `compileJava` and `processResources` depend on it).
+  the `main` source set so `compileJava` and `processResources` depend on it). Works with the
+  configuration cache.
+- **`className` instead of `name`.** In a Gradle container, `name` is the name an element is registered
+  under (`register("discount")`), read-only, so a table's generated class is named by `className`, which
+  is what the Maven plugin's `<name>` sets (and defaults the same way). Messages name it `'className'`
+  (`Two tables generate the class Fees; set 'className' on one`); the registered name appears only in
+  Gradle's own messages. A column's name is the argument of `column(...)`, since the columns are a list
+  in declaration order, not a container. Values are the Maven plugin's text (`hitPolicy = "FIRST"`,
+  `type = "NUMBER"`), in any case.
+- `skip` defaults to the Gradle property `praecepta.skip` (`-Ppraecepta.skip=true`), as the Maven plugin's
+  does to the user property. Each run empties both output directories first, so a removed table leaves no
+  class behind; a skipped run leaves them empty.
 - Built by the Maven reactor like every other module: compiled against the Gradle API from Maven Central
-  (`dev.gradleplugins:gradle-api`, `provided`), with `META-INF/gradle-plugins/io.github.brunopacheco1.praecepta.properties`.
-  Functional tests (Gradle TestKit, which downloads a Gradle distribution) run in a workflow of their own
-  (`gradle-versions.yml`, like `maven-versions.yml`: pull requests touching the Gradle plugin, compiler,
-  loader or engine sources, main, weekly), not in the default `mvn verify`.
+  (`dev.gradleplugins:gradle-api` 8.11.1, the last that gradleplugins.dev published, `provided`), with
+  `META-INF/gradle-plugins/io.github.brunopacheco1.praecepta.properties`. The plugin uses only API that
+  Gradle 8.5 to 9 share; 8.5 is the oldest it supports, the first Gradle that runs on Java 21.
+- Unit tests run in the default `mvn verify` with an in-process project (`ProjectBuilder`, which needs
+  `--add-opens java.base/java.lang` and a few Groovy modules on the test class path). Functional tests
+  (Gradle TestKit, which downloads a Gradle distribution) run with `-P gradle-functional`: the invoker
+  installs this build's artifacts into `target/it-repo`, the tests add the marker POM to it, and small
+  projects apply the plugin by id and version from there (and Maven Central, for the BOMs third-party POMs
+  import), compile and run the generated classes, compare them with the compiler's golden files, and
+  check the build cache (from another directory), the configuration cache, failures and `skip`, with
+  `--warning-mode=fail`. They run in `gradle-versions.yml` (Gradle 8.5 and 8.14.7 on Java 21, 9.9.1 on
+  Java 25: pull requests touching the Gradle plugin, its marker, the compiler, loader or engine sources
+  or their POMs, main, weekly), not in the default `mvn verify`.
 - Published to Maven Central only, with the plugin marker artifact so that `plugins { id(...) version
   "..." }` resolves from `mavenCentral()` in `pluginManagement`; the Gradle Plugin Portal is not used.
 

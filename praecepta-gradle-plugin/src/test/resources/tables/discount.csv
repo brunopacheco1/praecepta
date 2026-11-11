@@ -1,0 +1,4 @@
+country;age;since;discount;tier
+"PT","ES";[18..65);< date("2020-01-01");0.15;gold
+not("FR");>= 18;;0.05;silver
+;< 18;;0;junior
