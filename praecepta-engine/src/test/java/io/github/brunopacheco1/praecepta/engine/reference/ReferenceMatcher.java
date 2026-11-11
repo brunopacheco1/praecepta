@@ -7,11 +7,14 @@ package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetTime;
 import java.time.Period;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -47,7 +50,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * <p>Cells are parsed with the engine's {@link CellParser} (checked by its own example tests), but
  * evaluated here, directly on values, with FEEL's three-valued logic: a missing value fails
  * comparisons and intervals (unknown), equals only {@code null}, and so satisfies {@code not("A")}.
- * Blank strings count as missing. The engine instead precomputes value classes and bitmasks.
+ * Blank strings count as missing. Times and date-times with a time zone compare by the instant they
+ * denote, and comparing one with a value without a zone is unknown, equality included. The engine
+ * instead precomputes value classes and bitmasks.
  *
  * @param rules          rules in table order (DMN "rule order")
  * @param hitPolicy      DMN hit policy
@@ -56,9 +61,15 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * @param types          column types; columns not listed are STRING
  * @param allowedValues  declared input values per column, as unary tests of the column's type
  * @param feelCells      whether cells are strict FEEL, where a name compares with another input
+ * @param zonedColumns   the time and date-time columns whose inputs have a time zone; the others have none
  */
 public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
-        Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells) {
+        Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns) {
+
+    public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
+            Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells) {
+        this(rules, hitPolicy, outputPriority, types, allowedValues, feelCells, Set.of());
+    }
 
     public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy) {
         this(rules, hitPolicy, Map.of());
@@ -286,8 +297,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             case BOOLEAN -> values.addAll(List.of(false, true)); // the whole domain
             case STRING -> values.addAll(stringRepresentatives(cells));
             // years and months durations as the Period a getter returns
-            case YEAR_MONTH_DURATION -> orderedRepresentatives(type, cells).forEach(v -> values.add(((YearsAndMonths) v).toPeriod()));
-            default -> values.addAll(orderedRepresentatives(type, cells));
+            case YEAR_MONTH_DURATION -> orderedRepresentatives(type, cells, false).forEach(v -> values.add(((YearsAndMonths) v).toPeriod()));
+            // a column's times take a zone or none, as its getter does
+            default -> values.addAll(orderedRepresentatives(type, cells, zonedColumns.contains(column)));
         }
         if (withMissing) {
             values.add(null);
@@ -337,18 +349,22 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return result;
     }
 
-    /** The values the cells mention, the points around each and between neighbours, in order. */
-    private static Collection<Object> orderedRepresentatives(ColumnType type, List<UnaryTests> cells) {
+    /**
+     * The values the cells mention, the points around each and between neighbours, in order. Times and
+     * date-times only with a time zone if {@code zoned}, else only without one: the values of the other kind
+     * cannot be compared with the inputs, so they split nothing.
+     */
+    private static Collection<Object> orderedRepresentatives(ColumnType type, List<UnaryTests> cells, boolean zoned) {
         var points = new TreeSet<Object>(ReferenceMatcher::compare);
-        cells.forEach(cell -> points.addAll(literals(cell)));
+        cells.forEach(cell -> literals(cell).stream().filter(value -> isZoned(value) == zoned).forEach(points::add));
         var sorted = new ArrayList<>(points);
         var around = new TreeSet<Object>(ReferenceMatcher::compare);
         around.addAll(sorted);
         if (sorted.isEmpty()) {
             around.add(switch (type) {
                 case NUMBER -> BigDecimal.ZERO;
-                case TIME -> LocalTime.NOON;
-                case DATE_TIME -> LocalDateTime.of(2025, 1, 1, 0, 0);
+                case TIME -> zoned ? OffsetTime.of(LocalTime.NOON, ZoneOffset.UTC) : LocalTime.NOON;
+                case DATE_TIME -> zoned ? ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC) : LocalDateTime.of(2025, 1, 1, 0, 0);
                 case DAY_TIME_DURATION -> Duration.ZERO;
                 case YEAR_MONTH_DURATION -> new YearsAndMonths(0);
                 default -> LocalDate.of(2025, 1, 1);
@@ -391,6 +407,23 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                     var start = moment.toInstant(ZoneOffset.UTC);
                     var end = ((LocalDateTime) next).toInstant(ZoneOffset.UTC);
                     around.add(LocalDateTime.ofInstant(start.plus(Duration.between(start, end).dividedBy(2)), ZoneOffset.UTC));
+                }
+            }
+            // the generated times with a zone stay hours away from midnight, so a minute either side does not wrap around
+            case OffsetTime time -> {
+                around.add(time.minusMinutes(1));
+                around.add(time.plusMinutes(1));
+                if (next != null) {
+                    var start = instant(time);
+                    around.add(OffsetTime.ofInstant(start.plus(Duration.between(start, instant((OffsetTime) next)).dividedBy(2)), time.getOffset()));
+                }
+            }
+            case ZonedDateTime moment -> {
+                around.add(moment.minusHours(1));
+                around.add(moment.plusHours(1));
+                if (next != null) {
+                    var start = moment.toInstant();
+                    around.add(start.plus(Duration.between(start, ((ZonedDateTime) next).toInstant()).dividedBy(2)).atZone(moment.getZone()));
                 }
             }
             case Duration duration -> {
@@ -489,6 +522,16 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         if (test instanceof Compare c && c.value() == null || test instanceof Range r && (r.low() == null || r.high() == null)) {
             return null;
         }
+        // FEEL leaves comparing a time with a zone and one without undefined, equality included
+        boolean otherKind = switch (test) {
+            case NullTest n -> false;
+            case Equals e -> isZoned(e.value()) != isZoned(value);
+            case Compare c -> isZoned(c.value()) != isZoned(value);
+            case Range r -> isZoned(r.low()) != isZoned(value) || isZoned(r.high()) != isZoned(value);
+        };
+        if (otherKind) {
+            return null;
+        }
         return switch (test) {
             case NullTest n -> false;
             case Equals e -> compare(value, e.value()) == 0;
@@ -550,9 +593,23 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         };
     }
 
+    /** Values of one kind: times and date-times with a zone by instant, the rest by their natural order. */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static int compare(Object a, Object b) {
-        return ((Comparable) a).compareTo(b);
+        return switch (a) {
+            case OffsetTime time -> instant(time).compareTo(instant((OffsetTime) b));
+            case ZonedDateTime moment -> moment.toInstant().compareTo(((ZonedDateTime) b).toInstant());
+            default -> ((Comparable) a).compareTo(b);
+        };
+    }
+
+    private static boolean isZoned(Object value) {
+        return value instanceof OffsetTime || value instanceof ZonedDateTime;
+    }
+
+    /** A time with an offset as the instant it denotes on 1970-01-01. */
+    private static Instant instant(OffsetTime time) {
+        return time.atDate(LocalDate.EPOCH).toInstant();
     }
 
     private static List<Integer> ids(List<Praeceptum> rules) {

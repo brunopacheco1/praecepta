@@ -10,12 +10,16 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetTime;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
 /**
  * Writes column values ({@code String}, {@code BigDecimal}, {@code LocalDate}, {@code Boolean},
- * {@code LocalTime}, {@code LocalDateTime}, {@code Duration}, {@link YearsAndMonths}) as FEEL literals,
- * or as the plain text that outputs and map-based inputs use.
+ * {@code LocalTime}, {@code OffsetTime}, {@code LocalDateTime}, {@code ZonedDateTime}, {@code Duration},
+ * {@link YearsAndMonths}) as FEEL literals, or as the plain text that outputs and map-based inputs use.
+ * {@link FeelTemporals} reads times and date-times back from that text.
  */
 public final class FeelLiterals {
 
@@ -24,8 +28,10 @@ public final class FeelLiterals {
 
     /**
      * The FEEL literal of a value: {@code "PT"} (escaped), {@code 2.5}, {@code true},
-     * {@code date("2025-01-31")}, {@code time("08:30:00")}, {@code date and time("2025-01-31T08:30:00")},
-     * {@code duration("P1DT2H")}, {@code duration("P1Y2M")}, or {@code null}.
+     * {@code date("2025-01-31")}, {@code time("08:30:00")}, {@code time("08:30:00+01:00")},
+     * {@code date and time("2025-01-31T08:30:00")}, {@code date and time("2025-01-31T08:30:00Z")},
+     * {@code date and time("2025-01-31T08:30:00@Europe/Paris")}, {@code duration("P1DT2H")},
+     * {@code duration("P1Y2M")}, or {@code null}.
      */
     public static String literal(Object value) {
         return switch (value) {
@@ -33,7 +39,9 @@ public final class FeelLiterals {
             case String text -> "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
             case LocalDate date -> "date(\"" + date + "\")";
             case LocalTime time -> "time(\"" + text(time) + "\")";
+            case OffsetTime time -> "time(\"" + text(time) + "\")";
             case LocalDateTime dateTime -> "date and time(\"" + text(dateTime) + "\")";
+            case ZonedDateTime dateTime -> "date and time(\"" + text(dateTime) + "\")";
             case Duration duration -> "duration(\"" + text(duration) + "\")";
             case YearsAndMonths duration -> "duration(\"" + duration + "\")";
             default -> text(value); // numbers and booleans
@@ -41,15 +49,21 @@ public final class FeelLiterals {
     }
 
     /**
-     * The plain text of a value: decimals without an exponent, ISO dates and times with their seconds,
-     * ISO durations as FEEL writes them ({@code P1DT2H}, {@code P1Y2M}).
+     * The plain text of a value: decimals without an exponent, ISO dates and times with their seconds
+     * and, if they have one, their offset ({@code 08:30:00Z}, {@code 2025-01-31T08:30:00+01:00}) or zone
+     * id as FEEL writes it ({@code 2025-01-31T08:30:00@Europe/Paris}), ISO durations as FEEL writes them
+     * ({@code P1DT2H}, {@code P1Y2M}).
      */
     public static String text(Object value) {
         return switch (value) {
             case BigDecimal number -> number.toPlainString();
             case Duration duration -> durationText(duration);
             case LocalTime time -> DateTimeFormatter.ISO_LOCAL_TIME.format(time);
+            case OffsetTime time -> DateTimeFormatter.ISO_OFFSET_TIME.format(time);
             case LocalDateTime dateTime -> DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime);
+            case ZonedDateTime dateTime -> dateTime.getZone() instanceof ZoneOffset
+                    ? DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(dateTime)
+                    : DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime) + "@" + dateTime.getZone().getId();
             default -> value.toString();
         };
     }

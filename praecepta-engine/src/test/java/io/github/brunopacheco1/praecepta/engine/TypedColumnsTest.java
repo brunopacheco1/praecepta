@@ -212,11 +212,9 @@ class TypedColumnsTest {
         Assertions.assertThatThrownBy(() -> engine.evaluate(notABoolean))
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("is not a valid boolean");
-        var zoned = Map.of("start", "10:00:00Z");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(zoned))
-                .as("times have no zone")
-                .isInstanceOf(InvalidInputException.class)
-                .hasMessageContaining("is not a valid time");
+        // a time with a zone cannot be compared with the rules' times, which have none: only "-" matches it
+        Assertions.assertThat(engine.evaluate(Map.of("overtime", "false", "start", "23:00"))).containsExactly("night");
+        Assertions.assertThat(engine.evaluate(Map.of("overtime", "false", "start", "23:00:00Z"))).containsExactly("standard");
     }
 
     @Test

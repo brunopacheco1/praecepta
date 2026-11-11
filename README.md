@@ -77,7 +77,6 @@ Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drool
   another input (`> limit`), but not compute with it.
 - **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
   boxed expressions.
-- **Times with a time zone** ([#70](https://github.com/brunopacheco1/praecepta/issues/70)).
 - **A process engine, a modeller or a decision service** around the tables.
 
 # Getting Started
@@ -119,7 +118,9 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 | `date("2025-01-31")` or `2025-01-31` | that date | DATE |
 | `true`, `false` | that boolean | BOOLEAN |
 | `time("08:30:00")` or `08:30:00` | that time of day | TIME |
+| `time("08:30:00+01:00")` or `08:30:00Z` | that instant of the day, at an offset | TIME |
 | `date and time("2025-01-31T08:30:00")` or `2025-01-31T08:30:00` | that date and time | DATE_TIME |
+| `date and time("2025-01-31T08:30:00Z")`, `date and time("2025-01-31T08:30:00@Europe/Paris")` | that instant | DATE_TIME |
 | `duration("P1DT2H")` or `P1DT2H` | that length of time (`PT24H` equals `P1D`) | DAY_TIME_DURATION |
 | `duration("P1Y2M")` or `P1Y2M` | that number of months (`P12M` equals `P1Y`) | YEAR_MONTH_DURATION |
 | `< 18`, `<= 18`, `> 18`, `>= 18`, `< "N"` | comparisons | all but BOOLEAN |
@@ -129,8 +130,14 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 
 Missing values follow FEEL: they fail comparisons and intervals, equal only `null`, and so satisfy
 `not("FR")`. Blank text counts as missing. Strings compare as Java's `String.compareTo` does,
-character by character and case-sensitively (`"Zed" < "apple"`). Times and date-times are local:
-values with a time zone or offset (`Z`, `+02:00`, `@Europe/Paris`) are rejected.
+character by character and case-sensitively (`"Zed" < "apple"`).
+
+Times may have an offset (`Z`, `+01:00`) and date-times an offset or a zone id (`@Europe/Paris`).
+As in FEEL, values with a time zone compare by the instant they denote (`time("09:00:00+01:00")`
+equals `time("08:00:00Z")`), and a value with a zone cannot be compared with one without: the test
+is unknown, like a comparison with a missing value, so neither `time("08:00:00")` nor
+`not(time("08:00:00"))` matches `08:00Z`. A time with a zone id (`time("08:00:00@Europe/Paris")`)
+is rejected, as it has no fixed offset.
 
 ### Typed columns and input value lists
 ```java
@@ -142,6 +149,8 @@ var engine = PraeceptaEngine.<Applicant, String>builder()
         .booleanInput("student", Applicant::student)   // Boolean
         .timeInput("callTime", Applicant::callTime)    // LocalTime
         .dateTimeInput("appliedAt", Applicant::appliedAt) // LocalDateTime
+        .offsetTimeInput("cutOff", Applicant::cutOff)  // OffsetTime, compared by instant
+        .zonedDateTimeInput("signedAt", Applicant::signedAt) // ZonedDateTime (from an OffsetDateTime: toZonedDateTime())
         .durationInput("waited", Applicant::waited)    // Duration
         .periodInput("tenure", Applicant::tenure)      // Period of years and months
         .allowedValues("country", List.of("PT", "ES", "FR"))
@@ -154,7 +163,9 @@ With declared input values, other (non-missing) values throw `InvalidInputExcept
 `validationReport()` lists **gaps**: declared inputs no rule matches, e.g.
 `country = "FR", age in [18..120]`. Gaps are only analysed when every string column the rules test
 declares its values or uses comparisons or intervals (any other string then falls between them). With map-based inputs, declare non-string columns with
-`.columnType("age", ColumnType.NUMBER)`; their text is parsed.
+`.columnType("age", ColumnType.NUMBER)`; their text is parsed. A time or date-time column then takes
+values with and without a time zone (`08:30`, `08:30Z`, `2025-01-31T08:30@Europe/Paris`), and its
+gaps are looked for among both, while a typed getter gives one kind only.
 
 Notes:
 - `PRIORITY` and `OUTPUT_ORDER` need DMN output value lists:
@@ -195,8 +206,9 @@ written with `date(...)`, `time(...)` and `date and time(...)`); input entries t
 another input (`> limit`, `[floor..limit]`, `not(home)`), which then becomes an input of the engine,
 bound like a column (with map-based inputs it is read with the type of the column that names it);
 output entries that are literals
-or name one of the table's inputs (`a` returns the input `a`); every hit policy, with SUM, MIN, MAX and COUNT aggregation. Anything else (times with a
-zone, computed expressions such as `Symptom + " is listed"`, function calls) is rejected
+or name one of the table's inputs (`a` returns the input `a`); times and date-times with or without a time zone;
+every hit policy, with SUM, MIN, MAX and COUNT aggregation. Anything else (a time with a
+zone id, computed expressions such as `Symptom + " is listed"`, function calls) is rejected
 with a message naming the decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
 evaluate identically, which is how the benchmarks feed them.
 
@@ -231,7 +243,10 @@ Compiles tables at build time. For each table the `generate` goal:
 4. generates `<Name>Input` and `<Name>Output` records and a `<Name>` class that evaluates the DMN.
 
 A string column with a value list becomes an enum in the input record, using the int-coded path.
-Numbers are `BigDecimal` and dates `LocalDate`. At runtime the generated code needs only
+Numbers are `BigDecimal` and dates `LocalDate`. Times and date-times are `LocalTime` and
+`LocalDateTime`, or `OffsetTime` and `ZonedDateTime` when every value written for the column has a
+time zone (an input compared with such a column in a cell, as in `> limit`, takes a zone too); a
+column that mixes both kinds fails the build. At runtime the generated code needs only
 `praecepta-engine`; Apache POI stays a build-time dependency.
 
 ```xml

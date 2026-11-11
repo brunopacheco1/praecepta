@@ -11,7 +11,9 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetTime;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
@@ -22,7 +24,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * a binary search over a {@code long[]} instead of over objects compared through {@link Comparable}:
  * days since the epoch for dates, nanoseconds for times, date-times and days and time durations, months
  * for years and months durations, and for numbers the value scaled by a power of ten that makes every
- * boundary whole. A value without an exact key (beyond {@code long}, or a number finer than the
+ * boundary whole. Times and date-times with a time zone are keyed by instant: nanoseconds since the epoch,
+ * and for times, nanoseconds since midnight at offset zero (from -18 to 42 hours), so they sort as FEEL
+ * orders them. One line of a column ({@link ColumnIndex}) holds values either all with a zone or all
+ * without, so their keys are never mixed. A value without an exact key (beyond {@code long}, or a number finer than the
  * boundaries) still finds its class, or falls back to the column's search over the boundaries.
  */
 final class PrimitiveKeys {
@@ -111,11 +116,22 @@ final class PrimitiveKeys {
         return switch (value) {
             case LocalDate date -> date.toEpochDay();
             case LocalTime time -> time.toNanoOfDay();
+            case OffsetTime time -> utcNanos(time);
             case LocalDateTime dateTime -> Math.addExact(
                     Math.multiplyExact(dateTime.toEpochSecond(ZoneOffset.UTC), NANOS_PER_SECOND), dateTime.getNano());
+            case ZonedDateTime dateTime -> Math.addExact(Math.multiplyExact(dateTime.toEpochSecond(), NANOS_PER_SECOND), dateTime.getNano());
             case Duration duration -> duration.toNanos();
             case YearsAndMonths(long months) -> months;
             default -> throw new ArithmeticException("no key for " + value.getClass().getSimpleName());
         };
+    }
+
+    /**
+     * A time with an offset as nanoseconds since midnight at offset zero, which orders such times by
+     * instant: {@code 01:00+02:00} is -1 hour. Ranges from -18 hours ({@code 00:00+18:00}) to just under 42
+     * hours ({@code 23:59:59.999999999-18:00}).
+     */
+    static long utcNanos(OffsetTime time) {
+        return time.toLocalTime().toNanoOfDay() - time.getOffset().getTotalSeconds() * NANOS_PER_SECOND;
     }
 }

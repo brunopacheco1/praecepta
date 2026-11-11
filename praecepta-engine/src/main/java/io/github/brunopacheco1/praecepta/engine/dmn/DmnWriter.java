@@ -8,8 +8,6 @@ package io.github.brunopacheco1.praecepta.engine.dmn;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -23,6 +21,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableE
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
@@ -222,8 +221,8 @@ public final class DmnWriter {
                 case STRING -> value;
                 case NUMBER -> new BigDecimal(text);
                 case DATE -> LocalDate.parse(text);
-                case TIME -> LocalTime.parse(text);
-                case DATE_TIME -> LocalDateTime.parse(text);
+                case TIME -> FeelTemporals.parseTime(text);
+                case DATE_TIME -> FeelTemporals.parseDateTime(text);
                 case DAY_TIME_DURATION -> Duration.parse(text);
                 case YEAR_MONTH_DURATION -> YearsAndMonths.parse(text);
                 case BOOLEAN -> bool(text);

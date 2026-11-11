@@ -8,8 +8,6 @@ package io.github.brunopacheco1.praecepta.engine.feel;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,8 +34,11 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   18, 2.5                  number literals (NUMBER columns)
  *   date("2025-01-31")       date literal (DATE columns; a bare 2025-01-31 is accepted as well)
  *   time("08:30:00")         time literal (TIME columns; a bare 08:30:00 is accepted as well)
+ *   time("08:30:00+01:00")   time with an offset (Z, +01:00), compared by instant
  *   date and time("2025-01-31T08:30:00")
  *                            date-time literal (DATE_TIME columns; a bare 2025-01-31T08:30:00 too)
+ *   date and time("2025-01-31T08:30:00Z"), date and time("2025-01-31T08:30:00@Europe/Paris")
+ *                            date-time with an offset or a zone id, compared by instant
  *   duration("P1DT2H")       days and time duration (DAY_TIME_DURATION columns; a bare P1DT2H too)
  *   duration("P1Y2M")        years and months duration (YEAR_MONTH_DURATION columns; a bare P1Y2M too)
  *   true, false              boolean literals (BOOLEAN columns)
@@ -49,8 +50,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  * </pre>
  *
  * Tests are separated by commas outside quotes and brackets. Surrounding whitespace is ignored.
- * Times and date-times have no zone: a literal with an offset ({@code Z}, {@code +02:00}) or a zone
- * ({@code @Europe/Paris}) is rejected.
+ * Times and date-times may have a time zone ({@link FeelTemporals}): a time an offset, a date-time an
+ * offset or a zone id. A time with a zone id ({@code time("08:30:00@Europe/Paris")}) is rejected, as it
+ * has no fixed offset, and so is an interval with one end with a zone and one without, which FEEL
+ * cannot compare.
  */
 public final class CellParser {
 
@@ -60,16 +63,17 @@ public final class CellParser {
     private static final Pattern DATE_CALL = Pattern.compile("date\\(\\s*\"([^\"]*)\"\\s*\\)");
     private static final Pattern BARE_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
     private static final Pattern TIME_CALL = Pattern.compile("time\\(\\s*\"([^\"]*)\"\\s*\\)");
-    private static final Pattern BARE_TIME = Pattern.compile("\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?");
+    /** An offset after a bare time or date-time: Z, or a sign and hh:mm. */
+    private static final String OFFSET = "([Zz]|[+-]\\d{2}:\\d{2})";
+    private static final Pattern BARE_TIME = Pattern.compile("\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?" + OFFSET + "?");
     private static final Pattern DATE_TIME_CALL = Pattern.compile("date\\s+and\\s+time\\(\\s*\"([^\"]*)\"\\s*\\)");
-    private static final Pattern BARE_DATE_TIME = Pattern.compile("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?");
+    private static final Pattern BARE_DATE_TIME = Pattern.compile(
+            "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(" + OFFSET + "|@[\\w+\\-/]+)?");
     private static final Pattern DURATION_CALL = Pattern.compile("duration\\(\\s*\"([^\"]*)\"\\s*\\)");
     /** ISO 8601 durations: an optional sign, P, then digits, fractions and designators. */
     private static final Pattern BARE_DURATION = Pattern.compile("-?P[0-9YMWDTHS.]+");
     /** Names FEEL reserves for literals, which never name an input. */
     private static final Set<String> KEYWORDS = Set.of("true", "false", "null");
-    /** The digits of an offset after its sign: 02, 0200 or 02:00. */
-    private static final Pattern OFFSET_DIGITS = Pattern.compile("\\d{2}(:?\\d{2})?");
 
     private CellParser() {
     }
@@ -188,8 +192,13 @@ public final class CellParser {
             requireComparisons("intervals");
             var low = literal(text.substring(1, dots).strip());
             var high = literal(text.substring(dots + 2, text.length() - 1).strip());
-            if (!(low instanceof UnaryTests.Name) && !(high instanceof UnaryTests.Name) && compare(low, high) > 0) {
-                throw new CellSyntaxException(cell, "interval starts after it ends");
+            if (!(low instanceof UnaryTests.Name) && !(high instanceof UnaryTests.Name)) {
+                if (!FeelTemporals.comparable(low, high)) {
+                    throw new CellSyntaxException(cell, "interval has one end with a time zone and one without, which cannot be compared");
+                }
+                if (FeelTemporals.compare(low, high) > 0) {
+                    throw new CellSyntaxException(cell, "interval starts after it ends");
+                }
             }
             return new Range(low, text.charAt(0) == '[', high, text.charAt(text.length() - 1) == ']');
         }
@@ -213,8 +222,8 @@ public final class CellParser {
                 case NUMBER -> number(text);
                 case BOOLEAN -> bool(text);
                 case DATE -> temporal(text, DATE_CALL, BARE_DATE, LocalDate::parse, "date(\"yyyy-mm-dd\")");
-                case TIME -> temporal(text, TIME_CALL, BARE_TIME, LocalTime::parse, "time(\"hh:mm:ss\")");
-                case DATE_TIME -> temporal(text, DATE_TIME_CALL, BARE_DATE_TIME, LocalDateTime::parse,
+                case TIME -> temporal(text, TIME_CALL, BARE_TIME, FeelTemporals::parseTime, "time(\"hh:mm:ss\")");
+                case DATE_TIME -> temporal(text, DATE_TIME_CALL, BARE_DATE_TIME, FeelTemporals::parseDateTime,
                         "date and time(\"yyyy-mm-ddThh:mm:ss\")");
                 case DAY_TIME_DURATION -> temporal(text, DURATION_CALL, BARE_DURATION, Duration::parse, "duration(\"P1DT2H\")");
                 case YEAR_MONTH_DURATION -> temporal(text, DURATION_CALL, BARE_DURATION, Parser::yearsAndMonths, "duration(\"P1Y2M\")");
@@ -310,33 +319,19 @@ public final class CellParser {
             } else {
                 throw new CellSyntaxException(cell, "'" + text + "' is not a " + type.feelName() + "; write " + hint);
             }
-            if (hasZone(iso)) {
-                throw new CellSyntaxException(cell, "'" + iso + "' has a time zone; only local times are supported");
+            if (type == ColumnType.TIME && iso.indexOf('@') >= 0) {
+                throw new CellSyntaxException(cell, "'" + iso + "' is a time with a zone id, which is not supported; "
+                        + "write an offset such as +01:00");
+            }
+            // FEEL writes a zone id as @Europe/Paris only; Java's [Europe/Paris] could carry an offset FEEL cannot write back
+            if (iso.indexOf('[') >= 0) {
+                throw new CellSyntaxException(cell, "invalid " + type.feelName() + " '" + iso + "'; write a zone id as @Europe/Paris");
             }
             try {
                 return parse.apply(iso);
             } catch (DateTimeParseException e) {
                 throw new CellSyntaxException(cell, "invalid " + type.feelName() + " '" + iso + "'");
             }
-        }
-
-        /** Compares two values of the same column type. */
-        @SuppressWarnings({"unchecked", "rawtypes"})
-        private static int compare(Comparable<?> a, Comparable<?> b) {
-            return ((Comparable) a).compareTo(b);
-        }
-
-        /**
-         * Whether a time or date-time ends with an offset or a zone: {@code Z}, {@code +02:00},
-         * {@code -0500}, {@code @Europe/Paris}. An offset follows the time, so its sign comes after a
-         * colon; the dashes of a date ({@code 2025-01-31}) do not count.
-         */
-        private static boolean hasZone(String iso) {
-            if (iso.indexOf('@') >= 0 || iso.endsWith("Z") || iso.endsWith("z")) {
-                return true;
-            }
-            int sign = Math.max(iso.lastIndexOf('+'), iso.lastIndexOf('-'));
-            return sign > 0 && iso.lastIndexOf(':', sign) >= 0 && OFFSET_DIGITS.matcher(iso.substring(sign + 1)).matches();
         }
 
         // ---- scanners: where tests, strings and intervals end ------------------------------------

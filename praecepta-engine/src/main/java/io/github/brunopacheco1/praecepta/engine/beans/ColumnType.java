@@ -21,11 +21,18 @@ public enum ColumnType {
     DATE,
     /** {@code true} or {@code false} ({@code Boolean}). Cells: {@code true}, {@code false}, lists, {@code not(...)}; no comparisons. */
     BOOLEAN,
-    /** Times of day without a zone ({@code LocalTime}). Cells use {@code time("08:30:00")}, comparisons and intervals. */
+    /**
+     * Times of day, without a zone ({@code LocalTime}) or with an offset ({@code OffsetTime}). Cells use
+     * {@code time("08:30:00")} or {@code time("08:30:00+01:00")}, comparisons and intervals. Times with
+     * an offset compare by instant, and comparing one with a time without a zone is unknown.
+     */
     TIME,
     /**
-     * Dates with a time of day, without a zone ({@code LocalDateTime}). Cells use
-     * {@code date and time("2025-01-31T08:30:00")}, comparisons and intervals.
+     * Dates with a time of day, without a zone ({@code LocalDateTime}) or with an offset or a zone id
+     * ({@code ZonedDateTime}). Cells use {@code date and time("2025-01-31T08:30:00")},
+     * {@code date and time("2025-01-31T08:30:00Z")} or {@code date and time("2025-01-31T08:30:00@Europe/Paris")},
+     * comparisons and intervals. Date-times with a zone compare by instant, and comparing one with a
+     * date-time without a zone is unknown.
      */
     DATE_TIME,
     /**

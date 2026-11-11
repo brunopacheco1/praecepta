@@ -8,10 +8,13 @@ package io.github.brunopacheco1.praecepta.engine;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetTime;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
@@ -29,6 +32,13 @@ final class OpenIntervals {
     /** Suffixes tried for a readable string inside an interval, before falling back to {@link #LOWEST_CHARACTER}. */
     private static final List<String> READABLE_SUFFIXES = List.of("a", "A", "0", "!");
 
+    private static final long NANOS_PER_HOUR = Duration.ofHours(1).toNanos();
+    private static final long NANOS_PER_DAY = Duration.ofDays(1).toNanos();
+    /** The earliest time with an offset, by instant: {@code 00:00+18:00}, as {@link PrimitiveKeys#utcNanos} keys it. */
+    private static final long EARLIEST_ZONED_TIME = -18 * NANOS_PER_HOUR;
+    /** The latest time with an offset, by instant: {@code 23:59:59.999999999-18:00}. */
+    private static final long LATEST_ZONED_TIME = NANOS_PER_DAY - 1 + 18 * NANOS_PER_HOUR;
+
     private OpenIntervals() {
     }
 
@@ -37,9 +47,15 @@ final class OpenIntervals {
      * before midnight or after the last nanosecond of a day, anywhere outside {@code false} and
      * {@code true} (both are always boundaries), or between a string and its successor. Below the
      * empty string, or the one-character string U+0000, there is no non-blank string, and blank ones
-     * count as missing.
+     * count as missing. On the line of times and date-times with a time zone ({@code zoned}), an interval
+     * is empty when no instant lies in it: between instants a nanosecond apart, or for times, outside the
+     * instants that times of day with an offset from -18:00 to +18:00 denote.
      */
-    static boolean isEmpty(ColumnType type, Comparable<?> low, Comparable<?> high) {
+    static boolean isEmpty(ColumnType type, Comparable<?> low, Comparable<?> high, boolean zoned) {
+        if (zoned) {
+            return type == ColumnType.TIME ? emptyZonedTimes((OffsetTime) low, (OffsetTime) high)
+                    : low != null && high != null && !((ZonedDateTime) low).toInstant().plusNanos(1).isBefore(((ZonedDateTime) high).toInstant());
+        }
         return switch (type) {
             case BOOLEAN -> true;
             case DATE -> low != null && high != null && !((LocalDate) low).plusDays(1).isBefore((LocalDate) high);
@@ -54,9 +70,14 @@ final class OpenIntervals {
 
     /**
      * A value inside a non-empty interval: the midpoint of two bounds, a round step beyond a single
-     * bound, or a fixed value (zero, 1970-01-01, noon) when unbounded.
+     * bound, or a fixed value (zero, 1970-01-01, noon; at offset zero on the line with a time zone) when
+     * unbounded.
      */
-    static Object valueInside(ColumnType type, Comparable<?> low, Comparable<?> high) {
+    static Object valueInside(ColumnType type, Comparable<?> low, Comparable<?> high, boolean zoned) {
+        if (zoned) {
+            return type == ColumnType.TIME ? betweenZonedTimes((OffsetTime) low, (OffsetTime) high)
+                    : betweenZonedDateTimes((ZonedDateTime) low, (ZonedDateTime) high);
+        }
         return switch (type) {
             case DATE -> betweenDates((LocalDate) low, (LocalDate) high);
             case TIME -> betweenTimes((LocalTime) low, (LocalTime) high);
@@ -161,6 +182,60 @@ final class OpenIntervals {
         var start = low.toInstant(ZoneOffset.UTC);
         var middle = start.plus(Duration.between(start, high.toInstant(ZoneOffset.UTC)).dividedBy(2));
         return LocalDateTime.ofInstant(middle, ZoneOffset.UTC);
+    }
+
+    private static boolean emptyZonedTimes(OffsetTime low, OffsetTime high) {
+        if (low == null) {
+            return high != null && PrimitiveKeys.utcNanos(high) <= EARLIEST_ZONED_TIME;
+        }
+        if (high == null) {
+            return PrimitiveKeys.utcNanos(low) >= LATEST_ZONED_TIME;
+        }
+        return PrimitiveKeys.utcNanos(high) - PrimitiveKeys.utcNanos(low) <= 1;
+    }
+
+    /**
+     * Noon at offset zero when unbounded, an hour beyond a single bound (but no further than the earliest
+     * or latest instant), else the midpoint; at the offset of a bound when the time of day fits.
+     */
+    private static OffsetTime betweenZonedTimes(OffsetTime low, OffsetTime high) {
+        long key;
+        if (low == null) {
+            key = high == null ? NANOS_PER_DAY / 2 : Math.max(EARLIEST_ZONED_TIME, PrimitiveKeys.utcNanos(high) - NANOS_PER_HOUR);
+        } else if (high == null) {
+            key = Math.min(LATEST_ZONED_TIME, PrimitiveKeys.utcNanos(low) + NANOS_PER_HOUR);
+        } else {
+            // at least two nanoseconds apart (the interval is not empty), so the midpoint lies strictly inside
+            key = Math.floorDiv(PrimitiveKeys.utcNanos(low) + PrimitiveKeys.utcNanos(high), 2);
+        }
+        var bound = low != null ? low : high;
+        return zonedTime(key, bound == null ? ZoneOffset.UTC : bound.getOffset());
+    }
+
+    /**
+     * The time with an offset at an instant ({@link PrimitiveKeys#utcNanos}): at {@code preferred} if the
+     * time of day fits in a day there, else at the whole number of hours that brings it into the day.
+     */
+    private static OffsetTime zonedTime(long key, ZoneOffset preferred) {
+        long local = key + preferred.getTotalSeconds() * 1_000_000_000L;
+        if (local >= 0 && local < NANOS_PER_DAY) {
+            return OffsetTime.of(LocalTime.ofNanoOfDay(local), preferred);
+        }
+        int hours = key < 0 ? (int) Math.ceilDiv(-key, NANOS_PER_HOUR) : key >= NANOS_PER_DAY
+                ? -(int) Math.ceilDiv(key - NANOS_PER_DAY + 1, NANOS_PER_HOUR) : 0;
+        return OffsetTime.of(LocalTime.ofNanoOfDay(key + hours * NANOS_PER_HOUR), ZoneOffset.ofHours(hours));
+    }
+
+    /** As for date-times without a zone, measured by instant; the midpoint in the lower bound's zone. */
+    private static ZonedDateTime betweenZonedDateTimes(ZonedDateTime low, ZonedDateTime high) {
+        if (low == null) {
+            return high == null ? Instant.EPOCH.atZone(ZoneOffset.UTC) : high.minusDays(1);
+        }
+        if (high == null) {
+            return low.plusDays(1);
+        }
+        var start = low.toInstant();
+        return start.plus(Duration.between(start, high.toInstant()).dividedBy(2)).atZone(low.getZone());
     }
 
     private static BigDecimal betweenNumbers(BigDecimal low, BigDecimal high) {

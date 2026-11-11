@@ -155,7 +155,7 @@ class DmnReaderTest {
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
             "untyped duration   | duration        | at      |                      |         | type 'duration' is not supported",
-            "zoned time cell    | time            | at      | time(\"10:00:00Z\")  |         | rule 1, column 'at': Invalid cell",
+            "time with zone id  | time            | at      | time(\"10:00:00@Europe/Paris\") | | rule 1, column 'at': Invalid cell",
             "computed input     | number          | age * 2 |                      |         | input expression 'age * 2' is not supported",
             "unsupported cell   | number          | age     | &gt; abs(x)          |         | rule 1, column 'age'",
             "computed output    | string          | a       |                      | a + \"x\" | rule 1, output 'result': 'a + \"x\"' is not supported",

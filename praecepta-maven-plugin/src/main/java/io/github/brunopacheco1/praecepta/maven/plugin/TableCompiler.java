@@ -20,7 +20,6 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
-import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
@@ -140,16 +139,20 @@ final class TableCompiler {
 
     // ---- validation ---------------------------------------------------------------------------
 
-    /** Builds the engine exactly as the generated code will (map-based, so no classes are needed yet). */
+    /**
+     * Builds the engine as the generated code will: each input bound with the getter of its generated
+     * Java type, so that times and date-times with a time zone, or without, are analysed as the record
+     * gives them. The getters are never called, so no classes are needed yet. A string column with a value
+     * list is bound as a string: the table's value list is the generated enum's constants.
+     */
     private static ValidationReport validate(DecisionTable table, Severity failOn) {
         if (table.aggregation() != null
                 && (table.outputs().size() != 1 || table.outputs().getFirst().type() != ColumnType.NUMBER)) {
             throw new IllegalArgumentException("Table '%s': %s aggregation needs exactly one NUMBER output"
                     .formatted(table.name(), table.aggregation()));
         }
-        var builder = PraeceptaEngine.<Map<String, String>, PraeceptaOutput>builder()
+        var builder = PraeceptaEngine.<Object, PraeceptaOutput>builder()
                 .table(table)
-                .inputs(PraeceptaInput::new)
                 .output(new OutputStrategy<>() {
                     @Override
                     public PraeceptaOutput transform(PraeceptaOutput output) {
@@ -162,6 +165,14 @@ final class TableCompiler {
                         return new PraeceptaOutput(Map.of());
                     }
                 });
+        try {
+            var zoned = TimeZones.of(table).inputs();
+            table.inputs().forEach(column -> bind(builder, column.name(), column.type(), zoned.contains(column.name())));
+            table.namedInputs().forEach((name, type) -> bind(builder, name, type, zoned.contains(name)));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(e.getMessage().startsWith("Table '") ? e.getMessage()
+                    : "Table '%s': %s".formatted(table.name(), e.getMessage()), e);
+        }
         if (failOn != null) {
             builder.failOn(failOn);
         }
@@ -169,6 +180,32 @@ final class TableCompiler {
             return builder.build().validationReport();
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("Table '%s': %s".formatted(table.name(), e.getMessage()), e);
+        }
+    }
+
+    /** Binds an input with a getter of the Java type generated code gives it; validation never calls it. */
+    private static void bind(PraeceptaEngine.Builder<Object, PraeceptaOutput> builder, String name, ColumnType type, boolean zoned) {
+        switch (type) {
+            case STRING -> builder.input(name, input -> null);
+            case NUMBER -> builder.numberInput(name, input -> null);
+            case DATE -> builder.dateInput(name, input -> null);
+            case BOOLEAN -> builder.booleanInput(name, input -> null);
+            case TIME -> {
+                if (zoned) {
+                    builder.offsetTimeInput(name, input -> null);
+                } else {
+                    builder.timeInput(name, input -> null);
+                }
+            }
+            case DATE_TIME -> {
+                if (zoned) {
+                    builder.zonedDateTimeInput(name, input -> null);
+                } else {
+                    builder.dateTimeInput(name, input -> null);
+                }
+            }
+            case DAY_TIME_DURATION -> builder.durationInput(name, input -> null);
+            case YEAR_MONTH_DURATION -> builder.periodInput(name, input -> null);
         }
     }
 }

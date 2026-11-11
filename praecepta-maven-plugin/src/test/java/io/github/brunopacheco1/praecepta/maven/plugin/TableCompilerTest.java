@@ -18,7 +18,10 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetTime;
 import java.time.Period;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -184,6 +187,69 @@ class TableCompilerTest {
             var christmas = (Optional<?>) evaluate.invoke(null, constructor.newInstance(false, LocalTime.NOON, christmasNoon));
             Assertions.assertThat(christmas).get().hasToString("ShiftOutput[paid=false, until=null, reviewed=null, rate=holiday]");
         }
+    }
+
+    @Test
+    void times_and_date_times_written_with_a_zone_become_offset_times_and_zoned_date_times() throws Exception {
+        var config = new TableConfig(table("deliveries.csv"), "Delivery", null, HitPolicy.FIRST, null,
+                List.of(new ColumnConfig("cutOff", ColumnType.TIME, null, List.of()),
+                        new ColumnConfig("at", ColumnType.DATE_TIME, null, List.of())),
+                List.of(new ColumnConfig("slot", ColumnType.STRING, null, List.of()),
+                        new ColumnConfig("due", ColumnType.DATE_TIME, null, List.of())));
+        var result = TableCompiler.compile(config, PACKAGE, Severity.WARNING);
+
+        Assertions.assertThat(result.sources().get("DeliveryInput"))
+                .contains("public record DeliveryInput(java.time.OffsetTime cutOff, java.time.ZonedDateTime at)");
+        Assertions.assertThat(result.sources().get("DeliveryOutput"))
+                .contains("public record DeliveryOutput(String slot, java.time.ZonedDateTime due)",
+                        "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseZonedDateTime(value)");
+        Assertions.assertThat(result.sources().get("Delivery"))
+                .contains(".offsetTimeInput(\"cutOff\", DeliveryInput::cutOff)", ".zonedDateTimeInput(\"at\", DeliveryInput::at)");
+        Assertions.assertThat(result.dmn()).contains("&lt; time(\"12:00:00+01:00\")", "date and time(\"2025-12-24T09:00:00@Europe/Paris\")");
+        Assertions.assertThat(result.report().isEmpty()).as("validated as the record gives values: with a zone only").isTrue();
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".DeliveryInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Delivery").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            // 10:30Z is 11:30+01:00, before noon in Paris
+            var morning = (Optional<?>) evaluate.invoke(null, constructor.newInstance(OffsetTime.of(10, 30, 0, 0, ZoneOffset.UTC), null));
+            Assertions.assertThat(morning).get().hasToString("DeliveryOutput[slot=morning, due=2025-12-24T09:00+01:00[Europe/Paris]]");
+            var eve = ZonedDateTime.of(2025, 12, 23, 22, 59, 0, 0, ZoneOffset.UTC);
+            var afternoon = (Optional<?>) evaluate.invoke(null, constructor.newInstance(OffsetTime.of(11, 0, 0, 0, ZoneOffset.UTC), eve));
+            Assertions.assertThat(afternoon).get().hasToString("DeliveryOutput[slot=afternoon, due=2025-12-24T15:00Z]");
+        }
+    }
+
+    @Test
+    void inputs_compared_with_a_zoned_column_take_a_zone_too() throws Exception {
+        var config = new TableConfig(table("cutoffs.dmn"), "Cutoffs", null, null, null, List.of(), List.of());
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("CutoffsInput"))
+                .contains("public record CutoffsInput(java.time.OffsetTime at, java.time.OffsetTime limit)");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".CutoffsInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Cutoffs").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            var nineInParis = OffsetTime.of(9, 0, 0, 0, ZoneOffset.ofHours(1));
+            var eightUtc = OffsetTime.of(8, 0, 0, 0, ZoneOffset.UTC);
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(nineInParis, eightUtc)))
+                    .as("the same instant is not later").get().hasToString("CutoffsOutput[decision=on time]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(nineInParis.plusNanos(1), eightUtc)))
+                    .get().hasToString("CutoffsOutput[decision=late]");
+        }
+    }
+
+    @Test
+    void a_column_with_times_with_and_without_a_zone_is_rejected() {
+        var config = new TableConfig(table("mixed-times.csv"), "Mixed", null, HitPolicy.FIRST, null,
+                List.of(new ColumnConfig("start", ColumnType.TIME, null, List.of())),
+                List.of(new ColumnConfig("rate", ColumnType.STRING, null, List.of())));
+        Assertions.assertThatThrownBy(() -> TableCompiler.compile(config, PACKAGE, Severity.ERROR))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Table 'mixed-times': input 'start' takes time values both with and without a time zone, "
+                        + "but its generated record component holds one kind");
     }
 
     @Test

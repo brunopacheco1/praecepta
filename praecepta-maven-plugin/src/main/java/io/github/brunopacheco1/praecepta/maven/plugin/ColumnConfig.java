@@ -33,7 +33,11 @@ public class ColumnConfig {
     /** The column's header in the sheet. */
     String name;
 
-    /** STRING (default), NUMBER, DATE, BOOLEAN, TIME or DATE_TIME. */
+    /**
+     * STRING (default), NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION or YEAR_MONTH_DURATION. A
+     * TIME or DATE_TIME column whose values are all written with a time zone generates an {@code OffsetTime}
+     * or {@code ZonedDateTime} (see {@link TimeZones}).
+     */
     ColumnType type = ColumnType.STRING;
 
     /**

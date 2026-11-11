@@ -25,8 +25,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
  * Generates, for a table {@code Discount}:
  * <ul>
  * <li>{@code DiscountInput}: a record with one component per input column ({@code String},
- * {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime}, {@code LocalDateTime},
- * {@code Duration} or {@code Period}), and one per other input the cells compare with;
+ * {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime} or {@code OffsetTime},
+ * {@code LocalDateTime} or {@code ZonedDateTime} (see {@link TimeZones}), {@code Duration} or
+ * {@code Period}), and one per other input the cells compare with;
  * a string column with a value list gets a nested enum,
  * bound to the engine's int-coded path;</li>
  * <li>{@code DiscountOutput}: a record with one component per output column;</li>
@@ -209,6 +210,8 @@ final class SourceGenerator {
     private final String outputType;
     private final List<InputField> inputs;
     private final List<String> outputMembers;
+    /** The time and date-time columns whose values have a time zone. */
+    private final TimeZones.Zoned zoned;
 
     /** Lines put first in every generated file as {@code //} comments, e.g. an SPDX header; empty for none. */
     private final List<String> fileHeader;
@@ -233,9 +236,11 @@ final class SourceGenerator {
                 JavaNames::member, where + " inputs");
         this.outputMembers = JavaNames.distinct(table.outputs().stream().map(DecisionTable.OutputColumn::name).toList(),
                 JavaNames::member, where + " outputs");
+        this.zoned = TimeZones.of(table);
         this.inputs = new ArrayList<>();
         for (int c = 0; c < inputColumns.size(); c++) {
-            inputs.add(InputField.of(inputColumns.get(c), inputMembers.get(c)));
+            var column = inputColumns.get(c);
+            inputs.add(InputField.of(column, inputMembers.get(c), zoned.inputs().contains(column.name())));
         }
     }
 
@@ -281,7 +286,7 @@ final class SourceGenerator {
         var arguments = new StringJoiner(",\n                ");
         for (int c = 0; c < table.outputs().size(); c++) {
             var column = table.outputs().get(c);
-            var converter = Converter.of(column.type());
+            var converter = outputConverter(column);
             components.add(converter.javaType() + " " + outputMembers.get(c));
             var value = "values.get(" + stringLiteral(column.name()) + ")";
             arguments.add(converter.parser() == null ? value : converter.method() + "(" + value + ")");
@@ -296,7 +301,7 @@ final class SourceGenerator {
     private String outputParsers() {
         var parsers = new StringBuilder();
         table.outputs().stream()
-                .map(column -> Converter.of(column.type()))
+                .map(this::outputConverter)
                 .filter(converter -> converter.parser() != null)
                 .distinct()
                 .sorted(Comparator.comparing(Converter::method))
@@ -305,6 +310,10 @@ final class SourceGenerator {
                         "method", converter.method(),
                         "parser", converter.parser()))));
         return parsers.toString();
+    }
+
+    private Converter outputConverter(DecisionTable.OutputColumn column) {
+        return Converter.of(column.type(), zoned.outputs().contains(column.name()));
     }
 
     // ---- decision class -------------------------------------------------------------------------
@@ -335,7 +344,7 @@ final class SourceGenerator {
         var column = stringLiteral(input.column().name());
         var getter = inputType + "::" + input.member();
         if (!input.isEnum()) {
-            return BINDING_LINE + ".%s(%s, %s)".formatted(Converter.of(input.column().type()).binding(), column, getter);
+            return BINDING_LINE + ".%s(%s, %s)".formatted(input.converter().binding(), column, getter);
         }
         var enumType = inputType + "." + input.enumName();
         return BINDING_LINE + ".enumInput(%s, %s.class, %s::value, %s)".formatted(column, enumType, enumType, getter);
@@ -424,12 +433,17 @@ final class SourceGenerator {
      * @param member     its component in the input record
      * @param enumName   for a string column with a value list, its nested enum; else null
      * @param enumValues the values of that enum's constants, in order; else empty
+     * @param zoned      for a time or date-time, whether its values have a time zone
      */
-    private record InputField(InputColumn column, String member, String enumName, List<String> enumValues) {
+    private record InputField(InputColumn column, String member, String enumName, List<String> enumValues, boolean zoned) {
 
-        static InputField of(InputColumn column, String member) {
+        static InputField of(InputColumn column, String member, boolean zoned) {
             var values = valueListOf(column);
-            return new InputField(column, member, values.isEmpty() ? null : JavaNames.type(column.name()), values);
+            return new InputField(column, member, values.isEmpty() ? null : JavaNames.type(column.name()), values, zoned);
+        }
+
+        Converter converter() {
+            return Converter.of(column.type(), zoned);
         }
 
         boolean isEnum() {
@@ -453,7 +467,7 @@ final class SourceGenerator {
         }
 
         String javaType() {
-            return isEnum() ? enumName : Converter.of(column.type()).javaType();
+            return isEnum() ? enumName : converter().javaType();
         }
     }
 
@@ -467,7 +481,16 @@ final class SourceGenerator {
      */
     private record Converter(String javaType, String binding, String method, String parser) {
 
-        static Converter of(ColumnType type) {
+        /** @param zoned for a time or date-time, whether its values have a time zone */
+        static Converter of(ColumnType type, boolean zoned) {
+            if (zoned && type == ColumnType.TIME) {
+                return new Converter("java.time.OffsetTime", "offsetTimeInput", "offsetTime", "java.time.OffsetTime.parse");
+            }
+            if (zoned && type == ColumnType.DATE_TIME) {
+                // FEEL writes a zone id as @Europe/Paris, which ZonedDateTime.parse does not read
+                return new Converter("java.time.ZonedDateTime", "zonedDateTimeInput", "zonedDateTime",
+                        "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseZonedDateTime");
+            }
             return switch (type) {
                 case STRING -> new Converter("String", "input", null, null);
                 case NUMBER -> new Converter("java.math.BigDecimal", "numberInput", "number", "new java.math.BigDecimal");

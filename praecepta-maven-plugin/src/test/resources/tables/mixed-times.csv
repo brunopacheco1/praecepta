@@ -1,0 +1,3 @@
+start;rate
+< 12:00;morning
+>= 12:00Z;afternoon

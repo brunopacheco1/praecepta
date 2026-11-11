@@ -10,6 +10,9 @@ import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetTime;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -165,8 +168,116 @@ class ColumnIndexBehaviourTest {
                 '00:00' (LocalTime) -> [4]
                 '23:59:59.999999999' (LocalTime) -> [3, 5]
                 '08:00' (String) -> [2]
-                '10:00:00Z' (String) -> Input c=10:00:00Z is not a valid time
+                '10:00:00Z' (String) -> Input c=10:00Z has a time zone, which the column's input binding does not take
                 'bad' (String) -> Input c=bad is not a valid time
+                """);
+    }
+
+    @Test
+    void times_with_an_offset_are_ordered_by_instant_on_a_line_of_their_own() {
+        // 09:00+01:00 is the instant of 08:00Z, and 10:00-02:00 that of 12:00Z: each pair is one boundary, written as first seen
+        var column = columnTaking(ColumnType.TIME, Zoning.ZONED, null, "< time(\"08:00:00Z\")", "time(\"09:00:00+01:00\")",
+                "> time(\"10:00:00-02:00\")", "> time(\"08:00:00\")", "not(time(\"08:00:00\"))", "-", "null, time(\"12:00:00Z\")");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..time("08:00:00Z")) rules=[0, 5] example=07:00Z (OffsetTime)
+                1 time("08:00:00Z") rules=[1, 5] example=08:00Z (OffsetTime)
+                2 (time("08:00:00Z")..time("10:00:00-02:00")) rules=[5] example=10:00Z (OffsetTime)
+                3 time("10:00:00-02:00") rules=[5, 6] example=10:00-02:00 (OffsetTime)
+                4 (time("10:00:00-02:00")..+inf) rules=[2, 5] example=11:00-02:00 (OffsetTime)
+                5 null missing rules=[4, 5, 6] example=-
+                """);
+        Assertions.assertThat(column.describe(List.of(0, 1, 2, 3, 4))).containsExactly("(-inf..+inf)");
+        Assertions.assertThat(lookups(column, null, OffsetTime.of(9, 0, 0, 0, ZoneOffset.ofHours(1)), "07:59:59.999999999Z",
+                "13:00:00+01:00", "12:00:00.000000001Z", "08:00", "08:00@Europe/Paris")).isEqualTo("""
+                null -> [4, 5, 6]
+                '09:00+01:00' (OffsetTime) -> [1, 5]
+                '07:59:59.999999999Z' (String) -> [0, 5]
+                '13:00:00+01:00' (String) -> [5, 6]
+                '12:00:00.000000001Z' (String) -> [2, 5]
+                '08:00' (String) -> Input c=08:00 has no time zone, which the column's input binding requires
+                '08:00@Europe/Paris' (String) -> Input c=08:00@Europe/Paris is not a valid time
+                """);
+    }
+
+    @Test
+    void times_with_an_offset_span_from_minus_18_to_42_hours_by_instant() {
+        var column = columnTaking(ColumnType.TIME, Zoning.ZONED, null, "<= time(\"00:00:00+18:00\")", ">= time(\"23:59:59.999999999-18:00\")",
+                "[time(\"01:00:00+02:00\")..time(\"23:00:00-02:00\")]");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..time("00:00:00+18:00")) empty rules=[]
+                1 time("00:00:00+18:00") rules=[0] example=00:00+18:00 (OffsetTime)
+                2 (time("00:00:00+18:00")..time("01:00:00+02:00")) rules=[] example=08:30+18:00 (OffsetTime)
+                3 time("01:00:00+02:00") rules=[2] example=01:00+02:00 (OffsetTime)
+                4 (time("01:00:00+02:00")..time("23:00:00-02:00")) rules=[2] example=14:00+02:00 (OffsetTime)
+                5 time("23:00:00-02:00") rules=[2] example=23:00-02:00 (OffsetTime)
+                6 (time("23:00:00-02:00")..time("23:59:59.999999999-18:00")) rules=[] example=23:29:59.999999999-10:00 (OffsetTime)
+                7 time("23:59:59.999999999-18:00") rules=[1] example=23:59:59.999999999-18:00 (OffsetTime)
+                8 (time("23:59:59.999999999-18:00")..+inf) empty rules=[]
+                9 null missing rules=[] example=-
+                """);
+    }
+
+    @Test
+    void map_inputs_split_times_without_and_with_a_zone_into_two_lines() {
+        var column = columnTaking(ColumnType.TIME, Zoning.EITHER, null, "< time(\"12:00:00\")", ">= time(\"12:00:00+01:00\")", "not(null)",
+                "not(time(\"12:00:00\"))");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..time("12:00:00")) rules=[0, 2, 3] example=11:00 (LocalTime)
+                1 time("12:00:00") rules=[2] example=12:00 (LocalTime)
+                2 (time("12:00:00")..+inf) rules=[2, 3] example=13:00 (LocalTime)
+                3 (-inf..time("12:00:00+01:00")) rules=[2] example=11:00+01:00 (OffsetTime)
+                4 time("12:00:00+01:00") rules=[1, 2] example=12:00+01:00 (OffsetTime)
+                5 (time("12:00:00+01:00")..+inf) rules=[1, 2] example=13:00+01:00 (OffsetTime)
+                6 null missing rules=[3] example=-
+                """);
+        // runs never cross from one line to the other; a whole line says which it is
+        Assertions.assertThat(column.describe(List.of(1, 2, 3)))
+                .containsExactly("[time(\"12:00:00\")..+inf)", "(-inf..time(\"12:00:00+01:00\"))");
+        Assertions.assertThat(column.describe(List.of(0, 1, 2, 4, 5)))
+                .containsExactly("any time without a time zone", "[time(\"12:00:00+01:00\")..+inf)");
+        Assertions.assertThat(column.describe(List.of(3, 4, 5))).containsExactly("any time with a time zone");
+        Assertions.assertThat(lookups(column, LocalTime.NOON, "11:00:00Z", "12:00", "11:00:00.000000001Z")).isEqualTo("""
+                '12:00' (LocalTime) -> [2]
+                '11:00:00Z' (String) -> [1, 2]
+                '12:00' (String) -> [2]
+                '11:00:00.000000001Z' (String) -> [1, 2]
+                """);
+    }
+
+    @Test
+    void date_times_with_a_zone_are_ordered_by_instant_whatever_the_zone() {
+        var column = columnTaking(ColumnType.DATE_TIME, Zoning.EITHER,
+                "[date and time(\"2025-01-01T00:00:00Z\")..date and time(\"2026-01-01T00:00:00Z\")), date and time(\"2025-06-01T00:00:00\")",
+                "< date and time(\"2025-03-30T03:00:00@Europe/Paris\")", "date and time(\"2025-03-30T01:00:00Z\")",
+                "> date and time(\"2025-03-30T01:00:00.000000001Z\")");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..date and time("2025-06-01T00:00:00")) disallowed rules=[] example=2025-05-31T00:00 (LocalDateTime)
+                1 date and time("2025-06-01T00:00:00") rules=[] example=2025-06-01T00:00 (LocalDateTime)
+                2 (date and time("2025-06-01T00:00:00")..+inf) disallowed rules=[] example=2025-06-02T00:00 (LocalDateTime)
+                3 (-inf..date and time("2025-01-01T00:00:00Z")) disallowed rules=[0] example=2024-12-31T00:00Z (ZonedDateTime)
+                4 date and time("2025-01-01T00:00:00Z") rules=[0] example=2025-01-01T00:00Z (ZonedDateTime)
+                5 (date and time("2025-01-01T00:00:00Z")..date and time("2025-03-30T03:00:00@Europe/Paris")) rules=[0] \
+                example=2025-02-14T00:30Z (ZonedDateTime)
+                6 date and time("2025-03-30T03:00:00@Europe/Paris") rules=[1] example=2025-03-30T03:00+02:00[Europe/Paris] (ZonedDateTime)
+                7 (date and time("2025-03-30T03:00:00@Europe/Paris")..date and time("2025-03-30T01:00:00.000000001Z")) empty rules=[]
+                8 date and time("2025-03-30T01:00:00.000000001Z") rules=[] example=2025-03-30T01:00:00.000000001Z (ZonedDateTime)
+                9 (date and time("2025-03-30T01:00:00.000000001Z")..date and time("2026-01-01T00:00:00Z")) rules=[2] \
+                example=2025-08-15T12:30Z (ZonedDateTime)
+                10 date and time("2026-01-01T00:00:00Z") disallowed rules=[2] example=2026-01-01T00:00Z (ZonedDateTime)
+                11 (date and time("2026-01-01T00:00:00Z")..+inf) disallowed rules=[2] example=2026-01-02T00:00Z (ZonedDateTime)
+                12 null missing rules=[] example=-
+                """);
+        Assertions.assertThat(lookups(column, ZonedDateTime.of(2025, 3, 30, 3, 0, 0, 0, ZoneOffset.ofHours(2)), "2025-03-30T01:00:00Z",
+                "2025-03-30T03:00:00+02:00[Europe/Paris]", "2025-03-30T01:00:00@UTC", "2025-06-01T00:00", "2025-06-01T00:00:00+00:00",
+                "2027-01-01T00:00Z", "2025-01-01T00:00@Mars/Olympus")).isEqualTo("""
+                '2025-03-30T03:00+02:00' (ZonedDateTime) -> [1]
+                '2025-03-30T01:00:00Z' (String) -> [1]
+                '2025-03-30T03:00:00+02:00[Europe/Paris]' (String) -> [1]
+                '2025-03-30T01:00:00@UTC' (String) -> [1]
+                '2025-06-01T00:00' (String) -> []
+                '2025-06-01T00:00:00+00:00' (String) -> [2]
+                '2027-01-01T00:00Z' (String) -> Input c=2027-01-01T00:00Z is not one of the column's allowed input values
+                '2025-01-01T00:00@Mars/Olympus' (String) -> Input c=2025-01-01T00:00@Mars/Olympus is not a valid date and time
                 """);
     }
 
@@ -330,7 +441,7 @@ class ColumnIndexBehaviourTest {
     void comparing_string_classes_with_declared_values_and_an_enum() {
         var cells = cells(ColumnType.STRING, "< \"B\"", "> \"A\"");
         var allowed = CellParser.parse("\"A\",\"B\",\"C\"", ColumnType.STRING);
-        var column = new ColumnIndex("c", ColumnType.STRING, cells, allowed, 1, null);
+        var column = new ColumnIndex("c", ColumnType.STRING, cells, allowed, 1, Zoning.LOCAL, null);
         Assertions.assertThat(dump(column)).isEqualTo("""
                 0 (-inf.."A") disallowed rules=[0] example=0 (String)
                 1 "A" rules=[0] example=A (String)
@@ -349,7 +460,7 @@ class ColumnIndexBehaviourTest {
                 'Ab' (String) -> Input c=Ab is not one of the column's allowed input values
                 'D' (String) -> Input c=D is not one of the column's allowed input values
                 """);
-        var byEnum = new ColumnIndex("letter", ColumnType.STRING, cells, allowed, 1, new String[] {"A", "B", "C"});
+        var byEnum = new ColumnIndex("letter", ColumnType.STRING, cells, allowed, 1, Zoning.LOCAL, new String[] {"A", "B", "C"});
         Assertions.assertThat(lookups(byEnum, null, Letter.A, Letter.B, Letter.C)).isEqualTo("""
                 null -> []
                 'A' (Letter) -> [0]
@@ -363,7 +474,7 @@ class ColumnIndexBehaviourTest {
         var cells = cells(ColumnType.STRING, "\"A\",\"B\"", "not(\"A\")", "null");
         var enumValues = new String[] {"A", "B", "C"};
         var column = new ColumnIndex("letter", ColumnType.STRING, cells, CellParser.parse("\"A\",\"B\",\"C\"", ColumnType.STRING), 1,
-                enumValues);
+                Zoning.LOCAL, enumValues);
         Assertions.assertThat(lookups(column, null, Letter.A, Letter.B, Letter.C)).isEqualTo("""
                 null -> [1, 2]
                 'A' (Letter) -> [0]
@@ -371,14 +482,18 @@ class ColumnIndexBehaviourTest {
                 'C' (Letter) -> [1]
                 """);
         var withoutC = CellParser.parse("\"A\",\"B\"", ColumnType.STRING);
-        Assertions.assertThatThrownBy(() -> new ColumnIndex("letter", ColumnType.STRING, cells, withoutC, 1, enumValues))
+        Assertions.assertThatThrownBy(() -> new ColumnIndex("letter", ColumnType.STRING, cells, withoutC, 1, Zoning.LOCAL, enumValues))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessage("Column 'letter': enum value 'C' is not one of the column's input values");
     }
 
     private static ColumnIndex column(ColumnType type, String allowed, String... cells) {
+        return columnTaking(type, Zoning.LOCAL, allowed, cells);
+    }
+
+    private static ColumnIndex columnTaking(ColumnType type, Zoning zoning, String allowed, String... cells) {
         var allowedTests = allowed == null ? null : CellParser.parse(allowed, type);
-        return new ColumnIndex("c", type, cells(type, cells), allowedTests, BitsetIndex.wordsFor(cells.length), null);
+        return new ColumnIndex("c", type, cells(type, cells), allowedTests, BitsetIndex.wordsFor(cells.length), zoning, null);
     }
 
     private static List<UnaryTests> cells(ColumnType type, String... cells) {

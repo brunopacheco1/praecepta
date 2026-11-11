@@ -10,7 +10,9 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetTime;
 import java.time.Period;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -146,7 +148,8 @@ public final class PraeceptaEngine<I, O> {
         var enumValues = enumValuesByColumn(builder.bindings);
         var columnIndexes = evaluationOrder.stream()
                 .map(column -> new ColumnIndex(column, types.get(column), inBitOrder(cells.get(column), bitToRule),
-                        parseAllowedValues(column, types.get(column), allowedValues.get(column)), words, enumValues.get(column)))
+                        parseAllowedValues(column, types.get(column), allowedValues.get(column)), words, zoning(builder, column),
+                        enumValues.get(column)))
                 .toList();
         index = new BitsetIndex(columnIndexes, bitToRule);
 
@@ -594,6 +597,11 @@ public final class PraeceptaEngine<I, O> {
         return allowedValues;
     }
 
+    /** Whether a column's inputs have a time zone: as its getter says, or either way when read from text. */
+    private static Zoning zoning(Builder<?, ?> builder, String column) {
+        return builder.inputStrategy != null ? Zoning.EITHER : builder.bindings.get(column).zoning();
+    }
+
     /** For each enum-bound column, each constant's value by ordinal. */
     private static Map<String, String[]> enumValuesByColumn(Map<String, ? extends Builder.Binding<?>> bindings) {
         var byColumn = new HashMap<String, String[]>();
@@ -829,14 +837,40 @@ public final class PraeceptaEngine<I, O> {
             return bind(column, ColumnType.BOOLEAN, extractor);
         }
 
-        /** Binds a TIME column to a getter returning a time of day without a zone. */
+        /**
+         * Binds a TIME column to a getter returning a time of day without a zone. Cells with an offset
+         * ({@code time("08:30:00+01:00")}) cannot be compared with such times: they never match them.
+         */
         public Builder<I, O> timeInput(String column, Function<? super I, LocalTime> extractor) {
             return bind(column, ColumnType.TIME, extractor);
         }
 
-        /** Binds a DATE_TIME column to a getter returning a date and time without a zone. */
+        /**
+         * Binds a TIME column to a getter returning a time of day with an offset, compared by instant
+         * ({@code 08:30+01:00} equals {@code 07:30Z}). Cells without a zone ({@code time("08:30:00")})
+         * cannot be compared with such times: they never match them.
+         */
+        public Builder<I, O> offsetTimeInput(String column, Function<? super I, OffsetTime> extractor) {
+            return bind(column, ColumnType.TIME, extractor, null, Zoning.ZONED);
+        }
+
+        /**
+         * Binds a DATE_TIME column to a getter returning a date and time without a zone. Cells with a zone
+         * ({@code date and time("2025-01-31T08:30:00Z")}) cannot be compared with such values: they never
+         * match them.
+         */
         public Builder<I, O> dateTimeInput(String column, Function<? super I, LocalDateTime> extractor) {
             return bind(column, ColumnType.DATE_TIME, extractor);
+        }
+
+        /**
+         * Binds a DATE_TIME column to a getter returning a date and time with an offset or a zone id,
+         * compared by instant. An {@code OffsetDateTime} binds through {@code OffsetDateTime::toZonedDateTime}.
+         * Cells without a zone ({@code date and time("2025-01-31T08:30:00")}) cannot be compared with such
+         * values: they never match them.
+         */
+        public Builder<I, O> zonedDateTimeInput(String column, Function<? super I, ZonedDateTime> extractor) {
+            return bind(column, ColumnType.DATE_TIME, extractor, null, Zoning.ZONED);
         }
 
         /** Binds a DAY_TIME_DURATION column to a getter returning a duration, compared by length. */
@@ -868,12 +902,14 @@ public final class PraeceptaEngine<I, O> {
             Objects.requireNonNull(type, "type");
             Objects.requireNonNull(value, "value");
             var values = Arrays.stream(type.getEnumConstants()).map(value).toList();
-            return bind(column, ColumnType.STRING, extractor, values);
+            return bind(column, ColumnType.STRING, extractor, values, Zoning.LOCAL);
         }
 
         /**
          * Converts each input to a map of column values (as text). Simpler than per-column binding, but
-         * slower. Columns are STRING unless declared otherwise with {@link #columnType}.
+         * slower. Columns are STRING unless declared otherwise with {@link #columnType}. Times and
+         * date-times may be given with or without a time zone, so the validation report also looks for
+         * gaps among both.
          */
         public Builder<I, O> inputs(InputStrategy<I> inputStrategy) {
             this.inputStrategy = Objects.requireNonNull(inputStrategy, "inputStrategy");
@@ -953,13 +989,14 @@ public final class PraeceptaEngine<I, O> {
         }
 
         private Builder<I, O> bind(String column, ColumnType type, Function<? super I, ?> extractor) {
-            return bind(column, type, extractor, null);
+            return bind(column, type, extractor, null, Zoning.LOCAL);
         }
 
-        private Builder<I, O> bind(String column, ColumnType type, Function<? super I, ?> extractor, List<String> enumValues) {
+        private Builder<I, O> bind(String column, ColumnType type, Function<? super I, ?> extractor, List<String> enumValues,
+                Zoning zoning) {
             Objects.requireNonNull(column, COLUMN);
             Objects.requireNonNull(extractor, "extractor");
-            if (bindings.putIfAbsent(column, new Binding<>(type, extractor, enumValues)) != null) {
+            if (bindings.putIfAbsent(column, new Binding<>(type, extractor, enumValues, zoning)) != null) {
                 throw new IllegalArgumentException("Input column '%s' is declared twice".formatted(column));
             }
             return this;
@@ -1002,8 +1039,11 @@ public final class PraeceptaEngine<I, O> {
             }
         }
 
-        /** @param enumValues for an enum-bound column, each constant's value by ordinal; else null */
-        private record Binding<I>(ColumnType type, Function<? super I, ?> extractor, List<String> enumValues) {
+        /**
+         * @param enumValues for an enum-bound column, each constant's value by ordinal; else null
+         * @param zoning     whether the getter's times and date-times have a time zone
+         */
+        private record Binding<I>(ColumnType type, Function<? super I, ?> extractor, List<String> enumValues, Zoning zoning) {
         }
     }
 }

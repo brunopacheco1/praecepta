@@ -46,8 +46,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * <p>Supported: decision tables whose input expressions name an input variable, with
  * {@code string}, {@code number} (or {@code integer}, {@code long}, {@code double}), {@code date},
  * {@code boolean}, {@code time}, {@code dateTime} (or {@code date and time}), {@code dayTimeDuration} and
- * {@code yearMonthDuration} (or their FEEL names) columns, times without
- * a zone; columns typed by an item definition of one of those types, whose allowed values become the
+ * {@code yearMonthDuration} (or their FEEL names) columns, times and date-times with or without a time zone
+ * (but no time with a zone id, which has no fixed offset); columns typed by an item definition of one of those types, whose allowed values become the
  * input value list unless the input declares its own; input entries in Praecepta's FEEL subset
  * (lists, {@code not(...)}, {@code null}, comparisons, intervals, {@code -}); input and output value
  * lists; output entries that are literals or name one of the table's inputs (of the output's type, or

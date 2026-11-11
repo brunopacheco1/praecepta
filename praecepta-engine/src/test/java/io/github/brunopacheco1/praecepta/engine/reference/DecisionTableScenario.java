@@ -10,13 +10,19 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetTime;
 import java.time.Period;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
@@ -42,8 +48,12 @@ import net.jqwik.api.Tuple;
  * that both kinds of string column (with and without comparisons) are common, and string inputs
  * include values between and around the letters the cells mention. Values come from small domains, and dates are consecutive
  * days, so overlaps, boundaries and empty gaps between days are frequent; times and date-times step
- * by half an hour and twelve hours, and inputs fall on and between those steps. Some columns declare
- * input values, and inputs include values outside them.
+ * by half an hour and twelve hours, and inputs fall on and between those steps. Half the time and
+ * date-time columns take values with a time zone (bound with {@code offsetTimeInput} and
+ * {@code zonedDateTimeInput}): the same instants, written at various offsets and zones, so that equal
+ * instants written differently are frequent. One literal in five of a time or date-time column has the
+ * other kind (a zone where the inputs have none, or none where they have one), which FEEL cannot compare
+ * with the inputs. Some columns declare input values, and inputs include values outside them.
  *
  * <p>Every rule has outputs {@code id} (its 1-based position, unique), {@code out} (one of x/y/z,
  * often shared), {@code n} (a small number, for aggregation) and {@code echo}, which one time in three
@@ -51,7 +61,7 @@ import net.jqwik.api.Tuple;
  * string input may also have.
  */
 public record DecisionTableScenario(List<String> columns, Map<String, ColumnType> types, Map<String, String> allowedValues,
-        List<Praeceptum> rules, List<Map<String, Object>> inputs, boolean feelCells) {
+        List<Praeceptum> rules, List<Map<String, Object>> inputs, boolean feelCells, Set<String> zonedColumns) {
 
     public static final String ID = "id";
     public static final String OUT = "out";
@@ -67,9 +77,21 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     static final LocalDateTime MOMENT0 = DAY0.atTime(6, 0);
     /** String values: a column's domain is the first two to four; comparisons and intervals use all six. */
     private static final List<String> LETTERS = List.of("a", "b", "c", "d", "e", "f");
+    /** The offsets times with a zone are written at. */
+    private static final List<ZoneOffset> OFFSETS = List.of(ZoneOffset.UTC, ZoneOffset.ofHours(1), ZoneOffset.ofHours(-5),
+            ZoneOffset.ofHoursMinutes(5, 30));
+    /** The zones date-times with a zone are written in: offsets, and zone ids with daylight saving time. */
+    private static final List<ZoneId> ZONES = List.of(ZoneOffset.UTC, ZoneOffset.ofHours(1), ZoneOffset.ofHours(-5),
+            ZoneId.of("Europe/Paris"), ZoneId.of("America/New_York"));
 
-    /** Column definition: type, string domain, and declared input values (null if none). */
-    private record Column(ColumnType type, List<String> domain, String allowed) {
+    /**
+     * Column definition: type, string domain, declared input values (null if none), and for a time or
+     * date-time column, whether its inputs have a time zone.
+     */
+    private record Column(ColumnType type, List<String> domain, String allowed, boolean zoned) {
+        Column(ColumnType type, List<String> domain, String allowed) {
+            this(type, domain, allowed, false);
+        }
     }
 
     /** Scenarios in Praecepta's syntax, and as often in strict FEEL with cells naming other columns. */
@@ -95,7 +117,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             }
             rewritten.add(new Praeceptum(rule.priority(), new PraeceptaInput(cells), rule.output()));
         }
-        return new DecisionTableScenario(columns, types, allowedValues, List.copyOf(rewritten), inputs, true);
+        return new DecisionTableScenario(columns, types, allowedValues, List.copyOf(rewritten), inputs, true, zonedColumns);
     }
 
     private String variableCell(ColumnType type, int r, int c) {
@@ -139,15 +161,17 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             var maybe = declareStrings ? declared : oneTimeInThree(declared);
             return maybe.map(allowed -> new Column(ColumnType.STRING, domain, allowed));
         });
-        var number = oneTimeInThree(interval(ColumnType.NUMBER)).map(allowed -> new Column(ColumnType.NUMBER, List.of(), allowed));
-        var date = oneTimeInThree(interval(ColumnType.DATE)).map(allowed -> new Column(ColumnType.DATE, List.of(), allowed));
+        var number = oneTimeInThree(interval(ColumnType.NUMBER, false)).map(allowed -> new Column(ColumnType.NUMBER, List.of(), allowed));
+        var date = oneTimeInThree(interval(ColumnType.DATE, false)).map(allowed -> new Column(ColumnType.DATE, List.of(), allowed));
         var bool = oneTimeInThree(Arbitraries.of("true", "false", "true, false"))
                 .map(allowed -> new Column(ColumnType.BOOLEAN, List.of(), allowed));
-        var time = oneTimeInThree(interval(ColumnType.TIME)).map(allowed -> new Column(ColumnType.TIME, List.of(), allowed));
-        var dateTime = oneTimeInThree(interval(ColumnType.DATE_TIME)).map(allowed -> new Column(ColumnType.DATE_TIME, List.of(), allowed));
-        var dayTime = oneTimeInThree(interval(ColumnType.DAY_TIME_DURATION))
+        var time = Arbitraries.of(false, true).flatMap(zoned -> oneTimeInThree(interval(ColumnType.TIME, zoned))
+                .map(allowed -> new Column(ColumnType.TIME, List.of(), allowed, zoned)));
+        var dateTime = Arbitraries.of(false, true).flatMap(zoned -> oneTimeInThree(interval(ColumnType.DATE_TIME, zoned))
+                .map(allowed -> new Column(ColumnType.DATE_TIME, List.of(), allowed, zoned)));
+        var dayTime = oneTimeInThree(interval(ColumnType.DAY_TIME_DURATION, false))
                 .map(allowed -> new Column(ColumnType.DAY_TIME_DURATION, List.of(), allowed));
-        var yearMonth = oneTimeInThree(interval(ColumnType.YEAR_MONTH_DURATION))
+        var yearMonth = oneTimeInThree(interval(ColumnType.YEAR_MONTH_DURATION, false))
                 .map(allowed -> new Column(ColumnType.YEAR_MONTH_DURATION, List.of(), allowed));
         return Arbitraries.frequencyOf(Tuple.of(4, string), Tuple.of(2, number), Tuple.of(2, date),
                 Tuple.of(1, bool), Tuple.of(1, time), Tuple.of(1, dateTime), Tuple.of(1, dayTime), Tuple.of(1, yearMonth));
@@ -199,15 +223,40 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             case DATE -> Arbitraries.integers().between(0, 5).flatMap(d -> Arbitraries.of(
                     "date(\"" + DAY0.plusDays(d) + "\")", DAY0.plusDays(d).toString()));
             case BOOLEAN -> Arbitraries.of("true", "false");
-            case TIME -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(
-                    value(ColumnType.TIME, i), TIME0.plusMinutes(30L * i).toString()));
-            case DATE_TIME -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(
-                    value(ColumnType.DATE_TIME, i), MOMENT0.plusHours(12L * i).toString()));
+            case TIME, DATE_TIME -> Arbitraries.frequencyOf(Tuple.of(4, temporalLiteral(column.type(), column.zoned())),
+                    Tuple.of(1, temporalLiteral(column.type(), !column.zoned())));
             case DAY_TIME_DURATION -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(
-                    value(ColumnType.DAY_TIME_DURATION, i), FeelLiterals.text(dayTime(i))));
+                    value(ColumnType.DAY_TIME_DURATION, i, -1), FeelLiterals.text(dayTime(i))));
             case YEAR_MONTH_DURATION -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(
-                    value(ColumnType.YEAR_MONTH_DURATION, i), FeelLiterals.text(yearMonth(i))));
+                    value(ColumnType.YEAR_MONTH_DURATION, i, -1), FeelLiterals.text(yearMonth(i))));
         };
+    }
+
+    /**
+     * A time or date-time, with a zone or without, written with its function or as bare text. Without a
+     * zone, the bare text has no seconds ({@code 08:30}), as people write it.
+     */
+    private static Arbitrary<String> temporalLiteral(ColumnType type, boolean zoned) {
+        return Combinators.combine(Arbitraries.integers().between(0, 5), zone(type, zoned)).as((i, zone) -> temporal(type, i, zone))
+                .flatMap(value -> Arbitraries.of(FeelLiterals.literal(value), zoned ? FeelLiterals.text(value) : value.toString()));
+    }
+
+    /** Which of {@link #OFFSETS} or {@link #ZONES} to write a value in; -1, none, if not {@code zoned}. */
+    private static Arbitrary<Integer> zone(ColumnType type, boolean zoned) {
+        return zoned ? Arbitraries.integers().between(0, (type == ColumnType.TIME ? OFFSETS : ZONES).size() - 1) : Arbitraries.just(-1);
+    }
+
+    /**
+     * Step {@code i} of a time (half hours from 08:00) or date-time (twelve hours from 2025-01-01T06:00):
+     * without a zone if {@code zone} is -1, else the same instant at offset zero, written at that offset or zone.
+     */
+    static Comparable<?> temporal(ColumnType type, int i, int zone) {
+        if (type == ColumnType.TIME) {
+            var time = TIME0.plusMinutes(30L * i);
+            return zone < 0 ? time : OffsetTime.of(time, ZoneOffset.UTC).withOffsetSameInstant(OFFSETS.get(zone));
+        }
+        var moment = MOMENT0.plusHours(12L * i);
+        return zone < 0 ? moment : moment.atZone(ZoneOffset.UTC).withZoneSameInstant(ZONES.get(zone));
     }
 
     /** Days and time durations step by six hours, so that four steps make a day. */
@@ -228,21 +277,28 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             return literal(column);
         }
         var comparison = Combinators.combine(Arbitraries.of("<", "<=", ">", ">="), literal(column)).as((op, v) -> op + " " + v);
-        return Arbitraries.oneOf(comparison, interval(column.type()));
+        var interval = column.type() == ColumnType.TIME || column.type() == ColumnType.DATE_TIME
+                ? Arbitraries.frequencyOf(Tuple.of(4, interval(column.type(), column.zoned())), Tuple.of(1, interval(column.type(), !column.zoned())))
+                : interval(column.type(), false);
+        return Arbitraries.oneOf(comparison, interval);
     }
 
-    private static Arbitrary<String> interval(ColumnType type) {
+    /** An interval between two steps; with a zone, each end is written in a zone of its own. */
+    private static Arbitrary<String> interval(ColumnType type, boolean zoned) {
         return Combinators.combine(Arbitraries.integers().between(0, 5), Arbitraries.integers().between(0, 5),
-                Arbitraries.of("[", "(", "]"), Arbitraries.of("]", ")", "["))
-                .as((a, b, open, close) -> open + value(type, Math.min(a, b)) + ".." + value(type, Math.max(a, b)) + close);
+                Arbitraries.of("[", "(", "]"), Arbitraries.of("]", ")", "["), zone(type, zoned), zone(type, zoned))
+                .as((a, b, open, close, lowZone, highZone) -> open + value(type, Math.min(a, b), lowZone) + ".."
+                        + value(type, Math.max(a, b), highZone) + close);
     }
 
-    private static String value(ColumnType type, int i) {
+    private static String value(ColumnType type, int i, int zone) {
         return switch (type) {
             case NUMBER -> String.valueOf(i);
             case DATE -> "date(\"" + DAY0.plusDays(i) + "\")";
-            case TIME -> "time(\"" + DateTimeFormatter.ISO_LOCAL_TIME.format(TIME0.plusMinutes(30L * i)) + "\")";
-            case DATE_TIME -> "date and time(\"" + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(MOMENT0.plusHours(12L * i)) + "\")";
+            case TIME -> zone >= 0 ? FeelLiterals.literal(temporal(type, i, zone))
+                    : "time(\"" + DateTimeFormatter.ISO_LOCAL_TIME.format(TIME0.plusMinutes(30L * i)) + "\")";
+            case DATE_TIME -> zone >= 0 ? FeelLiterals.literal(temporal(type, i, zone))
+                    : "date and time(\"" + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(MOMENT0.plusHours(12L * i)) + "\")";
             case STRING -> "\"" + LETTERS.get(i) + "\"";
             case DAY_TIME_DURATION -> FeelLiterals.literal(dayTime(i));
             case YEAR_MONTH_DURATION -> FeelLiterals.literal(yearMonth(i));
@@ -269,9 +325,17 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                         .injectNull(0.15);
                 case DATE -> Arbitraries.integers().between(-1, 6).<Object>map(DAY0::plusDays).injectNull(0.15);
                 case BOOLEAN -> Arbitraries.<Object>of(true, false).injectNull(0.15);
-                // quarter steps: on every boundary and halfway between them
-                case TIME -> Arbitraries.integers().between(-2, 12).<Object>map(q -> TIME0.plusMinutes(15L * q)).injectNull(0.15);
-                case DATE_TIME -> Arbitraries.integers().between(-2, 12).<Object>map(q -> MOMENT0.plusHours(6L * q)).injectNull(0.15);
+                // quarter steps: on every boundary and halfway between them; with a zone, the same instants in various zones
+                case TIME -> Combinators.combine(Arbitraries.integers().between(-2, 12), zone(ColumnType.TIME, column.zoned()))
+                        .<Object>as((q, zone) -> {
+                            var time = TIME0.plusMinutes(15L * q);
+                            return zone < 0 ? time : OffsetTime.of(time, ZoneOffset.UTC).withOffsetSameInstant(OFFSETS.get(zone));
+                        }).injectNull(0.15);
+                case DATE_TIME -> Combinators.combine(Arbitraries.integers().between(-2, 12), zone(ColumnType.DATE_TIME, column.zoned()))
+                        .<Object>as((q, zone) -> {
+                            var moment = MOMENT0.plusHours(6L * q);
+                            return zone < 0 ? moment : moment.atZone(ZoneOffset.UTC).withZoneSameInstant(ZONES.get(zone));
+                        }).injectNull(0.15);
                 // half steps, negative ones included; periods are not normalised, so P12M must equal P1Y
                 case DAY_TIME_DURATION -> Arbitraries.integers().between(-2, 12).<Object>map(h -> Duration.ofHours(3L * h)).injectNull(0.15);
                 case YEAR_MONTH_DURATION -> Arbitraries.integers().between(-2, 14).<Object>map(Period::ofMonths).injectNull(0.15);
@@ -284,10 +348,14 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         var names = new ArrayList<String>();
         var types = new LinkedHashMap<String, ColumnType>();
         var allowed = new LinkedHashMap<String, String>();
+        var zoned = new LinkedHashSet<String>();
         for (int c = 0; c < columns.size(); c++) {
             var name = "c" + c;
             names.add(name);
             types.put(name, columns.get(c).type());
+            if (columns.get(c).zoned()) {
+                zoned.add(name);
+            }
             if (columns.get(c).allowed() != null) {
                 allowed.put(name, columns.get(c).allowed());
             }
@@ -315,12 +383,20 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             inputs.add(input);
         }
         return new DecisionTableScenario(List.copyOf(names), Map.copyOf(types), Map.copyOf(allowed), List.copyOf(rules), List.copyOf(inputs),
-                false);
+                false, Set.copyOf(zoned));
     }
 
-    /** Binds every column to the input map with the typed getter of its type. */
+    /** Binds every column to the input map with the typed getter of its type, and of its zone for times and date-times. */
     public <O> void bindColumns(PraeceptaEngine.Builder<Map<String, Object>, O> builder) {
         for (var column : columns) {
+            if (zonedColumns.contains(column)) {
+                if (types.get(column) == ColumnType.TIME) {
+                    builder.offsetTimeInput(column, input -> (OffsetTime) input.get(column));
+                } else {
+                    builder.zonedDateTimeInput(column, input -> (ZonedDateTime) input.get(column));
+                }
+                continue;
+            }
             switch (types.get(column)) {
                 case STRING -> builder.input(column, input -> (String) input.get(column));
                 case NUMBER -> builder.numberInput(column, input -> (BigDecimal) input.get(column));
@@ -335,7 +411,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     }
 
     public ReferenceMatcher reference(List<Praeceptum> tableRules, HitPolicy policy, Map<String, List<String>> outputPriority) {
-        return new ReferenceMatcher(tableRules, policy, outputPriority, types, allowedValues, feelCells);
+        return new ReferenceMatcher(tableRules, policy, outputPriority, types, allowedValues, feelCells, zonedColumns);
     }
 
     public List<String> ids(List<PraeceptaOutput> outputs) {
@@ -368,7 +444,10 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         return policy == HitPolicy.PRIORITY || policy == HitPolicy.OUTPUT_ORDER ? Map.of(OUT, priority) : Map.of();
     }
 
-    /** The input as text, for map-based binding: numbers in plain notation, dates in ISO format. */
+    /**
+     * The input as text, for map-based binding: numbers in plain notation, dates in ISO format, and
+     * date-times with a zone id as Java writes them ({@code 2025-01-01T07:00+01:00[Europe/Paris]}).
+     */
     public static Map<String, String> asText(Map<String, Object> input) {
         var text = new HashMap<String, String>();
         input.forEach((column, value) -> text.put(column, switch (value) {

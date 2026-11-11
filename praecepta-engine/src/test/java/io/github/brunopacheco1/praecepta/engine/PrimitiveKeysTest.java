@@ -10,6 +10,10 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.List;
 
@@ -17,6 +21,7 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 
 /** The keyed lookup finds the class the search over the boundaries finds, or declines (-1). */
@@ -69,6 +74,23 @@ class PrimitiveKeysTest {
         Assertions.assertThat(keys.classOf(LocalDateTime.MAX)).isEqualTo(-1);
     }
 
+    @Test
+    void zoned_times_and_date_times_are_keyed_by_instant() {
+        var plusOne = ZoneOffset.ofHours(1);
+        // 09:00+01:00 is the instant of 08:00Z, and 23:00-02:00 lies after both: 01:00 the next day at offset zero
+        assertSameClasses(ColumnType.TIME, List.of(OffsetTime.of(8, 0, 0, 0, ZoneOffset.UTC), OffsetTime.of(23, 0, 0, 0, ZoneOffset.ofHours(-2))),
+                List.of(OffsetTime.of(9, 0, 0, 0, plusOne), OffsetTime.of(8, 59, 0, 0, plusOne), OffsetTime.of(23, 30, 0, 0, ZoneOffset.UTC),
+                        OffsetTime.of(0, 0, 0, 0, ZoneOffset.ofHours(18)), OffsetTime.of(1, 0, 0, 1, ZoneOffset.UTC).withOffsetSameInstant(plusOne),
+                        OffsetTime.MAX, OffsetTime.MIN));
+        var paris = ZoneId.of("Europe/Paris");
+        assertSameClasses(ColumnType.DATE_TIME,
+                List.of(ZonedDateTime.of(2025, 3, 30, 3, 0, 0, 0, paris), ZonedDateTime.of(2025, 10, 26, 2, 30, 0, 0, paris)),
+                List.of(ZonedDateTime.of(2025, 3, 30, 1, 0, 0, 0, ZoneOffset.UTC),
+                        ZonedDateTime.of(2025, 3, 30, 0, 59, 59, 999_999_999, ZoneOffset.UTC),
+                        ZonedDateTime.of(2025, 10, 26, 2, 30, 0, 0, paris).withLaterOffsetAtOverlap(),
+                        ZonedDateTime.of(2025, 10, 26, 0, 30, 0, 0, ZoneOffset.UTC), ZonedDateTime.of(1969, 1, 1, 0, 0, 0, 0, plusOne)));
+    }
+
     private static void assertSameClasses(ColumnType type, List<? extends Comparable<?>> boundaryList, List<? extends Comparable<?>> values) {
         var boundaries = boundaryList.toArray(Comparable<?>[]::new);
         var keys = PrimitiveKeys.of(type, boundaries);
@@ -81,10 +103,9 @@ class PrimitiveKeysTest {
         return Arrays.stream(values).map(BigDecimal::new).toArray(Comparable<?>[]::new);
     }
 
-    /** The class as {@link ColumnIndex} finds it without keys. */
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    /** The class as {@link ColumnIndex} finds it without keys: values with a zone ordered by instant. */
     private static int searched(Comparable<?>[] boundaries, Object value) {
-        int found = Arrays.binarySearch(boundaries, value, (a, b) -> ((Comparable) a).compareTo(b));
+        int found = Arrays.binarySearch(boundaries, value, FeelTemporals::compare);
         return found >= 0 ? 2 * found + 1 : 2 * (-found - 1);
     }
 }

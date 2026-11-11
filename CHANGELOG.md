@@ -11,6 +11,39 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+### Added
+- **Times and date-times with a time zone** ([#70](https://github.com/brunopacheco1/praecepta/issues/70)):
+  TIME columns also take times with an offset (`time("16:12:00+01:00")`, `16:12:00Z`), held as
+  `OffsetTime`, and DATE_TIME columns date-times with an offset or a zone id
+  (`date and time("2018-07-30T16:12:00Z")`, `date and time("2018-07-30T16:12:00@Europe/Paris")`),
+  held as `ZonedDateTime`. As in FEEL, they compare by the instant they denote, so
+  `time("09:00:00+01:00")` equals `time("08:00:00Z")`, and comparing one with a value without a zone
+  is undefined: the test is unknown, so neither `time("08:00:00")` nor its `not(...)` matches
+  `08:00Z`. The builder gains `offsetTimeInput` and `zonedDateTimeInput` (bind an `OffsetDateTime`
+  through `toZonedDateTime()`); map-based inputs read both kinds from text, including the
+  `[Europe/Paris]` form `ZonedDateTime.toString()` writes. In the index, values with a zone lie on a
+  line of their own, ordered by instant and keyed in `PrimitiveKeys` by nanoseconds, and a column
+  has only the lines its binding can give, so gap analysis stays exact: a typed getter's column
+  is searched for gaps among its own kind only, a map-based one among both (a gap there reads, for
+  example, `start = any time with a time zone`). `DmnReader` and `DmnWriter` read and write the
+  zoned literals, and the new `feel.FeelTemporals` parses FEEL time text and orders values as FEEL
+  does. The Maven plugin generates `OffsetTime` and `ZonedDateTime` components for columns whose
+  values are all written with a zone (and for the inputs their cells compare with), and fails the
+  build for a column that mixes both kinds. A time with a zone id (`time("16:12:00@Europe/Paris")`)
+  is still rejected, as it has no fixed offset.
+
+### Changed
+- **Map-based inputs accept times and date-times with a time zone**, which they used to reject as
+  invalid: they now match only the cells that accept any value (or test with zoned literals), and
+  the validation report may list gaps among them for tables with time or date-time comparisons. Bind
+  such columns with `timeInput` or `dateTimeInput`, or declare their input values, to keep to values
+  without a zone.
+- **Cell values (`UnaryTests`)** may now be `OffsetTime` and `ZonedDateTime` in TIME and DATE_TIME
+  columns, and `FeelLiterals` writes them: code that switches over the value types of a cell needs
+  these cases.
+- **The Maven plugin validates a table with getters of the generated Java types** instead of
+  map-based inputs, so the build-time analysis matches what the generated code can evaluate.
+
 ## [0.3.0] - 2026-11-11
 
 Cells that compare with another input, duration columns, string ranges, COUNT, output entries that
