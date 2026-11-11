@@ -603,7 +603,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         for (var test : tests) {
             // a name of an input that holds a list: whether the value is in it (FEEL's ? in list)
             var outcome = test instanceof Equals(UnaryTests.Name(var name)) && inputs.apply(name) instanceof List<?> list
-                    ? (value == null ? Boolean.FALSE : some(list.stream().<Test>map(element -> new Equals((Comparable<?>) element)).toList(), List.of(value)))
+                    ? in(value, list)
                     : test(resolve(test, inputs), value);
             if (outcome == null) {
                 unknown = true;
@@ -612,6 +612,17 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             }
         }
         return unknown ? null : false;
+    }
+
+    /**
+     * Whether a value is in a list, as FEEL's {@code ? in list}: whether some element equals it, unknown
+     * (null) if none does but one cannot be compared with it. A missing value is in no list.
+     */
+    private static Boolean in(Object value, List<?> list) {
+        if (value == null) {
+            return Boolean.FALSE;
+        }
+        return some(list.stream().<Test>map(element -> new Equals((Comparable<?>) element)).toList(), List.of(value));
     }
 
     /** The test with each name replaced by that input's value, which may be null (missing). */

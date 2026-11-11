@@ -482,7 +482,8 @@ class ColumnIndexBehaviourTest {
                 'C' (Letter) -> [1]
                 """);
         var withoutC = CellParser.parse("\"A\",\"B\"", ColumnType.STRING);
-        Assertions.assertThatThrownBy(() -> new ColumnIndex("letter", ColumnType.STRING, cells, withoutC, 1, Zoning.LOCAL, enumValues, Masks.Form.AUTO))
+        Assertions.assertThatThrownBy(() -> new ColumnIndex("letter", ColumnType.STRING, cells, withoutC, 1, Zoning.LOCAL, enumValues,
+                Masks.Form.AUTO))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessage("Column 'letter': enum value 'C' is not one of the column's input values");
     }
