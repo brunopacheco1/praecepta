@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine.feel;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -36,6 +37,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   time("08:30:00")         time literal (TIME columns; a bare 08:30:00 is accepted as well)
  *   date and time("2025-01-31T08:30:00")
  *                            date-time literal (DATE_TIME columns; a bare 2025-01-31T08:30:00 too)
+ *   duration("P1DT2H")       days and time duration (DAY_TIME_DURATION columns; a bare P1DT2H too)
+ *   duration("P1Y2M")        years and months duration (YEAR_MONTH_DURATION columns; a bare P1Y2M too)
  *   true, false              boolean literals (BOOLEAN columns)
  *   &lt; 18, &gt;= 2.5, &lt; "N"      comparisons (all but BOOLEAN columns; strings compare lexicographically)
  *   [18..65), (0..1], ]a..b[  intervals; [ and ] include their end, ( ) and outward-facing brackets exclude it
@@ -58,6 +61,9 @@ public final class CellParser {
     private static final Pattern BARE_TIME = Pattern.compile("\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?");
     private static final Pattern DATE_TIME_CALL = Pattern.compile("date\\s+and\\s+time\\(\\s*\"([^\"]*)\"\\s*\\)");
     private static final Pattern BARE_DATE_TIME = Pattern.compile("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?");
+    private static final Pattern DURATION_CALL = Pattern.compile("duration\\(\\s*\"([^\"]*)\"\\s*\\)");
+    /** ISO 8601 durations: an optional sign, P, then digits, fractions and designators. */
+    private static final Pattern BARE_DURATION = Pattern.compile("-?P[0-9YMWDTHS.]+");
     /** The digits of an offset after its sign: 02, 0200 or 02:00. */
     private static final Pattern OFFSET_DIGITS = Pattern.compile("\\d{2}(:?\\d{2})?");
 
@@ -177,7 +183,18 @@ public final class CellParser {
                 case TIME -> temporal(text, TIME_CALL, BARE_TIME, LocalTime::parse, "time(\"hh:mm:ss\")");
                 case DATE_TIME -> temporal(text, DATE_TIME_CALL, BARE_DATE_TIME, LocalDateTime::parse,
                         "date and time(\"yyyy-mm-ddThh:mm:ss\")");
+                case DAY_TIME_DURATION -> temporal(text, DURATION_CALL, BARE_DURATION, Duration::parse, "duration(\"P1DT2H\")");
+                case YEAR_MONTH_DURATION -> temporal(text, DURATION_CALL, BARE_DURATION, Parser::yearsAndMonths, "duration(\"P1Y2M\")");
             };
+        }
+
+        /** A years and months duration; one with days (or weeks) is not one, so it fails to parse like any other. */
+        private static YearsAndMonths yearsAndMonths(String iso) {
+            try {
+                return YearsAndMonths.parse(iso);
+            } catch (IllegalArgumentException e) {
+                throw new DateTimeParseException(e.getMessage(), iso, 0, e);
+            }
         }
 
         private String string(String text) {
@@ -247,7 +264,7 @@ public final class CellParser {
         }
 
         /**
-         * A date, time or date-time: its FEEL function call, or, outside strict FEEL, the bare ISO text.
+         * A date, time, date-time or duration: its FEEL function call, or, outside strict FEEL, the bare ISO text.
          * Strict FEEL cannot take the bare form, as it reads {@code 2025-01-31} as {@code 2025 - 1 - 31}.
          */
         private Comparable<?> temporal(String text, Pattern call, Pattern bare, Function<String, Comparable<?>> parse, String hint) {

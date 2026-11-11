@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine.dmn;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -28,6 +29,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
+import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 
 /**
  * Writes a {@link DecisionTable} as a DMN 1.3 model with one decision. Cells are parsed and written
@@ -216,6 +218,8 @@ public final class DmnWriter {
                 case DATE -> LocalDate.parse(text);
                 case TIME -> LocalTime.parse(text);
                 case DATE_TIME -> LocalDateTime.parse(text);
+                case DAY_TIME_DURATION -> Duration.parse(text);
+                case YEAR_MONTH_DURATION -> YearsAndMonths.parse(text);
                 case BOOLEAN -> bool(text);
             });
         } catch (IllegalArgumentException | DateTimeParseException e) {
@@ -260,6 +264,8 @@ public final class DmnWriter {
             case BOOLEAN -> "boolean";
             case TIME -> "time";
             case DATE_TIME -> "dateTime";
+            case DAY_TIME_DURATION -> "dayTimeDuration";
+            case YEAR_MONTH_DURATION -> "yearMonthDuration";
         });
     }
 

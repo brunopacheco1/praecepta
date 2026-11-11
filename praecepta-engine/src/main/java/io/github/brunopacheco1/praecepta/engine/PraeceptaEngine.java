@@ -6,9 +6,11 @@
 package io.github.brunopacheco1.praecepta.engine;
 
 import java.lang.System.Logger.Level;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -278,18 +280,6 @@ public final class PraeceptaEngine<I, O> {
             this.outputs = outputs;
             this.columns = columns;
         }
-
-        Map<String, String> values() {
-            return values;
-        }
-
-        String[] outputs() {
-            return outputs;
-        }
-
-        int[] columns() {
-            return columns;
-        }
     }
 
     /**
@@ -326,11 +316,11 @@ public final class PraeceptaEngine<I, O> {
     /** The outputs of a rule that names inputs, filled in with the text of the input's values. */
     private <T> PraeceptaOutput output(int bit, T input, BitsetIndex.ColumnReader<T> reader) {
         var named = namedInputsByBit[bit];
-        var values = new HashMap<>(named.values());
-        for (int i = 0; i < named.outputs().length; i++) {
-            int column = named.columns()[i];
+        var values = new HashMap<>(named.values);
+        for (int i = 0; i < named.outputs.length; i++) {
+            int column = named.columns[i];
             var value = index.column(column).value(reader.read(input, column));
-            values.put(named.outputs()[i], value == null ? null : FeelLiterals.text(value));
+            values.put(named.outputs[i], value == null ? null : FeelLiterals.text(value));
         }
         return new PraeceptaOutput(values);
     }
@@ -705,6 +695,19 @@ public final class PraeceptaEngine<I, O> {
         /** Binds a DATE_TIME column to a getter returning a date and time without a zone. */
         public Builder<I, O> dateTimeInput(String column, Function<? super I, LocalDateTime> extractor) {
             return bind(column, ColumnType.DATE_TIME, extractor);
+        }
+
+        /** Binds a DAY_TIME_DURATION column to a getter returning a duration, compared by length. */
+        public Builder<I, O> durationInput(String column, Function<? super I, Duration> extractor) {
+            return bind(column, ColumnType.DAY_TIME_DURATION, extractor);
+        }
+
+        /**
+         * Binds a YEAR_MONTH_DURATION column to a getter returning a period of years and months, compared
+         * by its total of months ({@code P1Y} equals {@code P12M}); a period with days is not a valid value.
+         */
+        public Builder<I, O> periodInput(String column, Function<? super I, Period> extractor) {
+            return bind(column, ColumnType.YEAR_MONTH_DURATION, extractor);
         }
 
         /**

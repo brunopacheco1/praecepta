@@ -94,6 +94,8 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
                     case BOOLEAN -> builder.booleanInput(column, input -> (Boolean) input.get(column));
                     case TIME -> builder.timeInput(column, input -> (LocalTime) input.get(column));
                     case DATE_TIME -> builder.dateTimeInput(column, input -> (LocalDateTime) input.get(column));
+                    case DAY_TIME_DURATION -> builder.durationInput(column, input -> (java.time.Duration) input.get(column));
+                    case YEAR_MONTH_DURATION -> builder.periodInput(column, input -> (java.time.Period) input.get(column));
                 }
             }
             engine = builder.build();

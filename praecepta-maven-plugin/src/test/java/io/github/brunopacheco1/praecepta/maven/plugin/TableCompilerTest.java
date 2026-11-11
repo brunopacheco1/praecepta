@@ -14,9 +14,11 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -105,6 +107,31 @@ class TableCompilerTest {
             var outputs = (List<?>) evaluate.invoke(null, request);
             Assertions.assertThat(outputs).map(Object::toString)
                     .containsExactly("DiscountOutput[discount=0.15, tier=gold]", "DiscountOutput[discount=0.05, tier=silver]");
+        }
+    }
+
+    @Test
+    void duration_columns_become_durations_and_periods() throws Exception {
+        var config = new TableConfig(table("waits.csv"), "Wait", null, HitPolicy.FIRST, null,
+                List.of(new ColumnConfig("delay", ColumnType.DAY_TIME_DURATION, null, List.of()),
+                        new ColumnConfig("tenure", ColumnType.YEAR_MONTH_DURATION, null, List.of())),
+                List.of(new ColumnConfig("extension", ColumnType.DAY_TIME_DURATION, null, List.of()),
+                        new ColumnConfig("plan", ColumnType.STRING, null, List.of())));
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+
+        Assertions.assertThat(result.sources().get("WaitInput"))
+                .contains("public record WaitInput(java.time.Duration delay, java.time.Period tenure)");
+        Assertions.assertThat(result.dmn()).contains("typeRef=\"dayTimeDuration\"", "typeRef=\"yearMonthDuration\"",
+                "&gt;= duration(\"P1Y\")", "duration(\"P2DT6H\")");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".WaitInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Wait").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            var waited = (Optional<?>) evaluate.invoke(null, constructor.newInstance(Duration.ofHours(30), Period.ofMonths(14)));
+            Assertions.assertThat(waited).get().hasToString("WaitOutput[extension=PT54H, plan=long]");
+            var brief = (Optional<?>) evaluate.invoke(null, constructor.newInstance(Duration.ofHours(2), null));
+            Assertions.assertThat(brief).get().hasToString("WaitOutput[extension=PT12H, plan=short]");
         }
     }
 

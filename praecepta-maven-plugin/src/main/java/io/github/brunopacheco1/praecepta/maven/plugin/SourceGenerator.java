@@ -471,6 +471,8 @@ final class SourceGenerator {
                 case BOOLEAN -> new Converter("Boolean", "booleanInput", "bool", "Boolean.valueOf");
                 case TIME -> new Converter("java.time.LocalTime", "timeInput", "time", "java.time.LocalTime.parse");
                 case DATE_TIME -> new Converter("java.time.LocalDateTime", "dateTimeInput", "dateTime", "java.time.LocalDateTime.parse");
+                case DAY_TIME_DURATION -> new Converter("java.time.Duration", "durationInput", "duration", "java.time.Duration.parse");
+                case YEAR_MONTH_DURATION -> new Converter("java.time.Period", "periodInput", "period", "java.time.Period.parse");
             };
         }
     }

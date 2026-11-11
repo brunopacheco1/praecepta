@@ -27,11 +27,27 @@ public enum ColumnType {
      * Dates with a time of day, without a zone ({@code LocalDateTime}). Cells use
      * {@code date and time("2025-01-31T08:30:00")}, comparisons and intervals.
      */
-    DATE_TIME;
+    DATE_TIME,
+    /**
+     * Durations of days, hours, minutes and seconds ({@code java.time.Duration}), compared by length.
+     * Cells use {@code duration("P1DT2H")}, comparisons and intervals.
+     */
+    DAY_TIME_DURATION,
+    /**
+     * Durations of years and months ({@link io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths},
+     * bound from a {@code java.time.Period}), compared by their total of months ({@code P1Y} equals
+     * {@code P12M}). Cells use {@code duration("P1Y2M")}, comparisons and intervals.
+     */
+    YEAR_MONTH_DURATION;
 
     /** The type's name in FEEL and in messages: {@code string}, {@code number}, ..., {@code date and time}. */
     public String feelName() {
-        return this == DATE_TIME ? "date and time" : name().toLowerCase(Locale.ROOT);
+        return switch (this) {
+            case DATE_TIME -> "date and time";
+            case DAY_TIME_DURATION -> "days and time duration";
+            case YEAR_MONTH_DURATION -> "years and months duration";
+            default -> name().toLowerCase(Locale.ROOT);
+        };
     }
 
     /** Whether cells may compare values of this type ({@code <}, {@code >=}, intervals): all but BOOLEAN. */

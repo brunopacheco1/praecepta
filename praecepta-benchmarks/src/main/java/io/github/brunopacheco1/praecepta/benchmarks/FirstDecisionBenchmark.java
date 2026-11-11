@@ -105,6 +105,8 @@ public class FirstDecisionBenchmark {
             case BOOLEAN -> Boolean.valueOf(text);
             case TIME -> LocalTime.parse(text);
             case DATE_TIME -> LocalDateTime.parse(text);
+            case DAY_TIME_DURATION -> java.time.Duration.parse(text);
+            case YEAR_MONTH_DURATION -> java.time.Period.parse(text);
         };
     }
 }

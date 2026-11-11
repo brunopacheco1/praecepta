@@ -20,6 +20,14 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `tBureauCallType`, a `string` with the allowed values `"FULL","MINI","NONE"`. The column takes
   the base type, and the allowed values become its input value list unless the input declares its
   own. Item definitions may build on one another; structured types and collections are still rejected.
+- **Duration columns** ([#52](https://github.com/brunopacheco1/praecepta/issues/52)):
+  `DAY_TIME_DURATION` (`java.time.Duration`, bound with `durationInput`) and `YEAR_MONTH_DURATION`
+  (bound with `periodInput` from a `java.time.Period` of years and months, held as the new
+  comparable `feel.YearsAndMonths`, so `P12M` equals `P1Y`). Cells write `duration("P1DT2H")` or,
+  outside DMN, the bare ISO text, with comparisons and intervals. `DmnReader` and `DmnWriter` map
+  them to `dayTimeDuration` and `yearMonthDuration`, and the Maven plugin generates `Duration` and
+  `Period` components. The six TCK checks with duration columns also compare with other inputs, so
+  they wait for #51.
 - **Output entries that name an input** ([#53](https://github.com/brunopacheco1/praecepta/issues/53)):
   a DMN output entry `a` returns the input `a`. `PraeceptaOutput` gains `references` (output
   column to input column; the one-argument constructor keeps working), and the engine fills those

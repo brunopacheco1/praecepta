@@ -6,9 +6,11 @@
 package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.Period;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,6 +24,8 @@ import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
+import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
 import net.jqwik.api.Combinators;
@@ -96,8 +100,12 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 .map(allowed -> new Column(ColumnType.BOOLEAN, List.of(), allowed));
         var time = oneTimeInThree(interval(ColumnType.TIME)).map(allowed -> new Column(ColumnType.TIME, List.of(), allowed));
         var dateTime = oneTimeInThree(interval(ColumnType.DATE_TIME)).map(allowed -> new Column(ColumnType.DATE_TIME, List.of(), allowed));
+        var dayTime = oneTimeInThree(interval(ColumnType.DAY_TIME_DURATION))
+                .map(allowed -> new Column(ColumnType.DAY_TIME_DURATION, List.of(), allowed));
+        var yearMonth = oneTimeInThree(interval(ColumnType.YEAR_MONTH_DURATION))
+                .map(allowed -> new Column(ColumnType.YEAR_MONTH_DURATION, List.of(), allowed));
         return Arbitraries.frequencyOf(Tuple.of(4, string), Tuple.of(2, number), Tuple.of(2, date),
-                Tuple.of(1, bool), Tuple.of(1, time), Tuple.of(1, dateTime));
+                Tuple.of(1, bool), Tuple.of(1, time), Tuple.of(1, dateTime), Tuple.of(1, dayTime), Tuple.of(1, yearMonth));
     }
 
     /** Declared input values one time in three; otherwise none (null). */
@@ -150,7 +158,23 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                     value(ColumnType.TIME, i), TIME0.plusMinutes(30L * i).toString()));
             case DATE_TIME -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(
                     value(ColumnType.DATE_TIME, i), MOMENT0.plusHours(12L * i).toString()));
+            case DAY_TIME_DURATION -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(
+                    value(ColumnType.DAY_TIME_DURATION, i), FeelLiterals.text(dayTime(i))));
+            case YEAR_MONTH_DURATION -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(
+                    value(ColumnType.YEAR_MONTH_DURATION, i), FeelLiterals.text(yearMonth(i))));
         };
+    }
+
+    /** Days and time durations step by six hours, so that four steps make a day. */
+    private static Duration dayTime(int step) {
+        return Duration.ofHours(6L * step);
+    }
+
+    /** Years and months durations, unevenly spaced so that some intervals hold one month and some none. */
+    private static final List<Integer> MONTHS = List.of(0, 1, 3, 6, 12, 13);
+
+    private static YearsAndMonths yearMonth(int step) {
+        return new YearsAndMonths(MONTHS.get(step));
     }
 
     /** A comparison or an interval (ordered columns). */
@@ -175,6 +199,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             case TIME -> "time(\"" + DateTimeFormatter.ISO_LOCAL_TIME.format(TIME0.plusMinutes(30L * i)) + "\")";
             case DATE_TIME -> "date and time(\"" + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(MOMENT0.plusHours(12L * i)) + "\")";
             case STRING -> "\"" + LETTERS.get(i) + "\"";
+            case DAY_TIME_DURATION -> FeelLiterals.literal(dayTime(i));
+            case YEAR_MONTH_DURATION -> FeelLiterals.literal(yearMonth(i));
             case BOOLEAN -> throw new IllegalArgumentException("no intervals on " + type);
         };
     }
@@ -201,6 +227,9 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 // quarter steps: on every boundary and halfway between them
                 case TIME -> Arbitraries.integers().between(-2, 12).<Object>map(q -> TIME0.plusMinutes(15L * q)).injectNull(0.15);
                 case DATE_TIME -> Arbitraries.integers().between(-2, 12).<Object>map(q -> MOMENT0.plusHours(6L * q)).injectNull(0.15);
+                // half steps, negative ones included; periods are not normalised, so P12M must equal P1Y
+                case DAY_TIME_DURATION -> Arbitraries.integers().between(-2, 12).<Object>map(h -> Duration.ofHours(3L * h)).injectNull(0.15);
+                case YEAR_MONTH_DURATION -> Arbitraries.integers().between(-2, 14).<Object>map(Period::ofMonths).injectNull(0.15);
             });
         }
         return Combinators.combine(values).as(row -> new ArrayList<>(row));
@@ -253,6 +282,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 case BOOLEAN -> builder.booleanInput(column, input -> (Boolean) input.get(column));
                 case TIME -> builder.timeInput(column, input -> (LocalTime) input.get(column));
                 case DATE_TIME -> builder.dateTimeInput(column, input -> (LocalDateTime) input.get(column));
+                case DAY_TIME_DURATION -> builder.durationInput(column, input -> (Duration) input.get(column));
+                case YEAR_MONTH_DURATION -> builder.periodInput(column, input -> (Period) input.get(column));
             }
         }
     }
