@@ -60,6 +60,16 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   listed; other issues are logged as warnings. With `micronaut-management`, the `praecepta` endpoint
   reports every decision and its validation issues (`/praecepta`, `/praecepta/{name}`). Micronaut is
   `provided`, and the module needs no reflection. `praecepta.enabled=false` turns it off.
+- **Quarkus extension** ([#76](https://github.com/brunopacheco1/praecepta/issues/76)):
+  `praecepta-quarkus` (with its build-time module, `praecepta-quarkus-deployment`), for Quarkus 3.40 and
+  later. While Quarkus builds the application, it finds the DMN files under `rules/` on the class path
+  (`quarkus.praecepta.locations`), compiles the Excel and CSV tables declared under
+  `quarkus.praecepta.tables."<key>"` with the Maven plugin's settings in kebab-case, validates them and
+  fails the build on the configured issues (`quarkus.praecepta.fail-on`), listing every problem at once.
+  The application gets a `Decisions` bean and one map-based engine bean per decision, injected with
+  `@Identifier("Discount")` (or `@Named`), with the validation reports at runtime. In dev mode a changed
+  table restarts the application. Apache POI stays in the build; the extension uses no reflection, but
+  native images are not tested yet ([#19](https://github.com/brunopacheco1/praecepta/issues/19)).
 
 ### Changed
 - The release publishes every module but the benchmarks and the TCK runner, found by the build rather
