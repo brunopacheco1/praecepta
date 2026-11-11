@@ -1,0 +1,4 @@
+delay;tenure;extension;plan
+< P1D;;PT12H;short
+>= P1D;>= P1Y;P2DT6H;long
+;;;standard

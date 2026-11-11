@@ -29,7 +29,8 @@ them when you build; evaluate them with a dependency-free engine.
 # Features
 - All DMN hit policies: UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER and COLLECT
   (with SUM / MIN / MAX / COUNT aggregation)
-- DMN FEEL cells on STRING, NUMBER, DATE, BOOLEAN, TIME and DATE_TIME columns: lists, `not(...)`,
+- DMN FEEL cells on STRING, NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION and
+  YEAR_MONTH_DURATION columns: lists, `not(...)`,
   comparisons, intervals, `null`; unquoted `PT,ES` cells from earlier versions keep working
 - Optional DMN input value lists: values outside them are rejected
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
@@ -75,8 +76,7 @@ Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drool
   (e.g. `income > 2 * rent`). Praecepta cells are FEEL *simple unary tests* on one column.
 - **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
   boxed expressions.
-- **Durations** ([planned](https://github.com/brunopacheco1/praecepta/issues/52)) and **times with a
-  time zone**.
+- **Times with a time zone**.
 - **A process engine, a modeller or a decision service** around the tables.
 
 # Getting Started
@@ -119,6 +119,8 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 | `true`, `false` | that boolean | BOOLEAN |
 | `time("08:30:00")` or `08:30:00` | that time of day | TIME |
 | `date and time("2025-01-31T08:30:00")` or `2025-01-31T08:30:00` | that date and time | DATE_TIME |
+| `duration("P1DT2H")` or `P1DT2H` | that length of time (`PT24H` equals `P1D`) | DAY_TIME_DURATION |
+| `duration("P1Y2M")` or `P1Y2M` | that number of months (`P12M` equals `P1Y`) | YEAR_MONTH_DURATION |
 | `< 18`, `<= 18`, `> 18`, `>= 18`, `< "N"` | comparisons | all but BOOLEAN |
 | `[18..65)`, `(0..1]`, `]a..b[`, `["A".."M"]` | intervals: `[`/`]` closed, `(`/`)` or outward brackets open | all but BOOLEAN |
 | `null` | only a missing value | all |
@@ -139,6 +141,8 @@ var engine = PraeceptaEngine.<Applicant, String>builder()
         .booleanInput("student", Applicant::student)   // Boolean
         .timeInput("callTime", Applicant::callTime)    // LocalTime
         .dateTimeInput("appliedAt", Applicant::appliedAt) // LocalDateTime
+        .durationInput("waited", Applicant::waited)    // Duration
+        .periodInput("tenure", Applicant::tenure)      // Period of years and months
         .allowedValues("country", List.of("PT", "ES", "FR"))
         .allowedValues("age", "[0..120]")
         .output(output -> output.values().get("tier"))
@@ -183,11 +187,11 @@ var engine = PraeceptaEngine.<Customer, String>builder()
 
 Supported: input expressions that name a variable, including FEEL names with spaces (`age`,
 `customer.age`, `Credit Score`); `string`, `number` (`integer`, `long`, `double`), `date`,
-`boolean`, `time` and `dateTime` columns, or an item definition of one of them (such as a `string`
+`boolean`, `time`, `dateTime`, `dayTimeDuration` and `yearMonthDuration` columns, or an item definition of one of them (such as a `string`
 with allowed values, which become the input value list); input entries in the cell syntax above, as strict FEEL
 (strings quoted, since an unquoted word is a reference to another variable, and dates and times
 written with `date(...)`, `time(...)` and `date and time(...)`); output entries that are literals
-or name one of the table's inputs (`a` returns the input `a`); every hit policy, with SUM, MIN, MAX and COUNT aggregation. Anything else (durations, times with a
+or name one of the table's inputs (`a` returns the input `a`); every hit policy, with SUM, MIN, MAX and COUNT aggregation. Anything else (times with a
 zone, cells that refer to other variables, computed expressions, function calls) is rejected
 with a message naming the decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
 evaluate identically, which is how the benchmarks feed them.

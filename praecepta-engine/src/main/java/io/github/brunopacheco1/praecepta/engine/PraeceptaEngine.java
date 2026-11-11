@@ -6,9 +6,11 @@
 package io.github.brunopacheco1.praecepta.engine;
 
 import java.lang.System.Logger.Level;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -683,6 +685,19 @@ public final class PraeceptaEngine<I, O> {
         /** Binds a DATE_TIME column to a getter returning a date and time without a zone. */
         public Builder<I, O> dateTimeInput(String column, Function<? super I, LocalDateTime> extractor) {
             return bind(column, ColumnType.DATE_TIME, extractor);
+        }
+
+        /** Binds a DAY_TIME_DURATION column to a getter returning a duration, compared by length. */
+        public Builder<I, O> durationInput(String column, Function<? super I, Duration> extractor) {
+            return bind(column, ColumnType.DAY_TIME_DURATION, extractor);
+        }
+
+        /**
+         * Binds a YEAR_MONTH_DURATION column to a getter returning a period of years and months, compared
+         * by its total of months ({@code P1Y} equals {@code P12M}); a period with days is not a valid value.
+         */
+        public Builder<I, O> periodInput(String column, Function<? super I, Period> extractor) {
+            return bind(column, ColumnType.YEAR_MONTH_DURATION, extractor);
         }
 
         /**

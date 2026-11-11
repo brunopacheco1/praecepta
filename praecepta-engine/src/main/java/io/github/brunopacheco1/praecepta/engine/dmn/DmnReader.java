@@ -45,7 +45,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  *
  * <p>Supported: decision tables whose input expressions name an input variable, with
  * {@code string}, {@code number} (or {@code integer}, {@code long}, {@code double}), {@code date},
- * {@code boolean}, {@code time} and {@code dateTime} (or {@code date and time}) columns, times without
+ * {@code boolean}, {@code time}, {@code dateTime} (or {@code date and time}), {@code dayTimeDuration} and
+ * {@code yearMonthDuration} (or their FEEL names) columns, times without
  * a zone; columns typed by an item definition of one of those types, whose allowed values become the
  * input value list unless the input declares its own; input entries in Praecepta's FEEL subset
  * (lists, {@code not(...)}, {@code null}, comparisons, intervals, {@code -}); input and output value
@@ -456,7 +457,7 @@ public final class DmnReader {
             var definition = byName.get(name);
             if (definition == null) {
                 throw new InvalidDecisionTableException(
-                        "%s: type '%s' is not supported (string, number, date, boolean, time, dateTime and item definitions of them are)"
+                        "%s: type '%s' is not supported (string, number, date, boolean, time, dateTime, dayTimeDuration, yearMonthDuration and item definitions of them are)"
                                 .formatted(where, typeRef));
             }
             if (Boolean.parseBoolean(definition.getAttribute("isCollection").strip())) {
@@ -483,6 +484,8 @@ public final class DmnReader {
                 case "boolean" -> ColumnType.BOOLEAN;
                 case "time" -> ColumnType.TIME;
                 case "datetime", "date and time" -> ColumnType.DATE_TIME;
+                case "daytimeduration", "days and time duration" -> ColumnType.DAY_TIME_DURATION;
+                case "yearmonthduration", "years and months duration" -> ColumnType.YEAR_MONTH_DURATION;
                 default -> null;
             });
         }

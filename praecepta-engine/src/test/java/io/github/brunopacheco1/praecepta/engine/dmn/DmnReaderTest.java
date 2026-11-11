@@ -154,7 +154,7 @@ class DmnReaderTest {
      */
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
-            "duration column    | dayTimeDuration | at      |                      |         | type 'dayTimeDuration' is not supported",
+            "untyped duration   | duration        | at      |                      |         | type 'duration' is not supported",
             "zoned time cell    | time            | at      | time(\"10:00:00Z\")  |         | rule 1, column 'at': Invalid cell",
             "variable in a cell | string          | a       | not(Complex.aString) |         "
                     + "| rule 1, column 'a': Invalid cell 'not(Complex.aString)': 'Complex.aString' is a FEEL name",
@@ -279,8 +279,8 @@ class DmnReaderTest {
             "collection           | <itemDefinition name=\"tT\" isCollection=\"true\"><typeRef>string</typeRef></itemDefinition> "
                     + "| type 'tT' is a collection",
             "no base type         | <itemDefinition name=\"tT\"/> | type 'tT' is not supported; its item definition has no base type",
-            "unsupported base     | <itemDefinition name=\"tT\"><typeRef>dayTimeDuration</typeRef></itemDefinition> "
-                    + "| type 'dayTimeDuration' is not supported",
+            "unsupported base     | <itemDefinition name=\"tT\"><typeRef>context</typeRef></itemDefinition> "
+                    + "| type 'context' is not supported",
             "defined by itself    | <itemDefinition name=\"tT\"><typeRef>tU</typeRef></itemDefinition><itemDefinition name=\"tU\"><typeRef>tT</typeRef></itemDefinition> "
                     + "| item definition 'tT' is defined in terms of itself",
             "invalid allowed list | <itemDefinition name=\"tT\"><typeRef>number</typeRef><allowedValues><text>\"high\"</text></allowedValues></itemDefinition> "

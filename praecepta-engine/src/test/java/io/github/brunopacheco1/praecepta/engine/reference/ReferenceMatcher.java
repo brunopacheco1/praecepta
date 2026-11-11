@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.Period;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,6 +36,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
+import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 
 /**
  * Executable specification of decision-table semantics: a deliberately naive matcher that evaluates
@@ -264,6 +266,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         switch (type) {
             case BOOLEAN -> values.addAll(List.of(false, true)); // the whole domain
             case STRING -> values.addAll(stringRepresentatives(cells));
+            // years and months durations as the Period a getter returns
+            case YEAR_MONTH_DURATION -> orderedRepresentatives(type, cells).forEach(v -> values.add(((YearsAndMonths) v).toPeriod()));
             default -> values.addAll(orderedRepresentatives(type, cells));
         }
         if (withMissing) {
@@ -326,6 +330,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                 case NUMBER -> BigDecimal.ZERO;
                 case TIME -> LocalTime.NOON;
                 case DATE_TIME -> LocalDateTime.of(2025, 1, 1, 0, 0);
+                case DAY_TIME_DURATION -> Duration.ZERO;
+                case YEAR_MONTH_DURATION -> new YearsAndMonths(0);
                 default -> LocalDate.of(2025, 1, 1);
             });
         }
@@ -367,6 +373,18 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                     var end = ((LocalDateTime) next).toInstant(ZoneOffset.UTC);
                     around.add(LocalDateTime.ofInstant(start.plus(Duration.between(start, end).dividedBy(2)), ZoneOffset.UTC));
                 }
+            }
+            case Duration duration -> {
+                around.add(duration.minusHours(1));
+                around.add(duration.plusHours(1));
+                if (next != null) {
+                    around.add(duration.plus(((Duration) next).minus(duration).dividedBy(2)));
+                }
+            }
+            case YearsAndMonths duration -> {
+                // no years and months duration lies between consecutive months
+                around.add(new YearsAndMonths(duration.months() - 1));
+                around.add(new YearsAndMonths(duration.months() + 1));
             }
             default -> throw new IllegalStateException("not an ordered value: " + point);
         }
@@ -465,9 +483,13 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return types.getOrDefault(column, ColumnType.STRING);
     }
 
+    /** An input value; blank text counts as missing, and a period is compared by its years and months. */
     private static Object value(Map<String, ?> input, String column) {
-        var value = input.get(column);
-        return value instanceof String s && s.isBlank() ? null : value;
+        return switch (input.get(column)) {
+            case String s when s.isBlank() -> null;
+            case Period period -> YearsAndMonths.of(period);
+            case null, default -> input.get(column);
+        };
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

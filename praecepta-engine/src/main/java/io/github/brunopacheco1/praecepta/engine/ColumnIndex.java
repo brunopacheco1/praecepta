@@ -7,9 +7,11 @@ package io.github.brunopacheco1.praecepta.engine;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.Period;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,6 +33,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
+import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 
 /**
  * One column of the {@link BitsetIndex}. The column's values are partitioned into <em>classes</em>
@@ -386,15 +389,30 @@ final class ColumnIndex {
                     case DATE -> LocalDate.parse(value);
                     case TIME -> LocalTime.parse(value);
                     case DATE_TIME -> LocalDateTime.parse(value);
+                    case DAY_TIME_DURATION -> Duration.parse(value);
+                    case YEAR_MONTH_DURATION -> YearsAndMonths.parse(value);
                     case BOOLEAN -> bool(text);
                     case STRING -> throw new IllegalStateException("STRING values are looked up as they are, not converted");
                 };
-            } catch (NumberFormatException | DateTimeParseException e) {
+            } catch (IllegalArgumentException | DateTimeParseException e) {
                 throw notValid(text);
             }
         }
-        // typed getters already return the column's Java type (LocalDate, LocalTime, ...); numbers vary
-        return type == ColumnType.NUMBER ? number((Number) raw) : raw;
+        // typed getters already return the column's Java type (LocalDate, LocalTime, ...); numbers vary,
+        // and a years and months duration is bound as a Period
+        return switch (type) {
+            case NUMBER -> number((Number) raw);
+            case YEAR_MONTH_DURATION -> yearsAndMonths((Period) raw);
+            default -> raw;
+        };
+    }
+
+    private YearsAndMonths yearsAndMonths(Period period) {
+        try {
+            return YearsAndMonths.of(period);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidInputException(name, period, "has days; a years and months duration has only years and months");
+        }
     }
 
     /** {@code true} or {@code false} in any case. */
@@ -520,14 +538,22 @@ final class ColumnIndex {
         };
     }
 
-    /** A concrete value inside a non-empty class, or null for the missing class / any other string. */
+    /**
+     * A concrete value inside a non-empty class, as a getter of the column returns it (a Period for a
+     * years and months duration), or null for the missing class / any other string.
+     */
     Object representative(int valueClass) {
         return switch (classes.get(valueClass)) {
-            case ValueClass.Point(var value) -> value;
-            case ValueClass.Between(var low, var high) -> OpenIntervals.valueInside(type, low, high);
+            case ValueClass.Point(var value) -> bindable(value);
+            case ValueClass.Between(var low, var high) -> bindable(OpenIntervals.valueInside(type, low, high));
             case ValueClass.OtherString other -> null;
             case ValueClass.Missing missing -> null;
         };
+    }
+
+    /** A value as a getter returns it: a years and months duration as the Period {@code periodInput} binds. */
+    private static Object bindable(Object value) {
+        return value instanceof YearsAndMonths duration ? duration.toPeriod() : value;
     }
 
     // ---- FEEL semantics per class ---------------------------------------------------------------

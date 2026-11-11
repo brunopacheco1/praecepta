@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 
 /**
  * The values strictly between two boundaries of an ordered column ({@link ColumnIndex}'s classes
@@ -45,6 +46,8 @@ final class OpenIntervals {
             case TIME -> emptyTimes((LocalTime) low, (LocalTime) high);
             case DATE_TIME -> low != null && high != null && !((LocalDateTime) low).plusNanos(1).isBefore((LocalDateTime) high);
             case STRING -> emptyStrings((String) low, (String) high);
+            case DAY_TIME_DURATION -> low != null && high != null && ((Duration) low).plusNanos(1).compareTo((Duration) high) >= 0;
+            case YEAR_MONTH_DURATION -> low != null && high != null && ((YearsAndMonths) low).months() + 1 >= ((YearsAndMonths) high).months();
             case NUMBER -> false;
         };
     }
@@ -60,9 +63,33 @@ final class OpenIntervals {
             case DATE_TIME -> betweenDateTimes((LocalDateTime) low, (LocalDateTime) high);
             case NUMBER -> betweenNumbers((BigDecimal) low, (BigDecimal) high);
             case STRING -> betweenStrings((String) low, (String) high);
+            case DAY_TIME_DURATION -> betweenDurations((Duration) low, (Duration) high);
+            case YEAR_MONTH_DURATION -> betweenMonths((YearsAndMonths) low, (YearsAndMonths) high);
             // BOOLEAN intervals are always empty
             case BOOLEAN -> throw new IllegalStateException("no %s value between %s and %s".formatted(type, low, high));
         };
+    }
+
+    /** A day beyond a single bound, zero when unbounded, else the midpoint (at least two nanoseconds apart, so inside). */
+    private static Duration betweenDurations(Duration low, Duration high) {
+        if (low == null) {
+            return high == null ? Duration.ZERO : high.minusDays(1);
+        }
+        if (high == null) {
+            return low.plusDays(1);
+        }
+        return low.plus(high.minus(low).dividedBy(2));
+    }
+
+    /** A month beyond a single bound, zero when unbounded, else the midpoint (at least two months apart, so inside). */
+    private static YearsAndMonths betweenMonths(YearsAndMonths low, YearsAndMonths high) {
+        if (low == null) {
+            return new YearsAndMonths(high == null ? 0 : high.months() - 1);
+        }
+        if (high == null) {
+            return new YearsAndMonths(low.months() + 1);
+        }
+        return new YearsAndMonths(Math.floorDiv(low.months() + high.months(), 2));
     }
 
     private static boolean emptyStrings(String low, String high) {

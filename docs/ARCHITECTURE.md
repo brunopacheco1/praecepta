@@ -29,14 +29,14 @@ builds an engine once and calls it.
 
 1. **Rules and cells.** A rule (`Praeceptum`) maps input columns to cells and output columns to
    values. `CellParser` parses each cell, according to its column's type (`ColumnType`: STRING,
-   NUMBER, DATE, BOOLEAN, TIME, DATE_TIME), into `UnaryTests`: the subset of DMN FEEL *simple unary tests* that looks at one
+   NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION, YEAR_MONTH_DURATION), into `UnaryTests`: the subset of DMN FEEL *simple unary tests* that looks at one
    column value (lists, `not(...)`, comparisons, intervals, `null`, "any").
 2. **The bitset index** (`BitsetIndex`, `ColumnIndex`). Every rule owns one bit. Each column splits
    its values into *classes* that no rule can tell apart, and each class carries a mask: the rules
    that accept it.
    - **Strings:** one class per value a rule mentions (or the column declares), one for any other
      value, and one for a missing value. Lookup is a hash, or an array index for enum inputs.
-   - **Numbers, dates, times and date-times:** the boundaries the rules mention split the line into
+   - **Numbers, dates, times, date-times and durations:** the boundaries the rules mention split the line into
      intervals and points; lookup is a binary search. A string column whose cells compare
      (`< "N"`, `["A".."M"]`) is split the same way; a value the rules mention is still found by hash,
      and only other values need the binary search. Booleans are the same with `false < true`,
@@ -58,7 +58,7 @@ An engine is **immutable** once built: any number of threads may share it withou
 - `DmnReader` reads DMN 1.1 to 1.5 (as written by Camunda Modeler, Drools, Trisotech and
   `DmnWriter`) into a `DecisionTable`: hit policy, aggregation, column types, value lists and rules.
   It uses the JDK's XML parser with DTDs and external entities disabled. Anything it does not
-  support (durations, times with a zone, computed expressions, function calls) is rejected
+  support (times with a zone, computed expressions, function calls) is rejected
   with an error naming the decision, rule and column.
 - `DmnWriter` writes a `DecisionTable` as standard DMN 1.3, which `DmnReader` reads back unchanged
   and which Camunda 8 and Drools evaluate identically (the benchmarks check this).

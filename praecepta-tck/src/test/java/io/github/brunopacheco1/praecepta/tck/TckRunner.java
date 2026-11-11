@@ -151,7 +151,8 @@ final class TckRunner {
 
     private static String text(Simple simple) {
         return switch (simple.type()) {
-            case "", "string", "decimal", "double", "integer", "int", "long", "float", "date", "boolean" -> simple.text();
+            case "", "string", "decimal", "double", "integer", "int", "long", "float", "date", "boolean",
+                 "duration", "dayTimeDuration", "yearMonthDuration" -> simple.text();
             case "time", "dateTime" -> {
                 if (ZONED.matcher(simple.text().strip()).matches()) {
                     throw new Unsupported("times and date-times with a time zone");
@@ -244,7 +245,7 @@ final class TckRunner {
      * {@code Complex.aString} or {@code < Another number}.
      */
     private static final Pattern REFERENCE = Pattern.compile(
-            "'[\\p{L}_?][\\p{L}\\p{N}_?. ]*' (is a FEEL name|is not a (number|date|boolean|time|date and time))");
+            "'[\\p{L}_?][\\p{L}\\p{N}_?. ]*' (is a FEEL name|is not a (number|date|boolean|time|date and time|days and time duration|years and months duration))");
 
     /**
      * Reader messages recognised by a fixed phrase, and the feature each one names. They are tried in
@@ -286,8 +287,7 @@ final class TckRunner {
     private static String unsupportedType(String type) {
         var local = type.contains(":") ? type.substring(type.indexOf(':') + 1) : type;
         return switch (local) {
-            case "dayTimeDuration", "yearMonthDuration", "duration", "days and time duration", "years and months duration" ->
-                    "duration columns (#52)";
+            case "duration" -> "duration columns that are neither days and time nor years and months";
             default -> local + " columns";
         };
     }

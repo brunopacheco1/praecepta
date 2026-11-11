@@ -250,7 +250,8 @@ public record Table(String name, List<String> inputs, List<ColumnType> types, Li
             case STRING -> stringCell(form, random);
             case NUMBER -> numberCell(form, random);
             case DATE -> dateCell(form, random);
-            case BOOLEAN, TIME, DATE_TIME -> throw new IllegalArgumentException("generated tables use STRING, NUMBER and DATE columns");
+            case BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION, YEAR_MONTH_DURATION ->
+                    throw new IllegalArgumentException("generated tables use STRING, NUMBER and DATE columns");
         };
     }
 
