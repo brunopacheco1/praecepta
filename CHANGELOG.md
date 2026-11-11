@@ -70,6 +70,17 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `@Identifier("Discount")` (or `@Named`), with the validation reports at runtime. In dev mode a changed
   table restarts the application. Apache POI stays in the build; the extension uses no reflection, but
   native images are not tested yet ([#19](https://github.com/brunopacheco1/praecepta/issues/19)).
+- **Gradle plugin** ([#18](https://github.com/brunopacheco1/praecepta/issues/18)), id
+  `io.github.brunopacheco1.praecepta`: does for Gradle builds what the Maven plugin does, through
+  `praecepta-compiler`, so the generated classes and DMN resources are the Maven plugin's byte for byte
+  (but for the tool they name). The `praecepta` extension takes the Maven plugin's settings
+  (`tables { register("discount") { source = file(...); hitPolicy = "FIRST"; inputs { column("age")
+  { type = "NUMBER" } } } }`), except that a table's generated class is named by `className`, since
+  `name` is the name it is registered under. The `generatePraecepta` task feeds the `main` source set, is
+  cacheable (across machines: tables count by name and content) and works with the configuration cache.
+  It runs on Gradle 8.5 and later with Java 21+, and is published to Maven Central with its plugin marker
+  (`io.github.brunopacheco1.praecepta:io.github.brunopacheco1.praecepta.gradle.plugin`), not to the Gradle
+  Plugin Portal.
 
 ### Changed
 - The release publishes every module but the benchmarks and the TCK runner, found by the build rather
