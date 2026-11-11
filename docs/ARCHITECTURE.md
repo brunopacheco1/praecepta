@@ -40,7 +40,8 @@ builds an engine once and calls it.
    - **Strings:** one class per value a rule mentions (or the column declares), one for any other
      value, and one for a missing value. Lookup is a hash, or an array index for enum inputs.
    - **Numbers, dates, times, date-times and durations:** the boundaries the rules mention split the line into
-     intervals and points; lookup is a binary search. A string column whose cells compare
+     intervals and points; lookup is a binary search, over `long` keys when the values have them
+     (`PrimitiveKeys`: epoch days, nanoseconds, months, scaled numbers). A string column whose cells compare
      (`< "N"`, `["A".."M"]`) is split the same way; a value the rules mention is still found by hash,
      and only other values need the binary search. Booleans are the same with `false < true`,
      both always boundaries, so they get one class each.
