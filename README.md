@@ -11,7 +11,7 @@ SPDX-License-Identifier: Apache-2.0
   </picture>
 </p>
 
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.brunopacheco1/praecepta-engine)](https://central.sonatype.com/artifact/io.github.brunopacheco1/praecepta-engine) [![Javadoc](https://img.shields.io/maven-central/v/io.github.brunopacheco1/praecepta-engine?label=javadoc&color=brightgreen)](https://javadoc.io/doc/io.github.brunopacheco1/praecepta-engine) [![Build](https://github.com/brunopacheco1/praecepta/actions/workflows/build.yml/badge.svg)](https://github.com/brunopacheco1/praecepta/actions/workflows/build.yml) [![CodeQL](https://github.com/brunopacheco1/praecepta/actions/workflows/codeql.yml/badge.svg)](https://github.com/brunopacheco1/praecepta/actions/workflows/codeql.yml) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/brunopacheco1/praecepta/badge)](https://scorecard.dev/viewer/?uri=github.com/brunopacheco1/praecepta) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16426/badge)](https://www.bestpractices.dev/projects/16426) [![OpenSSF Baseline](https://www.bestpractices.dev/projects/16426/baseline)](https://www.bestpractices.dev/projects/16426) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![REUSE status](https://api.reuse.software/badge/github.com/brunopacheco1/praecepta)](https://api.reuse.software/info/github.com/brunopacheco1/praecepta) [![Reproducible Builds](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/jvm-repo-rebuild/reproducible-central/master/content/io/github/brunopacheco1/praecepta/badge.json)](https://github.com/jvm-repo-rebuild/reproducible-central/blob/master/content/io/github/brunopacheco1/praecepta/README.md) [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=coverage)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.brunopacheco1/praecepta-engine)](https://central.sonatype.com/artifact/io.github.brunopacheco1/praecepta-engine) [![Javadoc](https://img.shields.io/maven-central/v/io.github.brunopacheco1/praecepta-engine?label=javadoc&color=brightgreen)](https://bruno.pacheco.lu/praecepta/api/engine/) [![Build](https://github.com/brunopacheco1/praecepta/actions/workflows/build.yml/badge.svg)](https://github.com/brunopacheco1/praecepta/actions/workflows/build.yml) [![CodeQL](https://github.com/brunopacheco1/praecepta/actions/workflows/codeql.yml/badge.svg)](https://github.com/brunopacheco1/praecepta/actions/workflows/codeql.yml) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/brunopacheco1/praecepta/badge)](https://scorecard.dev/viewer/?uri=github.com/brunopacheco1/praecepta) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16426/badge)](https://www.bestpractices.dev/projects/16426) [![OpenSSF Baseline](https://www.bestpractices.dev/projects/16426/baseline)](https://www.bestpractices.dev/projects/16426) [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE) [![REUSE status](https://api.reuse.software/badge/github.com/brunopacheco1/praecepta)](https://api.reuse.software/info/github.com/brunopacheco1/praecepta) [![Reproducible Builds](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/jvm-repo-rebuild/reproducible-central/master/content/io/github/brunopacheco1/praecepta/badge.json)](https://github.com/jvm-repo-rebuild/reproducible-central/blob/master/content/io/github/brunopacheco1/praecepta/README.md) [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=brunopacheco1_praecepta&metric=coverage)](https://sonarcloud.io/summary/new_code?id=brunopacheco1_praecepta)
 
 # Praecepta
 **DMN decision tables for Java.** *Praecepta* is Latin for "rules" (classical pronunciation:
@@ -30,13 +30,20 @@ them when you build; evaluate them with a dependency-free engine.
 - All DMN hit policies: UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER and COLLECT
   (with SUM / MIN / MAX / COUNT aggregation)
 - DMN FEEL cells on STRING, NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION and
-  YEAR_MONTH_DURATION columns: lists, `not(...)`,
-  comparisons, intervals, `null`; unquoted `PT,ES` cells from earlier versions keep working
+  YEAR_MONTH_DURATION columns: lists, `not(...)`, comparisons, intervals, `null`; unquoted `PT,ES`
+  cells from earlier versions keep working
+- Times and date-times with or without a time zone; two with one compare by instant, and one with
+  a zone compares with one without by local time, as in FEEL
+- List inputs, such as a customer's nationalities: a cell holds when some element passes it
+- DMN output entries that name an input or compute with `+`, `-`, `*`, `/` and `**`
+  (`(price - discount) * 1.2`, `Symptom + " is listed"`), evaluated only for the rules that match
 - Optional DMN input value lists: values outside them are rejected
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
   rules that can never be selected (FIRST, PRIORITY), and gaps (declared inputs no rule matches)
 - Bitset matching: memory grows linearly with the table (10,000 rules take 1.5 to 5 MB of heap,
-  against about 90 to 130 MB for Camunda and Drools) and most engines build in milliseconds
+  against about 90 to 130 MB for Camunda and Drools) and most engines build in milliseconds; the
+  mask of a value only a few rules accept, such as a product code, is stored compactly, so even a
+  column with a value per rule stays small
 - Enum inputs: lookups by ordinal instead of hashing
 - Immutable, thread-safe engines; no runtime dependencies
 - Rules from code, Excel, CSV or DMN files (DMN 1.1 to 1.5, as written by Camunda Modeler and
@@ -52,14 +59,14 @@ Java 21 or later (tested on 21, 25 and 27). Pick the modules you need:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-engine</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
 </dependency>
 
 <!-- optional: load rules from Excel or CSV at runtime (brings Apache POI) -->
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-loader</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
 </dependency>
 ```
 
@@ -72,12 +79,12 @@ Central.
 
 # What Praecepta is not
 Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drools when you need:
-- **Full FEEL**: functions, arithmetic, contexts, lists and computed expressions (e.g.
-  `income > 2 * rent`). Praecepta cells are FEEL *simple unary tests*; in DMN they may compare with
-  another input (`> limit`), but not compute with it.
+- **Full FEEL**: functions, contexts, `if`, and tests that compute (e.g. `income > 2 * rent`).
+  Praecepta's input entries are FEEL *simple unary tests*: in DMN they may compare with another
+  input (`> limit`) or test a list's elements, but not compute. Output entries may compute with `+`,
+  `-`, `*`, `/` and `**`, but call no functions.
 - **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
-  boxed expressions.
-- **Times with a time zone** ([#70](https://github.com/brunopacheco1/praecepta/issues/70)).
+  boxed expressions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)).
 - **A process engine, a modeller or a decision service** around the tables.
 
 # Getting Started
@@ -119,7 +126,9 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 | `date("2025-01-31")` or `2025-01-31` | that date | DATE |
 | `true`, `false` | that boolean | BOOLEAN |
 | `time("08:30:00")` or `08:30:00` | that time of day | TIME |
+| `time("08:30:00+01:00")` or `08:30:00Z` | that instant of the day, at an offset | TIME |
 | `date and time("2025-01-31T08:30:00")` or `2025-01-31T08:30:00` | that date and time | DATE_TIME |
+| `date and time("2025-01-31T08:30:00Z")`, `date and time("2025-01-31T08:30:00@Europe/Paris")` | that instant | DATE_TIME |
 | `duration("P1DT2H")` or `P1DT2H` | that length of time (`PT24H` equals `P1D`) | DAY_TIME_DURATION |
 | `duration("P1Y2M")` or `P1Y2M` | that number of months (`P12M` equals `P1Y`) | YEAR_MONTH_DURATION |
 | `< 18`, `<= 18`, `> 18`, `>= 18`, `< "N"` | comparisons | all but BOOLEAN |
@@ -129,8 +138,16 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 
 Missing values follow FEEL: they fail comparisons and intervals, equal only `null`, and so satisfy
 `not("FR")`. Blank text counts as missing. Strings compare as Java's `String.compareTo` does,
-character by character and case-sensitively (`"Zed" < "apple"`). Times and date-times are local:
-values with a time zone or offset (`Z`, `+02:00`, `@Europe/Paris`) are rejected.
+character by character and case-sensitively (`"Zed" < "apple"`). Where DMN 1.5 and its TCK leave a
+case open (`-` against a missing value, `=` between a time with a zone and one without), Praecepta's
+choice is recorded in [#86](https://github.com/brunopacheco1/praecepta/issues/86).
+
+Times may have an offset (`Z`, `+01:00`) and date-times an offset or a zone id (`@Europe/Paris`).
+As in FEEL, two values with a time zone compare by the instant they denote (`time("09:00:00+01:00")`
+equals `time("08:00:00Z")`). When only one of the two has a zone, the other takes its offset (DMN 1.5,
+Table 54), so they compare by local time: `time("08:00:00")` matches `08:00`, `08:00Z` and
+`08:00+05:00`, `< time("12:00:00+01:00")` matches `11:59`, and an interval may have an end of each
+kind. A time with a zone id (`time("08:00:00@Europe/Paris")`) is rejected, as it has no fixed offset.
 
 ### Typed columns and input value lists
 ```java
@@ -142,6 +159,8 @@ var engine = PraeceptaEngine.<Applicant, String>builder()
         .booleanInput("student", Applicant::student)   // Boolean
         .timeInput("callTime", Applicant::callTime)    // LocalTime
         .dateTimeInput("appliedAt", Applicant::appliedAt) // LocalDateTime
+        .offsetTimeInput("cutOff", Applicant::cutOff)  // OffsetTime, compared by instant
+        .zonedDateTimeInput("signedAt", Applicant::signedAt) // ZonedDateTime (from an OffsetDateTime: toZonedDateTime())
         .durationInput("waited", Applicant::waited)    // Duration
         .periodInput("tenure", Applicant::tenure)      // Period of years and months
         .allowedValues("country", List.of("PT", "ES", "FR"))
@@ -153,8 +172,17 @@ var engine = PraeceptaEngine.<Applicant, String>builder()
 With declared input values, other (non-missing) values throw `InvalidInputException`, and
 `validationReport()` lists **gaps**: declared inputs no rule matches, e.g.
 `country = "FR", age in [18..120]`. Gaps are only analysed when every string column the rules test
-declares its values or uses comparisons or intervals (any other string then falls between them). With map-based inputs, declare non-string columns with
-`.columnType("age", ColumnType.NUMBER)`; their text is parsed.
+declares its values or uses comparisons or intervals (any other string then falls between them).
+With map-based inputs, declare non-string columns with `.columnType("age", ColumnType.NUMBER)`;
+their text is parsed. A time or date-time column then takes values with and without a time zone
+(`08:30`, `08:30Z`, `2025-01-31T08:30@Europe/Paris`), and its gaps are looked for among both, while
+a typed getter gives one kind only. To cells without a zone the zone makes no difference (`08:30Z`
+and `08:30+05:00` both count as `08:30`), so a table whose cells all lack one reports the same gaps
+either way, once; to cells with a zone, a value with a zone counts by its instant and one without
+by its local time, so gaps are reported for each kind (`cutOff in {[time("12:00:00")..+inf),
+[time("12:00:00Z")..+inf)}`). Declared input values are compared the same way. To keep a column to
+one kind, bind the inputs per column, with `timeInput` or `offsetTimeInput`, `dateTimeInput` or
+`zonedDateTimeInput`.
 
 Notes:
 - `PRIORITY` and `OUTPUT_ORDER` need DMN output value lists:
@@ -167,6 +195,38 @@ Notes:
   index an array by ordinal instead of hashing, and the enum's constants become the column's
   input value list. Each constant stands for its `name()`, or pass a function such as
   `Country::code`.
+
+### List inputs
+A column may hold several values, such as a customer's nationalities. Its cells are written as
+usual, and hold when **some element** passes one of the tests; `not(...)` holds when **no element**
+does:
+
+```java
+var engine = PraeceptaEngine.<Customer, String>builder()
+        .hitPolicy(HitPolicy.FIRST)
+        .listInput("nationalities", Customer::nationalities)        // a Collection<String>
+        .listInput("ages", ColumnType.NUMBER, Customer::childrenAges) // a Collection of numbers
+        .output(output -> output.values().get("offer"))
+        .rules(rules)
+        .build();
+```
+
+| Cell | `["PT","BR"]` | `["BR"]` | `[]` (empty) | `null` (missing) |
+|---|---|---|---|---|
+| `"PT","ES"` (holds PT or ES) | yes | | | |
+| `not("PT")` (holds no PT) | | yes | yes | |
+| `null` (no list) | | | | yes |
+| `-` | yes | yes | yes | yes |
+
+These are the semantics of FEEL's `list contains`: a missing list makes every test unknown, while an
+empty one passes none. Elements may not be missing, must be values of the element type (as its
+single-value getter returns them, or text), and declared input values apply to each element.
+The elements of a list of times or date-times may have a time zone or not; each is compared as a
+single value is (by instant when the element and the cell both have a zone, else by local time).
+With map-based inputs, declare the column with `.listColumnType("nationalities", ColumnType.STRING)`
+and give a FEEL list as text: `["PT", "BR"]` (or `PT, BR`), `[]` for an empty list. Rules that test a
+list column are left out of the static analysis (overlaps, unreachable rules, gaps), since a list
+can match rules whose values never meet in a single value.
 
 ### DMN
 `DmnReader` loads a decision table from a DMN file (DMN 1.1 to 1.5), including its hit policy,
@@ -188,16 +248,24 @@ var engine = PraeceptaEngine.<Customer, String>builder()
 
 Supported: input expressions that name a variable, including FEEL names with spaces (`age`,
 `customer.age`, `Credit Score`); `string`, `number` (`integer`, `long`, `double`), `date`,
-`boolean`, `time`, `dateTime`, `dayTimeDuration` and `yearMonthDuration` columns, or an item definition of one of them (such as a `string`
-with allowed values, which become the input value list); input entries in the cell syntax above, as strict FEEL
-(strings quoted, since an unquoted word is a reference to another variable, and dates and times
+`boolean`, `time`, `dateTime`, `dayTimeDuration` and `yearMonthDuration` columns, or an item
+definition of one of them (such as a `string` with allowed values, which become the input value
+list); input entries in the cell syntax above, as strict FEEL (strings quoted, since an unquoted word is a reference to another variable, and dates and times
 written with `date(...)`, `time(...)` and `date and time(...)`); input entries that compare with
 another input (`> limit`, `[floor..limit]`, `not(home)`), which then becomes an input of the engine,
 bound like a column (with map-based inputs it is read with the type of the column that names it);
-output entries that are literals
-or name one of the table's inputs (`a` returns the input `a`); every hit policy, with SUM, MIN, MAX and COUNT aggregation. Anything else (times with a
-zone, computed expressions such as `Symptom + " is listed"`, function calls) is rejected
-with a message naming the decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
+columns typed by a collection (`isCollection="true"`, with allowed values on the item type), whose
+entries test the elements with FEEL's list functions (`list contains(?, "PT")`,
+`some x in ? satisfies x >= 18`, `? = null`, joined with `or`, and `not(...)`); entries that name a
+list input (`Flu Symptoms`, typed by its `inputData`), which hold when the value is in the list;
+output entries that are literals, name one of the table's inputs (`a` returns the input `a`), or
+compute their value from literals and inputs with `+`, `-`, `*`, `/`, `**` and parentheses
+(`Symptom + " is listed"`, `(price - discount) * 1.2`, `amount * (1 + rate) ** years`: `+` joins strings
+or adds numbers, results have FEEL's 34 digits, and a missing operand gives a missing output), where an input is a column or an input the cells compare with that
+holds single values; times and date-times with or without a time zone; every hit policy,
+with SUM, MIN, MAX and COUNT aggregation. Anything else (a time with a zone id, function calls such
+as `upper case(a)`, `if`, inputs computed by other decisions) is rejected with a message naming the
+decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
 evaluate identically, which is how the benchmarks feed them.
 
 ## Praecepta Loader
@@ -231,14 +299,18 @@ Compiles tables at build time. For each table the `generate` goal:
 4. generates `<Name>Input` and `<Name>Output` records and a `<Name>` class that evaluates the DMN.
 
 A string column with a value list becomes an enum in the input record, using the int-coded path.
-Numbers are `BigDecimal` and dates `LocalDate`. At runtime the generated code needs only
-`praecepta-engine`; Apache POI stays a build-time dependency.
+Numbers are `BigDecimal` and dates `LocalDate`. Times and date-times are `LocalTime` and
+`LocalDateTime`, or `OffsetTime` and `ZonedDateTime` when every value written for the column has a
+time zone (an input compared with such a column in a cell, as in `> limit`, takes a zone too); a
+column that mixes both kinds fails the build. An input declared with `<list>true</list>` (or typed
+by a collection in a DMN file) becomes a `java.util.List` of its type. At runtime the generated code
+needs only `praecepta-engine`; Apache POI stays a build-time dependency.
 
 ```xml
 <plugin>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-maven-plugin</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
   <executions><execution><goals><goal>generate</goal></goals></execution></executions>
   <configuration>
     <packageName>com.acme.pricing</packageName>
@@ -285,9 +357,9 @@ engine against a naive reference implementation of DMN decision-table semantics 
 # DMN conformance
 `praecepta-tck` runs the decision-table test cases of the
 [DMN Technology Compatibility Kit](https://github.com/dmn-tck/tck) in every build. Every check whose
-table Praecepta can read passes; the others need features it does not have yet, mostly boolean
-columns ([#12](https://github.com/brunopacheco1/praecepta/issues/12)). The pass rate, the results per
-test case and what each unsupported check needs are in
+table Praecepta can read passes (83 of 86); the other three need inputs computed by other decisions
+([#14](https://github.com/brunopacheco1/praecepta/issues/14)), which Praecepta does not have yet.
+The pass rate, the results per test case and what each unsupported check needs are in
 [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md).
 
 # Benchmarks
@@ -302,6 +374,9 @@ The tables (`-p table=...`) are:
 - `mixed-<rules>[x<columns>]`: generated tables mixing string, number and date columns, with
   comparisons, intervals and `not(...)` (COLLECT);
 - `unique-<rules>[x<columns>]`: generated string tables whose rules never overlap (UNIQUE);
+- `lookup-<rules>[x<columns>]`: generated string tables with many values per column, as in a price
+  list by product code: each rule has its own code, so most value classes hold a few rules
+  (COLLECT);
 - a suffix `-first`, `-priority`, `-ruleorder`, `-collect` or `-unique` changes only the hit
   policy: `mixed-1000-first` has the rules of `mixed-1000`.
 

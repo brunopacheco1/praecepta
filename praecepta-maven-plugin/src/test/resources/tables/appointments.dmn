@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- outputs that name a zoned input, and a time output written with an offset -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="appointments" name="appointments" namespace="https://example.com/appointments">
+  <decision id="appointments" name="appointments">
+    <decisionTable id="table" hitPolicy="FIRST">
+      <input id="at" label="at"><inputExpression typeRef="dateTime"><text>at</text></inputExpression></input>
+      <output id="confirmed" name="confirmed" typeRef="dateTime"/>
+      <output id="opens" name="opens" typeRef="time"/>
+      <rule id="r1">
+        <inputEntry><text>&gt;= date and time("2025-01-01T00:00:00Z")</text></inputEntry>
+        <outputEntry><text>at</text></outputEntry>
+        <outputEntry><text>time("09:00:00+01:00")</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

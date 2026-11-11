@@ -31,7 +31,7 @@ mkdir -p "$out"
 case "$profile" in
   full)
     runs=(-f 3 -wi 5 -w 2s -i 5 -r 3s)
-    scale=real,synthetic-10,synthetic-100,synthetic-1000,synthetic-10000,mixed-10,mixed-100,mixed-1000,mixed-10000
+    scale=real,synthetic-10,synthetic-100,synthetic-1000,synthetic-10000,mixed-10,mixed-100,mixed-1000,mixed-10000,lookup-1000,lookup-10000
     columns=synthetic-1000x5,synthetic-1000x20,mixed-1000x6,mixed-1000x18
     policies=mixed-1000-first,mixed-1000-priority,mixed-1000-ruleorder,unique-1000
     nomatch=synthetic-1000,mixed-100,mixed-1000,unique-1000

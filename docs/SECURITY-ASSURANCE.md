@@ -49,7 +49,7 @@ data and needs no configuration.
 | Asset | Threat | Countered by |
 |---|---|---|
 | The host application's files and network | A crafted DMN document using XXE or a DTD to read files or make requests | DTDs disallowed, external entities off, secure processing on (`DmnReader`) |
-| The host application's availability | Documents or cells crafted to crash the parser or exhaust memory | Fuzzing of the cell parser and DMN reader; JDK XML limits; a cell grammar without nesting (`not(...)` only wraps a whole cell), so parsing depth is bounded |
+| The host application's availability | Documents or cells crafted to crash the parser or exhaust memory | Fuzzing of the cell parser and DMN reader; JDK XML limits; a cell grammar without nesting (`not(...)` only wraps a whole cell), and output expressions of at most 1,000 operators and parentheses, so parsing and evaluation depth is bounded |
 | Correct decisions | Ambiguous or overlapping rules giving different answers than intended | Strict DMN hit policies; validation of overlaps, unreachable rules and gaps; the engine is tested against a reference implementation with property-based tests |
 | A build using the Maven plugin | Table content injected into generated Java code | `JavaNames` sanitises identifiers (reserved words included); string literals are escaped; comments escape unicode escapes and comment terminators |
 | Users' supply chain | A tampered release or dependency | Signed releases with provenance; pinned CI actions; Dependabot, dependency review and OSV scans; a signed-commit, pull-request-only `main` |
@@ -64,9 +64,9 @@ data and needs no configuration.
    that matters, and names are sanitised before they are written.
 
 ## Secure design principles applied
-- **Economy of mechanism:** cells are only *simple unary tests* on one column, not a general
-  expression language, so evaluating a table cannot run arbitrary code; the engine has no runtime
-  dependencies.
+- **Economy of mechanism:** cells are only *simple unary tests* on one column, and output entries
+  at most `+ - * /` on literals and inputs, not a general expression language with functions, so
+  evaluating a table cannot run arbitrary code; the engine has no runtime dependencies.
 - **Fail-safe defaults:** unsupported DMN features, unknown cell syntax and undeclared values are
   rejected, not ignored; XML features are off unless needed.
 - **Complete mediation:** every table goes through the same parser and validation, whatever its

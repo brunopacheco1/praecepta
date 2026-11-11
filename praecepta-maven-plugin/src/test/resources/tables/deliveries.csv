@@ -1,0 +1,4 @@
+cutOff;at;due;slot
+< time("12:00:00+01:00");;2025-12-24T09:00:00@Europe/Paris;morning
+>= 11:00Z;< date and time("2025-12-24T00:00:00@Europe/Paris");2025-12-24T15:00:00Z;afternoon
+;;;later

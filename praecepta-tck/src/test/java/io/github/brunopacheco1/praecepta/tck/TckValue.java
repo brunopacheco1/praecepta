@@ -7,8 +7,6 @@ package io.github.brunopacheco1.praecepta.tck;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -18,6 +16,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.w3c.dom.Element;
+
+import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 
 /** A value in a TCK test file: an input node, an expected result, or a result computed by Praecepta. */
 sealed interface TckValue {
@@ -112,14 +112,20 @@ sealed interface TckValue {
                 case "decimal", "double", "integer", "int", "long", "float" ->
                         new BigDecimal(expected.text().strip()).compareTo(new BigDecimal(actual.strip())) == 0;
                 case "date" -> LocalDate.parse(expected.text().strip()).equals(LocalDate.parse(actual.strip()));
-                case "time" -> LocalTime.parse(expected.text().strip()).equals(LocalTime.parse(actual.strip()));
-                case "datetime" -> LocalDateTime.parse(expected.text().strip()).equals(LocalDateTime.parse(actual.strip()));
+                case "time" -> sameTemporal(FeelTemporals.parseTime(expected.text().strip()), FeelTemporals.parseTime(actual.strip()));
+                case "datetime" -> sameTemporal(FeelTemporals.parseDateTime(expected.text().strip()),
+                        FeelTemporals.parseDateTime(actual.strip()));
                 case "boolean" -> expected.text().strip().equalsIgnoreCase(actual.strip());
                 default -> expected.text().equals(actual);
             };
         } catch (NumberFormatException | DateTimeParseException e) {
             return false;
         }
+    }
+
+    /** Equal as FEEL compares times and date-times: with a zone by instant; never one with a zone and one without. */
+    private static boolean sameTemporal(Object expected, Object actual) {
+        return FeelTemporals.hasZone(expected) == FeelTemporals.hasZone(actual) && FeelTemporals.compare(expected, actual) == 0;
     }
 
     private static boolean sameItems(List<TckValue> expected, List<TckValue> actual, boolean ordered) {

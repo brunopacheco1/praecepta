@@ -8,6 +8,7 @@ package io.github.brunopacheco1.praecepta.engine;
 import java.util.List;
 import java.util.function.Function;
 
+import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
@@ -19,7 +20,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
 /**
  * Decides, on concrete values, a cell that compares with other inputs ({@code > dateE},
  * {@code [numB..numC]}), with FEEL's three-valued logic: a comparison with a missing value is unknown,
- * so it fails, and so does its {@code not(...)}; {@code = x} is true when both are missing.
+ * so it fails, and so does its {@code not(...)}; {@code = x} is true when both are missing. A time or
+ * date-time with a time zone and one without compare by their local time ({@link FeelTemporals}). A plain
+ * name whose input holds a list ({@code Flu Symptoms}) is true when the value is in that list, as in
+ * DMN; the engine only lets list inputs be named that way.
  */
 final class VariableCells {
 
@@ -58,14 +62,20 @@ final class VariableCells {
             case NullTest n -> value == null;
             case Equals(var literal) -> {
                 var other = resolve(literal, inputs);
-                yield value == null || other == null ? value == other : compare(value, other) == 0;
+                if (other instanceof List<?> list) {
+                    yield in(value, list);
+                }
+                if (value == null || other == null) {
+                    yield value == other;
+                }
+                yield FeelTemporals.compare(value, other) == 0;
             }
             case Compare(var operator, var literal) -> {
                 var other = resolve(literal, inputs);
                 if (value == null || other == null) {
                     yield null;
                 }
-                int cmp = compare(value, other);
+                int cmp = FeelTemporals.compare(value, other);
                 yield switch (operator) {
                     case LT -> cmp < 0;
                     case LE -> cmp <= 0;
@@ -79,19 +89,30 @@ final class VariableCells {
                 if (value == null || from == null || to == null) {
                     yield null;
                 }
-                int above = compare(value, from);
-                int below = compare(value, to);
+                int above = FeelTemporals.compare(value, from);
+                int below = FeelTemporals.compare(value, to);
                 yield (lowClosed ? above >= 0 : above > 0) && (highClosed ? below <= 0 : below < 0);
             }
         };
     }
 
-    private static Object resolve(Comparable<?> literal, Function<String, Object> inputs) {
-        return literal instanceof Name(var name) ? inputs.apply(name) : literal;
+    /**
+     * Membership in a named list, as FEEL's {@code ? in list} tests it: true if an element equals the
+     * value, else false. A list holds no missing value, so a missing value is in none.
+     */
+    private static Boolean in(Object value, List<?> list) {
+        if (value == null) {
+            return Boolean.FALSE;
+        }
+        for (var element : list) {
+            if (FeelTemporals.compare(value, element) == 0) {
+                return Boolean.TRUE;
+            }
+        }
+        return Boolean.FALSE;
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static int compare(Object a, Object b) {
-        return ((Comparable) a).compareTo(b);
+    private static Object resolve(Comparable<?> literal, Function<String, Object> inputs) {
+        return literal instanceof Name(var name) ? inputs.apply(name) : literal;
     }
 }

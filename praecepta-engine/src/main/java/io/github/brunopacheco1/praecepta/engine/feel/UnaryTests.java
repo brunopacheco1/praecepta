@@ -14,9 +14,11 @@ import java.util.Optional;
  * looks at a single column value, which is what lets rules be indexed with bitmasks; a test that
  * compares with another input ({@link Name}, strict FEEL only) is decided when evaluating instead.
  *
- * <p>Values are {@code String}, {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime},
- * {@code LocalDateTime}, {@code Duration} or {@link YearsAndMonths}, depending on the column type, or a
- * {@link Name}.
+ * <p>Values are {@code String}, {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime} or
+ * {@code OffsetTime}, {@code LocalDateTime} or {@code ZonedDateTime}, {@code Duration} or
+ * {@link YearsAndMonths}, depending on the column type, or a {@link Name}. Two times or date-times
+ * with a time zone compare by instant; one with a zone and one without compare by their local time
+ * ({@link FeelTemporals}), equality included.
  *
  * <p>A missing (null) value follows FEEL's three-valued logic: {@code null} is true for it, a literal is
  * false, and a comparison or an interval is unknown, which is neither a match nor a mismatch.
@@ -82,34 +84,44 @@ public sealed interface UnaryTests {
     record Range(Comparable<?> low, boolean lowClosed, Comparable<?> high, boolean highClosed) implements Test {
     }
 
-    /** The names of the inputs a cell compares with ({@link Name}), in the order written. */
-    static List<String> names(UnaryTests cell) {
-        var tests = switch (cell) {
-            case Any any -> List.<Test>of();
+    /** The cell's tests, in the order written: those inside {@code not(...)} for a negated cell; none for {@code -}. */
+    default List<Test> tests() {
+        return switch (this) {
+            case Any any -> List.of();
             case Positive(var positive) -> positive;
             case Negated(var negated) -> negated;
         };
+    }
+
+    /** The names of the inputs a cell compares with ({@link Name}), in the order written. */
+    static List<String> names(UnaryTests cell) {
         var names = new ArrayList<String>();
-        for (var test : tests) {
-            switch (test) {
-                case NullTest n -> {
-                    // no value
-                }
-                case Equals(var value) -> addName(value, names);
-                case Compare(var operator, var value) -> addName(value, names);
-                case Range(var low, var lowClosed, var high, var highClosed) -> {
-                    addName(low, names);
-                    addName(high, names);
-                }
+        cell.tests().forEach(test -> names.addAll(names(test)));
+        return names;
+    }
+
+    /** The names of the inputs a test compares with ({@link Name}), in the order written. */
+    static List<String> names(Test test) {
+        var names = new ArrayList<String>();
+        for (var value : values(test)) {
+            if (value instanceof Name(var name)) {
+                names.add(name);
             }
         }
         return names;
     }
 
-    private static void addName(Comparable<?> value, List<String> names) {
-        if (value instanceof Name(var name)) {
-            names.add(name);
-        }
+    /**
+     * The values a test compares with, literals or {@link Name}s: an equality's or comparison's value, an
+     * interval's two ends; none for {@code null}.
+     */
+    static List<Comparable<?>> values(Test test) {
+        return switch (test) {
+            case NullTest n -> List.of();
+            case Equals(var value) -> List.of(value);
+            case Compare(var operator, var value) -> List.of(value);
+            case Range(var low, var lowClosed, var high, var highClosed) -> List.of(low, high);
+        };
     }
 
     /**
@@ -117,7 +129,18 @@ public sealed interface UnaryTests {
      * be decided once that input's value is known.
      */
     default boolean namesInputs() {
-        return !names(this).isEmpty();
+        for (var test : tests()) {
+            boolean names = switch (test) {
+                case NullTest n -> false;
+                case Equals(var value) -> value instanceof Name;
+                case Compare(var operator, var value) -> value instanceof Name;
+                case Range(var low, var lowClosed, var high, var highClosed) -> low instanceof Name || high instanceof Name;
+            };
+            if (names) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

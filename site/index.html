@@ -114,8 +114,9 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
         <article>
           <h3>FEEL cells</h3>
           <p>Lists, <code>not(...)</code>, comparisons, intervals and <code>null</code> on string, number,
-            date, boolean, time, date-time and duration columns, with optional input value lists. In DMN,
-            cells may also compare with another input, as in <code>&gt; limit</code>.</p>
+            date, boolean, time, date-time and duration columns, times with or without a zone, and optional
+            input value lists. An input may hold a list, such as nationalities, and in DMN a cell may
+            compare with another input, as in <code>&gt; limit</code>.</p>
         </article>
         <article>
           <h3>Validation when you build</h3>
@@ -124,8 +125,9 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
         </article>
         <article>
           <h3>DMN in, DMN out</h3>
-          <p>Reads DMN 1.1 to 1.5, including files from Camunda Modeler, and writes DMN 1.3 that Camunda
-            and Drools evaluate the same way.</p>
+          <p>Reads DMN 1.1 to 1.5, including files from Camunda Modeler and outputs that compute, as in
+            <code>(price - discount) * 1.2</code>, and writes DMN 1.3 that Camunda and Drools evaluate the
+            same way.</p>
         </article>
         <article>
           <h3>A Maven plugin</h3>
@@ -205,7 +207,8 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
             rules mention, and a binary search finds the interval.</p>
           <p>Evaluating an input looks up one mask per column and ANDs them. A 64-bit AND checks 64 rules
             at once, and the hit policy reads the result: FIRST is the lowest set bit, a single CPU
-            instruction. Memory grows with columns × values × rules, never with their product.</p>
+            instruction. Memory grows with columns × values × rules, never with their product, and a mask
+            only a few rules share, such as one product code's, keeps only its non-zero words.</p>
         </div>
         <figure class="bits" aria-labelledby="bits-caption">
           <table>
@@ -230,13 +233,13 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
       <h2 id="not-title">What it is not</h2>
       <p>Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drools when you need:</p>
       <ul class="plain">
-        <li><strong>Full FEEL:</strong> functions, arithmetic, contexts and computed expressions, such as
-          <code>income &gt; 2 * rent</code>. Praecepta cells are FEEL simple unary tests; in DMN they may
-          compare with another input (<code>&gt; limit</code>), but not compute with it.</li>
+        <li><strong>Full FEEL:</strong> functions, contexts, <code>if</code> and tests that compute, such as
+          <code>income &gt; 2 * rent</code>. Praecepta's input entries are FEEL simple unary tests: in DMN
+          they may compare with another input (<code>&gt; limit</code>) or test a list's elements, but not
+          compute. Output entries may compute with <code>+ - * /</code>, but call no functions.</li>
         <li><strong>Decision requirement graphs:</strong> decisions feeding other decisions, business
-          knowledge models and boxed expressions.</li>
-        <li><strong>Times with a zone:</strong> times and date-times are local
-          (<a href="https://github.com/brunopacheco1/praecepta/issues/70">#70</a>).</li>
+          knowledge models and boxed expressions
+          (<a href="https://github.com/brunopacheco1/praecepta/issues/14">#14</a>).</li>
         <li><strong>A process engine, a modeller or a decision service</strong> around the tables.</li>
       </ul>
     </section>
@@ -408,29 +411,32 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
       <h2 id="roadmap-title">Roadmap</h2>
       <ol class="timeline">
         <li>
-          <h3>0.3</h3>
+          <h3>0.4</h3>
           <ul class="plain">
-            <li>Cells that compare with another input, duration columns and string ranges
-              (<a href="https://github.com/brunopacheco1/praecepta/issues/51">#51</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/52">#52</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/13">#13</a>)</li>
-            <li>COUNT, outputs that name an input, item-definition types
-              (<a href="https://github.com/brunopacheco1/praecepta/issues/15">#15</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/53">#53</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/54">#54</a>)</li>
-            <li>Faster number, date and duration columns (<a href="https://github.com/brunopacheco1/praecepta/issues/16">#16</a>); the DMN conformance kit passes 78 of 86
+            <li>Inputs that hold lists, output entries that compute, times with a zone
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/25">#25</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/71">#71</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/70">#70</a>)</li>
+            <li>Compact masks: a 10,000-rule price list in a quarter of the memory (<a href="https://github.com/brunopacheco1/praecepta/issues/17">#17</a>)</li>
+            <li>The DMN conformance kit passes 83 of 86; the rest need decisions feeding other decisions
               (<a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
           </ul>
         </li>
         <li>
-          <h3>Next: 0.4</h3>
+          <h3>Next: 0.5</h3>
           <ul class="plain">
-            <li>Times with a zone, output entries that are expressions, list-valued inputs
-              (<a href="https://github.com/brunopacheco1/praecepta/issues/70">#70</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/71">#71</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/25">#25</a>)</li>
+            <li>GraalVM native image and a Gradle plugin (<a href="https://github.com/brunopacheco1/praecepta/issues/19">#19</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/18">#18</a>)</li>
+            <li>Spring Boot, Quarkus and Micronaut integrations
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/20">#20</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/76">#76</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/77">#77</a>)</li>
           </ul>
         </li>
         <li>
-          <h3>Later this year</h3>
+          <h3>0.6</h3>
           <ul class="plain">
-            <li>Compressed bitmaps for very large tables (<a href="https://github.com/brunopacheco1/praecepta/issues/17">#17</a>)</li>
-            <li>Gradle, GraalVM, Spring Boot and a playground, as people ask
-              (<a href="https://github.com/brunopacheco1/praecepta/issues/18">#18</a>–<a href="https://github.com/brunopacheco1/praecepta/issues/21">#21</a>)</li>
+            <li>An online playground: paste a table, see its validation report and try inputs (<a href="https://github.com/brunopacheco1/praecepta/issues/21">#21</a>)</li>
+          </ul>
+        </li>
+        <li>
+          <h3>Later</h3>
+          <ul class="plain">
             <li>Decisions feeding other decisions, if they fit (<a href="https://github.com/brunopacheco1/praecepta/issues/14">#14</a>)</li>
           </ul>
         </li>

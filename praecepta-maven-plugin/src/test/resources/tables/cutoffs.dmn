@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="cutoffs" name="cutoffs" namespace="https://example.com/cutoffs">
+  <decision id="cutoffs" name="cutoffs">
+    <decisionTable id="table" hitPolicy="FIRST">
+      <input id="at" label="at"><inputExpression typeRef="time"><text>at</text></inputExpression></input>
+      <output id="decision" name="decision" typeRef="string"/>
+      <rule id="r1">
+        <inputEntry><text>&gt; limit</text></inputEntry>
+        <outputEntry><text>"late"</text></outputEntry>
+      </rule>
+      <rule id="r2">
+        <inputEntry><text>&lt; time("06:00:00Z")</text></inputEntry>
+        <outputEntry><text>"early"</text></outputEntry>
+      </rule>
+      <rule id="r3">
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"on time"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

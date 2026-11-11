@@ -15,11 +15,13 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Issue;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
+import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 
 /**
@@ -35,7 +37,9 @@ import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
  * it matches is also matched by a rule with a lower bit (earlier, or higher priority): a search over
  * the rule's own classes, pruned as soon as a candidate covers what is left.</li>
  * <li>Rules with cells that compare with another input match inputs known only when evaluating, so
- * they take part only as rules that may be unreachable themselves (judged on their other cells).</li>
+ * they take part only as rules that may be unreachable themselves (judged on their other cells). So
+ * do rules that test a column holding lists, whose matches the classes of single values cannot
+ * describe; such a column shows the analysis a single class.</li>
  * <li>Gaps are regions of declared input values that no rule matches. They are only searched when
  * every string column the rules constrain has declared input values; otherwise every unknown string
  * would be a gap. Missing values are not part of the searched domain.</li>
@@ -49,20 +53,28 @@ final class TableAnalysis {
     private final BitsetIndex index;
     private final List<Praeceptum> rules;
     /**
-     * Rules with cells that compare with another input, which the index sees as "any value": the
-     * inputs they match are known only when evaluating, so they never count as overlapping, never cover
-     * another rule, and while there are any, gaps are not searched.
+     * Rules with cells that compare with another input, which the index sees as "any value", or that
+     * test a column holding lists: the inputs they match are known only when evaluating, so they never
+     * count as overlapping, never cover another rule, and while there are any, gaps are not searched.
      */
     private final long[] variableRules;
+    /** ANY: a rule's outputs as they are compared; two rules conflict when theirs differ. */
+    private final Function<PraeceptaOutput, ?> comparableOutput;
 
-    private TableAnalysis(BitsetIndex index, List<Praeceptum> rules, long[] variableRules) {
+    private TableAnalysis(BitsetIndex index, List<Praeceptum> rules, long[] variableRules, Function<PraeceptaOutput, ?> comparableOutput) {
         this.index = index;
         this.rules = rules;
         this.variableRules = variableRules;
+        this.comparableOutput = comparableOutput;
     }
 
-    static List<Issue> analyse(BitsetIndex index, List<Praeceptum> rules, HitPolicy policy, long[] variableRules) {
-        var analysis = new TableAnalysis(index, rules, variableRules);
+    /**
+     * @param comparableOutput a rule's outputs as ANY compares them (number outputs by value), so that
+     *                         rules conflict exactly when evaluation would find them different
+     */
+    static List<Issue> analyse(BitsetIndex index, List<Praeceptum> rules, HitPolicy policy, long[] variableRules,
+            Function<PraeceptaOutput, ?> comparableOutput) {
+        var analysis = new TableAnalysis(index, rules, variableRules, comparableOutput);
         var issues = new ArrayList<Issue>(switch (policy) {
             case UNIQUE -> analysis.overlaps(Kind.OVERLAPPING_RULES, false);
             case ANY -> analysis.overlaps(Kind.CONFLICTING_OUTPUTS, true);
@@ -87,7 +99,8 @@ final class TableAnalysis {
             for (int other = BitsetIndex.next(overlapping, bit + 1); other >= 0; other = BitsetIndex.next(overlapping, other + 1)) {
                 int first = Math.min(index.ruleAt(bit), index.ruleAt(other));
                 int second = Math.max(index.ruleAt(bit), index.ruleAt(other));
-                if (!onlyConflictingOutputs || !Objects.equals(rules.get(first).output(), rules.get(second).output())) {
+                if (!onlyConflictingOutputs || !Objects.equals(comparableOutput.apply(rules.get(first).output()),
+                        comparableOutput.apply(rules.get(second).output()))) {
                     pairs.add(new int[] {first, second});
                 }
             }
@@ -154,9 +167,9 @@ final class TableAnalysis {
                 var masks = new ArrayList<long[]>();
                 var rest = coversRest[c + 1].clone();
                 for (int k = 0; k < col.classCount(); k++) {
-                    if (col.canOccur(k) && BitsetIndex.get(col.masks[k], bit)) {
+                    if (col.canOccur(k) && col.accepts(k, bit)) {
                         masks.add(col.masks[k]);
-                        BitsetIndex.and(rest, col.masks[k]);
+                        Masks.and(rest, col.masks[k]);
                     }
                 }
                 acceptedMasks[c] = masks.toArray(long[][]::new);
@@ -179,7 +192,7 @@ final class TableAnalysis {
             var nextStates = new LinkedHashSet<State>(); // classes leading to the same candidates are searched once
             for (var mask : acceptedMasks[column]) {
                 var next = candidates.clone();
-                BitsetIndex.and(next, mask);
+                Masks.and(next, mask);
                 if (BitsetIndex.isEmpty(next)) {
                     return false; // inputs of this class reach the rule
                 }
@@ -263,7 +276,7 @@ final class TableAnalysis {
     private boolean isConstrained(ColumnIndex col) {
         var all = index.allRules();
         for (int k = 0; k < col.classCount(); k++) {
-            if (!col.empty[k] && !Arrays.equals(col.masks[k], all)) {
+            if (!col.empty[k] && !Arrays.equals(Masks.dense(col.masks[k], all.length), all)) {
                 return true;
             }
         }
@@ -324,7 +337,7 @@ final class TableAnalysis {
                 continue;
             }
             var next = candidates.clone();
-            BitsetIndex.and(next, col.masks[k]);
+            Masks.and(next, col.masks[k]);
             byCandidates.computeIfAbsent(key(next), mask -> new Branch(next)).classes.add(k);
         }
         return byCandidates.values();

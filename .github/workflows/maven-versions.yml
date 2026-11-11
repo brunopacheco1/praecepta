@@ -1,0 +1,57 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# The Maven plugin built and integration-tested with each Maven version it supports. On pull
+# requests only when the plugin, the engine it compiles tables with, or a build file changes;
+# always on main, and weekly so a new Maven release is noticed.
+name: Maven versions
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'praecepta-maven-plugin/**'
+      - 'praecepta-engine/src/main/**'
+      - '**/pom.xml'
+      - '.mvn/**'
+      - '.github/workflows/maven-versions.yml'
+  schedule:
+    - cron: '29 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# a newer push to the same pull request replaces the run in progress; pushes to main always finish
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  maven:
+    # the Maven plugin's integration tests (src/it) run with the Maven building them
+    name: Maven ${{ matrix.maven }} (plugin)
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.preview }}
+    strategy:
+      fail-fast: false
+      matrix:
+        maven: ['3.9.16', '3.10.0']
+        preview: [false]
+        include:
+          - maven: '4.0.0-rc-7' # release candidate: reported, not blocking
+            preview: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Install Maven ${{ matrix.maven }} (wrapper)
+        run: mvn -B -N org.apache.maven.plugins:maven-wrapper-plugin:3.3.4:wrapper -Dmaven=${{ matrix.maven }}
+      - name: Build the plugin and run its integration tests
+        run: |
+          ./mvnw -B --version
+          ./mvnw -B -pl praecepta-maven-plugin -am verify

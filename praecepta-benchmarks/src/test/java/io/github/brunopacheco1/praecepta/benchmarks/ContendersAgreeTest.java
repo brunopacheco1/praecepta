@@ -53,6 +53,8 @@ class ContendersAgreeTest {
             "drools, unique-100, match",
             "camunda, unique-100, nomatch",
             "drools, unique-100, nomatch",
+            "camunda, lookup-100, match",
+            "drools, lookup-100, match",
     })
     void engines_agree_with_praecepta(String engine, String tableName, String shape) {
         var table = Table.named(tableName);

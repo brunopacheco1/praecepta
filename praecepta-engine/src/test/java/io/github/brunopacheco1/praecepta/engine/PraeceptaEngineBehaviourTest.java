@@ -82,7 +82,7 @@ class PraeceptaEngineBehaviourTest {
             var builder = byColumn(HitPolicy.FIRST).columnType("country", ColumnType.STRING);
             Assertions.assertThatThrownBy(builder::build)
                     .isExactlyInstanceOf(IllegalStateException.class)
-                    .hasMessage("columnType(...) only applies with inputs(...); per-column bindings carry their type");
+                    .hasMessage("columnType(...) and listColumnType(...) only apply with inputs(...); per-column bindings carry their type");
         }
 
         @Test

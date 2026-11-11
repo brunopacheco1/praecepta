@@ -8,10 +8,13 @@ package io.github.brunopacheco1.praecepta.engine.reference;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.BinaryOperator;
 import java.util.stream.Collectors;
 
 import org.assertj.core.api.Assertions;
 
+import io.github.brunopacheco1.praecepta.engine.ForcedMaskForm;
 import io.github.brunopacheco1.praecepta.engine.OutputStrategy;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind;
@@ -37,17 +40,32 @@ import net.jqwik.api.Provide;
  * {@link ReferenceMatcher}, an executable statement of strict DMN 1.3 semantics with FEEL unary tests.
  *
  * <p>{@code perColumn} alternates between the two ways of binding inputs: typed getters, and text
- * maps parsed per column type.
+ * maps parsed per column type. Each scenario also picks the form the engine stores its masks in
+ * (dense, chosen by density, sparse wherever possible, or a mix of both), and the wide scenarios have up to 200
+ * rules, so masks of several words, sparse and dense, are checked against the reference.
  */
 class EngineMatchesReferencePropertiesTest {
 
     private static final int TRIES = 1000;
     /** Static analysis is checked by brute force over every input region, so fewer tries. */
     private static final int ANALYSIS_TRIES = 300;
+    /** Tables of up to 200 rules: each try evaluates every hit policy. */
+    private static final int WIDE_TRIES = 200;
+    private static final int WIDE_ANALYSIS_TRIES = 50;
 
     @Provide
     Arbitrary<DecisionTableScenario> scenarios() {
         return DecisionTableScenario.arbitrary();
+    }
+
+    @Provide
+    Arbitrary<DecisionTableScenario> wideScenarios() {
+        return DecisionTableScenario.wide();
+    }
+
+    @Provide
+    Arbitrary<DecisionTableScenario> temporalScenarios() {
+        return DecisionTableScenario.temporal();
     }
 
     @Provide
@@ -101,11 +119,12 @@ class EngineMatchesReferencePropertiesTest {
         assertSameHits(s, DecisionTableScenario.outOnly(s.rules()), HitPolicy.ANY, List.of(), perColumn);
     }
 
+    /** The number output {@code n} is now and then an expression, which may give a missing value: the aggregations skip it. */
     @Property(tries = TRIES, edgeCases = EdgeCasesMode.NONE)
     void collect_aggregations_match_dmn(@ForAll("scenarios") DecisionTableScenario s, @ForAll boolean perColumn) {
         var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of());
         for (var aggregation : AggregationOperator.values()) {
-            var builder = PraeceptaEngine.<Map<String, Object>, BigDecimal>builder()
+            var builder = PraeceptaEngine.<Map<String, Object>, Optional<BigDecimal>>builder()
                     .table(s.table(s.rules(), HitPolicy.COLLECT, List.of()))
                     .aggregation(aggregation)
                     .output(numericOutput());
@@ -117,8 +136,10 @@ class EngineMatchesReferencePropertiesTest {
                     continue;
                 }
                 var expected = reference.aggregate(input, DecisionTableScenario.NUMBER, Aggregator.valueOf(aggregation.name()));
+                // no match gives no output, except for COUNT; matches whose outputs are all missing give a missing total
+                var noMatch = aggregation != AggregationOperator.COUNT && reference.matches(input).isEmpty();
                 Assertions.assertThat(engine.evaluate(input)).as("%s of input %s", aggregation, input)
-                        .isEqualTo(expected == null ? List.of() : List.of(expected));
+                        .isEqualTo(noMatch ? List.of() : List.of(Optional.ofNullable(expected)));
             }
         }
     }
@@ -133,15 +154,75 @@ class EngineMatchesReferencePropertiesTest {
         }
     }
 
+    // ---- times and date-times, with and without a zone, single and in lists ------------------------
+
+    @Property(tries = TRIES, edgeCases = EdgeCasesMode.NONE)
+    void temporal_tables_match_the_reference_under_every_hit_policy(@ForAll("temporalScenarios") DecisionTableScenario s,
+            @ForAll("priorities") List<String> priority, @ForAll boolean perColumn) {
+        for (var policy : HitPolicy.values()) {
+            var rules = policy == HitPolicy.ANY ? DecisionTableScenario.outOnly(s.rules()) : s.rules();
+            assertSameHits(s, rules, policy, priority, perColumn);
+        }
+    }
+
+    // ---- tables of several words -----------------------------------------------------------------
+
+    /**
+     * ANY over outputs that read no input: the engine compares the matches with the masks of the rules
+     * that have the same outputs, which span several words here, stored in every form.
+     */
+    @Property(tries = WIDE_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void wide_any_tables_compare_outputs_with_the_masks_of_equal_outputs(@ForAll("wideScenarios") DecisionTableScenario s,
+            @ForAll boolean perColumn) {
+        var rules = DecisionTableScenario.outOnlyValues(s.rules());
+        for (var form : ForcedMaskForm.values()) {
+            assertSameHits(s.withMaskForm(form), rules, HitPolicy.ANY, List.of(), perColumn);
+        }
+    }
+
+    @Property(tries = TRIES, edgeCases = EdgeCasesMode.NONE)
+    void any_tables_compare_outputs_with_the_masks_of_equal_outputs(@ForAll("scenarios") DecisionTableScenario s, @ForAll boolean perColumn) {
+        assertSameHits(s, DecisionTableScenario.outOnlyValues(s.rules()), HitPolicy.ANY, List.of(), perColumn);
+    }
+
+    @Property(tries = WIDE_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void wide_tables_match_the_reference_under_every_hit_policy(@ForAll("wideScenarios") DecisionTableScenario s,
+            @ForAll("priorities") List<String> priority, @ForAll boolean perColumn) {
+        for (var policy : HitPolicy.values()) {
+            var rules = policy == HitPolicy.ANY ? DecisionTableScenario.outOnly(s.rules()) : s.rules();
+            assertSameHits(s, rules, policy, priority, perColumn);
+        }
+    }
+
+    @Property(tries = WIDE_ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void wide_tables_validation_report_matches_the_reference(@ForAll("wideScenarios") DecisionTableScenario s,
+            @ForAll("priorities") List<String> priority, @ForAll boolean perColumn) {
+        assertSameFindings(s, priority, perColumn);
+    }
+
     // ---- static analysis ------------------------------------------------------------------------
 
+    /**
+     * Also with map-based inputs ({@code perColumn} false), whose time and date-time columns take values
+     * with a time zone and without: the analysis then looks for overlaps and gaps among both kinds.
+     */
     @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
     void validation_report_matches_the_reference(@ForAll("scenarios") DecisionTableScenario s,
-            @ForAll("priorities") List<String> priority) {
+            @ForAll("priorities") List<String> priority, @ForAll boolean perColumn) {
+        assertSameFindings(s, priority, perColumn);
+    }
+
+    @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void temporal_tables_validation_report_matches_the_reference(@ForAll("temporalScenarios") DecisionTableScenario s,
+            @ForAll("priorities") List<String> priority, @ForAll boolean perColumn) {
+        assertSameFindings(s, priority, perColumn);
+    }
+
+    private static void assertSameFindings(DecisionTableScenario s, List<String> priority, boolean perColumn) {
         for (var policy : List.of(HitPolicy.UNIQUE, HitPolicy.ANY, HitPolicy.FIRST, HitPolicy.PRIORITY)) {
             var rules = policy == HitPolicy.ANY ? DecisionTableScenario.outOnly(s.rules()) : s.rules();
-            var engine = engine(s, rules, policy, priority, true);
-            var reference = s.reference(rules, policy, DecisionTableScenario.outputPriority(policy, priority));
+            var engine = engine(s, rules, policy, priority, perColumn);
+            var reference = s.reference(rules, policy, DecisionTableScenario.outputPriority(policy, priority), perColumn);
             var actual = engine.validationReport().issues().stream()
                     .filter(issue -> issue.kind() != Kind.GAP)
                     .map(issue -> new Finding(issue.kind().name(), issue.ruleIds()))
@@ -152,23 +233,27 @@ class EngineMatchesReferencePropertiesTest {
     }
 
     @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
-    void gaps_are_reported_exactly_when_valid_inputs_go_unmatched(@ForAll("scenariosWithValueLists") DecisionTableScenario s) {
-        var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of());
+    void gaps_are_reported_exactly_when_valid_inputs_go_unmatched(@ForAll("scenariosWithValueLists") DecisionTableScenario s,
+            @ForAll boolean perColumn) {
+        var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of(), perColumn);
         Assertions.assertThat(reference.gapAnalysisApplies(s.columns())).isTrue();
-        assertGapsMatchUncoveredInputs(s, reference);
+        assertGapsMatchUncoveredInputs(s, reference, perColumn);
     }
 
-    /** Also without value lists: number, date and time columns, and string columns that compare. */
+    /**
+     * Also without value lists: number, date and time columns, and string columns that compare; with
+     * map-based inputs, among times and date-times of both kinds.
+     */
     @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
-    void gaps_are_reported_exactly_wherever_gap_analysis_applies(@ForAll("scenarios") DecisionTableScenario s) {
-        var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of());
+    void gaps_are_reported_exactly_wherever_gap_analysis_applies(@ForAll("scenarios") DecisionTableScenario s, @ForAll boolean perColumn) {
+        var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of(), perColumn);
         if (reference.gapAnalysisApplies(s.columns())) {
-            assertGapsMatchUncoveredInputs(s, reference);
+            assertGapsMatchUncoveredInputs(s, reference, perColumn);
         }
     }
 
-    private static void assertGapsMatchUncoveredInputs(DecisionTableScenario s, ReferenceMatcher reference) {
-        var engine = engine(s, s.rules(), HitPolicy.COLLECT, List.of(), true);
+    private static void assertGapsMatchUncoveredInputs(DecisionTableScenario s, ReferenceMatcher reference, boolean perColumn) {
+        var engine = engine(s, s.rules(), HitPolicy.COLLECT, List.of(), perColumn);
         var gaps = engine.validationReport().issues(Kind.GAP);
         var uncovered = reference.uncoveredInputs(s.columns());
 
@@ -224,6 +309,7 @@ class EngineMatchesReferencePropertiesTest {
     }
 
     private static <O> void configure(PraeceptaEngine.Builder<Map<String, Object>, O> builder, DecisionTableScenario s, boolean perColumn) {
+        s.applyMaskForm(builder);
         if (perColumn) {
             s.bindColumns(builder);
         } else {
@@ -241,32 +327,37 @@ class EngineMatchesReferencePropertiesTest {
                 .toList();
     }
 
-    private static OutputStrategy<BigDecimal> numericOutput() {
+    /** The number output, empty where it is missing (a computed output may be), which the aggregations skip. */
+    private static OutputStrategy<Optional<BigDecimal>> numericOutput() {
         return new OutputStrategy<>() {
             @Override
-            public BigDecimal transform(PraeceptaOutput output) {
-                return new BigDecimal(output.values().get(DecisionTableScenario.NUMBER));
+            public Optional<BigDecimal> transform(PraeceptaOutput output) {
+                return Optional.ofNullable(output.values().get(DecisionTableScenario.NUMBER)).map(BigDecimal::new);
             }
 
             @Override
-            public BigDecimal sum(BigDecimal a, BigDecimal b) {
-                return a.add(b);
+            public Optional<BigDecimal> sum(Optional<BigDecimal> a, Optional<BigDecimal> b) {
+                return combine(a, b, BigDecimal::add);
             }
 
             @Override
-            public BigDecimal count(int matches) {
-                return BigDecimal.valueOf(matches);
+            public Optional<BigDecimal> count(int matches) {
+                return Optional.of(BigDecimal.valueOf(matches));
             }
 
             @Override
-            public BigDecimal min(BigDecimal a, BigDecimal b) {
-                return a.min(b);
+            public Optional<BigDecimal> min(Optional<BigDecimal> a, Optional<BigDecimal> b) {
+                return combine(a, b, BigDecimal::min);
             }
 
             @Override
-            public BigDecimal max(BigDecimal a, BigDecimal b) {
-                return a.max(b);
+            public Optional<BigDecimal> max(Optional<BigDecimal> a, Optional<BigDecimal> b) {
+                return combine(a, b, BigDecimal::max);
             }
         };
+    }
+
+    private static Optional<BigDecimal> combine(Optional<BigDecimal> a, Optional<BigDecimal> b, BinaryOperator<BigDecimal> operator) {
+        return a.isEmpty() ? b : b.isEmpty() ? a : Optional.of(operator.apply(a.get(), b.get()));
     }
 }

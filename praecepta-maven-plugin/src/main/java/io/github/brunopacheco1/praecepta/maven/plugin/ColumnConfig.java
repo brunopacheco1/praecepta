@@ -22,6 +22,10 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
  *   <name>age</name>
  *   <type>NUMBER</type>
  * </input>
+ * <input>
+ *   <name>nationalities</name>
+ *   <list>true</list>
+ * </input>
  * <output>
  *   <name>tier</name>
  *   <priority><value>gold</value><value>silver</value></priority>
@@ -33,7 +37,11 @@ public class ColumnConfig {
     /** The column's header in the sheet. */
     String name;
 
-    /** STRING (default), NUMBER, DATE, BOOLEAN, TIME or DATE_TIME. */
+    /**
+     * STRING (default), NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION or YEAR_MONTH_DURATION. A
+     * TIME or DATE_TIME column whose values are all written with a time zone generates an {@code OffsetTime}
+     * or {@code ZonedDateTime} (see {@link TimeZones}).
+     */
     ColumnType type = ColumnType.STRING;
 
     /**
@@ -45,6 +53,13 @@ public class ColumnConfig {
     /** Outputs only: the DMN output value list, highest priority first (PRIORITY and OUTPUT_ORDER). */
     List<String> priority = new ArrayList<>();
 
+    /**
+     * Inputs only: whether the column holds lists of its type, such as a customer's nationalities. A
+     * cell then matches when some element passes one of its tests; the input record gets a
+     * {@code java.util.List} component, and {@code allowedValues} apply to the elements.
+     */
+    boolean list;
+
     public ColumnConfig() {
     }
 
@@ -53,5 +68,12 @@ public class ColumnConfig {
         this.type = type;
         this.allowedValues = allowedValues;
         this.priority = new ArrayList<>(priority);
+    }
+
+    /** An input column that holds lists of {@code type}. */
+    static ColumnConfig listInput(String name, ColumnType type, String allowedValues) {
+        var column = new ColumnConfig(name, type, allowedValues, List.of());
+        column.list = true;
+        return column;
     }
 }

@@ -8,7 +8,6 @@ package io.github.brunopacheco1.praecepta.engine;
 import java.util.Arrays;
 import java.util.List;
 
-import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 
 /**
@@ -16,7 +15,9 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException
  * partitions its values into classes ({@link ColumnIndex}) carrying the mask of rules accepting them.
  * An input's matches are the AND of one class mask per column.
  *
- * <p>Memory is proportional to columns × classes × rules / 8 bytes, with no wildcard expansion.
+ * <p>Memory is proportional to columns × classes × rules / 8 bytes, with no wildcard expansion; a
+ * class mask that few rules accept is stored sparse ({@link Masks}), so that a column with thousands
+ * of values in a table of thousands of rules takes memory in proportion to the bits set instead.
  * Bits are assigned in a caller-chosen order (see {@link #ruleAt(int)}), which lets "lowest set bit"
  * mean "first in rule order" or "highest priority".
  */
@@ -70,6 +71,9 @@ final class BitsetIndex {
         var matches = allRules.clone();
         for (int c = 0; c < columns.length; c++) {
             var mask = columns[c].maskFor(reader.read(input, c));
+            if (mask.length != words) { // a sparse mask (see Masks): few words are left to intersect
+                return matchSparse(input, reader, c, matches, mask);
+            }
             long any = 0;
             for (int w = 0; w < words; w++) {
                 any |= (matches[w] &= mask[w]);
@@ -84,12 +88,44 @@ final class BitsetIndex {
     }
 
     /**
+     * Goes on with {@link #match} from column {@code column}, whose mask is the sparse {@code mask}: from
+     * there on, only the words that mask holds can have a match, so the candidates are kept as
+     * {@code [word, bits]} pairs and each further column intersects only those.
+     */
+    private <T> long[] matchSparse(T input, ColumnReader<T> reader, int column, long[] matches, long[] mask) {
+        var pairs = new long[mask.length];
+        int count = 0;
+        for (int i = 0; i < mask.length; i += 2) {
+            long bits = matches[(int) mask[i]] & mask[i + 1];
+            if (bits != 0) {
+                pairs[2 * count] = mask[i];
+                pairs[2 * count + 1] = bits;
+                count++;
+            }
+        }
+        int c = column + 1; // the next column to read
+        while (count > 0 && c < columns.length) {
+            count = Masks.andPairs(pairs, count, columns[c].maskFor(reader.read(input, c)), words);
+            c++;
+        }
+        if (count == 0) {
+            validate(input, reader, c);
+            return NO_MATCH;
+        }
+        Arrays.fill(matches, 0L);
+        for (int i = 0; i < 2 * count; i += 2) {
+            matches[(int) pairs[i]] = pairs[i + 1];
+        }
+        return matches;
+    }
+
+    /**
      * Checks declared input values (and parsability) for the columns from {@code from} on. A STRING
-     * column without declared input values accepts any value, so it is skipped.
+     * column of single values without declared input values accepts any value, so it is skipped.
      */
     private <T> void validate(T input, ColumnReader<T> reader, int from) {
         for (int c = from; c < columns.length; c++) {
-            if (columns[c].hasAllowedValues || columns[c].type != ColumnType.STRING) {
+            if (columns[c].checksValues()) {
                 columns[c].maskFor(reader.read(input, c));
             }
         }
@@ -130,8 +166,8 @@ final class BitsetIndex {
         for (var column : columns) {
             var union = new long[words];
             for (int k = 0; k < column.classCount(); k++) {
-                if (column.canOccur(k) && get(column.masks[k], bit)) {
-                    or(union, column.masks[k]);
+                if (column.canOccur(k) && column.accepts(k, bit)) {
+                    Masks.or(union, column.masks[k]);
                 }
             }
             and(overlapping, union);

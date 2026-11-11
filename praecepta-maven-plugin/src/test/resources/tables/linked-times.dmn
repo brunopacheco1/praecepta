@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- two time columns that a cell links, one written with a zone and one without -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="linked" name="linked" namespace="https://example.com/linked">
+  <decision id="linked" name="linked">
+    <decisionTable id="table" hitPolicy="FIRST">
+      <input id="start" label="start"><inputExpression typeRef="time"><text>start</text></inputExpression></input>
+      <input id="end" label="end"><inputExpression typeRef="time"><text>end</text></inputExpression></input>
+      <output id="result" name="result" typeRef="string"/>
+      <rule id="r1">
+        <inputEntry><text>&lt; end, &lt; time("08:00:00Z")</text></inputEntry>
+        <inputEntry><text>&lt; time("18:00:00")</text></inputEntry>
+        <outputEntry><text>"ok"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

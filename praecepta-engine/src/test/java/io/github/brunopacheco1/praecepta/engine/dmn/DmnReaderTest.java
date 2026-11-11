@@ -155,10 +155,10 @@ class DmnReaderTest {
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
             "untyped duration   | duration        | at      |                      |         | type 'duration' is not supported",
-            "zoned time cell    | time            | at      | time(\"10:00:00Z\")  |         | rule 1, column 'at': Invalid cell",
+            "time with zone id  | time            | at      | time(\"10:00:00@Europe/Paris\") | | rule 1, column 'at': Invalid cell",
             "computed input     | number          | age * 2 |                      |         | input expression 'age * 2' is not supported",
             "unsupported cell   | number          | age     | &gt; abs(x)          |         | rule 1, column 'age'",
-            "computed output    | string          | a       |                      | a + \"x\" | rule 1, output 'result': 'a + \"x\"' is not supported",
+            "function output    | string          | a       |                      | upper case(a) | rule 1, output 'result': 'upper case(a)' is not supported",
     })
     void unsupported_dmn_is_rejected_with_its_location(String description, String typeRef, String inputExpression,
             String inputEntry, String outputEntry, String message) {
@@ -174,6 +174,106 @@ class DmnReaderTest {
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("Decision 't'")
                 .hasMessageContaining(message);
+    }
+
+    /** A collection of strings, and one of numbers. */
+    private static final String LIST_TYPES = """
+            <itemDefinition name="tStrings" isCollection="true"><typeRef>string</typeRef></itemDefinition>
+            <itemDefinition name="tNumbers" isCollection="true"><typeRef>number</typeRef></itemDefinition>""";
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+            "input values of a list   | <input><inputExpression typeRef=\"tStrings\"><text>a</text></inputExpression>"
+                    + "<inputValues><text>\"PT\"</text></inputValues></input> | <output name=\"result\" typeRef=\"string\"/> | `\"x\"` "
+                    + "| input 'a': input values of a list are not supported",
+            "a list output            | <input><inputExpression typeRef=\"string\"><text>a</text></inputExpression></input> "
+                    + "| <output name=\"result\" typeRef=\"tStrings\"/> | `\"x\"` "
+                    + "| output 'result': type 'tStrings' is a collection, which is not supported for outputs",
+            "an output naming a list  | <input><inputExpression typeRef=\"tStrings\"><text>a</text></inputExpression></input> "
+                    + "| <output name=\"result\" typeRef=\"string\"/> | a "
+                    + "| rule 1, output 'result': names input 'a', a list, which outputs cannot hold",
+    })
+    void lists_where_dmn_tables_cannot_hold_them_are_rejected(String description, String input, String output, String outputEntry,
+            String message) {
+        var dmn = stream(model(LIST_TYPES + """
+                  <decision id="t" name="t"><decisionTable>
+                    %s
+                    %s
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>%s</text></outputEntry></rule>
+                  </decisionTable></decision>""".formatted(input, output, outputEntry)));
+        Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessageContaining("Decision 't'")
+                .hasMessageContaining(message);
+    }
+
+    /** A decision whose string column 'Symptom' compares with the input 'Flu Symptoms', of the given type, and outputs {@code output}. */
+    private static String symptomTable(String inputDataType, String output) {
+        return model(LIST_TYPES + """
+                  <inputData id="i" name="Flu Symptoms"><variable name="Flu Symptoms" typeRef="%s"/></inputData>
+                  <decision id="t" name="t"><decisionTable>
+                    <input><inputExpression typeRef="string"><text>Symptom</text></inputExpression></input>
+                    <output name="result" typeRef="string"/>
+                    <rule><inputEntry><text>Flu Symptoms</text></inputEntry><outputEntry><text>%s</text></outputEntry></rule>
+                  </decisionTable></decision>""".formatted(inputDataType, output));
+    }
+
+    @Test
+    void a_named_list_input_must_hold_elements_of_the_type_of_the_column_that_names_it() {
+        var dmn = stream(symptomTable("tNumbers", "\"flu\""));
+        Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Decision 't': a string column compares with 'Flu Symptoms', a list of number");
+    }
+
+    @Test
+    void a_named_input_whose_type_cannot_be_resolved_holds_single_values() {
+        var table = DmnReader.read(stream(symptomTable("tUnknown", "\"flu\"")));
+        Assertions.assertThat(table.listInputs()).isEmpty();
+        var engine = PraeceptaEngine.<Map<String, String>, String>builder()
+                .table(table)
+                .inputs(PraeceptaInput::new)
+                .output(output -> output.values().get("result"))
+                .build();
+        Assertions.assertThat(engine.evaluate(Map.of("Symptom", "cough", "Flu Symptoms", "cough"))).containsExactly("flu");
+        Assertions.assertThat(engine.evaluate(Map.of("Symptom", "cough", "Flu Symptoms", "fever"))).isEmpty();
+    }
+
+    @Test
+    void outputs_may_read_the_inputs_the_cells_compare_with_as_the_engine_does() {
+        var xml = model("""
+                  <decision id="t" name="t"><decisionTable hitPolicy="COLLECT">
+                    <input><inputExpression typeRef="number"><text>amount</text></inputExpression></input>
+                    <output name="headroom" typeRef="number"/>
+                    <output name="cap" typeRef="number"/>
+                    <rule><inputEntry><text>&lt;= limit</text></inputEntry>
+                      <outputEntry><text>limit - amount</text></outputEntry><outputEntry><text>limit</text></outputEntry></rule>
+                  </decisionTable></decision>""");
+        var table = DmnReader.read(stream(xml));
+        var output = table.rules().getFirst().output();
+        Assertions.assertThat(output.expressions()).containsExactly(Map.entry("headroom", "limit - amount"));
+        Assertions.assertThat(output.references()).containsExactly(Map.entry("cap", "limit"));
+
+        var engine = PraeceptaEngine.<Map<String, String>, Map<String, String>>builder()
+                .table(table)
+                .inputs(PraeceptaInput::new)
+                .output(PraeceptaOutput::values)
+                .build();
+        Assertions.assertThat(engine.evaluate(Map.of("amount", "30", "limit", "100.50")))
+                .containsExactly(Map.of("headroom", "70.5", "cap", "100.50"));
+        Assertions.assertThat(DmnReader.read(stream(DmnWriter.write(table))).rules()).isEqualTo(table.rules());
+    }
+
+    @Test
+    void outputs_may_not_read_a_named_list_input() {
+        var dmn = stream(symptomTable("tStrings", "Flu Symptoms + \"!\""));
+        Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessageContaining("Decision 't', rule 1, output 'result': 'Flu Symptoms + \"!\"' names 'Flu Symptoms', "
+                        + "which is not one of the table's inputs of single values");
+        var naming = stream(symptomTable("tStrings", "Flu Symptoms"));
+        Assertions.assertThatThrownBy(() -> DmnReader.read(naming))
+                .hasMessage("Decision 't', rule 1, output 'result': names input 'Flu Symptoms', a list, which outputs cannot hold");
     }
 
     @Test
@@ -274,8 +374,12 @@ class DmnReaderTest {
     @CsvSource(delimiter = '|', value = {
             "structured type      | <itemDefinition name=\"tT\"><itemComponent name=\"a\"><typeRef>string</typeRef></itemComponent></itemDefinition> "
                     + "| type 'tT' is a structured item definition",
-            "collection           | <itemDefinition name=\"tT\" isCollection=\"true\"><typeRef>string</typeRef></itemDefinition> "
-                    + "| type 'tT' is a collection",
+            "list of lists        | <itemDefinition name=\"tT\" isCollection=\"true\"><typeRef>tU</typeRef></itemDefinition>"
+                    + "<itemDefinition name=\"tU\" isCollection=\"true\"><typeRef>string</typeRef></itemDefinition> "
+                    + "| type 'tU' is a collection of collections",
+            "constrained list     | <itemDefinition name=\"tT\" isCollection=\"true\"><typeRef>string</typeRef>"
+                    + "<allowedValues><text>\"a\"</text></allowedValues></itemDefinition> "
+                    + "| type 'tT' constrains a collection as a whole",
             "no base type         | <itemDefinition name=\"tT\"/> | type 'tT' is not supported; its item definition has no base type",
             "unsupported base     | <itemDefinition name=\"tT\"><typeRef>context</typeRef></itemDefinition> "
                     + "| type 'context' is not supported",

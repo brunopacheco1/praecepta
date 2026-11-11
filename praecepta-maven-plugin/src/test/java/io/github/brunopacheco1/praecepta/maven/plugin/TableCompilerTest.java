@@ -5,6 +5,7 @@
  */
 package io.github.brunopacheco1.praecepta.maven.plugin;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
@@ -18,7 +19,11 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetTime;
 import java.time.Period;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -34,6 +39,7 @@ import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
+import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 
 /**
  * Compiles tables, then compiles the generated sources with the JDK's compiler and runs them against
@@ -129,6 +135,39 @@ class TableCompilerTest {
     }
 
     @Test
+    void list_columns_become_lists_matched_element_by_element() throws Exception {
+        var config = new TableConfig(table("nationalities.csv"), "Offer", null, HitPolicy.FIRST, null,
+                List.of(ColumnConfig.listInput("nationalities", ColumnType.STRING, "\"PT\",\"ES\",\"BR\""),
+                        ColumnConfig.listInput("ages", ColumnType.NUMBER, null)),
+                List.of(new ColumnConfig("offer", ColumnType.STRING, null, List.of())));
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+
+        Assertions.assertThat(result.sources().get("OfferInput"))
+                .contains("public record OfferInput(java.util.List<String> nationalities, java.util.List<java.math.BigDecimal> ages)");
+        Assertions.assertThat(result.sources().get("Offer"))
+                .contains(".listInput(\"nationalities\", OfferInput::nationalities)",
+                        ".listInput(\"ages\", io.github.brunopacheco1.praecepta.engine.beans.ColumnType.NUMBER, OfferInput::ages)");
+        Assertions.assertThat(result.dmn()).contains("list contains(?, \"PT\") or list contains(?, \"ES\")", "isCollection=\"true\"");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".OfferInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Offer").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(List.of("BR", "ES"), List.of())))
+                    .get().hasToString("OfferOutput[offer=iberian]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(List.of("BR"), List.of(new BigDecimal(70)))))
+                    .get().hasToString("OfferOutput[offer=senior]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(null, null)))
+                    .get().hasToString("OfferOutput[offer=standard]");
+            // the value list applies to the elements
+            var unknown = constructor.newInstance(List.of("FR"), null);
+            Assertions.assertThatThrownBy(() -> evaluate.invoke(null, unknown))
+                    .isInstanceOf(InvocationTargetException.class)
+                    .cause().hasMessageContaining("nationalities=FR");
+        }
+    }
+
+    @Test
     void duration_columns_become_durations_and_periods() throws Exception {
         var config = new TableConfig(table("waits.csv"), "Wait", null, HitPolicy.FIRST, null,
                 List.of(new ColumnConfig("delay", ColumnType.DAY_TIME_DURATION, null, List.of()),
@@ -183,6 +222,164 @@ class TableCompilerTest {
             var christmasNoon = LocalDateTime.of(2025, 12, 25, 12, 0);
             var christmas = (Optional<?>) evaluate.invoke(null, constructor.newInstance(false, LocalTime.NOON, christmasNoon));
             Assertions.assertThat(christmas).get().hasToString("ShiftOutput[paid=false, until=null, reviewed=null, rate=holiday]");
+        }
+    }
+
+    @Test
+    void times_and_date_times_written_with_a_zone_become_offset_times_and_zoned_date_times() throws Exception {
+        var config = new TableConfig(table("deliveries.csv"), "Delivery", null, HitPolicy.FIRST, null,
+                List.of(new ColumnConfig("cutOff", ColumnType.TIME, null, List.of()),
+                        new ColumnConfig("at", ColumnType.DATE_TIME, null, List.of())),
+                List.of(new ColumnConfig("slot", ColumnType.STRING, null, List.of()),
+                        new ColumnConfig("due", ColumnType.DATE_TIME, null, List.of())));
+        var result = TableCompiler.compile(config, PACKAGE, Severity.WARNING);
+
+        Assertions.assertThat(result.sources().get("DeliveryInput"))
+                .contains("public record DeliveryInput(java.time.OffsetTime cutOff, java.time.ZonedDateTime at)");
+        Assertions.assertThat(result.sources().get("DeliveryOutput"))
+                .contains("public record DeliveryOutput(String slot, java.time.ZonedDateTime due)",
+                        "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseZonedDateTime(value)");
+        Assertions.assertThat(result.sources().get("Delivery"))
+                .contains(".offsetTimeInput(\"cutOff\", DeliveryInput::cutOff)", ".zonedDateTimeInput(\"at\", DeliveryInput::at)");
+        Assertions.assertThat(result.dmn()).contains("&lt; time(\"12:00:00+01:00\")", "date and time(\"2025-12-24T09:00:00@Europe/Paris\")");
+        Assertions.assertThat(result.report().isEmpty()).as("validated as the record gives values: with a zone only").isTrue();
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".DeliveryInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Delivery").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            // 10:30Z is 11:30+01:00, before noon in Paris
+            var morning = (Optional<?>) evaluate.invoke(null, constructor.newInstance(OffsetTime.of(10, 30, 0, 0, ZoneOffset.UTC), null));
+            Assertions.assertThat(morning).get().hasToString("DeliveryOutput[slot=morning, due=2025-12-24T09:00+01:00[Europe/Paris]]");
+            var eve = ZonedDateTime.of(2025, 12, 23, 22, 59, 0, 0, ZoneOffset.UTC);
+            var afternoon = (Optional<?>) evaluate.invoke(null, constructor.newInstance(OffsetTime.of(11, 0, 0, 0, ZoneOffset.UTC), eve));
+            Assertions.assertThat(afternoon).get().hasToString("DeliveryOutput[slot=afternoon, due=2025-12-24T15:00Z]");
+        }
+    }
+
+    @Test
+    void list_columns_of_times_written_with_a_zone_become_lists_of_offset_times() throws Exception {
+        var config = new TableConfig(table("windows.csv"), "Window", null, HitPolicy.FIRST, null,
+                List.of(ColumnConfig.listInput("slots", ColumnType.TIME, null)),
+                List.of(new ColumnConfig("fee", ColumnType.NUMBER, null, List.of())));
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+
+        Assertions.assertThat(result.sources().get("WindowInput"))
+                .contains("public record WindowInput(java.util.List<java.time.OffsetTime> slots)");
+        Assertions.assertThat(result.sources().get("Window"))
+                .contains(".listInput(\"slots\", io.github.brunopacheco1.praecepta.engine.beans.ColumnType.TIME, WindowInput::slots)");
+        Assertions.assertThat(result.dmn()).contains("some x in ? satisfies x &gt;= time(\"12:00:00+01:00\")", "isCollection=\"true\"");
+        // the same table from DMN, whose list cells use FEEL's list functions, takes the zone too
+        var fromDmn = DmnReader.read(new ByteArrayInputStream(result.dmn().getBytes(StandardCharsets.UTF_8)));
+        Assertions.assertThat(TimeZones.of(fromDmn).inputs()).containsExactly("slots");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".WindowInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Window").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            // 13:00+02:00 is 11:00Z, within [08:00Z..12:00Z]
+            var within = List.of(OffsetTime.of(13, 0, 0, 0, ZoneOffset.ofHours(2)));
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(within))).get().hasToString("WindowOutput[fee=5]");
+            var late = List.of(OffsetTime.of(7, 0, 0, 0, ZoneOffset.UTC), OffsetTime.of(14, 0, 0, 0, ZoneOffset.ofHours(1)));
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(late))).get().hasToString("WindowOutput[fee=3]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(List.of()))).get().hasToString("WindowOutput[fee=9]");
+        }
+    }
+
+    @Test
+    void inputs_compared_with_a_zoned_column_take_a_zone_too() throws Exception {
+        var config = new TableConfig(table("cutoffs.dmn"), "Cutoffs", null, null, null, List.of(), List.of());
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("CutoffsInput"))
+                .contains("public record CutoffsInput(java.time.OffsetTime at, java.time.OffsetTime limit)");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".CutoffsInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Cutoffs").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            var nineInParis = OffsetTime.of(9, 0, 0, 0, ZoneOffset.ofHours(1));
+            var eightUtc = OffsetTime.of(8, 0, 0, 0, ZoneOffset.UTC);
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(nineInParis, eightUtc)))
+                    .as("the same instant is not later").get().hasToString("CutoffsOutput[decision=on time]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(nineInParis.plusNanos(1), eightUtc)))
+                    .get().hasToString("CutoffsOutput[decision=late]");
+        }
+    }
+
+    @Test
+    void a_column_with_times_with_and_without_a_zone_is_rejected() {
+        var config = new TableConfig(table("mixed-times.csv"), "Mixed", null, HitPolicy.FIRST, null,
+                List.of(new ColumnConfig("start", ColumnType.TIME, null, List.of())),
+                List.of(new ColumnConfig("rate", ColumnType.STRING, null, List.of())));
+        Assertions.assertThatThrownBy(() -> TableCompiler.compile(config, PACKAGE, Severity.ERROR))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Table 'mixed-times': input 'start' takes time values both with and without a time zone, "
+                        + "but its generated record component holds one kind");
+    }
+
+    @Test
+    void outputs_naming_a_zoned_input_and_zoned_time_outputs_keep_their_zone() throws Exception {
+        var config = new TableConfig(table("appointments.dmn"), "Appointment", null, null, null, List.of(), List.of());
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("AppointmentInput")).contains("public record AppointmentInput(java.time.ZonedDateTime at)");
+        Assertions.assertThat(result.sources().get("AppointmentOutput"))
+                .contains("public record AppointmentOutput(java.time.ZonedDateTime confirmed, java.time.OffsetTime opens)");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".AppointmentInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Appointment").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            // 02:30 happens twice in Paris that night: the later one, at +01:00, keeps its instant
+            var later = ZonedDateTime.of(2025, 10, 26, 2, 30, 0, 0, ZoneId.of("Europe/Paris")).withLaterOffsetAtOverlap();
+            for (var at : List.of(later, later.withEarlierOffsetAtOverlap(), ZonedDateTime.of(2025, 6, 1, 8, 0, 0, 0, ZoneOffset.ofHours(-5)))) {
+                var output = ((Optional<?>) evaluate.invoke(null, constructor.newInstance(at))).orElseThrow();
+                Assertions.assertThat(output.getClass().getMethod("confirmed").invoke(output)).as("%s", at).isEqualTo(at);
+                Assertions.assertThat(output.getClass().getMethod("opens").invoke(output))
+                        .isEqualTo(OffsetTime.of(9, 0, 0, 0, ZoneOffset.ofHours(1)));
+            }
+        }
+    }
+
+    @Test
+    void inputs_a_cell_links_must_be_written_with_one_kind_of_time() {
+        var config = new TableConfig(table("linked-times.dmn"), "Linked", null, null, null, List.of(), List.of());
+        Assertions.assertThatThrownBy(() -> TableCompiler.compile(config, PACKAGE, Severity.ERROR))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Table 'linked': input 'start' takes time values both with and without a time zone, "
+                        + "but its generated record component holds one kind");
+    }
+
+    @Test
+    void a_time_output_that_is_not_a_time_is_rejected() {
+        var config = new TableConfig(table("bad-time-output.csv"), "Opening", null, HitPolicy.FIRST, null,
+                List.of(new ColumnConfig("start", ColumnType.TIME, null, List.of())),
+                List.of(new ColumnConfig("opens", ColumnType.TIME, null, List.of())));
+        Assertions.assertThatThrownBy(() -> TableCompiler.compile(config, PACKAGE, Severity.ERROR))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Table 'bad-time-output': output 'opens' value 'noon' is not a time");
+    }
+
+    @Test
+    void dmn_output_expressions_and_named_list_inputs_run_in_generated_code() throws Exception {
+        var config = new TableConfig(table("flu.dmn"), "Flu", null, null, null, List.of(), List.of());
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("FluInput"))
+                .contains("public record FluInput(String symptom, java.math.BigDecimal days, java.util.List<String> fluSymptoms)");
+        Assertions.assertThat(result.sources().get("FluOutput")).contains("public record FluOutput(String message, java.math.BigDecimal hours)");
+        Assertions.assertThat(result.sources().get("Flu")).contains(".listInput(\"Flu Symptoms\", FluInput::fluSymptoms)");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".FluInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Flu").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            var flu = List.of("fever", "cough");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("cough", new BigDecimal("2.5"), flu)))
+                    .get().hasToString("FluOutput[message=cough is in the list of Flu symptoms, hours=60]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("rash", new BigDecimal(2), flu)))
+                    .get().hasToString("FluOutput[message=rash is not a Flu symptom, hours=0]");
+            // a missing operand gives a missing output
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("fever", null, flu)))
+                    .get().hasToString("FluOutput[message=fever is in the list of Flu symptoms, hours=null]");
         }
     }
 

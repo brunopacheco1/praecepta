@@ -9,6 +9,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.OffsetTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import org.assertj.core.api.Assertions;
@@ -130,6 +134,36 @@ class CellParserTest {
                 .isEqualTo(positive(new Equals(moment), new Equals(moment)));
     }
 
+    @Test
+    void times_may_have_an_offset_and_date_times_an_offset_or_a_zone_id() {
+        var plusOne = ZoneOffset.ofHours(1);
+        Assertions.assertThat(CellParser.parseFeel("time(\"08:30:00+01:00\"), < time(\"08:30:00Z\")", ColumnType.TIME))
+                .isEqualTo(positive(new Equals(OffsetTime.of(8, 30, 0, 0, plusOne)),
+                        new Compare(Operator.LT, OffsetTime.of(8, 30, 0, 0, ZoneOffset.UTC))));
+        Assertions.assertThat(CellParser.parse("08:30-05:00", ColumnType.TIME))
+                .isEqualTo(positive(new Equals(OffsetTime.of(8, 30, 0, 0, ZoneOffset.ofHours(-5)))));
+        var paris = ZonedDateTime.of(2025, 1, 31, 8, 30, 0, 0, ZoneId.of("Europe/Paris"));
+        Assertions.assertThat(CellParser.parseFeel("date and time(\"2025-01-31T08:30:00@Europe/Paris\")", ColumnType.DATE_TIME))
+                .isEqualTo(positive(new Equals(paris)));
+        Assertions.assertThat(CellParser.parse("2025-01-31T08:30@Europe/Paris, 2025-01-31T08:30Z", ColumnType.DATE_TIME))
+                .isEqualTo(positive(new Equals(paris), new Equals(ZonedDateTime.of(2025, 1, 31, 8, 30, 0, 0, ZoneOffset.UTC))));
+        // the ends of an interval are ordered by instant: 08:30+01:00 is 07:30Z
+        Assertions.assertThat(CellParser.parseFeel("[time(\"08:30:00+01:00\")..time(\"07:30:00Z\")]", ColumnType.TIME))
+                .isEqualTo(positive(new Range(OffsetTime.of(8, 30, 0, 0, plusOne), true, OffsetTime.of(7, 30, 0, 0, ZoneOffset.UTC), true)));
+    }
+
+    @Test
+    void zoned_literals_are_written_back_as_they_were_read() {
+        for (var cell : List.of("time(\"08:30:00+01:00\")", "time(\"08:30:00.5Z\")", "date and time(\"2025-01-31T08:30:00Z\")",
+                "date and time(\"2025-01-31T08:30:00-05:00\")", "date and time(\"2025-01-31T08:30:00@Europe/Paris\")")) {
+            var type = cell.startsWith("time") ? ColumnType.TIME : ColumnType.DATE_TIME;
+            var value = CellParser.parseFeel(cell, type).values().orElseThrow().getFirst();
+            Assertions.assertThat(FeelLiterals.literal(value)).isEqualTo(cell);
+            Assertions.assertThat(type == ColumnType.TIME ? FeelTemporals.parseTime(FeelLiterals.text(value))
+                    : FeelTemporals.parseDateTime(FeelLiterals.text(value))).isEqualTo(value);
+        }
+    }
+
     @ParameterizedTest
     @CsvSource(delimiter = ';', value = {
             "[1..5];  true;  true",
@@ -197,13 +231,16 @@ class CellParserTest {
             "BOOLEAN; yes;            is not a boolean",
             "TIME;   time(\"25:00:00\"); invalid time",
             "TIME;   8am;             is not a time",
-            "TIME;   time(\"10:00:00Z\"); has a time zone",
-            "TIME;   10:00:00+02:00;  is not a time",
-            "DATE_TIME; date and time(\"2025-01-01T10:00:00@Europe/Paris\"); has a time zone",
-            "DATE_TIME; date and time(\"2025-01-01T10:00:00-05:00\"); has a time zone",
+            "TIME;   time(\"10:00:00@Europe/Paris\"); is a time with a zone id, which is not supported",
+            "TIME;   10:00:00+2;      is not a time",
+            "DATE_TIME; date and time(\"2025-01-01T10:00:00@Mars/Olympus\"); invalid date and time",
+            "DATE_TIME; date and time(\"2025-01-01T10:00:00-0500\"); invalid date and time",
+            "DATE_TIME; date and time(\"2025-10-26T02:30+01:00[Europe/Paris]\"); write a zone id as @Europe/Paris",
+            "TIME;   [time(\"11:00:00\")..time(\"10:00:00+05:00\")]; starts after it ends",
+            "TIME;   [time(\"10:00:00Z\")..time(\"10:00:00+01:00\")]; starts after it ends",
             "DATE_TIME; 2025-01-01;   is not a date and time",
             "DATE_TIME; date and time(\"2025-01-31\"); invalid date and time",
-            "TIME;   time(\"10:00:00+0200\"); has a time zone",
+            "TIME;   time(\"10:00:00+0200\"); invalid time",
             "DATE_TIME; [date and time(\"2025-01-02T00:00:00\")..date and time(\"2025-01-01T00:00:00\")]; starts after it ends",
             "NUMBER; abc;             is not a number",
             "NUMBER; [5..1];          starts after it ends",
