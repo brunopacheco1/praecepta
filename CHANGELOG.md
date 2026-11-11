@@ -11,15 +11,15 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-11
+
+Cells that compare with another input, duration columns, string ranges, COUNT, output entries that
+name an input, and columns typed by an item definition: the DMN conformance kit (TCK) now passes 78
+of its 86 decision-table checks (was 51). Number, date, time and duration columns are also faster to
+evaluate. Read *Changed* before upgrading if you switch over `ColumnType` or deconstruct
+`PraeceptaOutput` or `DecisionTable` with record patterns.
+
 ### Added
-- **Independently verified reproducible builds:** [Reproducible Central](https://github.com/jvm-repo-rebuild/reproducible-central)
-  rebuilds Praecepta's releases and checks them against Maven Central; 0.2.0 matches bit for bit (14 of
-  14 artifacts). Its badge is in the README and on the website.
-- **Columns typed by an item definition** ([#54](https://github.com/brunopacheco1/praecepta/issues/54)):
-  `DmnReader` reads columns whose `typeRef` names one of the model's item definitions, such as
-  `tBureauCallType`, a `string` with the allowed values `"FULL","MINI","NONE"`. The column takes
-  the base type, and the allowed values become its input value list unless the input declares its
-  own. Item definitions may build on one another; structured types and collections are still rejected.
 - **Cells that compare with another input** ([#51](https://github.com/brunopacheco1/praecepta/issues/51)):
   in a DMN table a cell may name another input, as in `> limit`, `[floor..limit]` or `not(home)`.
   `DecisionTable` gains `feelCells` (its cells are strict FEEL, set by `DmnReader`) and
@@ -30,25 +30,19 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   plugin adds it to the generated input record. The static analysis stays sound: such rules never
   count as overlapping or as hiding another rule (they are still reported unreachable when their
   other cells are covered), and gaps are not searched. Praecepta's own syntax (Excel, CSV, code) is
-  unchanged: there an unquoted word is still a string. The DMN TCK now passes 78 of 86 checks (was
-  55); the rest need times with a zone, list inputs (#25), chained decisions (#14) or computed
-  outputs.
+  unchanged: there an unquoted word is still a string. With the other additions below, the DMN TCK
+  passes 78 of 86 checks (was 51 in 0.2.0); the rest need times with a zone
+  ([#70](https://github.com/brunopacheco1/praecepta/issues/70)), chained decisions
+  ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) or output entries that are
+  expressions ([#71](https://github.com/brunopacheco1/praecepta/issues/71)).
 - **Duration columns** ([#52](https://github.com/brunopacheco1/praecepta/issues/52)):
   `DAY_TIME_DURATION` (`java.time.Duration`, bound with `durationInput`) and `YEAR_MONTH_DURATION`
   (bound with `periodInput` from a `java.time.Period` of years and months, held as the new
   comparable `feel.YearsAndMonths`, so `P12M` equals `P1Y`). Cells write `duration("P1DT2H")` or,
   outside DMN, the bare ISO text, with comparisons and intervals. `DmnReader` and `DmnWriter` map
   them to `dayTimeDuration` and `yearMonthDuration`, and the Maven plugin generates `Duration` and
-  `Period` components. The six TCK checks with duration columns also compare with other inputs, so
-  they wait for #51.
-- **Output entries that name an input** ([#53](https://github.com/brunopacheco1/praecepta/issues/53)):
-  a DMN output entry `a` returns the input `a`. `PraeceptaOutput` gains `references` (output
-  column to input column; the one-argument constructor keeps working), and the engine fills those
-  outputs in from each evaluated input with the text of its value, so an `OutputStrategy` still sees
-  only values. Rules without references keep their outputs built once. Under ANY such outputs are
-  compared per evaluation; in an output with a priority list they are rejected. `DmnReader` reads
-  them when the input has the output's type (a string output takes any input), and `DmnWriter`
-  writes them back. The DMN TCK now passes 55 of 86 checks (was 54).
+  `Period` components. Their TCK checks also compare with other inputs, and pass together with
+  #51.
 - **String ranges in cells** ([#13](https://github.com/brunopacheco1/praecepta/issues/13)): STRING
   columns take comparisons and intervals (`< "N"`, `["A".."M"]`, also unquoted outside DMN),
   ordered as `String.compareTo` orders them (by UTF-16 code unit, so case-sensitively). Such a
@@ -60,11 +54,26 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   table can return the number of matching rules. `OutputStrategy.count(int)` builds the output from
   it (zero when no rule matches, so a COUNT table always returns one output); the engine calls it
   once when built, so a strategy without it fails there. `DmnReader` reads `aggregation="COUNT"`,
-  and the Maven plugin generates it for a COLLECT table with one NUMBER output. The DMN TCK now
-  passes 54 of 86 checks (was 51).
+  and the Maven plugin generates it for a COLLECT table with one NUMBER output.
+- **Output entries that name an input** ([#53](https://github.com/brunopacheco1/praecepta/issues/53)):
+  a DMN output entry `a` returns the input `a`. `PraeceptaOutput` gains `references` (output
+  column to input column; the one-argument constructor keeps working), and the engine fills those
+  outputs in from each evaluated input with the text of its value, so an `OutputStrategy` still sees
+  only values. Rules without references keep their outputs built once. Under ANY such outputs are
+  compared per evaluation; in an output with a priority list they are rejected. `DmnReader` reads
+  them when the input has the output's type (a string output takes any input), and `DmnWriter`
+  writes them back.
+- **Columns typed by an item definition** ([#54](https://github.com/brunopacheco1/praecepta/issues/54)):
+  `DmnReader` reads columns whose `typeRef` names one of the model's item definitions, such as
+  `tBureauCallType`, a `string` with the allowed values `"FULL","MINI","NONE"`. The column takes
+  the base type, and the allowed values become its input value list unless the input declares its
+  own. Item definitions may build on one another; structured types and collections are still rejected.
 - **`UnaryTests.values()`:** the values of a cell that is a plain list of literals (`"A","B"`), or
   empty for any other cell. The engine, the DMN reader and the Maven plugin now share this one
   definition of a value list.
+- **Independently verified reproducible builds:** [Reproducible Central](https://github.com/jvm-repo-rebuild/reproducible-central)
+  rebuilds Praecepta's releases and checks them against Maven Central; 0.2.0 matches bit for bit (14 of
+  14 artifacts). Its badge is in the README and on the website.
 
 ### Changed
 - **Faster number, date, time and duration columns** ([#16](https://github.com/brunopacheco1/praecepta/issues/16)):
@@ -77,6 +86,11 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   a release can be rebuilt bit for bit from its tag with only the version changed. 0.2.0 was
   stamped with the time of its release run; its rebuild sets that value explicitly (see
   `docs/RELEASING.md`).
+- **`ColumnType` has two new constants** (`DAY_TIME_DURATION`, `YEAR_MONTH_DURATION`): an exhaustive
+  `switch` over it needs new cases.
+- **Two records gain a component:** `PraeceptaOutput` gains `references` and `DecisionTable` gains
+  `feelCells`. Their former constructors remain, but record patterns that deconstruct them need the
+  new component.
 
 ### Fixed
 - **A rule that tests a column with no input binding is rejected with a clear message** whatever its
@@ -218,6 +232,7 @@ Code written against the prototype needs the changes listed under *Changed*.
 - **`MissingOutputException`** (no match now yields an empty result), **`InvalidPraeceptaException`**
   and the trie visitor API.
 
-[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/brunopacheco1/praecepta/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/brunopacheco1/praecepta/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/brunopacheco1/praecepta/releases/tag/v0.1.0
