@@ -27,7 +27,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * @param outputs     output columns, in table order
  * @param rules       rules in rule order; input cells are unary tests of their column's type, outputs
  *                    are plain values as text (a string, or a number, boolean, date or time such as
- *                    {@code 2025-01-31}), null when empty
+ *                    {@code 2025-01-31}), null when empty, unless they name an input or are expressions
+ *                    ({@link PraeceptaOutput#references}, {@link PraeceptaOutput#expressions})
  * @param feelCells   whether the input cells are strict FEEL, as a DMN file holds them (strings quoted,
  *                    {@code date(...)} calls), where a name compares with another input, as in
  *                    {@code > dateE}; otherwise Praecepta's syntax, where an unquoted word is a string

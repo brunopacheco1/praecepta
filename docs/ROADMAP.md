@@ -11,43 +11,41 @@ priorities follow what users ask for, so a 👍 or a comment on an issue moves i
 are made is in [GOVERNANCE.md](../GOVERNANCE.md); past decisions are in
 [MODERNISATION.md](MODERNISATION.md).
 
-## 0.3
-Released in November 2026 (see the [changelog](../CHANGELOG.md)), with three items pulled forward
-from later in the year:
-- **Cells that compare with another input**
-  ([#51](https://github.com/brunopacheco1/praecepta/issues/51)), as in `> limit`, in DMN tables.
-  The index treats them as "any value" and the engine checks them only on the rules it leaves, so
-  other tables keep their speed.
-- **Duration columns** ([#52](https://github.com/brunopacheco1/praecepta/issues/52)) and **string
-  ranges** ([#13](https://github.com/brunopacheco1/praecepta/issues/13)).
-- **COUNT aggregation** ([#15](https://github.com/brunopacheco1/praecepta/issues/15)), **output
-  entries that name an input** ([#53](https://github.com/brunopacheco1/praecepta/issues/53)) and
-  **columns typed by an item definition**
-  ([#54](https://github.com/brunopacheco1/praecepta/issues/54)).
-- **Primitive keys for number, date, time and duration columns**
-  ([#16](https://github.com/brunopacheco1/praecepta/issues/16)), 20 to 35 % faster on mixed tables.
-
-The TCK went from 51 to 78 of 86 checks, and every check Praecepta supports passes. Each of the
-other 8 needs a feature with its own issue.
-
-## Next: 0.4
-The rest of the TCK's decision tables that fit in a single table:
-- **Times and date-times with a time zone**
-  ([#70](https://github.com/brunopacheco1/praecepta/issues/70)).
+## 0.4
+Released in November 2026 (see the [changelog](../CHANGELOG.md)), with the rest of the TCK's
+decision tables that fit in a single table:
+- **Inputs that hold lists** ([#25](https://github.com/brunopacheco1/praecepta/issues/25)), such as
+  a customer's nationalities: a cell holds when some element passes it, as FEEL's `list contains`
+  reads it, and DMN files write it so.
 - **Output entries that are expressions**
-  ([#71](https://github.com/brunopacheco1/praecepta/issues/71)), starting with string
-  concatenation and arithmetic.
-- **List-valued inputs** ([#25](https://github.com/brunopacheco1/praecepta/issues/25)), which one
-  of those TCK tables also needs.
+  ([#71](https://github.com/brunopacheco1/praecepta/issues/71)): string joins and arithmetic on
+  literals and inputs, as in `(price - discount) * 1.2`, evaluated only for the rules that match.
+- **Times and date-times with a time zone**
+  ([#70](https://github.com/brunopacheco1/praecepta/issues/70)), compared by instant as in FEEL.
+- **Compact masks for very large tables**
+  ([#17](https://github.com/brunopacheco1/praecepta/issues/17)): the mask of a value only a few
+  rules accept is stored sparse, without a new dependency, so a 10,000-rule table with a code per
+  rule takes 4.6 MB instead of 17.6 MB and answers in 0.39 µs instead of 0.68 µs.
 
-## Later in the year
-- **Compressed bitmaps for very large tables**
-  ([#17](https://github.com/brunopacheco1/praecepta/issues/17)).
-- **Integrations, as people ask for them:** a Gradle plugin
-  ([#18](https://github.com/brunopacheco1/praecepta/issues/18)), GraalVM native image
-  ([#19](https://github.com/brunopacheco1/praecepta/issues/19)), a Spring Boot starter
-  ([#20](https://github.com/brunopacheco1/praecepta/issues/20)), and an online playground
-  ([#21](https://github.com/brunopacheco1/praecepta/issues/21)).
+The TCK went from 78 to 83 of 86 checks, and every check Praecepta supports passes. The other 3 need
+decision requirement graphs.
+
+## Next: 0.5
+Integrations, so Praecepta fits the build and the framework an application already uses:
+- **GraalVM native image** ([#19](https://github.com/brunopacheco1/praecepta/issues/19)), tested in
+  CI.
+- **A Gradle plugin** ([#18](https://github.com/brunopacheco1/praecepta/issues/18)), doing what the
+  Maven plugin does.
+- **A Spring Boot starter** ([#20](https://github.com/brunopacheco1/praecepta/issues/20)), a
+  **Quarkus extension** ([#76](https://github.com/brunopacheco1/praecepta/issues/76)) and a
+  **Micronaut module** ([#77](https://github.com/brunopacheco1/praecepta/issues/77)), which give
+  engines as beans, validated when the application builds or starts.
+
+## 0.6
+- **An online playground** ([#21](https://github.com/brunopacheco1/praecepta/issues/21)): paste a
+  table, see its validation report and evaluate inputs, without installing anything.
+
+## Later
 - **Decision requirement graphs** (decisions feeding other decisions,
   [#14](https://github.com/brunopacheco1/praecepta/issues/14)), the last 3 TCK checks, if they fit
   without turning Praecepta into a full DMN engine.

@@ -11,35 +11,19 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
-Times and date-times with a time zone, inputs that hold lists, output entries that are expressions,
+## [0.4.0] - 2026-11-11
+
+Inputs that hold lists, output entries that are expressions, times and date-times with a time zone,
 and compact masks for large tables. The features work together: a list may hold times with a time
 zone, and a list column's elements are looked up in masks of either form. The DMN conformance kit
 (TCK) now passes 83 of its 86 decision-table checks (was 78); the other three need inputs computed
-by other decisions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)). Read *Changed*
-before upgrading if you deconstruct `PraeceptaOutput` or `DecisionTable` with record patterns, or
-feed map-based inputs to tables that compare times.
+by other decisions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)). Tables with a value
+per rule, such as a price list by product code, take about a quarter of the memory and evaluate
+faster. `ColumnType` has no new constants (a list column keeps its element type), but read *Changed*
+before upgrading if you deconstruct `PraeceptaOutput` or `DecisionTable` with record patterns, switch
+over the value types of a cell (`UnaryTests`), or feed map-based inputs to tables that compare times.
 
 ### Added
-- **Times and date-times with a time zone** ([#70](https://github.com/brunopacheco1/praecepta/issues/70)):
-  TIME columns also take times with an offset (`time("16:12:00+01:00")`, `16:12:00Z`), held as
-  `OffsetTime`, and DATE_TIME columns date-times with an offset or a zone id
-  (`date and time("2018-07-30T16:12:00Z")`, `date and time("2018-07-30T16:12:00@Europe/Paris")`),
-  held as `ZonedDateTime`. As in FEEL, they compare by the instant they denote, so
-  `time("09:00:00+01:00")` equals `time("08:00:00Z")`, and comparing one with a value without a zone
-  is undefined: the test is unknown, so neither `time("08:00:00")` nor its `not(...)` matches
-  `08:00Z`. The builder gains `offsetTimeInput` and `zonedDateTimeInput` (bind an `OffsetDateTime`
-  through `toZonedDateTime()`); map-based inputs read both kinds from text, including the
-  `[Europe/Paris]` form `ZonedDateTime.toString()` writes. In the index, values with a zone lie on a
-  line of their own, ordered by instant and keyed in `PrimitiveKeys` by nanoseconds, and a column
-  has only the lines its binding can give, so gap analysis stays exact: a typed getter's column
-  is searched for gaps among its own kind only, a map-based one among both (a gap there reads, for
-  example, `start = any time with a time zone`). `DmnReader` and `DmnWriter` read and write the
-  zoned literals, and the new `feel.FeelTemporals` parses FEEL time text and orders values as FEEL
-  does. The Maven plugin generates `OffsetTime` and `ZonedDateTime` components for columns whose
-  values are all written with a zone (and for the inputs their cells compare with), and fails the
-  build for a column that mixes both kinds. A time with a zone id (`time("16:12:00@Europe/Paris")`)
-  is still rejected, as it has no fixed offset. With it, the three checks of the DMN TCK's
-  `0036-dt-variable-input` that use zoned inputs pass.
 - **Inputs that hold lists** ([#25](https://github.com/brunopacheco1/praecepta/issues/25)): a column
   may hold several values, such as a customer's nationalities. Bind it with
   `listInput("nationalities", Customer::nationalities)` (strings) or
@@ -51,10 +35,11 @@ feed map-based inputs to tables that compare times.
   list makes every test unknown, so it matches only `-` and `null`, while an empty list matches no
   test, and so every `not(...)`. Elements may not be missing, and declared input values apply to the
   elements. The elements of a TIME or DATE_TIME list may have a time zone or not, each compared as a
-  single value of its kind is: an element that cannot be compared with a cell's literal leaves its test
-  unknown, so a `not(...)` holds only when every element is known to fail. The index ORs the masks of the elements' values, a few word operations per element, then
-  ANDs across columns as usual. `DecisionTable` gains `listInputs`, and
-  `DecisionTable.cell(rule, column)` parses a cell as the table holds it.
+  single value of its kind is: an element that cannot be compared with a cell's literal leaves its
+  test unknown, so a `not(...)` holds only when every element is known to fail. The index ORs the
+  masks of the elements' values, a few word operations per element, then ANDs across columns as
+  usual. `DecisionTable` gains `listInputs`, and `DecisionTable.cell(rule, column)` parses a cell as
+  the table holds it.
   - **DMN:** strict FEEL compares a list as a whole (`"PT"` never equals `["PT","BR"]`), so a list
     column's entries are written with FEEL's list functions, joined with `or`:
     `list contains(?, "PT")`, `some x in ? satisfies x >= 18`, `some x in ? satisfies x in [18..65)`,
@@ -86,6 +71,26 @@ feed map-based inputs to tables that compare times.
   and `DmnWriter` writes them back unchanged. Other FEEL (function calls, comparisons, `if`, lists) is
   still rejected with a message saying what is not supported. With list inputs above, both checks of
   the DMN TCK's `0039-dt-list-semantics` pass.
+- **Times and date-times with a time zone** ([#70](https://github.com/brunopacheco1/praecepta/issues/70)):
+  TIME columns also take times with an offset (`time("16:12:00+01:00")`, `16:12:00Z`), held as
+  `OffsetTime`, and DATE_TIME columns date-times with an offset or a zone id
+  (`date and time("2018-07-30T16:12:00Z")`, `date and time("2018-07-30T16:12:00@Europe/Paris")`),
+  held as `ZonedDateTime`. As in FEEL, they compare by the instant they denote, so
+  `time("09:00:00+01:00")` equals `time("08:00:00Z")`, and comparing one with a value without a zone
+  is undefined: the test is unknown, so neither `time("08:00:00")` nor its `not(...)` matches
+  `08:00Z`. The builder gains `offsetTimeInput` and `zonedDateTimeInput` (bind an `OffsetDateTime`
+  through `toZonedDateTime()`); map-based inputs read both kinds from text, including the
+  `[Europe/Paris]` form `ZonedDateTime.toString()` writes. In the index, values with a zone lie on a
+  line of their own, ordered by instant and keyed in `PrimitiveKeys` by nanoseconds, and a column
+  has only the lines its binding can give, so gap analysis stays exact: a typed getter's column
+  is searched for gaps among its own kind only, a map-based one among both (a gap there reads, for
+  example, `start = any time with a time zone`). `DmnReader` and `DmnWriter` read and write the
+  zoned literals, and the new `feel.FeelTemporals` parses FEEL time text and orders values as FEEL
+  does. The Maven plugin generates `OffsetTime` and `ZonedDateTime` components for columns whose
+  values are all written with a zone (and for the inputs their cells compare with), and fails the
+  build for a column that mixes both kinds. A time with a zone id (`time("16:12:00@Europe/Paris")`)
+  is still rejected, as it has no fixed offset. With it, the three checks of the DMN TCK's
+  `0036-dt-variable-input` that use zoned inputs pass.
 
 ### Changed
 - **Compact masks for large tables** ([#17](https://github.com/brunopacheco1/praecepta/issues/17)):
@@ -95,31 +100,31 @@ feed map-based inputs to tables that compare times.
   rules except for empty masks; other masks stay dense, as before. When a column's mask is sparse,
   evaluation intersects the later columns only on its words. Under ANY, the masks of rules with the
   same outputs are stored the same way, and a list column looks up its elements in masks of either
-  form. There is no new dependency and no API change. On an Apple M2
-  Pro, with the new `lookup-<rules>` benchmark tables (a code per rule, as in a price list),
-  `lookup-10000` went from 17.6 to 4.6 MB of retained heap and from 676 to 387 ns/op
-  (`EvaluationBenchmark`); `mixed-10000` from 6.7 to 5.3 MB. `mixed-100`, `mixed-1000`,
+  form. There is no new dependency and no API change. On an Apple M2 Pro, with the new
+  `lookup-<rules>` benchmark tables (a code per rule, as in a price list), `lookup-10000` went from
+  17.6 to 4.6 MB of retained heap and from 676 to 387 ns/op (`EvaluationBenchmark`); `mixed-10000`
+  from 6.7 to 5.3 MB. `mixed-100`, `mixed-1000`,
   `synthetic-1000` and `synthetic-10000` are unchanged within noise (331-353 ns/op against 331-336
   before on `mixed-100`, 551-574 against 542-575 on `mixed-1000`, two runs each).
+- **`PraeceptaOutput` gains a component, `expressions`.** Its former constructors remain, but record
+  patterns that deconstruct it need the new component.
+- **`DecisionTable` gains a component, `listInputs`.** Its former constructors remain, but record
+  patterns that deconstruct it need the new component.
+- **Cell values (`UnaryTests`)** may now be `OffsetTime` and `ZonedDateTime` in TIME and DATE_TIME
+  columns, and `FeelLiterals` writes them: code that switches over the value types of a cell needs
+  these cases.
 - **Map-based inputs accept times and date-times with a time zone**, which they used to reject as
   invalid: they now match only the cells that accept any value (or test with zoned literals), and
   the validation report may list gaps among them for tables with time or date-time comparisons. Bind
   such columns with `timeInput` or `dateTimeInput`, or declare their input values, to keep to values
   without a zone.
-- **Cell values (`UnaryTests`)** may now be `OffsetTime` and `ZonedDateTime` in TIME and DATE_TIME
-  columns, and `FeelLiterals` writes them: code that switches over the value types of a cell needs
-  these cases.
-- **The Maven plugin validates a table with getters of the generated Java types** instead of
-  map-based inputs, so the build-time analysis matches what the generated code can evaluate.
-- **`PraeceptaOutput` gains a component, `expressions`.** Its former constructors remain, but record
-  patterns that deconstruct it need the new component.
-- **`DecisionTable` gains a component, `listInputs`.** Its former constructors remain, but record
-  patterns that deconstruct it need the new component.
-- **`DmnWriter` writes an `inputData` for every input the cells compare with**, not only for the
-  table's columns, so a list input keeps its type and Drools can bind every input.
 - **`DmnReader` reads columns typed by a collection** instead of rejecting them; an output of a
   collection type, a collection of collections, and allowed values on a collection itself are still
   rejected.
+- **`DmnWriter` writes an `inputData` for every input the cells compare with**, not only for the
+  table's columns, so a list input keeps its type and Drools can bind every input.
+- **The Maven plugin validates a table with getters of the generated Java types** instead of
+  map-based inputs, so the build-time analysis matches what the generated code can evaluate.
 
 ## [0.3.0] - 2026-11-11
 
@@ -342,7 +347,8 @@ Code written against the prototype needs the changes listed under *Changed*.
 - **`MissingOutputException`** (no match now yields an empty result), **`InvalidPraeceptaException`**
   and the trie visitor API.
 
-[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/brunopacheco1/praecepta/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/brunopacheco1/praecepta/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/brunopacheco1/praecepta/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/brunopacheco1/praecepta/releases/tag/v0.1.0

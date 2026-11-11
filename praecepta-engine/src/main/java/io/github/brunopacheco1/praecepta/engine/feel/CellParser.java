@@ -54,6 +54,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  * offset or a zone id. A time with a zone id ({@code time("08:30:00@Europe/Paris")}) is rejected, as it
  * has no fixed offset, and so is an interval with one end with a zone and one without, which FEEL
  * cannot compare.
+ *
+ * <p>The same syntax serves columns that hold lists, whose cells test the elements. In strict FEEL such
+ * a cell is written with FEEL's list functions instead, as in {@code list contains(?, "PT")}; see
+ * {@link #parseFeelList}.
  */
 public final class CellParser {
 

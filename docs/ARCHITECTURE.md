@@ -29,11 +29,13 @@ builds an engine once and calls it.
 
 1. **Rules and cells.** A rule (`Praeceptum`) maps input columns to cells and output columns to
    values. `CellParser` parses each cell, according to its column's type (`ColumnType`: STRING,
-   NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION, YEAR_MONTH_DURATION; times and date-times with or without a time zone), into `UnaryTests`: the subset of DMN FEEL *simple unary tests* that looks at one
-   column value (lists, `not(...)`, comparisons, intervals, `null`, "any"). In a DMN table (strict
-   FEEL) a cell may also compare with another input (`> limit`); the index sees such a cell as "any
-   value", and the engine checks it on the rules the index leaves, with the inputs' values. The
-   analysis then never counts those rules as overlapping or hiding others, and skips gaps. A column
+   NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION, YEAR_MONTH_DURATION; times and
+   date-times with or without a time zone), into `UnaryTests`: the subset of DMN FEEL *simple unary
+   tests* that looks at one column value (lists, `not(...)`, comparisons, intervals, `null`,
+   "any"). In a DMN table (strict FEEL) a cell may also compare with another input (`> limit`); the
+   index sees such a cell as "any value", and the engine checks it on the rules the index leaves,
+   with the inputs' values. The analysis then never counts those rules as overlapping or hiding
+   others, and skips gaps. A column
    may also hold **lists** (`DecisionTable.listInputs`): its cells keep the same syntax and hold when
    some element passes a test (`not(...)`: when none does), as FEEL's `list contains` would; a cell
    that names a list input asks whether the value is in that list.
@@ -42,12 +44,12 @@ builds an engine once and calls it.
    that accept it.
    - **Strings:** one class per value a rule mentions (or the column declares), one for any other
      value, and one for a missing value. Lookup is a hash, or an array index for enum inputs.
-   - **Numbers, dates, times, date-times and durations:** the boundaries the rules mention split the line into
-     intervals and points; lookup is a binary search, over `long` keys when the values have them
-     (`PrimitiveKeys`: epoch days, nanoseconds, months, scaled numbers). A string column whose cells compare
-     (`< "N"`, `["A".."M"]`) is split the same way; a value the rules mention is still found by hash,
-     and only other values need the binary search. Booleans are the same with `false < true`,
-     both always boundaries, so they get one class each.
+   - **Numbers, dates, times, date-times and durations:** the boundaries the rules mention split the
+     line into intervals and points; lookup is a binary search, over `long` keys when the values have
+     them (`PrimitiveKeys`: epoch days, nanoseconds, months, scaled numbers). A string column whose
+     cells compare (`< "N"`, `["A".."M"]`) is split the same way; a value the rules mention is
+     still found by hash, and only other values need the binary search. Booleans are the same with
+     `false < true`, both always boundaries, so they get one class each.
    - **Times and date-times with a time zone** (`OffsetTime`, `ZonedDateTime`) lie on a line of
      their own, ordered by instant and keyed in `PrimitiveKeys` by nanoseconds at offset zero, which
      the boundaries with a zone split as above; values without a zone lie on the other line. FEEL

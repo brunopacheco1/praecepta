@@ -30,9 +30,12 @@ them when you build; evaluate them with a dependency-free engine.
 - All DMN hit policies: UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER and COLLECT
   (with SUM / MIN / MAX / COUNT aggregation)
 - DMN FEEL cells on STRING, NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION and
-  YEAR_MONTH_DURATION columns: lists, `not(...)`,
-  comparisons, intervals, `null`; unquoted `PT,ES` cells from earlier versions keep working
+  YEAR_MONTH_DURATION columns: lists, `not(...)`, comparisons, intervals, `null`; unquoted `PT,ES`
+  cells from earlier versions keep working
+- Times and date-times with or without a time zone; those with one compare by instant, as in FEEL
 - List inputs, such as a customer's nationalities: a cell holds when some element passes it
+- DMN output entries that name an input or compute with `+`, `-`, `*` and `/`
+  (`(price - discount) * 1.2`, `Symptom + " is listed"`), evaluated only for the rules that match
 - Optional DMN input value lists: values outside them are rejected
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
   rules that can never be selected (FIRST, PRIORITY), and gaps (declared inputs no rule matches)
@@ -55,14 +58,14 @@ Java 21 or later (tested on 21, 25 and 27). Pick the modules you need:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-engine</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
 </dependency>
 
 <!-- optional: load rules from Excel or CSV at runtime (brings Apache POI) -->
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-loader</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
 </dependency>
 ```
 
@@ -75,11 +78,12 @@ Central.
 
 # What Praecepta is not
 Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drools when you need:
-- **Full FEEL**: functions, arithmetic, contexts, lists and computed expressions (e.g.
-  `income > 2 * rent`). Praecepta cells are FEEL *simple unary tests*; in DMN they may compare with
-  another input (`> limit`), but not compute with it.
+- **Full FEEL**: functions, contexts, `if`, and tests that compute (e.g. `income > 2 * rent`).
+  Praecepta's input entries are FEEL *simple unary tests*: in DMN they may compare with another
+  input (`> limit`) or test a list's elements, but not compute. Output entries may compute with `+`,
+  `-`, `*` and `/`, but call no functions.
 - **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
-  boxed expressions.
+  boxed expressions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)).
 - **A process engine, a modeller or a decision service** around the tables.
 
 # Getting Started
@@ -165,10 +169,11 @@ var engine = PraeceptaEngine.<Applicant, String>builder()
 With declared input values, other (non-missing) values throw `InvalidInputException`, and
 `validationReport()` lists **gaps**: declared inputs no rule matches, e.g.
 `country = "FR", age in [18..120]`. Gaps are only analysed when every string column the rules test
-declares its values or uses comparisons or intervals (any other string then falls between them). With map-based inputs, declare non-string columns with
-`.columnType("age", ColumnType.NUMBER)`; their text is parsed. A time or date-time column then takes
-values with and without a time zone (`08:30`, `08:30Z`, `2025-01-31T08:30@Europe/Paris`), and its
-gaps are looked for among both, while a typed getter gives one kind only.
+declares its values or uses comparisons or intervals (any other string then falls between them).
+With map-based inputs, declare non-string columns with `.columnType("age", ColumnType.NUMBER)`;
+their text is parsed. A time or date-time column then takes values with and without a time zone
+(`08:30`, `08:30Z`, `2025-01-31T08:30@Europe/Paris`), and its gaps are looked for among both, while
+a typed getter gives one kind only.
 
 Notes:
 - `PRIORITY` and `OUTPUT_ORDER` need DMN output value lists:
@@ -233,9 +238,9 @@ var engine = PraeceptaEngine.<Customer, String>builder()
 
 Supported: input expressions that name a variable, including FEEL names with spaces (`age`,
 `customer.age`, `Credit Score`); `string`, `number` (`integer`, `long`, `double`), `date`,
-`boolean`, `time`, `dateTime`, `dayTimeDuration` and `yearMonthDuration` columns, or an item definition of one of them (such as a `string`
-with allowed values, which become the input value list); input entries in the cell syntax above, as strict FEEL
-(strings quoted, since an unquoted word is a reference to another variable, and dates and times
+`boolean`, `time`, `dateTime`, `dayTimeDuration` and `yearMonthDuration` columns, or an item
+definition of one of them (such as a `string` with allowed values, which become the input value
+list); input entries in the cell syntax above, as strict FEEL (strings quoted, since an unquoted word is a reference to another variable, and dates and times
 written with `date(...)`, `time(...)` and `date and time(...)`); input entries that compare with
 another input (`> limit`, `[floor..limit]`, `not(home)`), which then becomes an input of the engine,
 bound like a column (with map-based inputs it is read with the type of the column that names it);
@@ -247,8 +252,9 @@ output entries that are literals, name one of the table's inputs (`a` returns th
 compute their value from literals and inputs with `+`, `-`, `*`, `/` and parentheses
 (`Symptom + " is listed"`, `(price - discount) * 1.2`: `+` joins strings or adds numbers, a missing
 operand gives a missing output); times and date-times with or without a time zone; every hit policy,
-with SUM, MIN, MAX and COUNT aggregation. Anything else (a time with a zone id, function calls such as `upper case(a)`, `if`, inputs computed by other
-decisions) is rejected with a message naming the decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
+with SUM, MIN, MAX and COUNT aggregation. Anything else (a time with a zone id, function calls such
+as `upper case(a)`, `if`, inputs computed by other decisions) is rejected with a message naming the
+decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
 evaluate identically, which is how the benchmarks feed them.
 
 ## Praecepta Loader
@@ -287,14 +293,13 @@ Numbers are `BigDecimal` and dates `LocalDate`. Times and date-times are `LocalT
 time zone (an input compared with such a column in a cell, as in `> limit`, takes a zone too); a
 column that mixes both kinds fails the build. An input declared with `<list>true</list>` (or typed
 by a collection in a DMN file) becomes a `java.util.List` of its type. At runtime the generated code
-needs only
-`praecepta-engine`; Apache POI stays a build-time dependency.
+needs only `praecepta-engine`; Apache POI stays a build-time dependency.
 
 ```xml
 <plugin>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-maven-plugin</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
   <executions><execution><goals><goal>generate</goal></goals></execution></executions>
   <configuration>
     <packageName>com.acme.pricing</packageName>
@@ -342,8 +347,8 @@ engine against a naive reference implementation of DMN decision-table semantics 
 `praecepta-tck` runs the decision-table test cases of the
 [DMN Technology Compatibility Kit](https://github.com/dmn-tck/tck) in every build. Every check whose
 table Praecepta can read passes (83 of 86); the other three need inputs computed by other decisions
-([#14](https://github.com/brunopacheco1/praecepta/issues/14)), which Praecepta does not have yet. The pass rate, the results per
-test case and what each unsupported check needs are in
+([#14](https://github.com/brunopacheco1/praecepta/issues/14)), which Praecepta does not have yet.
+The pass rate, the results per test case and what each unsupported check needs are in
 [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md).
 
 # Benchmarks
