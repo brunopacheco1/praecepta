@@ -60,9 +60,10 @@ import net.jqwik.api.Tuple;
  * input could take, missing lists, and now and then a list holding a missing element, which is invalid.
  *
  * <p>Every rule has outputs {@code id} (its 1-based position, unique), {@code out} (one of x/y/z,
- * often shared), {@code n} (a small number, for aggregation) and {@code echo}, which one time in three
- * names the input {@code c0} (so it takes that input's value), unless {@code c0} holds lists, and is
- * otherwise {@code "a"}, a value a string input may also have.
+ * often shared), {@code n} (a small number, for aggregation) and {@code echo}, which one time in four
+ * names the input {@code c0} (so it takes that input's value), unless {@code c0} holds lists, one time
+ * in four is an output expression over a string or number column (or over literals), and is otherwise
+ * {@code "a"}, a value a string input may also have.
  *
  * @param zonedColumns the time and date-time columns whose inputs have a time zone
  * @param lists        the columns that hold lists
@@ -207,14 +208,37 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         return Arbitraries.oneOf(Arbitraries.just((String) null), Arbitraries.just((String) null), declared);
     }
 
-    private record RuleRow(List<String> cells, String out, int number, boolean echoesInput) {
+    /** What a rule's {@link #ECHO} output is. */
+    private enum Echo { VALUE, INPUT, EXPRESSION }
+
+    /** @param expression which of the expression forms the {@link #ECHO} output takes, if it is one */
+    private record RuleRow(List<String> cells, String out, int number, Echo echo, int expression) {
     }
 
     private static Arbitrary<RuleRow> rule(List<Column> columns) {
         var cells = new ArrayList<Arbitrary<String>>();
         columns.forEach(column -> cells.add(cell(column)));
         return Combinators.combine(Combinators.combine(cells).as(List::copyOf), Arbitraries.of(OUT_VALUES), Arbitraries.integers().between(1, 9),
-                Arbitraries.of(true, false, false)).as(RuleRow::new);
+                Arbitraries.of(Echo.VALUE, Echo.VALUE, Echo.INPUT, Echo.EXPRESSION), Arbitraries.integers().between(0, 3)).as(RuleRow::new);
+    }
+
+    /**
+     * An output expression over the first column of single strings or numbers, or over literals if there
+     * is none: concatenation, arithmetic with every operator, unary minus and parentheses, a name read
+     * twice, and a division by zero, which gives null.
+     */
+    private static String expression(List<String> names, Map<String, ColumnType> types, Set<String> lists, int form) {
+        var string = names.stream().filter(name -> types.get(name) == ColumnType.STRING && !lists.contains(name)).findFirst();
+        var number = names.stream().filter(name -> types.get(name) == ColumnType.NUMBER && !lists.contains(name)).findFirst();
+        if (number.isPresent() && (string.isEmpty() || form % 2 == 0)) {
+            var n = number.get();
+            return List.of(n + " * 2 - 1", "-(" + n + " + 1.50) / 4", n + " / 0", "1 + " + n + " * " + n).get(form);
+        }
+        if (string.isPresent()) {
+            var s = string.get();
+            return List.of(s + " + \"!\"", "\"<\" + " + s + " + \">\"", s + " + " + s, "\"a \\\"quoted\\\" \" + " + s).get(form);
+        }
+        return List.of("\"x\" + \"y\"", "1 + 2 * 3", "(10 - 4) / 4", "-2.50 * 2").get(form);
     }
 
     @SuppressWarnings("unchecked")
@@ -415,12 +439,13 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             }
             var outputs = new HashMap<>(Map.of(ID, String.valueOf(r + 1), OUT, row.out(), NUMBER, String.valueOf(row.number())));
             // an output holds one value, so it never names a column that holds lists
-            boolean echoes = row.echoesInput() && !lists.contains(names.getFirst());
-            Map<String, String> references = echoes ? Map.of(ECHO, names.getFirst()) : Map.of();
-            if (!echoes) {
+            var echo = row.echo() == Echo.INPUT && lists.contains(names.getFirst()) ? Echo.VALUE : row.echo();
+            Map<String, String> references = echo == Echo.INPUT ? Map.of(ECHO, names.getFirst()) : Map.of();
+            Map<String, String> expressions = echo == Echo.EXPRESSION ? Map.of(ECHO, expression(names, types, lists, row.expression())) : Map.of();
+            if (echo == Echo.VALUE) {
                 outputs.put(ECHO, ECHO_VALUE);
             }
-            rules.add(new Praeceptum(r + 1, new PraeceptaInput(cells), new PraeceptaOutput(Map.copyOf(outputs), references)));
+            rules.add(new Praeceptum(r + 1, new PraeceptaInput(cells), new PraeceptaOutput(Map.copyOf(outputs), references, expressions)));
         }
         var inputs = new ArrayList<Map<String, Object>>();
         for (var row : inputRows) {
@@ -499,7 +524,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                     if (rule.output().values().containsKey(ECHO)) {
                         values.put(ECHO, rule.output().values().get(ECHO));
                     }
-                    return new Praeceptum(rule.priority(), rule.input(), new PraeceptaOutput(Map.copyOf(values), rule.output().references()));
+                    return new Praeceptum(rule.priority(), rule.input(),
+                            new PraeceptaOutput(Map.copyOf(values), rule.output().references(), rule.output().expressions()));
                 })
                 .toList();
     }

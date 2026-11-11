@@ -80,8 +80,11 @@ An engine is **immutable** once built: any number of threads may share it withou
 - `DmnReader` reads DMN 1.1 to 1.5 (as written by Camunda Modeler, Drools, Trisotech and
   `DmnWriter`) into a `DecisionTable`: hit policy, aggregation, column types, value lists and rules.
   It uses the JDK's XML parser with DTDs and external entities disabled. Anything it does not
-  support (a time with a zone id, computed expressions, function calls) is rejected
-  with an error naming the decision, rule and column. Strict FEEL compares a list with a unary test
+  support (a time with a zone id, function calls, inputs computed by other decisions) is rejected
+  with an error naming the decision, rule and column. Output entries may be expressions of
+  literals and inputs with `+ - * /` (`OutputExpression`): they are kept as written, parsed and
+  type-checked when the engine is built, and evaluated only for matching rules, like outputs that
+  name an input; `DmnWriter` writes them back unchanged. Strict FEEL compares a list with a unary test
   as a whole, so a list column's entries are written with FEEL's list functions
   (`list contains(?, "PT") or some x in ? satisfies x >= 18`); `CellParser.parseFeelList` reads
   exactly those forms back into the same tests Praecepta's own syntax writes `"PT", >= 18`.
@@ -129,3 +132,19 @@ code, the Java baseline, DMN as the exchange format, the licence) are recorded i
   input: the classes of single values cannot describe sets of values, and an analysis over sets of
   classes would grow exponentially. Findings stay sound (nothing false is reported); some overlaps
   and gaps go unreported.
+
+### Output expressions (#71)
+- **A small subset, not a FEEL interpreter**: string and number literals, input names, `+ - * /`,
+  unary minus and parentheses. That covers string building and arithmetic (and the TCK's case) while
+  keeping the engine dependency-free; anything else is rejected by name, so a table never evaluates
+  differently from other engines in silence.
+- **Parsed and type-checked when the engine is built**, so a table that adds a string to a number
+  fails at build time, not at the first evaluation; the expression text is kept in
+  `PraeceptaOutput.expressions`, so `DmnWriter` writes back exactly what was read.
+- **Evaluated only for matching rules**, through the same path as outputs that name an input; rules
+  without such outputs keep their outputs converted once.
+- **FEEL's null and decimal semantics**: a missing operand or a division by zero gives null, a
+  quotient keeps 34 digits, and computed numbers are written without trailing zeros, since a FEEL
+  number is a value, not a scale.
+- **ANY compares evaluated outputs**; an output with a priority list cannot be an expression, since
+  its rank must be known when the engine is built.

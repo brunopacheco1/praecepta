@@ -76,15 +76,17 @@ class DmnReaderBehaviourTest {
     }
 
     @Test
-    void output_entries_that_are_neither_literals_nor_an_input_name_are_rejected() {
+    void output_entries_that_are_neither_literals_nor_an_input_name_nor_an_expression_are_rejected() {
         var word = stream(model("", table("string", "PT")));
         Assertions.assertThatThrownBy(() -> DmnReader.read(word))
                 .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessage("Decision 'd', rule 1, output 'o': 'PT' is not supported; output entries must be literals (quote text) or name an input");
+                .hasMessage("Decision 'd', rule 1, output 'o': 'PT' names 'PT', which is not one of the table's inputs of single values; "
+                        + "output entries must be literals or read the table's inputs");
         var list = stream(model("", table("number", "1, 2")));
         Assertions.assertThatThrownBy(() -> DmnReader.read(list))
                 .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessage("Decision 'd', rule 1, output 'o': '1, 2' is not supported; output entries must be literals or name an input");
+                .hasMessage("Decision 'd', rule 1, output 'o': '1, 2' is not supported; output entries must be literals, name an input, "
+                        + "or join literals and inputs with +, -, * and / ('1, 2' is not a supported output expression: unexpected ', 2')");
     }
 
     @Test

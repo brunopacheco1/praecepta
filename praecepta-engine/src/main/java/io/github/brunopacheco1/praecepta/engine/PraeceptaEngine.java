@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine;
 
 import java.lang.System.Logger.Level;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -46,7 +47,9 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableE
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
+import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
 /**
@@ -84,8 +87,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  *
  * <p>Instances are immutable and safe to share between threads. Outputs are converted once, when the
  * engine is built, and the same instances are returned by every evaluation, so output types should be
- * immutable; only a rule whose output names an input has its output converted again, into a new
- * instance, on every evaluation. Matching uses one bitmask per class of column values (the values the
+ * immutable; only a rule whose output names an input or is an expression
+ * ({@link PraeceptaOutput#expressions()}, such as {@code Symptom + " is listed"}) has its output
+ * computed and converted again, into a new instance, on every evaluation that selects it. Matching
+ * uses one bitmask per class of column values (the values the
  * rules cannot tell apart), so memory grows linearly with the table.
  *
  * @param <I> the input type
@@ -107,15 +112,15 @@ public final class PraeceptaEngine<I, O> {
     private final OutputStrategy<O> outputStrategy;
 
     // Indexed by bit, i.e. by rule in the index's bit order (see bitToRule):
-    /** The rule's converted output; null if it names an input (see namedInputsByBit). */
+    /** The rule's converted output; null if it reads an input (see namedInputsByBit). */
     private final Object[] outputByBit;
     /** The rule's output as a ready-made single-hit result, so that evaluation does not allocate one; null as above. */
     private final List<O>[] singleByBit;
-    /** The rule's outputs as written, for ANY when outputs name inputs. */
+    /** The rule's outputs as written, for ANY when outputs read inputs. */
     private final PraeceptaOutput[] ruleOutputByBit;
-    /** The rule's outputs that name an input, filled in on every evaluation; null if it names none. */
+    /** The rule's outputs that name an input or are expressions, filled in on every evaluation; null if it has none. */
     private final NamedInputs[] namedInputsByBit;
-    /** Whether some rule's output names an input. */
+    /** Whether some rule's output names an input or is an expression. */
     private final boolean namesInputs;
     /** The rule's cells that compare with another input, checked after the index; null if it has none. */
     private final VariableCell[][] variableCellsByBit;
@@ -183,17 +188,17 @@ public final class PraeceptaEngine<I, O> {
             var rule = rules.get(bitToRule[bit]);
             idByBit[bit] = rule.priority();
             ruleOutputByBit[bit] = rule.output();
-            if (rule.output().references().isEmpty()) {
+            if (!rule.output().readsInputs()) {
                 var output = outputStrategy.transform(rule.output());
                 outputByBit[bit] = output;
                 singleByBit[bit] = List.of(output);
             } else {
-                namedInputsByBit[bit] = namedInputs(rule, evaluationOrder, lists);
+                namedInputsByBit[bit] = namedInputs(rule, evaluationOrder, lists, types);
                 anyNamed = true;
             }
         }
         namesInputs = anyNamed;
-        // with outputs that name inputs, ANY compares the outputs of each evaluation instead
+        // with outputs that read inputs, ANY compares the outputs of each evaluation instead
         sameOutputsByBit = hitPolicy == HitPolicy.ANY && !namesInputs ? sameOutputMasks(rules, bitToRule, index.words()) : null;
         reduce = reducer(builder.aggregation, builder.outputStrategy);
         count = builder.aggregation == AggregationOperator.COUNT ? builder.outputStrategy::count : null;
@@ -462,63 +467,114 @@ public final class PraeceptaEngine<I, O> {
         return index.column(column).value(reader.read(input, column));
     }
 
-    // ---- outputs that name an input --------------------------------------------------------
+    // ---- outputs that name an input or are expressions ----------------------------------------
 
     /**
-     * A rule's outputs that name an input: its other outputs, and for each named one, the output
-     * column and the input column's position in the evaluation order. A class, not a record: it holds
-     * arrays and is never compared.
+     * A rule's outputs that read inputs: its other outputs; for each output that names an input, the
+     * output column and the input column's position in the evaluation order; and for each expression,
+     * the output column, the parsed expression and the position of each input it names. A class, not a
+     * record: it holds arrays and is never compared.
      */
     private static final class NamedInputs {
         private final Map<String, String> values;
         private final String[] outputs;
         private final int[] columns;
+        private final String[] expressionOutputs;
+        private final OutputExpression[] expressions;
+        private final Map<String, Integer>[] expressionColumns;
 
-        NamedInputs(Map<String, String> values, String[] outputs, int[] columns) {
+        NamedInputs(Map<String, String> values, String[] outputs, int[] columns, String[] expressionOutputs,
+                OutputExpression[] expressions, Map<String, Integer>[] expressionColumns) {
             this.values = values;
             this.outputs = outputs;
             this.columns = columns;
+            this.expressionOutputs = expressionOutputs;
+            this.expressions = expressions;
+            this.expressionColumns = expressionColumns;
         }
     }
 
     /**
-     * The outputs of {@code rule} that name an input, checked: each names an input column, and none is
-     * in an output priority list, where its place cannot be known before evaluation.
+     * The outputs of {@code rule} that read inputs, checked: each names an input that holds single
+     * values, an expression parses and its inputs' types go together, and none is in an output priority
+     * list (see {@link #priorityKey}), where its place cannot be known before evaluation.
      */
-    private static NamedInputs namedInputs(Praeceptum rule, List<String> evaluationOrder, Set<String> lists) {
+    private static NamedInputs namedInputs(Praeceptum rule, List<String> evaluationOrder, Set<String> lists,
+            Map<String, ColumnType> types) {
         var references = rule.output().references();
         var outputs = new String[references.size()];
         var columns = new int[references.size()];
         int i = 0;
         for (var reference : references.entrySet()) {
-            int column = evaluationOrder.indexOf(reference.getValue());
-            if (column < 0) {
-                throw new InvalidDecisionTableException("Rule %s: output '%s' names '%s', which is not an input column %s"
-                        .formatted(rule.priority(), reference.getKey(), reference.getValue(), evaluationOrder));
-            }
-            if (lists.contains(reference.getValue())) {
-                throw new InvalidDecisionTableException("Rule %s: output '%s' names '%s', which holds lists; an output holds one value"
-                        .formatted(rule.priority(), reference.getKey(), reference.getValue()));
-            }
             outputs[i] = reference.getKey();
-            columns[i++] = column;
+            columns[i++] = inputColumn(rule, reference.getKey(), reference.getValue(), evaluationOrder, lists);
         }
-        return new NamedInputs(rule.output().values(), outputs, columns);
+        var expressions = rule.output().expressions();
+        var expressionOutputs = new String[expressions.size()];
+        var parsed = new OutputExpression[expressions.size()];
+        @SuppressWarnings({"rawtypes", "unchecked"}) // a generic array cannot be created otherwise
+        Map<String, Integer>[] expressionColumns = new Map[expressions.size()];
+        int e = 0;
+        for (var expression : expressions.entrySet()) {
+            var output = expression.getKey();
+            var where = "Rule %s, output '%s'".formatted(rule.priority(), output);
+            try {
+                parsed[e] = OutputExpression.parse(expression.getValue());
+            } catch (ExpressionSyntaxException ex) {
+                throw new InvalidDecisionTableException(where + ": " + ex.getMessage());
+            }
+            var names = new HashMap<String, Integer>();
+            parsed[e].names().forEach(name -> names.put(name, inputColumn(rule, output, name, evaluationOrder, lists)));
+            try {
+                parsed[e].type(types::get);
+            } catch (ExpressionSyntaxException ex) {
+                throw new InvalidDecisionTableException(where + ": " + ex.getMessage());
+            }
+            expressionOutputs[e] = output;
+            expressionColumns[e++] = Map.copyOf(names);
+        }
+        return new NamedInputs(rule.output().values(), outputs, columns, expressionOutputs, parsed, expressionColumns);
     }
 
-    /** The single-hit result of the rule at {@code bit}: ready-made, unless it names inputs. */
+    /** The position, in the evaluation order, of the input an output reads, which must hold single values. */
+    private static int inputColumn(Praeceptum rule, String output, String input, List<String> evaluationOrder, Set<String> lists) {
+        int column = evaluationOrder.indexOf(input);
+        if (column < 0) {
+            throw new InvalidDecisionTableException("Rule %s: output '%s' names '%s', which is not an input column %s"
+                    .formatted(rule.priority(), output, input, evaluationOrder));
+        }
+        if (lists.contains(input)) {
+            throw new InvalidDecisionTableException("Rule %s: output '%s' names '%s', which holds lists; an output holds one value"
+                    .formatted(rule.priority(), output, input));
+        }
+        return column;
+    }
+
+    /** The single-hit result of the rule at {@code bit}: ready-made, unless it reads inputs. */
     private <T> List<O> single(int bit, T input, BitsetIndex.ColumnReader<T> reader) {
         var ready = singleByBit[bit];
         return ready != null ? ready : List.of(outputStrategy.transform(output(bit, input, reader)));
     }
 
-    /** The outputs of a rule that names inputs, filled in with the text of the input's values. */
+    /**
+     * The outputs of a rule that reads inputs, filled in with the text of the input's values and of the
+     * expressions' values; a computed number has no trailing zeros, since FEEL numbers are values.
+     */
     private <T> PraeceptaOutput output(int bit, T input, BitsetIndex.ColumnReader<T> reader) {
         var named = namedInputsByBit[bit];
         var values = new HashMap<>(named.values);
         for (int i = 0; i < named.outputs.length; i++) {
             var value = valueOf(named.columns[i], input, reader);
             values.put(named.outputs[i], value == null ? null : FeelLiterals.text(value));
+        }
+        for (int e = 0; e < named.expressions.length; e++) {
+            var columns = named.expressionColumns[e];
+            var value = named.expressions[e].evaluate(name -> valueOf(columns.get(name), input, reader));
+            values.put(named.expressionOutputs[e], switch (value) {
+                case null -> null;
+                case BigDecimal number -> number.signum() == 0 ? "0" : number.stripTrailingZeros().toPlainString();
+                default -> value.toString();
+            });
         }
         return new PraeceptaOutput(values);
     }
@@ -568,6 +624,11 @@ public final class PraeceptaEngine<I, O> {
             if (input != null) {
                 throw new InvalidDecisionTableException("Rule %s: output '%s' names input '%s', so it has no place in its priority list"
                         .formatted(rule.priority(), output, input));
+            }
+            var expression = rule.output().expressions().get(output);
+            if (expression != null) {
+                throw new InvalidDecisionTableException("Rule %s: output '%s' is the expression %s, so it has no place in its priority list"
+                        .formatted(rule.priority(), output, expression));
             }
             var value = rule.output().values().get(output);
             int position = priorityList.getValue().indexOf(value);

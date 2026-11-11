@@ -239,11 +239,12 @@ columns typed by a collection (`isCollection="true"`, with allowed values on the
 entries test the elements with FEEL's list functions (`list contains(?, "PT")`,
 `some x in ? satisfies x >= 18`, `? = null`, joined with `or`, and `not(...)`); entries that name a
 list input (`Flu Symptoms`, typed by its `inputData`), which hold when the value is in the list;
-output entries that are literals
-or name one of the table's inputs (`a` returns the input `a`); times and date-times with or without a time zone;
-every hit policy, with SUM, MIN, MAX and COUNT aggregation. Anything else (a time with a
-zone id, computed expressions such as `Symptom + " is listed"`, function calls) is rejected
-with a message naming the decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
+output entries that are literals, name one of the table's inputs (`a` returns the input `a`), or
+compute their value from literals and inputs with `+`, `-`, `*`, `/` and parentheses
+(`Symptom + " is listed"`, `(price - discount) * 1.2`: `+` joins strings or adds numbers, a missing
+operand gives a missing output); times and date-times with or without a time zone; every hit policy,
+with SUM, MIN, MAX and COUNT aggregation. Anything else (a time with a zone id, function calls such as `upper case(a)`, `if`, inputs computed by other
+decisions) is rejected with a message naming the decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
 evaluate identically, which is how the benchmarks feed them.
 
 ## Praecepta Loader
@@ -336,8 +337,9 @@ engine against a naive reference implementation of DMN decision-table semantics 
 # DMN conformance
 `praecepta-tck` runs the decision-table test cases of the
 [DMN Technology Compatibility Kit](https://github.com/dmn-tck/tck) in every build. Every check whose
-table Praecepta can read passes; the others need features it does not have yet, mostly boolean
-columns ([#12](https://github.com/brunopacheco1/praecepta/issues/12)). The pass rate, the results per
+table Praecepta can read passes (80 of 86); the others need features it does not have yet: inputs
+computed by other decisions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) and times
+with a time zone ([#70](https://github.com/brunopacheco1/praecepta/issues/70)). The pass rate, the results per
 test case and what each unsupported check needs are in
 [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md).
 

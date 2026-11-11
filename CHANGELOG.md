@@ -62,6 +62,23 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
     and `"BR"` overlap on `["PT","BR"]`), so rules whose cell in a list column is not `-` are left
     out of the static analysis, as rules that compare with another input are: they never count as
     overlapping or hiding another rule, and gaps are not searched while there are any.
+- **Output entries that are expressions** ([#71](https://github.com/brunopacheco1/praecepta/issues/71)):
+  an output may compute its value from literals and inputs with `+`, `-`, `*`, `/`, unary minus and
+  parentheses, as in `Symptom + " is in the list of Flu symptoms"` or `(price - discount) * 1.2`
+  (`feel.OutputExpression`). `+` joins two strings or adds two numbers, the others take numbers;
+  numbers are decimals, a quotient keeps 34 digits (FEEL's decimal128), and a computed number is
+  given without trailing zeros (`12`, not `12.00`). A missing operand or a division by zero gives a
+  missing output, as in FEEL. `PraeceptaOutput` gains `expressions` (output column to the expression
+  as written). The engine parses each expression and checks the types of the inputs it names when it
+  is built (a string and a number never combine; inputs of other types are rejected), and evaluates
+  it only for the rules that match, as it does for outputs that name an input. Under ANY the evaluated
+  outputs are compared; an output with a priority list cannot be an expression. `DmnReader` reads such
+  entries, checking that the value has the output's type (a string output takes a number as its text),
+  and `DmnWriter` writes them back unchanged. Other FEEL (function calls, comparisons, `if`, lists) is
+  still rejected with a message saying what is not supported. With list inputs above, the DMN TCK's
+  `0039-dt-list-semantics` now passes: **80 of 86 checks** (was 78); the rest need chained decisions
+  ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) or times with a time zone
+  ([#70](https://github.com/brunopacheco1/praecepta/issues/70)).
 
 ### Changed
 - **Map-based inputs accept times and date-times with a time zone**, which they used to reject as
@@ -74,6 +91,8 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   these cases.
 - **The Maven plugin validates a table with getters of the generated Java types** instead of
   map-based inputs, so the build-time analysis matches what the generated code can evaluate.
+- **`PraeceptaOutput` gains a component, `expressions`.** Its former constructors remain, but record
+  patterns that deconstruct it need the new component.
 - **`DecisionTable` gains a component, `listInputs`.** Its former constructors remain, but record
   patterns that deconstruct it need the new component.
 - **`DmnWriter` writes an `inputData` for every input the cells compare with**, not only for the

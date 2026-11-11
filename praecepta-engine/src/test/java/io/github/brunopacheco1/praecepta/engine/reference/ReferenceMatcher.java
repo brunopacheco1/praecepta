@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -36,6 +37,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
+import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
@@ -196,7 +198,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * value (null if missing), as plain outputs are text.
      */
     public PraeceptaOutput output(Praeceptum rule, Map<String, ?> input) {
-        if (rule.output().references().isEmpty()) {
+        if (rule.output().references().isEmpty() && rule.output().expressions().isEmpty()) {
             return rule.output();
         }
         var values = new HashMap<>(rule.output().values());
@@ -204,7 +206,48 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             var value = value(input, column);
             values.put(output, value == null ? null : FeelLiterals.text(value));
         });
+        rule.output().expressions().forEach((output, expression) -> {
+            var value = evaluate(OutputExpression.parse(expression), name -> value(input, name));
+            values.put(output, switch (value) {
+                case null -> null;
+                case BigDecimal number -> number.compareTo(BigDecimal.ZERO) == 0 ? "0" : number.stripTrailingZeros().toPlainString();
+                default -> value.toString();
+            });
+        });
         return new PraeceptaOutput(values);
+    }
+
+    /**
+     * An output expression on concrete values, as FEEL defines it: a missing operand gives null, {@code +}
+     * joins strings or adds numbers, a division by zero gives null and a quotient has 34 digits.
+     */
+    private static Object evaluate(OutputExpression expression, Function<String, Object> inputs) {
+        return switch (expression) {
+            case OutputExpression.Literal literal -> literal.value();
+            case OutputExpression.Name name -> inputs.apply(name.name());
+            case OutputExpression.Negation negation -> {
+                var operand = (BigDecimal) evaluate(negation.operand(), inputs);
+                yield operand == null ? null : BigDecimal.ZERO.subtract(operand);
+            }
+            case OutputExpression.Arithmetic arithmetic -> {
+                var a = evaluate(arithmetic.left(), inputs);
+                var b = evaluate(arithmetic.right(), inputs);
+                if (a == null || b == null) {
+                    yield null;
+                }
+                if (a instanceof String text) {
+                    yield text.concat((String) b);
+                }
+                var x = (BigDecimal) a;
+                var y = (BigDecimal) b;
+                yield switch (arithmetic.operator()) {
+                    case ADD -> x.add(y);
+                    case SUBTRACT -> x.subtract(y);
+                    case MULTIPLY -> x.multiply(y);
+                    case DIVIDE -> y.compareTo(BigDecimal.ZERO) == 0 ? null : x.divide(y, MathContext.DECIMAL128);
+                };
+            }
+        };
     }
 
     // ---- static analysis, by brute force --------------------------------------------------------

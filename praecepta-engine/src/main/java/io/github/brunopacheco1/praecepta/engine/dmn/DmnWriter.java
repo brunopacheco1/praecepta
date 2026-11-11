@@ -223,9 +223,15 @@ public final class DmnWriter {
             var output = outputs.get(c);
             var outputWhere = where + ", output '" + output.name() + "'";
             var input = rule.output().references().get(output.name());
-            var value = input != null
-                    ? namedInput(input, inputs, outputWhere)
-                    : outputLiteral(rule.output().values().get(output.name()), output.type(), outputWhere);
+            var expression = rule.output().expressions().get(output.name());
+            String value;
+            if (input != null) {
+                value = namedInput(input, inputs, outputWhere);
+            } else if (expression != null) {
+                value = expression; // as written: FEEL already
+            } else {
+                value = outputLiteral(rule.output().values().get(output.name()), output.type(), outputWhere);
+            }
             expression(xml, "outputEntry", id("output_entry_" + r + "_" + c), value);
         }
         xml.append("      </rule>\n");

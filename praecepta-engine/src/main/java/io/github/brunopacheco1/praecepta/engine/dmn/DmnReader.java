@@ -36,7 +36,9 @@ import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
+import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
 /**
@@ -55,7 +57,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * named inputs whose {@code inputData} is such a collection (see {@link DecisionTable#listInputs}); input
  * entries in Praecepta's FEEL subset (lists, {@code not(...)}, {@code null}, comparisons, intervals, {@code -}); input and output value
  * lists; output entries that are literals or name one of the table's inputs (of the output's type, or
- * any input for a string output); every hit policy; SUM, MIN, MAX and COUNT aggregation. Anything else is rejected with an
+ * any input for a string output), or that join string and number literals and the table's inputs with
+ * {@code +}, {@code -}, {@code *} and {@code /} ({@link OutputExpression}, kept as written in
+ * {@link PraeceptaOutput#expressions()}); every hit policy; SUM, MIN, MAX and COUNT aggregation. Anything else is rejected with an
  * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered
  * from 1 in table order.
  */
@@ -294,6 +298,7 @@ public final class DmnReader {
         }
         Map<String, String> values = new HashMap<>();
         Map<String, String> references = new HashMap<>();
+        Map<String, String> expressions = new HashMap<>();
         for (int c = 0; c < outputs.size(); c++) {
             var column = outputs.get(c);
             var text = textOf(outputEntries.get(c)).strip();
@@ -304,11 +309,50 @@ public final class DmnReader {
             }
             if (input != null) {
                 references.put(column.name(), input.name());
+                continue;
+            }
+            var literal = literalOutput(text, column.type());
+            if (literal != null) {
+                values.put(column.name(), literal.text());
             } else {
-                values.put(column.name(), outputValue(text, column.type(), outputWhere));
+                checkExpression(text, inputs, lists, column, outputWhere);
+                expressions.put(column.name(), text);
             }
         }
-        return new Praeceptum(number, new PraeceptaInput(cells), new PraeceptaOutput(values, references));
+        return new Praeceptum(number, new PraeceptaInput(cells), new PraeceptaOutput(values, references, expressions));
+    }
+
+    /**
+     * Checks an output entry that computes its value ({@link OutputExpression}): it parses, it names
+     * only the table's inputs of single values, their types go together, and the value has the output's
+     * type, or any type for a string output (which takes a number as its text, as it takes number literals).
+     */
+    private static void checkExpression(String text, List<InputColumn> inputs, Set<String> lists, OutputColumn output, String where) {
+        OutputExpression expression;
+        try {
+            expression = OutputExpression.parse(text);
+        } catch (ExpressionSyntaxException e) {
+            throw new InvalidDecisionTableException(("%s: '%s' is not supported; output entries must be literals, name an input, "
+                    + "or join literals and inputs with +, -, * and / (%s)").formatted(where, text, e.getMessage()));
+        }
+        var types = new HashMap<String, ColumnType>();
+        inputs.forEach(input -> types.put(input.name(), input.type()));
+        for (var name : expression.names()) {
+            if (!types.containsKey(name) || lists.contains(name)) {
+                throw new InvalidDecisionTableException(("%s: '%s' names '%s', which is not one of the table's inputs of single values; "
+                        + "output entries must be literals or read the table's inputs").formatted(where, text, name));
+            }
+        }
+        ColumnType type;
+        try {
+            type = expression.type(types::get);
+        } catch (ExpressionSyntaxException e) {
+            throw new InvalidDecisionTableException("%s: '%s' %s".formatted(where, text, e.getMessage()));
+        }
+        if (type != output.type() && output.type() != ColumnType.STRING) {
+            throw new InvalidDecisionTableException("%s: '%s' gives a %s, but the output is a %s"
+                    .formatted(where, text, type.feelName(), output.type().feelName()));
+        }
     }
 
     /**
@@ -349,29 +393,27 @@ public final class DmnReader {
         }
     }
 
+    /** A literal output entry's value as plain text ({@link FeelLiterals#text}), null for {@code null}. */
+    private record LiteralOutput(String text) {
+    }
+
     /**
-     * A literal output entry as plain text ({@link FeelLiterals#text}), or null. An unquoted entry of a
-     * string output may still be a number, boolean, date, time or date-time literal.
+     * A literal output entry, or null if the entry is not one. An unquoted entry of a string output may
+     * still be a number, boolean, date, time or date-time literal.
      */
-    private static String outputValue(String text, ColumnType type, String where) {
+    private static LiteralOutput literalOutput(String text, ColumnType type) {
         var literal = text.strip();
         if (literal.isEmpty() || literal.equals("null")) {
-            return null;
+            return new LiteralOutput(null);
         }
-        if (type == ColumnType.STRING && !literal.startsWith("\"")) {
-            for (var otherType : UNQUOTED_OUTPUT_TYPES) {
-                var value = literalValue(literal, otherType);
-                if (value.isPresent()) {
-                    return FeelLiterals.text(value.get());
-                }
+        var types = type == ColumnType.STRING && !literal.startsWith("\"") ? UNQUOTED_OUTPUT_TYPES : List.of(type);
+        for (var literalType : types) {
+            var value = literalValue(literal, literalType);
+            if (value.isPresent()) {
+                return new LiteralOutput(FeelLiterals.text(value.get()));
             }
-            throw new InvalidDecisionTableException(
-                    "%s: '%s' is not supported; output entries must be literals (quote text) or name an input".formatted(where, literal));
         }
-        return literalValue(literal, type)
-                .map(FeelLiterals::text)
-                .orElseThrow(() -> new InvalidDecisionTableException(
-                        "%s: '%s' is not supported; output entries must be literals or name an input".formatted(where, literal)));
+        return null;
     }
 
     /** The value of an entry that is a single literal of the type (no list, comparison or name). */
