@@ -112,7 +112,7 @@ final class PrimitiveKeys {
             case LocalDateTime dateTime -> Math.addExact(
                     Math.multiplyExact(dateTime.toEpochSecond(ZoneOffset.UTC), NANOS_PER_SECOND), dateTime.getNano());
             case Duration duration -> duration.toNanos();
-            case YearsAndMonths duration -> duration.months();
+            case YearsAndMonths(long months) -> months;
             default -> throw new ArithmeticException("no key for " + value.getClass().getSimpleName());
         };
     }
