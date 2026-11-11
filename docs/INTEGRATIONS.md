@@ -44,7 +44,7 @@ describe modules that do not exist yet; their authors update them as they land.
 | `praecepta-maven-plugin` | `praecepta-maven-plugin` | compiler; Maven API (`provided`) | released |
 | `praecepta-gradle-plugin` | `praecepta-gradle-plugin` | compiler; Gradle API (`provided`) | planned (#18) |
 | `io.github.brunopacheco1.praecepta.gradle.plugin` (groupId `io.github.brunopacheco1.praecepta`) | `praecepta-gradle-plugin-marker` | gradle plugin (pom only) | planned (#18) |
-| `praecepta-spring-boot-starter` | `praecepta-spring-boot-starter` | integration; Spring Boot (`provided` or optional) | planned (#20) |
+| `praecepta-spring-boot-starter` | `praecepta-spring-boot-starter` | integration; Spring Boot (`provided`) | 0.5 (#20) |
 | `praecepta-micronaut` | `praecepta-micronaut` | integration; Micronaut (`provided`) | planned (#77) |
 | `praecepta-quarkus` | `praecepta-quarkus` | integration, `quarkus-arc` | planned (#76) |
 | `praecepta-quarkus-deployment` | `praecepta-quarkus-deployment` | runtime, `quarkus-arc-deployment`, and compiler if it takes spreadsheets | planned (#76) |
@@ -232,7 +232,7 @@ cannot fail differently at runtime.
   time, as principle 3 already has it.
 - **No reflection:** the engine needs none. Framework modules keep to that.
 
-### Spring Boot starter (#20, planned)
+### Spring Boot starter (#20)
 - One module, `praecepta-spring-boot-starter` (auto-configuration and starter together), package
   `io.github.brunopacheco1.praecepta.spring`: `PraeceptaAutoConfiguration` (listed in
   `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`,
@@ -240,6 +240,15 @@ cannot fail differently at runtime.
   (`@ConfigurationProperties("praecepta")`, with configuration metadata), and the Actuator endpoint in a
   nested configuration conditional on Actuator. Resources are found with Spring's
   `ResourcePatternResolver`, so nested jars of executable jars work.
+- Built against Spring Boot 4 (the BOM imported in the module, version `spring-boot.version` in the
+  parent), every Spring dependency `provided`.
+- **Tables are loaded while bean definitions are registered** (an `ImportBeanDefinitionRegistrar`), since
+  each decision becomes a bean of its own: the registrar binds `praecepta.*` with Spring's `Binder`, finds
+  the files, runs `Decisions.load`, and registers `praeceptaDecisions` and the `praecepta.<name>` engines
+  (qualifier and generic type set) as non-lazy beans that return what it loaded. A failure therefore stops
+  the context's refresh before any application bean is created; `PraeceptaFailureAnalyzer` lists the
+  problems in Spring Boot's "APPLICATION FAILED TO START" report.
+- The endpoint's `@Selector` parameter is found by name, so the module compiles with `-parameters`.
 
 ### Micronaut module (#77, planned)
 - `praecepta-micronaut`, package `io.github.brunopacheco1.praecepta.micronaut`: a `@Factory`,

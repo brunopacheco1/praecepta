@@ -89,6 +89,9 @@
         <!-- native images (#19): only the native-image test project uses them (praecepta-maven-plugin/src/it/native-app) -->
         <native-maven-plugin.version>1.1.18</native-maven-plugin.version>
         <exec-maven-plugin.version>3.6.4</exec-maven-plugin.version>
+
+        <!-- Spring Boot starter (#20): its BOM is imported by praecepta-spring-boot-starter only -->
+        <spring-boot.version>4.1.2</spring-boot.version>
     </properties>
 
     <modules>
@@ -97,6 +100,7 @@
         <module>praecepta-compiler</module>
         <module>praecepta-integration</module>
         <module>praecepta-maven-plugin</module>
+        <module>praecepta-spring-boot-starter</module>
         <module>praecepta-benchmarks</module>
         <module>praecepta-tck</module>
     </modules>

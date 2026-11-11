@@ -1,0 +1,29 @@
+{
+  "properties": [
+    {
+      "name": "praecepta.locations",
+      "defaultValue": [
+        "classpath*:rules/**/*.dmn"
+      ]
+    }
+  ],
+  "hints": [
+    {
+      "name": "praecepta.fail-on",
+      "values": [
+        {
+          "value": "ERROR",
+          "description": "Validation errors (overlapping rules under UNIQUE, conflicting outputs under ANY) stop startup."
+        },
+        {
+          "value": "WARNING",
+          "description": "Warnings too (rules that can never be selected, gaps) stop startup."
+        },
+        {
+          "value": "NONE",
+          "description": "No validation issue stops startup; each is logged as a warning."
+        }
+      ]
+    }
+  ]
+}

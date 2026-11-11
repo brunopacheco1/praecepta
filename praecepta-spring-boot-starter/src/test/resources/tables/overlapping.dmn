@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A UNIQUE table whose two rules both match "PT": a validation ERROR. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="overlapping" name="Overlapping" namespace="http://example.com/tables">
+  <decision id="tier" name="Tier">
+    <decisionTable id="tierTable" hitPolicy="UNIQUE">
+      <input id="countryInput" label="Country">
+        <inputExpression id="countryExpression" typeRef="string">
+          <text>country</text>
+        </inputExpression>
+      </input>
+      <output id="tierOutput" name="tier" typeRef="string" />
+      <rule id="portugal">
+        <inputEntry id="portugalCountry"><text>"PT"</text></inputEntry>
+        <outputEntry id="portugalTier"><text>"gold"</text></outputEntry>
+      </rule>
+      <rule id="iberia">
+        <inputEntry id="iberiaCountry"><text>"PT","ES"</text></inputEntry>
+        <outputEntry id="iberiaTier"><text>"silver"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

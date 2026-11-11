@@ -18,6 +18,7 @@ builds an engine once and calls it.
 | `praecepta-compiler` | engine, loader | The build-time core of the build tools: loads a table, validates it, writes it as DMN and generates typed Java classes (`TableCompiler`). Independent of any build tool. |
 | `praecepta-integration` | engine | The runtime core of the framework integrations: finds DMN files by location pattern and builds a map-based engine per decision, with its validation report (`Decisions`). Independent of any framework. |
 | `praecepta-maven-plugin` | compiler, Maven API | The `generate` goal: runs the compiler on the configured tables and adds the results to the Maven build. |
+| `praecepta-spring-boot-starter` | integration, Spring Boot (`provided`) | Spring Boot auto-configuration: loads the tables at `praecepta.locations` at startup, registers a `Decisions` bean and an engine bean per decision, and reports them through the Actuator endpoint `praecepta`. |
 | `praecepta-benchmarks` | engine, Camunda 8, Drools, JMH | Compares Praecepta with other engines; not published. |
 | `praecepta-tck` | engine | Runs the DMN TCK's decision-table cases; not published. |
 
@@ -154,6 +155,12 @@ an engine bound to maps of text (`PraeceptaEngine<Map<String, String>, Map<Strin
 validation report, and fails with every problem at once (`DecisionsException`): unreadable files, invalid
 tables, duplicate names, and validation issues at the configured severity. Maps rather than records,
 because a container finds its tables at runtime; typed records remain the build plugins' job.
+
+The Spring Boot starter loads the tables while the context registers its bean definitions (an
+`ImportBeanDefinitionRegistrar`), because each decision becomes a bean of its own, named
+`praecepta.<name>` and qualified by the decision's name; its resources are found with Spring's
+`ResourcePatternResolver`, so the nested jars of an executable jar are searched too. A table that fails
+stops the refresh before any application bean is created.
 
 ## Native images
 Praecepta needs no reflection, so GraalVM's `native-image` builds applications that use it without a

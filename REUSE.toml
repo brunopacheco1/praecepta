@@ -18,6 +18,8 @@ path = [
     "**/*FuzzTestInputs/**",
     # the compiler's golden generated sources and DMN, compared byte for byte
     "praecepta-compiler/src/test/resources/golden/**",
+    # Spring Boot configuration metadata (JSON has no comments)
+    "praecepta-spring-boot-starter/src/main/resources/META-INF/additional-spring-configuration-metadata.json",
     # benchmark results: JMH output, logs and generated summaries
     "praecepta-benchmarks/results/**",
     # the social image, rendered from site/brand/social.svg
