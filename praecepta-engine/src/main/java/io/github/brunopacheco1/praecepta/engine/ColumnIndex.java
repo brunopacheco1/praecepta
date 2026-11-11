@@ -75,6 +75,8 @@ final class ColumnIndex {
     private final Set<String> disallowedStrings;
     /** Ordered columns (all but STRING, and STRING columns whose cells compare): the sorted distinct boundaries; else null. */
     private final Comparable<?>[] boundaries;
+    /** The boundaries as primitive keys, searched first; null for strings, booleans, or boundaries that do not fit. */
+    private final PrimitiveKeys keys;
     /** The value classes, by class number. */
     private final List<ValueClass> classes;
     final int nullClass;
@@ -113,6 +115,7 @@ final class ColumnIndex {
             addOrderedClasses(boundaries, partition);
             stringClasses = isString ? boundaryClasses(boundaries) : null;
         }
+        keys = boundaries == null || isString ? null : PrimitiveKeys.of(type, boundaries);
         nullClass = partition.size();
         partition.add(new ValueClass.Missing());
         classes = List.copyOf(partition);
@@ -351,6 +354,12 @@ final class ColumnIndex {
     private int classOf(Object value) {
         if (value == null) {
             return nullClass;
+        }
+        if (keys != null) {
+            int byKey = keys.classOf(value);
+            if (byKey >= 0) {
+                return byKey;
+            }
         }
         int found = Arrays.binarySearch(boundaries, value, ColumnIndex::compare);
         return found >= 0 ? 2 * found + 1 : 2 * (-found - 1);

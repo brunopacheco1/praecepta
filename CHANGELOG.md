@@ -67,6 +67,12 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   definition of a value list.
 
 ### Changed
+- **Faster number, date, time and duration columns** ([#16](https://github.com/brunopacheco1/praecepta/issues/16)):
+  their boundaries are also kept as `long` keys (days since the epoch, nanoseconds, months, or numbers
+  scaled to the finest boundary), so a lookup binary-searches a `long[]` instead of comparing
+  `BigDecimal` or `LocalDate` objects; a value without an exact key falls back to the old search. On
+  an Apple M2 Pro, `EvaluationBenchmark` went from 448-493 to 357-365 ns/op on `mixed-100` and from
+  726-911 to 569-573 ns/op on `mixed-1000` (two runs each); string tables are unchanged.
 - **Releases keep the build timestamp committed in the tag** (`project.build.outputTimestamp`), so
   a release can be rebuilt bit for bit from its tag with only the version changed. 0.2.0 was
   stamped with the time of its release run; its rebuild sets that value explicitly (see
