@@ -52,6 +52,8 @@ them when you build; evaluate them with a dependency-free engine.
   records, so applications ship only the engine
 - A Spring Boot starter that loads DMN tables at startup as engine beans, validates them, and reports
   them through Actuator
+- A Quarkus extension that validates tables while Quarkus builds the application and injects one
+  engine per decision, reloading changed tables in dev mode
 - GraalVM native images with no configuration for Praecepta itself (see [Native images](#native-images))
 
 # Installation
@@ -478,6 +480,70 @@ Micronaut endpoints it is sensitive by default, since the reports show the rules
 Micronaut builds the module's beans and binds its settings at compile time, so it needs no reflection
 and no annotation processing in your build. In a native image, include the DMN files as resources.
 
+## Praecepta Quarkus Extension
+Runs on Quarkus 3.40 and later with Java 21+. Add the extension to a Quarkus application:
+
+```xml
+<dependency>
+  <groupId>io.github.brunopacheco1</groupId>
+  <artifactId>praecepta-quarkus</artifactId>
+  <version>0.5.0</version>
+</dependency>
+```
+
+While Quarkus builds the application (`quarkus:build`, dev mode and tests), the extension:
+1. finds the DMN files under `rules/` on the class path (`src/main/resources/rules/` and any
+   dependency), and compiles the Excel and CSV tables declared in `application.properties`;
+2. validates them, failing the build on errors (`quarkus.praecepta.fail-on`: `ERROR` by default,
+   `WARNING` or `NONE`) with every problem listed at once, and logging the rest;
+3. registers the application's `Decisions` and one engine per decision, named after the DMN
+   decision's `name` (or, for a spreadsheet, its file name without the extension).
+
+```java
+@Inject
+@Identifier("Discount") // or @Named("Discount")
+PraeceptaEngine<Map<String, String>, Map<String, String>> discount;
+
+@Inject
+Decisions decisions;
+
+List<Map<String, String>> outputs = discount.evaluate(Map.of("country", "PT", "age", "42"));
+List<Map<String, String>> same = decisions.evaluate("Discount", Map.of("country", "PT", "age", "42"));
+```
+
+Inputs and outputs are the columns' values as text, keyed by column name: numbers as `42`, dates as
+`2025-01-31`, a list column's value as `["PT", "BR"]`; a missing or blank value is a missing input.
+Each output map holds one matching rule's outputs (under a COLLECT aggregation, the aggregate).
+`decisions.get("Discount").report()` gives the validation report at runtime, and `decisions.describe()`
+every decision's columns and issues as plain maps. The engines are immutable `@Singleton` beans; for
+typed input and output records, use the [Maven plugin](#praecepta-maven-plugin) and declare the
+generated class as a bean yourself.
+
+| Property | Default | Meaning |
+|---|---|---|
+| `quarkus.praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load: patterns, comma-separated. `classpath:` and `classpath*:` search the application and its dependencies, `file:` the file system; `*` matches within a directory, `**` across them. A pattern set here that finds nothing fails the build. |
+| `quarkus.praecepta.fail-on` | `ERROR` | The validation severity that fails the build: `ERROR`, `WARNING` or `NONE`. Tables that cannot be read fail it whatever this says. |
+| `quarkus.praecepta.tables."<key>".*` | | An Excel or CSV table to compile, with the Maven plugin's settings in kebab-case (below). |
+
+```properties
+quarkus.praecepta.tables.discount.source=src/main/rules/discount.xlsx
+quarkus.praecepta.tables.discount.hit-policy=FIRST
+quarkus.praecepta.tables.discount.inputs[0].name=country
+quarkus.praecepta.tables.discount.inputs[0].allowed-values="PT","ES","FR"
+quarkus.praecepta.tables.discount.inputs[1].name=age
+quarkus.praecepta.tables.discount.inputs[1].type=NUMBER
+quarkus.praecepta.tables.discount.outputs[0].name=discount
+quarkus.praecepta.tables.discount.outputs[0].type=NUMBER
+```
+
+A relative `source` is resolved against the project's directory; keep spreadsheets out of
+`src/main/resources` so they are not packaged. Apache POI is used at build time only and never reaches
+the application. In dev mode, changing a DMN file or a declared spreadsheet restarts the application
+with the new table, and a table that fails validation shows on the error page until it is fixed. The
+extension needs `quarkus-arc`, which every Quarkus application has. It uses no reflection; the tables
+are read while the application initialises, and in a native executable while the image is built, but
+native images are not yet tested in CI ([#19](https://github.com/brunopacheco1/praecepta/issues/19)).
+
 ## Native images
 Applications using Praecepta build as GraalVM native executables with no configuration for Praecepta
 itself: the engine uses no reflection, and the jars carry the reachability metadata they need under
@@ -598,7 +664,9 @@ Praecepta Engine has no runtime dependencies; it reads DMN with the JDK's XML pa
 
 Praecepta Loader depends on Apache POI. The Maven plugin uses it at build time only, through
 `praecepta-compiler`, the build-time core the build-tool integrations share. `praecepta-integration`,
-which the framework integrations share, needs only the engine. Their design is in
+which the framework integrations share, needs only the engine. The Quarkus extension's runtime module
+needs `praecepta-integration` and Quarkus' own `quarkus-arc`; its deployment module, which only
+Quarkus' build uses, brings `praecepta-compiler` and Apache POI. Their design is in
 [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md). `praecepta-micronaut` adds nothing beyond it: Micronaut
 is the application's own (`provided`).
 
