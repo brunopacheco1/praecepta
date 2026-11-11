@@ -30,7 +30,10 @@ builds an engine once and calls it.
 1. **Rules and cells.** A rule (`Praeceptum`) maps input columns to cells and output columns to
    values. `CellParser` parses each cell, according to its column's type (`ColumnType`: STRING,
    NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION, YEAR_MONTH_DURATION), into `UnaryTests`: the subset of DMN FEEL *simple unary tests* that looks at one
-   column value (lists, `not(...)`, comparisons, intervals, `null`, "any").
+   column value (lists, `not(...)`, comparisons, intervals, `null`, "any"). In a DMN table (strict
+   FEEL) a cell may also compare with another input (`> limit`); the index sees such a cell as "any
+   value", and the engine checks it on the rules the index leaves, with the inputs' values. The
+   analysis then never counts those rules as overlapping or hiding others, and skips gaps.
 2. **The bitset index** (`BitsetIndex`, `ColumnIndex`). Every rule owns one bit. Each column splits
    its values into *classes* that no rule can tell apart, and each class carries a mask: the rules
    that accept it.

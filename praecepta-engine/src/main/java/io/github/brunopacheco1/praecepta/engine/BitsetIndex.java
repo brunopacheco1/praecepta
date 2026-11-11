@@ -161,6 +161,13 @@ final class BitsetIndex {
         }
     }
 
+    /** Clears in {@code target} the bits set in {@code other}. */
+    static void andNot(long[] target, long[] other) {
+        for (int w = 0; w < target.length; w++) {
+            target[w] &= ~other[w];
+        }
+    }
+
     /** Whether every bit set in {@code mask} is also set in {@code of}. */
     static boolean isSubset(long[] mask, long[] of) {
         for (int w = 0; w < mask.length; w++) {

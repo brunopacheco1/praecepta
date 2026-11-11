@@ -111,6 +111,24 @@ class TableCompilerTest {
     }
 
     @Test
+    void inputs_that_dmn_cells_compare_with_become_input_components() throws Exception {
+        var config = new TableConfig(table("limits.dmn"), "Limits", null, null, null, List.of(), List.of());
+        var result = TableCompiler.compile(config, PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("LimitsInput"))
+                .contains("public record LimitsInput(java.math.BigDecimal amount, java.math.BigDecimal limit)");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".LimitsInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Limits").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(new BigDecimal(120), new BigDecimal(100))))
+                    .get().hasToString("LimitsOutput[decision=review]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(new BigDecimal(80), new BigDecimal(100))))
+                    .get().hasToString("LimitsOutput[decision=approve]");
+        }
+    }
+
+    @Test
     void duration_columns_become_durations_and_periods() throws Exception {
         var config = new TableConfig(table("waits.csv"), "Wait", null, HitPolicy.FIRST, null,
                 List.of(new ColumnConfig("delay", ColumnType.DAY_TIME_DURATION, null, List.of()),

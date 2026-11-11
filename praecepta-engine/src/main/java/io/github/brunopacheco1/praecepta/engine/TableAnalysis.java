@@ -34,6 +34,8 @@ import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
  * <li>A rule is unreachable under FIRST or PRIORITY when it matches no valid input, or when every input
  * it matches is also matched by a rule with a lower bit (earlier, or higher priority): a search over
  * the rule's own classes, pruned as soon as a candidate covers what is left.</li>
+ * <li>Rules with cells that compare with another input match inputs known only when evaluating, so
+ * they take part only as rules that may be unreachable themselves (judged on their other cells).</li>
  * <li>Gaps are regions of declared input values that no rule matches. They are only searched when
  * every string column the rules constrain has declared input values; otherwise every unknown string
  * would be a gap. Missing values are not part of the searched domain.</li>
@@ -46,14 +48,21 @@ final class TableAnalysis {
 
     private final BitsetIndex index;
     private final List<Praeceptum> rules;
+    /**
+     * Rules with cells that compare with another input, which the index sees as "any value": the
+     * inputs they match are known only when evaluating, so they never count as overlapping, never cover
+     * another rule, and while there are any, gaps are not searched.
+     */
+    private final long[] variableRules;
 
-    private TableAnalysis(BitsetIndex index, List<Praeceptum> rules) {
+    private TableAnalysis(BitsetIndex index, List<Praeceptum> rules, long[] variableRules) {
         this.index = index;
         this.rules = rules;
+        this.variableRules = variableRules;
     }
 
-    static List<Issue> analyse(BitsetIndex index, List<Praeceptum> rules, HitPolicy policy) {
-        var analysis = new TableAnalysis(index, rules);
+    static List<Issue> analyse(BitsetIndex index, List<Praeceptum> rules, HitPolicy policy, long[] variableRules) {
+        var analysis = new TableAnalysis(index, rules, variableRules);
         var issues = new ArrayList<Issue>(switch (policy) {
             case UNIQUE -> analysis.overlaps(Kind.OVERLAPPING_RULES, false);
             case ANY -> analysis.overlaps(Kind.CONFLICTING_OUTPUTS, true);
@@ -69,7 +78,11 @@ final class TableAnalysis {
     private List<Issue> overlaps(Kind kind, boolean onlyConflictingOutputs) {
         var pairs = new ArrayList<int[]>();
         for (int bit = 0; bit < index.ruleCount(); bit++) {
+            if (BitsetIndex.get(variableRules, bit)) {
+                continue;
+            }
             var overlapping = index.overlapping(bit);
+            BitsetIndex.andNot(overlapping, variableRules);
             // only the bits after this one, so each pair is found once
             for (int other = BitsetIndex.next(overlapping, bit + 1); other >= 0; other = BitsetIndex.next(overlapping, other + 1)) {
                 int first = Math.min(index.ruleAt(bit), index.ruleAt(other));
@@ -95,8 +108,9 @@ final class TableAnalysis {
                 unreachable.add(index.ruleAt(bit)); // matches no valid input at all
                 continue;
             }
-            // only rules with a lower bit win over this one
+            // only rules with a lower bit win over this one, and only rules matching what the index sees
             BitsetIndex.and(candidates, BitsetIndex.below(index.words(), bit));
+            BitsetIndex.andNot(candidates, variableRules);
             if (!BitsetIndex.isEmpty(candidates) && new CoverSearch(bit).covered(0, candidates)) {
                 unreachable.add(index.ruleAt(bit));
             }
@@ -223,7 +237,7 @@ final class TableAnalysis {
     }
 
     private List<Issue> gaps() {
-        if (!gapAnalysisApplies() || anyColumnWithoutValidValues()) {
+        if (!BitsetIndex.isEmpty(variableRules) || !gapAnalysisApplies() || anyColumnWithoutValidValues()) {
             return List.of();
         }
         var gaps = new ArrayList<Issue>();

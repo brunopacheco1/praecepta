@@ -60,10 +60,9 @@ class DurationColumnsTest {
         Assertions.assertThatThrownBy(() -> CellParser.parse("duration(\"P1Y\")", ColumnType.DAY_TIME_DURATION))
                 .isInstanceOf(CellSyntaxException.class)
                 .hasMessageContaining("invalid days and time duration 'P1Y'");
-        Assertions.assertThatThrownBy(() -> CellParser.parseFeel("P1D", ColumnType.DAY_TIME_DURATION))
-                .as("strict FEEL needs the function")
-                .isInstanceOf(CellSyntaxException.class)
-                .hasMessageContaining("write duration(\"P1DT2H\")");
+        // in strict FEEL a bare P1D is a name, of another input
+        Assertions.assertThat(CellParser.parseFeel("P1D", ColumnType.DAY_TIME_DURATION))
+                .isEqualTo(new UnaryTests.Positive(List.of(new UnaryTests.Equals(new UnaryTests.Name("P1D")))));
     }
 
     @Test

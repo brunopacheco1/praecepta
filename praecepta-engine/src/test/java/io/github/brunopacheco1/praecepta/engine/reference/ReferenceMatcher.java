@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Function;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
@@ -54,9 +55,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  *                       lowest priority (DMN output value lists), compared in map iteration order
  * @param types          column types; columns not listed are STRING
  * @param allowedValues  declared input values per column, as unary tests of the column's type
+ * @param feelCells      whether cells are strict FEEL, where a name compares with another input
  */
 public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
-        Map<String, ColumnType> types, Map<String, String> allowedValues) {
+        Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells) {
 
     public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy) {
         this(rules, hitPolicy, Map.of());
@@ -64,6 +66,11 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority) {
         this(rules, hitPolicy, outputPriority, Map.of(), Map.of());
+    }
+
+    public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
+            Map<String, ColumnType> types, Map<String, String> allowedValues) {
+        this(rules, hitPolicy, outputPriority, types, allowedValues, false);
     }
 
     /** Result of evaluating a decision table under strict DMN semantics. */
@@ -98,7 +105,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     public String invalidColumn(Map<String, ?> input) {
         for (var declared : allowedValues.entrySet()) {
             var value = value(input, declared.getKey());
-            if (value != null && !accepts(parse(declared.getValue(), declared.getKey()), value)) {
+            if (value != null && !accepts(CellParser.parse(declared.getValue(), type(declared.getKey())), value, name -> null)) {
                 return declared.getKey();
             }
         }
@@ -184,10 +191,10 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             if (invalidColumn(input) != null) {
                 continue;
             }
-            var matches = matches(input);
-            if (matches.isEmpty()) {
-                continue;
-            }
+            // rules with cells naming inputs match inputs known only when evaluating: they never overlap,
+            // and never hide another rule, but they are unreachable if their other cells are covered
+            var matches = matches(input).stream().filter(rule -> !isVariable(rule)).toList();
+            var seen = rules.stream().filter(rule -> staticallyAccepts(rule, input)).toList();
             switch (hitPolicy) {
                 case UNIQUE -> {
                     for (int a = 0; a < matches.size(); a++) {
@@ -205,11 +212,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                         }
                     }
                 }
-                case FIRST -> selected.add(matches.getFirst());
-                case PRIORITY -> {
-                    var comparator = Comparator.comparing(Praeceptum::output, byPriority());
-                    selected.add(matches.stream().sorted(comparator).findFirst().orElseThrow());
-                }
+                case FIRST -> selectUpToFirstStatic(seen, selected);
+                case PRIORITY -> selectUpToFirstStatic(seen.stream().sorted(Comparator.comparing(Praeceptum::output, byPriority())).toList(),
+                        selected);
                 default -> {
                     // multi-hit policies have no static findings
                 }
@@ -225,11 +230,25 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return findings;
     }
 
+    /** In order, the rules the index sees matching, up to the first that has no cell naming an input. */
+    private void selectUpToFirstStatic(List<Praeceptum> seen, Set<Praeceptum> selected) {
+        for (var rule : seen) {
+            selected.add(rule);
+            if (!isVariable(rule)) {
+                return;
+            }
+        }
+    }
+
     /**
      * Gaps are only analysed when every string column the rules constrain either declares its input
-     * values or compares (then, like a number column, it has no single class of unmentioned values).
+     * values or compares (then, like a number column, it has no single class of unmentioned values),
+     * and no cell names another input.
      */
     public boolean gapAnalysisApplies(List<String> columns) {
+        if (rules.stream().anyMatch(this::isVariable)) {
+            return false;
+        }
         for (var column : columns) {
             var cells = rules.stream().map(rule -> parse(rule.input().values().get(column), column)).toList();
             boolean constrained = cells.stream().anyMatch(cell -> !(cell instanceof UnaryTests.Any));
@@ -394,26 +413,43 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     private boolean ruleAccepts(Praeceptum rule, Map<String, ?> input) {
         for (var cell : rule.input().values().entrySet()) {
-            if (!accepts(parse(cell.getValue(), cell.getKey()), value(input, cell.getKey()))) {
+            if (!accepts(parse(cell.getValue(), cell.getKey()), value(input, cell.getKey()), name -> value(input, name))) {
                 return false;
             }
         }
         return true;
     }
 
-    private static boolean accepts(UnaryTests cell, Object value) {
+    /** Whether a cell compares with another input ({@code > dateE}), which the engine's index cannot see. */
+    private boolean isVariable(Praeceptum rule) {
+        return rule.input().values().entrySet().stream().anyMatch(cell -> parse(cell.getValue(), cell.getKey()).namesInputs());
+    }
+
+    /** What the engine's index sees of a rule: its cells, with those naming inputs taken as "any value". */
+    private boolean staticallyAccepts(Praeceptum rule, Map<String, ?> input) {
+        for (var cell : rule.input().values().entrySet()) {
+            var parsed = parse(cell.getValue(), cell.getKey());
+            if (!parsed.namesInputs() && !accepts(parsed, value(input, cell.getKey()), name -> null)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** @param inputs the value of each input a cell names */
+    private static boolean accepts(UnaryTests cell, Object value, Function<String, Object> inputs) {
         return switch (cell) {
             case UnaryTests.Any any -> true;
-            case UnaryTests.Positive positive -> any(positive.tests(), value) == Boolean.TRUE;
-            case UnaryTests.Negated negated -> any(negated.tests(), value) == Boolean.FALSE;
+            case UnaryTests.Positive positive -> any(positive.tests(), value, inputs) == Boolean.TRUE;
+            case UnaryTests.Negated negated -> any(negated.tests(), value, inputs) == Boolean.FALSE;
         };
     }
 
     /** True if any test is true; otherwise unknown (null) if any is unknown; otherwise false. */
-    private static Boolean any(List<Test> tests, Object value) {
+    private static Boolean any(List<Test> tests, Object value, Function<String, Object> inputs) {
         boolean unknown = false;
         for (var test : tests) {
-            var outcome = test(test, value);
+            var outcome = test(resolve(test, inputs), value);
             if (outcome == null) {
                 unknown = true;
             } else if (outcome) {
@@ -423,14 +459,35 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return unknown ? null : false;
     }
 
+    /** The test with each name replaced by that input's value, which may be null (missing). */
+    private static Test resolve(Test test, Function<String, Object> inputs) {
+        return switch (test) {
+            case NullTest n -> n;
+            case Equals e -> new Equals(resolve(e.value(), inputs));
+            case Compare c -> new Compare(c.operator(), resolve(c.value(), inputs));
+            case Range r -> new Range(resolve(r.low(), inputs), r.lowClosed(), resolve(r.high(), inputs), r.highClosed());
+        };
+    }
+
+    private static Comparable<?> resolve(Comparable<?> value, Function<String, Object> inputs) {
+        return value instanceof UnaryTests.Name(var name) ? (Comparable<?>) inputs.apply(name) : value;
+    }
+
+    /** FEEL on concrete values: a comparison with a missing value is unknown; null equals only null. */
     private static Boolean test(Test test, Object value) {
         if (value == null) {
             return switch (test) {
                 case NullTest n -> true;
-                case Equals e -> false;
+                case Equals e -> e.value() == null;
                 case Compare c -> null;
                 case Range r -> null;
             };
+        }
+        if (test instanceof Equals e && e.value() == null) {
+            return false;
+        }
+        if (test instanceof Compare c && c.value() == null || test instanceof Range r && (r.low() == null || r.high() == null)) {
+            return null;
         }
         return switch (test) {
             case NullTest n -> false;
@@ -472,11 +529,12 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                 }
             }
         }
+        values.removeIf(UnaryTests.Name.class::isInstance); // known only when evaluating
         return values;
     }
 
     private UnaryTests parse(String cell, String column) {
-        return CellParser.parse(cell, type(column));
+        return feelCells ? CellParser.parseFeel(cell, type(column)) : CellParser.parse(cell, type(column));
     }
 
     private ColumnType type(String column) {

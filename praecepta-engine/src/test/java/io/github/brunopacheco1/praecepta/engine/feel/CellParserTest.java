@@ -92,12 +92,17 @@ class CellParserTest {
         // Praecepta's own tables (Excel, CSV, code) keep the shorter syntax
         Assertions.assertThat(CellParser.parse("PT, ES", ColumnType.STRING))
                 .isEqualTo(positive(new Equals("PT"), new Equals("ES")));
-        // in DMN an unquoted word refers to another variable, which is not supported
+        // in DMN an unquoted word names another input, compared with when evaluating
         Assertions.assertThat(CellParser.parseFeel("\"PT\", \"ES\"", ColumnType.STRING))
                 .isEqualTo(positive(new Equals("PT"), new Equals("ES")));
-        Assertions.assertThatThrownBy(() -> CellParser.parseFeel("not(Complex.aString)", ColumnType.STRING))
-                .isInstanceOf(CellSyntaxException.class)
-                .hasMessageContaining("'Complex.aString' is a FEEL name");
+        Assertions.assertThat(CellParser.parseFeel("not(Complex.aString)", ColumnType.STRING))
+                .isEqualTo(new UnaryTests.Negated(List.of(new Equals(new UnaryTests.Name("Complex.aString")))));
+        Assertions.assertThat(CellParser.parseFeel("[numB..10], > dateE", ColumnType.NUMBER))
+                .isEqualTo(positive(new Range(new UnaryTests.Name("numB"), true, new BigDecimal("10"), true),
+                        new Compare(Operator.GT, new UnaryTests.Name("dateE"))));
+        // true, false and null stay literals; and a list holding a name is not a list of values
+        Assertions.assertThat(CellParser.parseFeel("true", ColumnType.BOOLEAN)).isEqualTo(positive(new Equals(Boolean.TRUE)));
+        Assertions.assertThat(CellParser.parseFeel("\"PT\", ES", ColumnType.STRING).values()).isEmpty();
     }
 
     @Test

@@ -5,6 +5,7 @@
  */
 package io.github.brunopacheco1.praecepta.engine.feel;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,7 +27,8 @@ public sealed interface UnaryTests {
      * comparison or an interval. Value lists of string columns and output value lists must have this form.
      */
     default Optional<List<Comparable<?>>> values() {
-        if (!(this instanceof Positive(var tests)) || !tests.stream().allMatch(Equals.class::isInstance)) {
+        if (!(this instanceof Positive(var tests))
+                || !tests.stream().allMatch(test -> test instanceof Equals(var value) && !(value instanceof Name))) {
             return Optional.empty();
         }
         return Optional.of(tests.stream().<Comparable<?>>map(test -> ((Equals) test).value()).toList());
@@ -76,6 +78,58 @@ public sealed interface UnaryTests {
      * {@code )} or {@code [} at the end.
      */
     record Range(Comparable<?> low, boolean lowClosed, Comparable<?> high, boolean highClosed) implements Test {
+    }
+
+    /** The names of the inputs a cell compares with ({@link Name}), in the order written. */
+    static List<String> names(UnaryTests cell) {
+        var tests = switch (cell) {
+            case Any any -> List.<Test>of();
+            case Positive(var positive) -> positive;
+            case Negated(var negated) -> negated;
+        };
+        var names = new ArrayList<String>();
+        for (var test : tests) {
+            switch (test) {
+                case NullTest n -> {
+                    // no value
+                }
+                case Equals(var value) -> addName(value, names);
+                case Compare(var operator, var value) -> addName(value, names);
+                case Range(var low, var lowClosed, var high, var highClosed) -> {
+                    addName(low, names);
+                    addName(high, names);
+                }
+            }
+        }
+        return names;
+    }
+
+    private static void addName(Comparable<?> value, List<String> names) {
+        if (value instanceof Name(var name)) {
+            names.add(name);
+        }
+    }
+
+    /**
+     * Whether some test compares with another input ({@link Name}) instead of a literal. Such a cell can only
+     * be decided once that input's value is known.
+     */
+    default boolean namesInputs() {
+        return !names(this).isEmpty();
+    }
+
+    /**
+     * In strict FEEL, a name where a literal could be, as in {@code > dateE} or {@code [numB..numC]}: the
+     * value of that input, known only when evaluating. It is comparable only so that it fits where literals
+     * go; names compare by their text.
+     *
+     * @param name the input's name, e.g. {@code dateE} or {@code Complex.aString}
+     */
+    record Name(String name) implements Comparable<Name> {
+        @Override
+        public int compareTo(Name other) {
+            return name.compareTo(other.name);
+        }
     }
 
     /** A comparison operator. */

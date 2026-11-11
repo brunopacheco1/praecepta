@@ -106,10 +106,9 @@ class EngineMatchesReferencePropertiesTest {
         var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of());
         for (var aggregation : AggregationOperator.values()) {
             var builder = PraeceptaEngine.<Map<String, Object>, BigDecimal>builder()
-                    .hitPolicy(HitPolicy.COLLECT)
+                    .table(s.table(s.rules(), HitPolicy.COLLECT, List.of()))
                     .aggregation(aggregation)
-                    .output(numericOutput())
-                    .rules(s.rules());
+                    .output(numericOutput());
             configure(builder, s, perColumn);
             var engine = builder.build();
             for (var input : s.inputs()) {
@@ -216,13 +215,10 @@ class EngineMatchesReferencePropertiesTest {
 
     private static PraeceptaEngine<Map<String, Object>, PraeceptaOutput> engine(DecisionTableScenario s,
             List<Praeceptum> rules, HitPolicy policy, List<String> priority, boolean perColumn) {
+        // the scenario's table: in strict FEEL when its cells name other columns; it carries the priority list
         var builder = PraeceptaEngine.<Map<String, Object>, PraeceptaOutput>builder()
-                .hitPolicy(policy)
-                .output(output -> output)
-                .rules(rules);
-        if (policy == HitPolicy.PRIORITY || policy == HitPolicy.OUTPUT_ORDER) {
-            builder.outputPriority(DecisionTableScenario.OUT, priority);
-        }
+                .table(s.table(rules, policy, priority))
+                .output(output -> output);
         configure(builder, s, perColumn);
         return builder.build();
     }

@@ -118,13 +118,16 @@ final class TckRunner {
         }
     }
 
-    /** The test case's inputs as text, by column; missing and null inputs are left out. */
+    /** The test case's inputs as text, by column and named input; missing and null inputs are left out. */
     private static Map<String, String> inputValues(Check check, DecisionTable table) {
         var values = new LinkedHashMap<String, String>();
-        for (var column : table.inputs()) {
-            var value = input(check, column.name());
+        var columns = new ArrayList<String>();
+        table.inputs().forEach(column -> columns.add(column.name()));
+        columns.addAll(table.namedInputs().keySet()); // the inputs cells compare with
+        for (var column : columns) {
+            var value = input(check, column);
             if (value != null) {
-                values.put(column.name(), value);
+                values.put(column, value);
             }
         }
         return values;

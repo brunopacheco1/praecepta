@@ -13,6 +13,7 @@ import java.time.LocalTime;
 import java.time.Period;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -108,6 +109,11 @@ public final class PraeceptaEngine<I, O> {
     private final NamedInputs[] namedInputsByBit;
     /** Whether some rule's output names an input. */
     private final boolean namesInputs;
+    /** The rule's cells that compare with another input, checked after the index; null if it has none. */
+    private final VariableCell[][] variableCellsByBit;
+    /** The rules with such cells. */
+    private final long[] variableRules;
+    private final boolean hasVariableCells;
     /** The rule's identifier, for violation messages. */
     private final Integer[] idByBit;
     /** ANY only: the mask of the rules whose outputs equal this rule's. */
@@ -126,9 +132,11 @@ public final class PraeceptaEngine<I, O> {
         var rules = List.copyOf(builder.rules);
 
         var types = columnTypes(builder, rules);
+        var cells = parseCells(rules, types, builder.feelCells);
+        // cells that compare with another input are decided when evaluating; the index sees "any value"
+        var variableCells = variableCells(rules, types, cells, builder.inputStrategy != null);
         var allowedValues = allowedValues(builder, types.keySet());
         inputs = List.copyOf(types.keySet());
-        var cells = parseCells(rules, types);
         var evaluationOrder = orderByWildcards(inputs, cells);
 
         int[] bitToRule = bitToRule(rules, builder.outputPriority);
@@ -174,7 +182,15 @@ public final class PraeceptaEngine<I, O> {
         reduce = reducer(builder.aggregation, builder.outputStrategy);
         count = builder.aggregation == AggregationOperator.COUNT ? builder.outputStrategy::count : null;
         noMatch = count == null ? List.of() : List.of(count.apply(0));
-        report = validate(index, rules, hitPolicy, builder.failOn);
+        variableCellsByBit = variableCellsByBit(variableCells, bitToRule, evaluationOrder);
+        variableRules = new long[words];
+        for (int bit = 0; bit < ruleCount; bit++) {
+            if (variableCellsByBit[bit] != null) {
+                BitsetIndex.set(variableRules, bit);
+            }
+        }
+        hasVariableCells = !BitsetIndex.isEmpty(variableRules);
+        report = validate(index, rules, hitPolicy, variableRules, builder.failOn);
     }
 
     /** Starts configuring an engine. */
@@ -203,6 +219,9 @@ public final class PraeceptaEngine<I, O> {
     @SuppressWarnings("unchecked")
     private <T> List<O> evaluate(T input, BitsetIndex.ColumnReader<T> reader) {
         long[] matches = index.match(input, reader);
+        if (matches.length != 0 && hasVariableCells && !keepVariableMatches(matches, input, reader)) {
+            return noMatch;
+        }
         if (matches.length == 0) {
             return noMatch;
         }
@@ -261,6 +280,119 @@ public final class PraeceptaEngine<I, O> {
     /** Findings of the static analysis performed at build time. */
     public ValidationReport validationReport() {
         return report;
+    }
+
+    // ---- cells that compare with another input ----------------------------------------------
+
+    /**
+     * A cell that compares with another input, as in {@code > dateE}: the column it tests and, for each
+     * input it names, that input's column; positions are in the evaluation order.
+     */
+    private record VariableCell(int column, UnaryTests cell, Map<String, Integer> names) {
+    }
+
+    /**
+     * Takes the cells that name inputs out of {@code cells}, leaving "any value" for the index, and
+     * returns them by rule (index in rule order) and column. Each named input becomes an input of the
+     * engine: bound by its own getter, or with map-based inputs, read with the type of the column that
+     * names it.
+     */
+    private static Map<Integer, Map<String, UnaryTests>> variableCells(List<Praeceptum> rules, Map<String, ColumnType> types,
+            Map<String, List<UnaryTests>> cells, boolean mapInputs) {
+        var byRule = new LinkedHashMap<Integer, Map<String, UnaryTests>>();
+        var named = new LinkedHashMap<String, ColumnType>();
+        for (var column : List.copyOf(cells.keySet())) {
+            var columnCells = new ArrayList<>(cells.get(column));
+            for (int r = 0; r < columnCells.size(); r++) {
+                var cell = columnCells.get(r);
+                if (!cell.namesInputs()) {
+                    continue;
+                }
+                nameInputs(rules.get(r), column, cell, types, named, mapInputs);
+                byRule.computeIfAbsent(r, any -> new LinkedHashMap<>()).put(column, cell);
+                columnCells.set(r, new UnaryTests.Any());
+            }
+            cells.put(column, List.copyOf(columnCells));
+        }
+        named.forEach((name, type) -> {
+            if (types.putIfAbsent(name, type) == null) {
+                cells.put(name, Collections.nCopies(rules.size(), new UnaryTests.Any()));
+            }
+        });
+        return byRule;
+    }
+
+    /**
+     * Adds to {@code named} the inputs {@code cell} compares with, checked: each has an input binding
+     * (or inputs are maps) and the type of {@code column}.
+     */
+    private static void nameInputs(Praeceptum rule, String column, UnaryTests cell, Map<String, ColumnType> types,
+            Map<String, ColumnType> named, boolean mapInputs) {
+        var type = types.get(column);
+        for (var name : UnaryTests.names(cell)) {
+            var known = types.containsKey(name) ? types.get(name) : named.get(name);
+            if (known == null && !mapInputs) {
+                throw new InvalidDecisionTableException("Rule %s, column '%s': compares with '%s', which has no input binding"
+                        .formatted(rule.priority(), column, name));
+            }
+            if (known != null && known != type) {
+                throw new InvalidDecisionTableException("Rule %s, column '%s': compares a %s with '%s', a %s"
+                        .formatted(rule.priority(), column, type.feelName(), name, known.feelName()));
+            }
+            named.putIfAbsent(name, type);
+        }
+    }
+
+    /** The variable cells by bit, with columns as positions in the evaluation order; null for rules without any. */
+    private static VariableCell[][] variableCellsByBit(Map<Integer, Map<String, UnaryTests>> byRule, int[] bitToRule,
+            List<String> evaluationOrder) {
+        var byBit = new VariableCell[bitToRule.length][];
+        for (int bit = 0; bit < bitToRule.length; bit++) {
+            var ruleCells = byRule.get(bitToRule[bit]);
+            if (ruleCells == null) {
+                continue;
+            }
+            byBit[bit] = ruleCells.entrySet().stream()
+                    .map(cell -> {
+                        var names = new LinkedHashMap<String, Integer>();
+                        UnaryTests.names(cell.getValue()).forEach(name -> names.put(name, evaluationOrder.indexOf(name)));
+                        return new VariableCell(evaluationOrder.indexOf(cell.getKey()), cell.getValue(), Map.copyOf(names));
+                    })
+                    .toArray(VariableCell[]::new);
+        }
+        return byBit;
+    }
+
+    /**
+     * Clears the matches whose cells that compare with other inputs fail for this input.
+     *
+     * @return whether a match is left
+     */
+    private <T> boolean keepVariableMatches(long[] matches, T input, BitsetIndex.ColumnReader<T> reader) {
+        boolean any = false;
+        for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
+            var cells = variableCellsByBit[bit];
+            if (cells != null && !acceptsAll(cells, input, reader)) {
+                matches[bit >>> 6] &= ~(1L << bit);
+            } else {
+                any = true;
+            }
+        }
+        return any;
+    }
+
+    private <T> boolean acceptsAll(VariableCell[] cells, T input, BitsetIndex.ColumnReader<T> reader) {
+        for (var cell : cells) {
+            var value = valueOf(cell.column(), input, reader);
+            if (!VariableCells.accepts(cell.cell(), value, name -> valueOf(cell.names().get(name), input, reader))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private <T> Object valueOf(int column, T input, BitsetIndex.ColumnReader<T> reader) {
+        return index.column(column).value(reader.read(input, column));
     }
 
     // ---- outputs that name an input --------------------------------------------------------
@@ -499,16 +631,17 @@ public final class PraeceptaEngine<I, O> {
         }
     }
 
-    /** Parsed cells per column, in rule order. */
-    private static Map<String, List<UnaryTests>> parseCells(List<Praeceptum> rules, Map<String, ColumnType> types) {
+    /** Parsed cells per column, in rule order: strict FEEL for a DMN table, else Praecepta's syntax. */
+    private static Map<String, List<UnaryTests>> parseCells(List<Praeceptum> rules, Map<String, ColumnType> types, boolean feel) {
         var cells = new LinkedHashMap<String, List<UnaryTests>>();
-        types.forEach((column, type) -> cells.put(column, rules.stream().map(rule -> parseCell(rule, column, type)).toList()));
+        types.forEach((column, type) -> cells.put(column, rules.stream().map(rule -> parseCell(rule, column, type, feel)).toList()));
         return cells;
     }
 
-    private static UnaryTests parseCell(Praeceptum rule, String column, ColumnType type) {
+    private static UnaryTests parseCell(Praeceptum rule, String column, ColumnType type, boolean feel) {
         try {
-            return CellParser.parse(rule.input().values().get(column), type);
+            var cell = rule.input().values().get(column);
+            return feel ? CellParser.parseFeel(cell, type) : CellParser.parse(cell, type);
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException("Rule %s, column '%s': %s".formatted(rule.priority(), column, e.getMessage()));
         }
@@ -582,8 +715,9 @@ public final class PraeceptaEngine<I, O> {
      * Runs the static analysis, most severe findings first. Fails if a finding is at least as severe
      * as {@code failOn}; otherwise logs the findings as a warning.
      */
-    private static ValidationReport validate(BitsetIndex index, List<Praeceptum> rules, HitPolicy hitPolicy, Severity failOn) {
-        var report = new ValidationReport(TableAnalysis.analyse(index, rules, hitPolicy).stream()
+    private static ValidationReport validate(BitsetIndex index, List<Praeceptum> rules, HitPolicy hitPolicy, long[] variableRules,
+            Severity failOn) {
+        var report = new ValidationReport(TableAnalysis.analyse(index, rules, hitPolicy, variableRules).stream()
                 .sorted(Comparator.comparing(Issue::severity).reversed())
                 .toList());
         if (failOn != null && report.hasIssuesAtLeast(failOn)) {
@@ -616,6 +750,8 @@ public final class PraeceptaEngine<I, O> {
         private final Map<String, String> allowedValues = new LinkedHashMap<>();
         /** Column types of a {@link #table(DecisionTable)}, checked against the bindings. */
         private Map<String, ColumnType> tableTypes;
+        /** Whether the rules' cells are strict FEEL, as a DMN table's are. */
+        private boolean feelCells;
 
         private OutputStrategy<O> outputStrategy;
         private final Map<String, List<String>> outputPriority = new LinkedHashMap<>();
@@ -645,6 +781,7 @@ public final class PraeceptaEngine<I, O> {
                 }
             }
             tableTypes = types;
+            feelCells = table.feelCells();
             if (usesOutputPriority(table.hitPolicy())) {
                 for (var output : table.outputs()) {
                     if (!output.values().isEmpty()) {

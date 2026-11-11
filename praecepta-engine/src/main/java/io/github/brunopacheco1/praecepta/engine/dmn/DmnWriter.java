@@ -123,7 +123,7 @@ public final class DmnWriter {
         xml.append("      <input").append(id("input_" + c)).append(attribute("label", input.name())).append(">\n");
         expression(xml, "inputExpression", id("input_expression_" + c) + typed(input.type()), input.name());
         if (input.allowedValues() != null) {
-            var values = standardFeel(input.allowedValues(), input.type(), "input values of column '" + input.name() + "'");
+            var values = standardFeel(input.allowedValues(), input.type(), false, "input values of column '" + input.name() + "'");
             expression(xml, "inputValues", id("input_values_" + c), values);
         }
         xml.append("      </input>\n");
@@ -150,7 +150,8 @@ public final class DmnWriter {
         var inputs = table.inputs();
         for (int c = 0; c < inputs.size(); c++) {
             var input = inputs.get(c);
-            var cell = standardFeel(rule.input().values().get(input.name()), input.type(), where + ", column '" + input.name() + "'");
+            var text = rule.input().values().get(input.name());
+            var cell = standardFeel(text, input.type(), table.feelCells(), where + ", column '" + input.name() + "'");
             expression(xml, "inputEntry", id("input_entry_" + r + "_" + c), cell);
         }
         var outputs = table.outputs();
@@ -182,10 +183,10 @@ public final class DmnWriter {
 
     // ---- cells and values as FEEL ----------------------------------------------------------------
 
-    /** A cell in Praecepta's syntax, as standard FEEL. */
-    private static String standardFeel(String cell, ColumnType type, String where) {
+    /** A cell in Praecepta's syntax, or already strict FEEL (a DMN table's), as standard FEEL. */
+    private static String standardFeel(String cell, ColumnType type, boolean feel, String where) {
         try {
-            return render(CellParser.parse(cell, type));
+            return render(feel ? CellParser.parseFeel(cell, type) : CellParser.parse(cell, type));
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }
@@ -198,11 +199,16 @@ public final class DmnWriter {
     private static String test(Test test) {
         return switch (test) {
             case NullTest() -> "null";
-            case Equals(var value) -> FeelLiterals.literal(value);
-            case Compare(var operator, var value) -> operator.symbol() + " " + FeelLiterals.literal(value);
-            case Range(var low, var lowClosed, var high, var highClosed) -> (lowClosed ? "[" : "(") + FeelLiterals.literal(low) + ".."
-                    + FeelLiterals.literal(high) + (highClosed ? "]" : ")");
+            case Equals(var value) -> literal(value);
+            case Compare(var operator, var value) -> operator.symbol() + " " + literal(value);
+            case Range(var low, var lowClosed, var high, var highClosed) -> (lowClosed ? "[" : "(") + literal(low) + ".."
+                    + literal(high) + (highClosed ? "]" : ")");
         };
+    }
+
+    /** A value as FEEL writes it: a literal, or the bare name of another input. */
+    private static String literal(Comparable<?> value) {
+        return value instanceof UnaryTests.Name(var name) ? name : FeelLiterals.literal(value);
     }
 
     /** An output value (plain text) as a FEEL literal of its column type. */
