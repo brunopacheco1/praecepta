@@ -34,8 +34,8 @@ import net.jqwik.api.Provide;
 /**
  * Random typed tables survive a DMN round trip: written by {@link DmnWriter}, read back by
  * {@link DmnReader} and loaded with {@code Builder#table}, they evaluate exactly as the reference
- * evaluates the original rules, under every hit policy. Writing is also stable: a table read back
- * writes the same XML.
+ * evaluates the original rules, under every hit policy, with the outputs' default values when no rule
+ * matches. Writing is also stable: a table read back writes the same XML.
  */
 class DmnRoundTripPropertiesTest {
 
@@ -91,6 +91,7 @@ class DmnRoundTripPropertiesTest {
 
         Assertions.assertThat(DmnWriter.write(read)).as("writing is stable").isEqualTo(xml);
         Assertions.assertThat(read.hitPolicy()).isEqualTo(policy);
+        Assertions.assertThat(read.outputs()).as("outputs, with their value lists and defaults").isEqualTo(original.outputs());
         Assertions.assertThat(read.listInputs()).as("list inputs").isEqualTo(s.lists());
         Assertions.assertThat(read.inputs()).extracting(DecisionTable.InputColumn::name, DecisionTable.InputColumn::type)
                 .containsExactlyElementsOf(original.inputs().stream()
@@ -103,7 +104,8 @@ class DmnRoundTripPropertiesTest {
         s.applyMaskForm(builder);
         var engine = builder.build();
 
-        var reference = s.reference(rules, policy, DecisionTableScenario.outputPriority(policy, priority));
+        var outputs = original.outputs().stream().map(DecisionTable.OutputColumn::name).toList();
+        var reference = s.reference(rules, policy, DecisionTableScenario.outputPriority(policy, priority), true, outputs);
         for (var input : s.inputs()) {
             switch (reference.evaluate(input)) {
                 case Outcome.Hits hits -> Assertions.assertThat(engine.evaluate(input))
@@ -123,16 +125,17 @@ class DmnRoundTripPropertiesTest {
         var inputs = s.columns().stream()
                 .map(column -> new DecisionTable.InputColumn(column, s.types().get(column), s.allowedValues().get(column)))
                 .toList();
+        // each with the scenario's default value, if it has one
         var outputs = new ArrayList<DecisionTable.OutputColumn>();
         if (policy != HitPolicy.ANY) {
-            outputs.add(new DecisionTable.OutputColumn(DecisionTableScenario.ID, ColumnType.STRING));
+            outputs.add(s.output(DecisionTableScenario.ID, ColumnType.STRING, List.of()));
         }
-        outputs.add(new DecisionTable.OutputColumn(DecisionTableScenario.OUT, ColumnType.STRING, priority));
+        outputs.add(s.output(DecisionTableScenario.OUT, ColumnType.STRING, priority));
         if (policy != HitPolicy.ANY) {
-            outputs.add(new DecisionTable.OutputColumn(DecisionTableScenario.NUMBER, ColumnType.NUMBER));
+            outputs.add(s.output(DecisionTableScenario.NUMBER, ColumnType.NUMBER, List.of()));
         }
         // a string output, which takes the value of any input it names
-        outputs.add(new DecisionTable.OutputColumn(DecisionTableScenario.ECHO, ColumnType.STRING));
+        outputs.add(s.output(DecisionTableScenario.ECHO, ColumnType.STRING, List.of()));
         return new DecisionTable("round_trip", policy, null, inputs, outputs, rules, s.feelCells(), s.lists());
     }
 }

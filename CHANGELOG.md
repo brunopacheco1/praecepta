@@ -32,12 +32,18 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 - `DmnReader.readAll(InputStream)` reads every decision table of a DMN model, in document order.
 - `feel.FeelStrings.compare(String, String)`: FEEL's order of strings, by code point (see *Fixed*,
   [#83](https://github.com/brunopacheco1/praecepta/issues/83)).
+- `PraeceptaEngine.Builder.defaultOutput(PraeceptaOutput)`, `DecisionTable.defaultOutput()` and
+  `DecisionTable.OutputColumn.defaultValue()`: the output when no rule matches (see *Fixed*,
+  [#79](https://github.com/brunopacheco1/praecepta/issues/79)).
 
 ### Changed
 - The release publishes every module but the benchmarks and the TCK runner, found by the build rather
   than listed, so new modules need no change to the release, the SBOM checks or the website. Rebuilding a
   release from 0.5.0 on uses `-pl '!praecepta-benchmarks,!praecepta-tck'` (see
   [docs/RELEASING.md](docs/RELEASING.md)).
+- `DecisionTable.OutputColumn` has a fourth component, `defaultValue`
+  ([#79](https://github.com/brunopacheco1/praecepta/issues/79)). Its constructors with two and three
+  arguments remain; a record pattern that deconstructs it needs the new component.
 
 ### Fixed
 - **String literals in cells read FEEL's escape sequences** ([#80](https://github.com/brunopacheco1/praecepta/issues/80)):
@@ -58,6 +64,23 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `< "～"` (U+FF5E) matched `"🐎"` (U+1F40E), and `["～".."🐎"]` was rejected as starting after it ended.
   The new `feel.FeelStrings.compare` orders strings by code point; the index, the validation report's
   examples and `FeelTemporals.compare` use it. Other strings compare as before.
+- **Default output values** ([#79](https://github.com/brunopacheco1/praecepta/issues/79)): `DmnReader`
+  read an output's value list but skipped its `defaultOutputEntry`, so a table that declares a default gave
+  no output when no rule matched, with no warning. DMN 1.5 says the default is then the result (8.2.12;
+  Table 34; 10.3.2.10, step 2: "if a default output value d is specified, DTI=FEEL(d)"), which applies
+  before the hit policy and any aggregation. The engine now returns that default output, converted once
+  when it is built: alone under every hit policy, as the one element of a multi-hit result, and as the
+  result of a COLLECT aggregation, COUNT included (`[Status=Declined, Rate=Standard]` for the TCK's
+  `0108-first-hitpolicy`, rather than `[]`). An output without a default is null in it. Tables without
+  defaults behave as before. `DecisionTable.OutputColumn` gains `defaultValue` (plain text, like a rule's
+  output; the three-argument constructor keeps none), so a record pattern over it needs the new component;
+  `DecisionTable.defaultOutput()` builds the output, and `PraeceptaEngine.Builder.defaultOutput(PraeceptaOutput)`
+  sets one for a table built in code (`table(...)` takes the table's). `DmnReader` reads defaults that are
+  literals of the output's type (`null` is no default) and rejects any other default naming the decision and
+  output, and `DmnWriter` writes them back. The Maven plugin generates the same classes; a DMN table's
+  default reaches its `evaluate`, whose Javadoc then says so, and a time or date-time default counts when
+  deciding whether the output's component has a time zone. Gaps are still reported for a table with a
+  default, since no rule covers them.
 
 ## [0.4.0] - 2026-11-11
 

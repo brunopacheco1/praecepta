@@ -109,7 +109,11 @@ An engine is **immutable** once built: any number of threads may share it withou
 
 ## DMN
 - `DmnReader` reads DMN 1.1 to 1.5 (as written by Camunda Modeler, Drools, Trisotech and
-  `DmnWriter`) into a `DecisionTable`: hit policy, aggregation, column types, value lists and rules.
+  `DmnWriter`) into a `DecisionTable`: hit policy, aggregation, column types, value lists, default
+  output values and rules. A table's default output (`DecisionTable.defaultOutput`, from each output's
+  `defaultOutputEntry`) is converted once when the engine is built and returned when no rule matches,
+  before the hit policy or the aggregation is applied (DMN 1.5, 10.3.2.10), so it costs nothing at
+  evaluation.
   It uses the JDK's XML parser with DTDs and external entities disabled. Anything it does not
   support (a time with a zone id, function calls, inputs computed by other decisions) is rejected
   with an error naming the decision, rule and column. Output entries may be expressions of

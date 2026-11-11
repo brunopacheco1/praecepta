@@ -133,6 +133,51 @@ class TableCompilerTest {
         }
     }
 
+    /** DMN 1.5, 10.3.2.10: when no rule matches, the table gives its default output values (#79). */
+    @Test
+    void a_dmn_tables_default_output_is_what_the_generated_class_gives_when_no_rule_matches() throws Exception {
+        var config = new TableDefinition(table("approvals.dmn"), "Approvals", null, null, null, List.of(), List.of());
+        var result = compile(config, PACKAGE, Severity.ERROR);
+        // the default's time has a zone, as the rules' have, so the component is an OffsetTime
+        Assertions.assertThat(result.sources().get("ApprovalsOutput"))
+                .contains("public record ApprovalsOutput(String status, String rate, java.time.OffsetTime until)");
+        Assertions.assertThat(result.sources().get("Approvals"))
+                .contains("@return the outputs of every matching rule, in hit-policy order; the table's default output alone if no rule matches");
+        Assertions.assertThat(result.dmn())
+                .contains("<defaultOutputEntry id=\"output_default_0\"><text>\"declined\"</text></defaultOutputEntry>")
+                .contains("<defaultOutputEntry id=\"output_default_2\"><text>time(\"17:00:00Z\")</text></defaultOutputEntry>");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".ApprovalsInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Approvals").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            Assertions.assertThat((List<?>) evaluate.invoke(null, constructor.newInstance(new BigDecimal(500))))
+                    .hasToString("[ApprovalsOutput[status=declined, rate=null, until=17:00Z]]");
+            Assertions.assertThat((List<?>) evaluate.invoke(null, constructor.newInstance(new BigDecimal(650))))
+                    .hasToString("[ApprovalsOutput[status=approved, rate=standard, until=null]]");
+        }
+    }
+
+    @Test
+    void a_default_output_without_a_zone_beside_rule_outputs_with_one_is_rejected() throws Exception {
+        var mixed = out.resolve("mixed-default.dmn");
+        Files.writeString(mixed, Files.readString(table("approvals.dmn")).replace("time(\"17:00:00Z\")", "time(\"17:00:00\")"));
+        var config = new TableDefinition(mixed, "Approvals", null, null, null, List.of(), List.of());
+        Assertions.assertThatThrownBy(() -> compile(config, PACKAGE, Severity.ERROR))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Table 'approvals': output 'until' takes time values both with and without a time zone, "
+                        + "but its generated record component holds one kind");
+    }
+
+    @Test
+    void a_single_hit_table_with_a_default_says_so_in_its_evaluate_method() throws Exception {
+        var first = out.resolve("first.dmn");
+        Files.writeString(first, Files.readString(table("approvals.dmn")).replace("RULE ORDER", "FIRST"));
+        var result = compile(new TableDefinition(first, "Approvals", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("Approvals"))
+                .contains("@return the selected output, or the table's default output if no rule matches");
+    }
+
     @Test
     void list_columns_become_lists_matched_element_by_element() throws Exception {
         var config = new TableDefinition(table("nationalities.csv"), "Offer", null, HitPolicy.FIRST, null,

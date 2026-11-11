@@ -107,6 +107,23 @@ class DecisionsTest {
                 .containsExactly(Map.of("total", "1234567890123456789012345678901235"));
     }
 
+    /** DMN 1.5, 10.3.2.10: a table's default output values are its result when no rule matches (#79). */
+    @Test
+    void a_tables_default_output_is_the_one_map_when_no_rule_matches() {
+        var table = DmnReader.readAll(stream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="fee" name="Fee"><decisionTable hitPolicy="COLLECT" aggregation="SUM">
+                    <input><inputExpression typeRef="string"><text>zone</text></inputExpression></input>
+                    <output name="fee" typeRef="number"><defaultOutputEntry><text>9.90</text></defaultOutputEntry></output>
+                    <rule><inputEntry><text>"islands"</text></inputEntry><outputEntry><text>12.5</text></outputEntry></rule>
+                    <rule><inputEntry><text>"islands"</text></inputEntry><outputEntry><text>5</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""")).getFirst();
+        var engine = Decision.of("fee", table).engine();
+        Assertions.assertThat(engine.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("fee", "17.5"));
+        Assertions.assertThat(engine.evaluate(Map.of("zone", "mainland"))).containsExactly(Map.of("fee", "9.90"));
+    }
+
     @Test
     void outputs_that_are_missing_map_to_null() {
         var table = DmnReader.readAll(stream("""

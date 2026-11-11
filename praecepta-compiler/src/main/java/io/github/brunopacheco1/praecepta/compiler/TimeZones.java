@@ -30,7 +30,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * list) all have one and there is at least one; for an input that holds lists, its elements do. Inputs that cells compare ({@code > other}) take the
  * same kind, so that they are compared as written (two values with a zone by instant, two without by local time),
  * and the inputs linked by such cells are decided together;</li>
- * <li>an output has values with a zone when its literal values all have one and so do the inputs its
+ * <li>an output has values with a zone when its literal values (its default value included) all have one and so do the inputs its
  * rules name, and there is at least one of them.</li>
  * </ul>
  * A column, or a group of linked inputs, whose literals mix the two kinds is rejected: FEEL compares a value with
@@ -114,9 +114,15 @@ final class TimeZones {
         return zoned;
     }
 
-    /** The kinds of the values the rules give a time or date-time output: those of the inputs they name, and of their literals. */
+    /**
+     * The kinds of the values a time or date-time output takes: those of the inputs the rules name, of the rules'
+     * literals, and of the output's default value.
+     */
     private static Set<Kind> outputKinds(DecisionTable table, DecisionTable.OutputColumn output, Set<String> zonedInputs) {
         var kinds = EnumSet.noneOf(Kind.class);
+        if (output.defaultValue() != null) {
+            kinds.add(kind(parse(output.defaultValue(), output.type(), table, output.name())));
+        }
         for (var rule : table.rules()) {
             var input = rule.output().references().get(output.name());
             var text = rule.output().values().get(output.name());

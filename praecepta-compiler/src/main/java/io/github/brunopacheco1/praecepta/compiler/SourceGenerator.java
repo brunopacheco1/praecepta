@@ -146,7 +146,7 @@ final class SourceGenerator {
     /** {@code evaluate} of a table that selects one output: a single-hit policy, or an aggregation. */
     private static final String EVALUATE_ONE = """
                 /**
-                 * @return the selected output, or empty if no rule matches
+                 * @return the selected output, or ${noMatch} if no rule matches
                  * @throws io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException if the hit policy is violated
                  * @throws io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException if a value is outside its column's value list
                  */
@@ -159,7 +159,7 @@ final class SourceGenerator {
     /** {@code evaluate} of a table that returns the outputs of every matching rule. */
     private static final String EVALUATE_ALL = """
                 /**
-                 * @return the outputs of every matching rule, in hit-policy order; empty if no rule matches
+                 * @return the outputs of every matching rule, in hit-policy order; ${noMatch} if no rule matches
                  * @throws io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException if a value is outside its column's value list
                  */
                 public static java.util.List<${Output}> evaluate(${Input} input) {
@@ -336,9 +336,20 @@ final class SourceGenerator {
                 "source", javadoc(sourceFile),
                 "generator", javadoc(generator),
                 "resource", stringLiteral(className + ".dmn"),
-                "evaluate", fill(singleResult ? EVALUATE_ONE : EVALUATE_ALL, Map.of()),
+                "evaluate", fill(singleResult ? EVALUATE_ONE : EVALUATE_ALL, Map.of("noMatch", noMatch(singleResult))),
                 "bindings", bindings.toString(),
                 "outputStrategy", outputStrategy()));
+    }
+
+    /**
+     * What {@code evaluate} gives when no rule matches: nothing, or the table's default output (DMN's default
+     * output values), which the engine gives whatever the hit policy.
+     */
+    private String noMatch(boolean singleResult) {
+        if (table.defaultOutput().isEmpty()) {
+            return "empty";
+        }
+        return singleResult ? "the table's default output" : "the table's default output alone";
     }
 
     /**

@@ -58,7 +58,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * entries test the elements ({@code list contains(?, "PT")}, see {@link CellParser#parseFeelList}), and
  * named inputs whose {@code inputData} is such a collection (see {@link DecisionTable#listInputs}); input
  * entries in Praecepta's FEEL subset (lists, {@code not(...)}, {@code null}, comparisons, intervals, {@code -}); input and output value
- * lists; output entries that are literals or name one of the table's inputs (of the output's type, or
+ * lists; outputs' default values ({@code defaultOutputEntry}, see {@link DecisionTable#defaultOutput}) that are
+ * literals; output entries that are literals or name one of the table's inputs (of the output's type, or
  * any input for a string output; an input is a column or an input the cells compare with, and holds single
  * values), or that join string and number literals and the table's inputs with
  * {@code +}, {@code -}, {@code *}, {@code /} and {@code **} ({@link OutputExpression}, kept as written in
@@ -297,13 +298,33 @@ public final class DmnReader {
                     .formatted(outputWhere, output.getAttribute(TYPE_REF)));
         }
         var type = resolved.columnType();
+        var defaultValue = defaultValue(output, type, outputWhere);
         var valueList = nonBlankText(output, "outputValues");
         if (valueList == null) {
-            return new OutputColumn(column, type, List.of());
+            return new OutputColumn(column, type, List.of(), defaultValue);
         }
         var values = parseCell(valueList, type, outputWhere + " value list").values()
                 .orElseThrow(() -> new InvalidDecisionTableException(outputWhere + ": the output value list must be a list of values"));
-        return new OutputColumn(column, type, values.stream().map(FeelLiterals::text).toList());
+        return new OutputColumn(column, type, values.stream().map(FeelLiterals::text).toList(), defaultValue);
+    }
+
+    /**
+     * An output's default value ({@code defaultOutputEntry}), the value when no rule matches, as plain text like
+     * a literal output entry; null if it has none, or if it is {@code null}, which is what having none gives
+     * (DMN 1.5, 10.3.2.10). It must be a literal of the output's type: a default that names an input or
+     * computes a value is rejected, since the engine gives the default without evaluating anything.
+     */
+    private static String defaultValue(Element output, ColumnType type, String where) {
+        var text = nonBlankText(output, "defaultOutputEntry");
+        if (text == null) {
+            return null;
+        }
+        var literal = literalOutput(text, type);
+        if (literal == null) {
+            throw new InvalidDecisionTableException("%s: default output '%s' is not supported; a default output must be a literal %s"
+                    .formatted(where, text.strip(), type.feelName()));
+        }
+        return literal.text();
     }
 
     /**

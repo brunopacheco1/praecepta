@@ -271,7 +271,10 @@ compute their value from literals and inputs with `+`, `-`, `*`, `/`, `**` and p
 (`Symptom + " is listed"`, `(price - discount) * 1.2`, `amount * (1 + rate) ** years`: `+` joins strings
 or adds numbers, results have FEEL's 34 digits, and a missing operand gives a missing output), where an input is a column or an input the cells compare with that
 holds single values; times and date-times with or without a time zone; every hit policy,
-with SUM, MIN, MAX and COUNT aggregation. Anything else (a time with a zone id, function calls such
+with SUM, MIN, MAX and COUNT aggregation; default output values (`defaultOutputEntry`, literals of the
+output's type), which are the result when no rule matches, whatever the hit policy or aggregation
+(`[{Status=Declined, Rate=null}]` rather than `[]`; an output without a default is null in it).
+`Builder.defaultOutput(...)` gives a table built in code the same. Anything else (a time with a zone id, function calls such
 as `upper case(a)`, `if`, inputs computed by other decisions) is rejected with a message naming the
 decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
 evaluate identically, which is how the benchmarks feed them.
@@ -347,7 +350,9 @@ needs only `praecepta-engine`; Apache POI stays a build-time dependency.
 Optional<DiscountOutput> discount = Discount.evaluate(new DiscountInput(DiscountInput.Country.PT, new BigDecimal(30)));
 ```
 
-Single-hit tables (and aggregations) return an `Optional`; multi-hit tables return a `List`.
+Single-hit tables (and aggregations) return an `Optional`; multi-hit tables return a `List`. When no
+rule matches, these are empty, unless the DMN table declares default output values: then they hold the
+default output.
 Generated code belongs to your project, so it carries no Praecepta licence header. Set
 `<fileHeader>` to prepend your own, such as your project's SPDX lines.
 `Discount.validationReport()` gives the build-time findings, and `Discount.engine()` the engine.

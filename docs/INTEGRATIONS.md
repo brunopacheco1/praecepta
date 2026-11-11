@@ -116,7 +116,9 @@ integration does:
   is a missing input. Each output map holds one matching rule's outputs (a missing computed output maps to
   null), in the hit policy's order. Under a COLLECT aggregation (one NUMBER output, as the build plugins
   require), the one map holds the aggregate: SUM adds with FEEL's 34 digits, MIN and MAX return the
-  rule's output as written, missing values are skipped, COUNT is the number of matches.
+  rule's output as written, missing values are skipped, COUNT is the number of matches. When no rule
+  matches, a table whose outputs declare default values (`defaultOutputEntry`) gives one map of them, null
+  for an output without one, whatever its hit policy or aggregation (DMN 1.5, 10.3.2.10).
 - **Typed records stay a build-time feature.** The classes the Maven and Gradle plugins generate are
   static (`Discount.evaluate(...)`, `Discount.engine()`) and need no container; an application that wants
   one injected declares it as a bean itself. Integrations do not scan for generated classes. The DMN

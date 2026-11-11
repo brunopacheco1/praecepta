@@ -74,13 +74,17 @@ import net.jqwik.api.Tuple;
  * in four is an output expression over a string or number column (or over literals), and is otherwise
  * {@code "a"}, a value a string input may also have.
  *
+ * <p>Half of the scenarios declare default output values ({@link #defaults}) for some of those outputs,
+ * which the table returns when no rule matches.
+ *
  * @param zonedColumns the time and date-time columns whose inputs have a time zone
  * @param lists        the columns that hold lists
  * @param maskForm     the form the engine stores its masks in
+ * @param defaults     the default value of each output that has one (DMN's {@code defaultOutputEntry}); empty for none
  */
 public record DecisionTableScenario(List<String> columns, Map<String, ColumnType> types, Map<String, String> allowedValues,
         List<Praeceptum> rules, List<Map<String, Object>> inputs, boolean feelCells, Set<String> zonedColumns,
-        Set<String> lists, ForcedMaskForm maskForm) {
+        Set<String> lists, ForcedMaskForm maskForm, Map<String, String> defaults) {
 
     public static final String ID = "id";
     public static final String OUT = "out";
@@ -182,7 +186,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             rewritten.add(new Praeceptum(rule.priority(), new PraeceptaInput(cells), rule.output()));
         }
         return new DecisionTableScenario(columns, types, allowedValues, List.copyOf(rewritten), inputs, true, zonedColumns, lists,
-                maskForm);
+                maskForm, defaults);
     }
 
     private String variableCell(ColumnType type, int r, int c) {
@@ -194,15 +198,57 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         return forms.get((r / 3 + c) % forms.size());
     }
 
-    /** The scenario's table, for {@code PraeceptaEngine.Builder#table}: its outputs carry {@code priority} for {@link #OUT}. */
+    /**
+     * The scenario's table, for {@code PraeceptaEngine.Builder#table}: its outputs carry {@code priority} for
+     * {@link #OUT}, and their {@link #defaults}.
+     */
     public DecisionTable table(List<Praeceptum> tableRules, HitPolicy policy, List<String> priority) {
         var inputColumns = columns.stream()
                 .map(column -> new DecisionTable.InputColumn(column, types.get(column), allowedValues.get(column)))
                 .toList();
-        var outputs = List.of(new DecisionTable.OutputColumn(ID, ColumnType.STRING),
-                new DecisionTable.OutputColumn(OUT, ColumnType.STRING, outputPriority(policy, priority).getOrDefault(OUT, List.of())),
-                new DecisionTable.OutputColumn(NUMBER, ColumnType.NUMBER), new DecisionTable.OutputColumn(ECHO, ColumnType.STRING));
+        var outputs = List.of(output(ID, ColumnType.STRING, List.of()),
+                output(OUT, ColumnType.STRING, outputPriority(policy, priority).getOrDefault(OUT, List.of())),
+                output(NUMBER, ColumnType.NUMBER, List.of()), output(ECHO, ColumnType.STRING, List.of()));
         return new DecisionTable("scenario", policy, null, inputColumns, outputs, tableRules, feelCells, lists);
+    }
+
+    /** An output column with its value list and its default value, if the scenario gives it one. */
+    public DecisionTable.OutputColumn output(String name, ColumnType type, List<String> values) {
+        return new DecisionTable.OutputColumn(name, type, values, defaults.get(name));
+    }
+
+    /**
+     * The output when no rule matches, for a table with these outputs, as DMN 1.5 has it (10.3.2.10, step 2):
+     * each output's default, null for one without; null, no output at all, if none has a default.
+     */
+    public PraeceptaOutput defaultOutput(List<String> outputs) {
+        if (outputs.stream().noneMatch(defaults::containsKey)) {
+            return null;
+        }
+        var values = new HashMap<String, String>();
+        outputs.forEach(output -> values.put(output, defaults.get(output)));
+        return new PraeceptaOutput(values);
+    }
+
+    /** No default output one time in two; otherwise one for some of the outputs. */
+    private static Arbitrary<Map<String, String>> defaultValues() {
+        var some = Combinators.combine(Arbitraries.integers().between(1, 15), Arbitraries.of(OUT_VALUES)).as((outputs, out) -> {
+            var defaults = new HashMap<String, String>();
+            if ((outputs & 1) != 0) {
+                defaults.put(ID, "0");
+            }
+            if ((outputs & 2) != 0) {
+                defaults.put(OUT, out);
+            }
+            if ((outputs & 4) != 0) {
+                defaults.put(NUMBER, "1.50");
+            }
+            if ((outputs & 8) != 0) {
+                defaults.put(ECHO, "none");
+            }
+            return Map.copyOf(defaults);
+        });
+        return Arbitraries.oneOf(Arbitraries.just(Map.<String, String>of()), some);
     }
 
     /** Scenarios where every string column declares its input values, so gaps are analysed. */
@@ -236,7 +282,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             var rules = rule(columns).list().ofMinSize(1).ofMaxSize(maxRules);
             var inputs = input(columns).list().ofMinSize(1).ofMaxSize(12);
             var forms = Arbitraries.of(ForcedMaskForm.values());
-            return Combinators.combine(rules, inputs, forms).as((ruleRows, inputRows, form) -> build(columns, ruleRows, inputRows, form));
+            return Combinators.combine(rules, inputs, forms, defaultValues())
+                    .as((ruleRows, inputRows, form, defaults) -> build(columns, ruleRows, inputRows, form, defaults));
         });
     }
 
@@ -550,7 +597,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     }
 
     private static DecisionTableScenario build(List<Column> columns, List<RuleRow> ruleRows, List<List<Object>> inputRows,
-            ForcedMaskForm maskForm) {
+            ForcedMaskForm maskForm, Map<String, String> defaults) {
         var names = new ArrayList<String>();
         var types = new LinkedHashMap<String, ColumnType>();
         var allowed = new LinkedHashMap<String, String>();
@@ -604,7 +651,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             inputs.add(input);
         }
         return new DecisionTableScenario(List.copyOf(names), Map.copyOf(types), Map.copyOf(allowed), List.copyOf(rules), List.copyOf(inputs),
-                false, Set.copyOf(zoned), Set.copyOf(lists), maskForm);
+                false, Set.copyOf(zoned), Set.copyOf(lists), maskForm, defaults);
     }
 
     /** Makes the builder store its masks in the scenario's form. */
@@ -663,12 +710,19 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
      */
     public ReferenceMatcher reference(List<Praeceptum> tableRules, HitPolicy policy, Map<String, List<String>> outputPriority,
             boolean perColumn) {
-        return new ReferenceMatcher(tableRules, policy, outputPriority, types, allowedValues, feelCells, zonedColumns, lists, !perColumn);
+        return reference(tableRules, policy, outputPriority, perColumn, List.of(ID, OUT, NUMBER, ECHO));
+    }
+
+    /** @param outputs the table's outputs, as {@link #table} has them unless a test builds its own table */
+    public ReferenceMatcher reference(List<Praeceptum> tableRules, HitPolicy policy, Map<String, List<String>> outputPriority,
+            boolean perColumn, List<String> outputs) {
+        return new ReferenceMatcher(tableRules, policy, outputPriority, types, allowedValues, feelCells, zonedColumns, lists, !perColumn,
+                defaultOutput(outputs));
     }
 
     /** This scenario with its masks stored in {@code form}. */
     public DecisionTableScenario withMaskForm(ForcedMaskForm form) {
-        return new DecisionTableScenario(columns, types, allowedValues, rules, inputs, feelCells, zonedColumns, lists, form);
+        return new DecisionTableScenario(columns, types, allowedValues, rules, inputs, feelCells, zonedColumns, lists, form, defaults);
     }
 
     public List<String> ids(List<PraeceptaOutput> outputs) {

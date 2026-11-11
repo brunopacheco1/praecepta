@@ -78,10 +78,19 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * @param bothKinds      whether the inputs of a time or date-time column may have a time zone or not, as
  *                       map-based inputs read them from text; the static analysis then visits both kinds
  *                       of values, whatever {@code zonedColumns} says
+ * @param defaultOutput  the output when no rule matches (DMN's default output values), or null if the table
+ *                       has none: DMN 1.5, 10.3.2.10, step 2, "if no rules match, if a default output value d is
+ *                       specified, DTI=FEEL(d)", before any hit policy or aggregation
  */
 public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
         Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
-        Set<String> lists, boolean bothKinds) {
+        Set<String> lists, boolean bothKinds, PraeceptaOutput defaultOutput) {
+
+    public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
+            Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
+            Set<String> lists, boolean bothKinds) {
+        this(rules, hitPolicy, outputPriority, types, allowedValues, feelCells, zonedColumns, lists, bothKinds, null);
+    }
 
     public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
             Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
@@ -164,6 +173,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             return new Outcome.InvalidInput(invalid);
         }
         var matches = matches(input);
+        if (matches.isEmpty() && defaultOutput != null) {
+            return new Outcome.Hits(List.of(defaultOutput)); // whatever the hit policy
+        }
         var outputs = matches.stream().map(rule -> output(rule, input)).toList();
         return switch (hitPolicy) {
             case UNIQUE -> matches.size() > 1
@@ -182,13 +194,19 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     /**
      * DMN COLLECT with an aggregator over a single numeric output column, skipping missing outputs (a
      * computed output that names a missing input or divides by zero). COUNT counts the matching rules.
-     * No match, or no output that is not missing → null (COUNT → 0).
+     * No match: the default output's value, if the table has a default output (null if that output has no
+     * default), whatever the aggregator. Otherwise no match, or no output that is not missing → null
+     * (COUNT → 0).
      */
     public BigDecimal aggregate(Map<String, ?> input, String output, Aggregator aggregator) {
         if (hitPolicy != HitPolicy.COLLECT) {
             throw new IllegalStateException("DMN only allows aggregation with COLLECT");
         }
         var matched = matches(input);
+        if (matched.isEmpty() && defaultOutput != null) {
+            var value = defaultOutput.values().get(output);
+            return value == null ? null : new BigDecimal(value);
+        }
         var values = matched.stream()
                 .map(rule -> output(rule, input).values().get(output))
                 .filter(Objects::nonNull)

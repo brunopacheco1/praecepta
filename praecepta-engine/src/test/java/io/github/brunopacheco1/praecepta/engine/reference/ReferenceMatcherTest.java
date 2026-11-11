@@ -105,6 +105,32 @@ class ReferenceMatcherTest {
         Assertions.assertThat(reference.aggregate(GREEN_LARGE, "points", Aggregator.COUNT)).isEqualTo(BigDecimal.ZERO);
     }
 
+    /** DMN 1.5, 10.3.2.10, step 2: with no match, the default output, before any hit policy or aggregation. */
+    @Test
+    void with_no_match_the_default_output_is_the_result_under_every_hit_policy_and_aggregation() {
+        var defaults = new HashMap<String, String>();
+        defaults.put("id", null);
+        defaults.put("grade", "C");
+        defaults.put("points", "0");
+        var defaultOutput = new PraeceptaOutput(defaults);
+        var priority = Map.of("grade", List.of("A", "B"));
+        for (var policy : HitPolicy.values()) {
+            var reference = new ReferenceMatcher(RULES, policy, priority, Map.of(), Map.of(), false, Set.of(), Set.of(), false, defaultOutput);
+            Assertions.assertThat(((Outcome.Hits) reference.evaluate(GREEN_LARGE)).outputs()).as("%s", policy).containsExactly(defaultOutput);
+            if (policy != HitPolicy.UNIQUE && policy != HitPolicy.ANY) {
+                Assertions.assertThat(((Outcome.Hits) reference.evaluate(BLUE_SMALL)).outputs()).as("%s", policy).isNotEmpty()
+                        .doesNotContain(defaultOutput);
+            }
+        }
+        var collect = new ReferenceMatcher(RULES, HitPolicy.COLLECT, Map.of(), Map.of(), Map.of(), false, Set.of(), Set.of(), false,
+                defaultOutput);
+        for (var aggregator : Aggregator.values()) {
+            Assertions.assertThat(collect.aggregate(GREEN_LARGE, "points", aggregator)).as("%s", aggregator).isEqualTo(BigDecimal.ZERO);
+        }
+        Assertions.assertThat(collect.aggregate(GREEN_LARGE, "id", Aggregator.SUM)).as("an output without a default").isNull();
+        Assertions.assertThat(collect.aggregate(RED_SMALL, "points", Aggregator.COUNT)).isEqualByComparingTo("3");
+    }
+
     // ---- lists, zones and output expressions, as FEEL evaluates them --------------------------------
 
     @Test
