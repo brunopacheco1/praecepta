@@ -363,6 +363,29 @@ class PraeceptaEngineBehaviourTest {
                     .hasMessage("Input country=PT is not one of the column's allowed input values");
         }
 
+        /** DMN 1.5, grammar rule 64: in a quoted string, \t is a tab and \U01F40E one character, not the letters after the backslash. */
+        @Test
+        void escape_sequences_in_quoted_cells_stand_for_the_characters_they_name() {
+            var engine = byColumn(HitPolicy.FIRST, rule(1, Map.of("country", "\"a\\tb\""), "TAB"),
+                    rule(2, Map.of("country", "\"\\U01F40E\", \"caf\\u00e9\""), "CODE POINT"),
+                    rule(3, Map.of("country", "\"a\\\\tb\""), "BACKSLASH")).build();
+            Assertions.assertThat(engine.evaluate(Map.of("country", "a\tb"))).containsExactly("TAB");
+            Assertions.assertThat(engine.evaluate(Map.of("country", "atb"))).isEmpty();
+            Assertions.assertThat(engine.evaluate(Map.of("country", "🐎"))).containsExactly("CODE POINT");
+            Assertions.assertThat(engine.evaluate(Map.of("country", "café"))).containsExactly("CODE POINT");
+            Assertions.assertThat(engine.evaluate(Map.of("country", "U01F40E"))).isEmpty();
+            Assertions.assertThat(engine.evaluate(Map.of("country", "a\\tb"))).containsExactly("BACKSLASH");
+        }
+
+        @Test
+        void a_quoted_cell_with_a_backslash_before_another_character_is_rejected() {
+            var builder = byColumn(HitPolicy.FIRST, rule(4, Map.of("country", "\"P\\T\""), "A"));
+            Assertions.assertThatThrownBy(builder::build)
+                    .isExactlyInstanceOf(InvalidDecisionTableException.class)
+                    .hasMessage("Rule 4, column 'country': Invalid cell '\"P\\T\"': \\T is not an escape sequence; "
+                            + "write \\\\ for a backslash in \"P\\T\"");
+        }
+
         @Test
         void bound_numbers_must_be_finite() {
             var engine = PraeceptaEngine.<Double, String>builder()

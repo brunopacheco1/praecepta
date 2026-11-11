@@ -36,7 +36,7 @@ public final class FeelLiterals {
     public static String literal(Object value) {
         return switch (value) {
             case null -> "null";
-            case String text -> "\"" + text.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+            case String text -> "\"" + FeelStrings.escaped(text) + "\"";
             case LocalDate date -> "date(\"" + date + "\")";
             case LocalTime time -> "time(\"" + text(time) + "\")";
             case OffsetTime time -> "time(\"" + text(time) + "\")";

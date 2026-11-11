@@ -47,7 +47,7 @@ import net.jqwik.api.Tuple;
 /**
  * A random decision table plus inputs to evaluate against it. Columns are STRING, NUMBER, DATE,
  * BOOLEAN, TIME or DATE_TIME, and cells use every form of the grammar: wildcards, literals (quoted
- * and legacy unquoted, function and bare forms), lists, comparisons, intervals with every bracket
+ * and legacy unquoted, with escape sequences, function and bare forms), lists, comparisons, intervals with every bracket
  * style, {@code not(...)} and {@code null}. String columns compare less often than the others, so
  * that both kinds of string column (with and without comparisons) are common, and string inputs
  * include values between and around the letters the cells mention. Values come from small domains, and dates are consecutive
@@ -352,7 +352,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     /** A literal, written in every accepted style. */
     private static Arbitrary<String> literal(Column column) {
         return switch (column.type()) {
-            case STRING -> Arbitraries.of(column.domain()).flatMap(v -> Arbitraries.of(v, "\"" + v + "\""));
+            case STRING -> Arbitraries.of(column.domain()).flatMap(v -> Arbitraries.of(v, "\"" + v + "\"", escaped(v)));
             case NUMBER -> Arbitraries.integers().between(0, 5).map(String::valueOf);
             case DATE -> Arbitraries.integers().between(0, 5).flatMap(d -> Arbitraries.of(
                     "date(\"" + DAY0.plusDays(d) + "\")", DAY0.plusDays(d).toString()));
@@ -364,6 +364,11 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             case YEAR_MONTH_DURATION -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(
                     value(ColumnType.YEAR_MONTH_DURATION, i, -1), FeelLiterals.text(yearMonth(i))));
         };
+    }
+
+    /** A string literal whose characters are all written as FEEL code points: {@code "\\u0061"} for {@code a}. */
+    private static String escaped(String value) {
+        return value.chars().mapToObj(c -> "\\u%04x".formatted(c)).collect(Collectors.joining("", "\"", "\""));
     }
 
     /**

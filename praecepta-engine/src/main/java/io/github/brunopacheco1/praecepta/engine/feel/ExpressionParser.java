@@ -156,7 +156,7 @@ final class ExpressionParser {
         throw unsupported("unexpected '" + c + "'");
     }
 
-    /** A string literal, in which a backslash escapes the character after it, as {@code CellParser} reads one. */
+    /** A string literal, with FEEL's escape sequences ({@link FeelStrings#escape}), as {@code CellParser} reads one. */
     private String string() {
         var value = new StringBuilder();
         int i = position + 1;
@@ -165,7 +165,7 @@ final class ExpressionParser {
             if (c != '\\') {
                 value.append(c);
             } else if (i < text.length()) {
-                i = escape(i, value);
+                i = FeelStrings.escape(text, i, value, this::unsupported);
             }
         }
         if (i == text.length()) {
@@ -173,35 +173,6 @@ final class ExpressionParser {
         }
         position = i + 1;
         return value.toString();
-    }
-
-    /**
-     * Appends the character an escape sequence stands for (FEEL's grammar rule 64).
-     *
-     * @param at the index just after the backslash
-     * @return the index just after the sequence
-     */
-    private int escape(int at, StringBuilder value) {
-        char kind = text.charAt(at);
-        switch (kind) {
-            case 'n' -> value.append('\n');
-            case 'r' -> value.append('\r');
-            case 't' -> value.append('\t');
-            case '\'', '"', '\\' -> value.append(kind);
-            case 'u', 'U' -> {
-                int digits = kind == 'u' ? 4 : 6;
-                int end = at + 1 + digits;
-                boolean hexadecimal = end <= text.length() && text.substring(at + 1, end).chars().allMatch(c -> Character.digit(c, 16) >= 0);
-                int codePoint = hexadecimal ? Integer.parseInt(text, at + 1, end, 16) : -1;
-                if (!Character.isValidCodePoint(codePoint)) {
-                    throw unsupported("\\" + kind + " is not followed by the " + digits + " hexadecimal digits of a character");
-                }
-                value.appendCodePoint(codePoint);
-                return end;
-            }
-            default -> throw unsupported("\\" + kind + " is not an escape sequence; write \\\\ for a backslash");
-        }
-        return at + 1;
     }
 
     /** FEEL's numeric literal: digits with an optional fraction, or a fraction alone, and an optional exponent ({@code 1.2e3}). */

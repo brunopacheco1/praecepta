@@ -13,6 +13,7 @@ import java.time.OffsetTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
 import java.util.List;
 
 import org.assertj.core.api.Assertions;
@@ -52,6 +53,68 @@ class CellParserTest {
     void quoted_strings_may_contain_commas_and_escaped_quotes() {
         Assertions.assertThat(CellParser.parse("\"a,b\", \"say \\\"hi\\\"\"", ColumnType.STRING))
                 .isEqualTo(positive(new Equals("a,b"), new Equals("say \"hi\"")));
+    }
+
+    /** DMN 1.5, grammar rule 64 and 10.3.1.1: the escape sequences of a string literal, in Praecepta's syntax and in strict FEEL. */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', quoteCharacter = '~', value = {
+            "\"a\\nb\"            | 0061 000A 0062",
+            "\"a\\tb\"            | 0061 0009 0062",
+            "\"a\\rb\"            | 0061 000D 0062",
+            "\"it\\'s \\\"x\\\"\" | 0069 0074 0027 0073 0020 0022 0078 0022",
+            "\"a\\\\b\"           | 0061 005C 0062",
+            "\"caf\\u00e9\"       | 0063 0061 0066 00E9",
+            "\"\\u00E9\"          | 00E9",
+            "\"\\U01F40E\"        | 1F40E",
+            "\"\\uD83D\\uDC0E\"   | 1F40E",
+            "\"\\u0022\"          | 0022",
+            "\"\\U000041b\"       | 0041 0062",
+    })
+    void quoted_strings_read_feel_escape_sequences(String cell, String codePoints) {
+        var value = Arrays.stream(codePoints.split(" "))
+                .collect(StringBuilder::new, (text, hex) -> text.appendCodePoint(Integer.parseInt(hex, 16)), StringBuilder::append)
+                .toString();
+        Assertions.assertThat(CellParser.parse(cell, ColumnType.STRING)).as("Praecepta's syntax").isEqualTo(positive(new Equals(value)));
+        Assertions.assertThat(CellParser.parseFeel(cell, ColumnType.STRING)).as("strict FEEL").isEqualTo(positive(new Equals(value)));
+        Assertions.assertThat(OutputExpression.parse(cell).evaluate(name -> null)).as("an output expression").isEqualTo(value);
+    }
+
+    @Test
+    void escape_sequences_hold_in_lists_comparisons_and_intervals() {
+        Assertions.assertThat(CellParser.parseFeel("\"a\\tb\", < \"\\n\", [\"\\u0041\"..\"\\U00005A\"]", ColumnType.STRING))
+                .isEqualTo(positive(new Equals("a\tb"), new Compare(Operator.LT, "\n"), new Range("A", true, "Z", true)));
+        Assertions.assertThat(CellParser.parse("not(\"a\\nb\")", ColumnType.STRING)).isEqualTo(negated(new Equals("a\nb")));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', quoteCharacter = '~', value = {
+            "\"a\\qb\"     | \\q is not an escape sequence; write \\\\ for a backslash in \"a\\qb\"",
+            "\"\\u12\"     | \\u is not followed by the 4 hexadecimal digits of a character",
+            "\"\\u12G4\"   | \\u is not followed by the 4 hexadecimal digits of a character",
+            "\"\\U110000\" | \\U is not followed by the 6 hexadecimal digits of a character",
+            "\"\\U1F40E\"  | \\U is not followed by the 6 hexadecimal digits of a character",
+            "\"\\x41\"     | \\x is not an escape sequence",
+    })
+    void a_backslash_before_anything_but_an_escape_sequence_is_rejected(String cell, String reason) {
+        Assertions.assertThatThrownBy(() -> CellParser.parse(cell, ColumnType.STRING))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining(reason);
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel(cell, ColumnType.STRING))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining(reason);
+    }
+
+    @Test
+    void a_backslash_in_quotes_starts_an_escape_sequence_even_in_a_path() {
+        // \t is a tab, so this is "C:", a tab and "emp"; a backslash is written \\
+        Assertions.assertThat(CellParser.parse("\"C:\\temp\"", ColumnType.STRING)).isEqualTo(positive(new Equals("C:\temp")));
+        Assertions.assertThat(CellParser.parse("\"C:\\\\temp\"", ColumnType.STRING)).isEqualTo(positive(new Equals("C:\\temp")));
+    }
+
+    @Test
+    void unquoted_words_keep_their_backslashes() {
+        Assertions.assertThat(CellParser.parse("C:\\temp, a\\nb", ColumnType.STRING))
+                .isEqualTo(positive(new Equals("C:\\temp"), new Equals("a\\nb")));
     }
 
     @Test

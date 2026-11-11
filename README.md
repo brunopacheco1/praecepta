@@ -136,6 +136,12 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 | `null` | only a missing value | all |
 | `not(...)` | anything the list inside does not match | all |
 
+Quoted strings take FEEL's escape sequences (DMN 1.5, grammar rule 64): `\"`, `\\`, `\'`, `\n` (a line
+feed), `\r`, `\t` (a tab), and a character by its code point, `\u00e9` or `\U01F40E`. A backslash before
+any other character is an error, so a Windows path is written `"C:\\temp"`; unquoted words keep their
+backslashes as they are. `DmnWriter` writes line breaks and tabs back as `\n`, `\r` and `\t`, since a FEEL
+string literal may not hold a line break.
+
 Missing values follow FEEL: they fail comparisons and intervals, equal only `null`, and so satisfy
 `not("FR")`. Blank text counts as missing. Strings compare as Java's `String.compareTo` does,
 character by character and case-sensitively (`"Zed" < "apple"`). Where DMN 1.5 and its TCK leave a

@@ -37,6 +37,18 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   release from 0.5.0 on uses `-pl '!praecepta-benchmarks,!praecepta-tck'` (see
   [docs/RELEASING.md](docs/RELEASING.md)).
 
+### Fixed
+- **String literals in cells read FEEL's escape sequences** ([#80](https://github.com/brunopacheco1/praecepta/issues/80)):
+  in a quoted string of a cell, an input or output value list or a DMN output entry, a backslash used to
+  mean "the next character as it is", so `"a\tb"` was `atb` and `"caf\u00e9"` was `cafu00e9`. They now
+  read as DMN 1.5 has them (grammar rule 64, 10.3.1.1), in Praecepta's syntax and in strict FEEL alike, and
+  as output expressions have read them since 0.4.0: `\n`, `\r`, `\t`, `\"`, `\\`, `\'`, and a character by
+  its code point (`\u00e9`, `\U01F40E`, or a surrogate pair `\uD83D\uDC0E`). A backslash before any other
+  character is rejected (`\q is not an escape sequence; write \\ for a backslash`), so a quoted Windows path
+  needs its backslashes doubled (`"C:\\temp"`); unquoted words keep their backslashes. `FeelLiterals.literal`,
+  and so `DmnWriter`, writes a line feed, a carriage return and a tab as `\n`, `\r` and `\t` (and the other
+  vertical space, U+000B and U+000C, as code points), since a FEEL string literal may not hold a line break.
+
 ## [0.4.0] - 2026-11-11
 
 Inputs that hold lists, output entries that are expressions, times and date-times with a time zone,
