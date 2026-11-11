@@ -50,6 +50,8 @@ them when you build; evaluate them with a dependency-free engine.
   other tools), and DMN export
 - A Maven plugin that validates tables at build time and generates typed input and output
   records, so applications ship only the engine
+- A Spring Boot starter that loads DMN tables at startup as engine beans, validates them, and reports
+  them through Actuator
 - GraalVM native images with no configuration for Praecepta itself (see [Native images](#native-images))
 
 # Installation
@@ -357,6 +359,63 @@ default output.
 Generated code belongs to your project, so it carries no Praecepta licence header. Set
 `<fileHeader>` to prepend your own, such as your project's SPDX lines.
 `Discount.validationReport()` gives the build-time findings, and `Discount.engine()` the engine.
+
+## Praecepta Spring Boot Starter
+For Spring Boot 4 applications. At startup it loads every DMN file under `rules/` on the class path,
+validates the decision tables, and registers them as beans:
+
+```xml
+<dependency>
+  <groupId>io.github.brunopacheco1</groupId>
+  <artifactId>praecepta-spring-boot-starter</artifactId>
+  <version>0.5.0</version>
+</dependency>
+```
+
+Each decision table becomes an engine bean, injected by the decision's name (its DMN `name`, or its
+`id` when it has none). Inputs and outputs are maps of column names to values as text, read with the
+column types the DMN declares (`"42"`, `"2025-01-31"`, `["PT", "BR"]` for a list column; a missing
+value is a missing input):
+
+```java
+@Service
+class Pricing {
+    private final PraeceptaEngine<Map<String, String>, Map<String, String>> discount;
+
+    Pricing(@Qualifier("Discount") PraeceptaEngine<Map<String, String>, Map<String, String>> discount) {
+        this.discount = discount;
+    }
+
+    List<Map<String, String>> discounts(String country, int age) {
+        return discount.evaluate(Map.of("country", country, "age", Integer.toString(age)));
+    }
+}
+```
+
+Each output map holds one matching rule's outputs, in the hit policy's order; under a COLLECT
+aggregation, the one map holds the aggregate. The `Decisions` bean (named `praeceptaDecisions`) holds them
+all: `decisions.evaluate("Discount", Map.of("country", "PT"))`, `decisions.names()`. The engine beans are
+named `praecepta.<decision name>`.
+
+| Property | Default | Meaning |
+|---|---|---|
+| `praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load: patterns with `classpath:` or `classpath*:` (both search every class path root), or `file:`; `*` matches within a path segment, `**` across segments. A comma-separated list or a YAML list. |
+| `praecepta.fail-on` | `ERROR` | The validation severity that stops startup: `ERROR`, `WARNING` or `NONE`. |
+| `praecepta.enabled` | `true` | `false` turns the starter off. |
+
+The application does not start if a table cannot be read or built, if two decisions have the same
+name, if a location you set finds no file, or if a table has validation issues at `praecepta.fail-on`
+or above; the failure lists every problem at once. Other issues are logged as warnings, such as
+`Discount: WARNING rule 3 can never be selected`.
+
+With Actuator, the endpoint `praecepta` reports each decision's columns, hit policy and validation
+issues (`/actuator/praecepta`, and `/actuator/praecepta/{name}` for one). Like every Actuator endpoint
+it is exposed only when you say so, for example with
+`management.endpoints.web.exposure.include=health,praecepta`. Nothing is evaluated through it.
+
+To keep tables in Excel or CSV, convert them at build time with the [Maven plugin](#praecepta-maven-plugin):
+the DMN resources it writes are found by a pattern that covers their package, such as
+`classpath*:com/acme/pricing/*.dmn`. Its generated classes are static and need no bean.
 
 ## Native images
 Applications using Praecepta build as GraalVM native executables with no configuration for Praecepta
