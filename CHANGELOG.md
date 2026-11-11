@@ -20,6 +20,19 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `tBureauCallType`, a `string` with the allowed values `"FULL","MINI","NONE"`. The column takes
   the base type, and the allowed values become its input value list unless the input declares its
   own. Item definitions may build on one another; structured types and collections are still rejected.
+- **Cells that compare with another input** ([#51](https://github.com/brunopacheco1/praecepta/issues/51)):
+  in a DMN table a cell may name another input, as in `> limit`, `[floor..limit]` or `not(home)`.
+  `DecisionTable` gains `feelCells` (its cells are strict FEEL, set by `DmnReader`) and
+  `namedInputs()`; `UnaryTests.Name` holds such a name. The index sees these cells as "any value",
+  and the engine checks them, with FEEL's three-valued logic, only on the rules the index leaves, so
+  tables without them keep their speed. A named input becomes an input of the engine: bound with
+  its own getter, or with map-based inputs read with the type of the column that names it; the Maven
+  plugin adds it to the generated input record. The static analysis stays sound: such rules never
+  count as overlapping or as hiding another rule (they are still reported unreachable when their
+  other cells are covered), and gaps are not searched. Praecepta's own syntax (Excel, CSV, code) is
+  unchanged: there an unquoted word is still a string. The DMN TCK now passes 78 of 86 checks (was
+  55); the rest need times with a zone, list inputs (#25), chained decisions (#14) or computed
+  outputs.
 - **Duration columns** ([#52](https://github.com/brunopacheco1/praecepta/issues/52)):
   `DAY_TIME_DURATION` (`java.time.Duration`, bound with `durationInput`) and `YEAR_MONTH_DURATION`
   (bound with `periodInput` from a `java.time.Period` of years and months, held as the new

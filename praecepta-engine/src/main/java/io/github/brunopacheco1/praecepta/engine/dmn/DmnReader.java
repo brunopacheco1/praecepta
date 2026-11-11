@@ -131,7 +131,8 @@ public final class DmnReader {
         for (int i = 0; i < ruleElements.size(); i++) {
             rules.add(rule(ruleElements.get(i), i + 1, inputs, outputs, where));
         }
-        return new DecisionTable(name, hitPolicy, aggregation, inputs, outputs, rules);
+        // cells stay strict FEEL, where a name compares with another input
+        return new DecisionTable(name, hitPolicy, aggregation, inputs, outputs, rules, true);
     }
 
     private static HitPolicy hitPolicy(String value, String where) {
@@ -182,30 +183,9 @@ public final class DmnReader {
         return new InputColumn(column, type.columnType(), allowed);
     }
 
-    /**
-     * A FEEL name, or a qualified name such as {@code applicant.age}. Each part starts with a letter,
-     * {@code _} or {@code ?}, continues with letters, digits, {@code _} and {@code ?}, and may hold single
-     * spaces between words, as FEEL allows: {@code Credit Score}, {@code Applicant data.Monthly income}.
-     * Checked one code point at a time, so long input costs linear time and no stack.
-     */
+    /** A FEEL name, or a qualified name such as {@code applicant.age} (see {@link CellParser#isName}). */
     static boolean isName(String text) {
-        int previous = '.'; // the text starts a part, as if after a dot
-        for (int c : text.codePoints().toArray()) {
-            boolean separator = c == '.' || c == ' ';
-            boolean afterSeparator = previous == '.' || previous == ' ';
-            boolean valid = separator
-                    ? !afterSeparator // no empty part, no space next to a dot, no double space
-                    : isNameStart(c) || previous != '.' && Character.isDigit(c); // digits never start a part
-            if (!valid) {
-                return false;
-            }
-            previous = c;
-        }
-        return previous != '.' && previous != ' ';
-    }
-
-    private static boolean isNameStart(int c) {
-        return Character.isLetter(c) || c == '_' || c == '?';
+        return CellParser.isName(text);
     }
 
     private static OutputColumn outputColumn(Element output, String unnamed, ItemDefinitions types, String where) {

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="limits" name="limits" namespace="https://example.com/limits">
+  <decision id="limits" name="limits">
+    <decisionTable id="table" hitPolicy="FIRST">
+      <input id="amount" label="amount"><inputExpression typeRef="number"><text>amount</text></inputExpression></input>
+      <output id="decision" name="decision" typeRef="string"/>
+      <rule id="r1">
+        <inputEntry><text>&gt; limit</text></inputEntry>
+        <outputEntry><text>"review"</text></outputEntry>
+      </rule>
+      <rule id="r2">
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"approve"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

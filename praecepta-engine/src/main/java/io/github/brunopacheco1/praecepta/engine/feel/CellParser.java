@@ -13,6 +13,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
 import java.util.regex.Pattern;
@@ -44,6 +45,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   [18..65), (0..1], ]a..b[  intervals; [ and ] include their end, ( ) and outward-facing brackets exclude it
  *   null                     only a missing value
  *   not(t1, t2)              anything but these tests
+ *   numB, &gt; dateE, [lo..hi]  strict FEEL only: a name compares with that input ({@link UnaryTests.Name})
  * </pre>
  *
  * Tests are separated by commas outside quotes and brackets. Surrounding whitespace is ignored.
@@ -64,10 +66,38 @@ public final class CellParser {
     private static final Pattern DURATION_CALL = Pattern.compile("duration\\(\\s*\"([^\"]*)\"\\s*\\)");
     /** ISO 8601 durations: an optional sign, P, then digits, fractions and designators. */
     private static final Pattern BARE_DURATION = Pattern.compile("-?P[0-9YMWDTHS.]+");
+    /** Names FEEL reserves for literals, which never name an input. */
+    private static final Set<String> KEYWORDS = Set.of("true", "false", "null");
     /** The digits of an offset after its sign: 02, 0200 or 02:00. */
     private static final Pattern OFFSET_DIGITS = Pattern.compile("\\d{2}(:?\\d{2})?");
 
     private CellParser() {
+    }
+
+    /**
+     * A FEEL name, or a qualified name such as {@code applicant.age}. Each part starts with a letter,
+     * {@code _} or {@code ?}, continues with letters, digits, {@code _} and {@code ?}, and may hold single
+     * spaces between words, as FEEL allows: {@code Credit Score}, {@code Applicant data.Monthly income}.
+     * Checked one code point at a time, so long input costs linear time and no stack.
+     */
+    public static boolean isName(String text) {
+        int previous = '.'; // the text starts a part, as if after a dot
+        for (int c : text.codePoints().toArray()) {
+            boolean separator = c == '.' || c == ' ';
+            boolean afterSeparator = previous == '.' || previous == ' ';
+            boolean valid = separator
+                    ? !afterSeparator // no empty part, no space next to a dot, no double space
+                    : isNameStart(c) || previous != '.' && Character.isDigit(c); // digits never start a part
+            if (!valid) {
+                return false;
+            }
+            previous = c;
+        }
+        return previous != '.' && previous != ' ';
+    }
+
+    private static boolean isNameStart(int c) {
+        return Character.isLetter(c) || c == '_' || c == '?';
     }
 
     /**
@@ -83,10 +113,10 @@ public final class CellParser {
     /**
      * Parses a cell as strict DMN FEEL, as DMN files hold it. Strings must be quoted, and dates and
      * times written with their functions ({@code date("2025-01-31")}): in FEEL an unquoted word is a
-     * name (a reference to another variable, which Praecepta does not support), and a bare
-     * {@code 2025-01-31} is a subtraction.
+     * name, a reference to another input ({@link UnaryTests.Name}), and a bare {@code 2025-01-31} is a
+     * subtraction.
      *
-     * @throws CellSyntaxException if the cell is not valid for the column type, or names a variable
+     * @throws CellSyntaxException if the cell is not valid for the column type
      */
     public static UnaryTests parseFeel(String cell, ColumnType type) {
         return new Parser(type, cell, true).parse();
@@ -158,7 +188,7 @@ public final class CellParser {
             requireComparisons("intervals");
             var low = literal(text.substring(1, dots).strip());
             var high = literal(text.substring(dots + 2, text.length() - 1).strip());
-            if (compare(low, high) > 0) {
+            if (!(low instanceof UnaryTests.Name) && !(high instanceof UnaryTests.Name) && compare(low, high) > 0) {
                 throw new CellSyntaxException(cell, "interval starts after it ends");
             }
             return new Range(low, text.charAt(0) == '[', high, text.charAt(text.length() - 1) == ']');
@@ -170,10 +200,13 @@ public final class CellParser {
             }
         }
 
-        /** A single value of the column's type. */
+        /** A single value of the column's type, or in strict FEEL a name of another input. */
         private Comparable<?> literal(String text) {
             if (text.isEmpty()) {
                 throw new CellSyntaxException(cell, "missing value");
+            }
+            if (strictFeel && isName(text) && !KEYWORDS.contains(text)) {
+                return new UnaryTests.Name(text);
             }
             return switch (type) {
                 case STRING -> string(text);

@@ -20,10 +20,13 @@ import java.util.Map;
 
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
+import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
+import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 import net.jqwik.api.Arbitraries;
@@ -48,7 +51,7 @@ import net.jqwik.api.Tuple;
  * string input may also have.
  */
 public record DecisionTableScenario(List<String> columns, Map<String, ColumnType> types, Map<String, String> allowedValues,
-        List<Praeceptum> rules, List<Map<String, Object>> inputs) {
+        List<Praeceptum> rules, List<Map<String, Object>> inputs, boolean feelCells) {
 
     public static final String ID = "id";
     public static final String OUT = "out";
@@ -69,8 +72,50 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     private record Column(ColumnType type, List<String> domain, String allowed) {
     }
 
+    /** Scenarios in Praecepta's syntax, and as often in strict FEEL with cells naming other columns. */
     public static Arbitrary<DecisionTableScenario> arbitrary() {
-        return scenarios(false);
+        return Arbitraries.oneOf(scenarios(false), scenarios(false).map(DecisionTableScenario::withVariableCells));
+    }
+
+    /**
+     * This scenario as a DMN table holds it: every cell in strict FEEL, and one cell in three (by rule and
+     * column) compares with a column of the same type instead, itself included ({@code > c1},
+     * {@code c0}, {@code not(c2)}).
+     */
+    public DecisionTableScenario withVariableCells() {
+        var rewritten = new ArrayList<Praeceptum>();
+        for (int r = 0; r < rules.size(); r++) {
+            var rule = rules.get(r);
+            var cells = new HashMap<String, String>();
+            for (int c = 0; c < columns.size(); c++) {
+                var column = columns.get(c);
+                var type = types.get(column);
+                var cell = rule.input().values().get(column);
+                cells.put(column, (r + c) % 3 == 0 ? variableCell(type, r, c) : DmnWriter.render(CellParser.parse(cell, type)));
+            }
+            rewritten.add(new Praeceptum(rule.priority(), new PraeceptaInput(cells), rule.output()));
+        }
+        return new DecisionTableScenario(columns, types, allowedValues, List.copyOf(rewritten), inputs, true);
+    }
+
+    private String variableCell(ColumnType type, int r, int c) {
+        var peers = columns.stream().filter(column -> types.get(column) == type).toList();
+        var other = peers.get(r % peers.size());
+        var forms = type.supportsComparisons()
+                ? List.of("> " + other, other, "not(" + other + ")", "<= " + other + ", null")
+                : List.of(other, "not(" + other + ")");
+        return forms.get((r / 3 + c) % forms.size());
+    }
+
+    /** The scenario's table, for {@code PraeceptaEngine.Builder#table}: its outputs carry {@code priority} for {@link #OUT}. */
+    public DecisionTable table(List<Praeceptum> tableRules, HitPolicy policy, List<String> priority) {
+        var inputColumns = columns.stream()
+                .map(column -> new DecisionTable.InputColumn(column, types.get(column), allowedValues.get(column)))
+                .toList();
+        var outputs = List.of(new DecisionTable.OutputColumn(ID, ColumnType.STRING),
+                new DecisionTable.OutputColumn(OUT, ColumnType.STRING, outputPriority(policy, priority).getOrDefault(OUT, List.of())),
+                new DecisionTable.OutputColumn(NUMBER, ColumnType.NUMBER), new DecisionTable.OutputColumn(ECHO, ColumnType.STRING));
+        return new DecisionTable("scenario", policy, null, inputColumns, outputs, tableRules, feelCells);
     }
 
     /** Scenarios where every string column declares its input values, so gaps are analysed. */
@@ -269,7 +314,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             }
             inputs.add(input);
         }
-        return new DecisionTableScenario(List.copyOf(names), Map.copyOf(types), Map.copyOf(allowed), List.copyOf(rules), List.copyOf(inputs));
+        return new DecisionTableScenario(List.copyOf(names), Map.copyOf(types), Map.copyOf(allowed), List.copyOf(rules), List.copyOf(inputs),
+                false);
     }
 
     /** Binds every column to the input map with the typed getter of its type. */
@@ -289,7 +335,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     }
 
     public ReferenceMatcher reference(List<Praeceptum> tableRules, HitPolicy policy, Map<String, List<String>> outputPriority) {
-        return new ReferenceMatcher(tableRules, policy, outputPriority, types, allowedValues);
+        return new ReferenceMatcher(tableRules, policy, outputPriority, types, allowedValues, feelCells);
     }
 
     public List<String> ids(List<PraeceptaOutput> outputs) {

@@ -225,13 +225,16 @@ final class SourceGenerator {
         this.inputType = className + "Input";
         this.outputType = className + "Output";
         var where = "Table '" + table.name() + "'";
-        var inputMembers = JavaNames.distinct(table.inputs().stream().map(InputColumn::name).toList(),
+        // the table's columns, then the inputs its cells compare with (DMN only, as in > limit)
+        var inputColumns = new ArrayList<>(table.inputs());
+        table.namedInputs().forEach((name, type) -> inputColumns.add(new InputColumn(name, type)));
+        var inputMembers = JavaNames.distinct(inputColumns.stream().map(InputColumn::name).toList(),
                 JavaNames::member, where + " inputs");
         this.outputMembers = JavaNames.distinct(table.outputs().stream().map(DecisionTable.OutputColumn::name).toList(),
                 JavaNames::member, where + " outputs");
         this.inputs = new ArrayList<>();
-        for (int c = 0; c < table.inputs().size(); c++) {
-            inputs.add(InputField.of(table.inputs().get(c), inputMembers.get(c)));
+        for (int c = 0; c < inputColumns.size(); c++) {
+            inputs.add(InputField.of(inputColumns.get(c), inputMembers.get(c)));
         }
     }
 

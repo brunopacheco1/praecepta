@@ -156,8 +156,6 @@ class DmnReaderTest {
     @CsvSource(delimiter = '|', value = {
             "untyped duration   | duration        | at      |                      |         | type 'duration' is not supported",
             "zoned time cell    | time            | at      | time(\"10:00:00Z\")  |         | rule 1, column 'at': Invalid cell",
-            "variable in a cell | string          | a       | not(Complex.aString) |         "
-                    + "| rule 1, column 'a': Invalid cell 'not(Complex.aString)': 'Complex.aString' is a FEEL name",
             "computed input     | number          | age * 2 |                      |         | input expression 'age * 2' is not supported",
             "unsupported cell   | number          | age     | &gt; abs(x)          |         | rule 1, column 'age'",
             "computed output    | string          | a       |                      | a + \"x\" | rule 1, output 'result': 'a + \"x\"' is not supported",
@@ -349,7 +347,7 @@ class DmnReaderTest {
         var fee = DmnReader.read(resource("dmn11-two-decisions.dmn"), "Fee");
         var again = DmnReader.read(stream(DmnWriter.write(fee)));
         Assertions.assertThat(again).isEqualTo(new DecisionTable(
-                "Fee", HitPolicy.COLLECT, AggregationOperator.SUM, fee.inputs(), fee.outputs(), again.rules()));
+                "Fee", HitPolicy.COLLECT, AggregationOperator.SUM, fee.inputs(), fee.outputs(), again.rules(), true));
         Assertions.assertThat(again.rules()).extracting(rule -> rule.output().values().get("fee")).containsExactly("5", "12.5");
 
         var discount = DmnReader.read(resource("camunda-modeler-discount.dmn"));

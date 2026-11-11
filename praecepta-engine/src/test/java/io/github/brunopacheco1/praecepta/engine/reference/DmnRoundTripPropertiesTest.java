@@ -100,6 +100,6 @@ class DmnRoundTripPropertiesTest {
         }
         // a string output, which takes the value of any input it names
         outputs.add(new DecisionTable.OutputColumn(DecisionTableScenario.ECHO, ColumnType.STRING));
-        return new DecisionTable("round_trip", policy, null, inputs, outputs, rules);
+        return new DecisionTable("round_trip", policy, null, inputs, outputs, rules, s.feelCells());
     }
 }

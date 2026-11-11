@@ -190,9 +190,12 @@ Supported: input expressions that name a variable, including FEEL names with spa
 `boolean`, `time`, `dateTime`, `dayTimeDuration` and `yearMonthDuration` columns, or an item definition of one of them (such as a `string`
 with allowed values, which become the input value list); input entries in the cell syntax above, as strict FEEL
 (strings quoted, since an unquoted word is a reference to another variable, and dates and times
-written with `date(...)`, `time(...)` and `date and time(...)`); output entries that are literals
+written with `date(...)`, `time(...)` and `date and time(...)`); input entries that compare with
+another input (`> limit`, `[floor..limit]`, `not(home)`), which then becomes an input of the engine,
+bound like a column (with map-based inputs it is read with the type of the column that names it);
+output entries that are literals
 or name one of the table's inputs (`a` returns the input `a`); every hit policy, with SUM, MIN, MAX and COUNT aggregation. Anything else (times with a
-zone, cells that refer to other variables, computed expressions, function calls) is rejected
+zone, computed expressions, function calls) is rejected
 with a message naming the decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
 evaluate identically, which is how the benchmarks feed them.
 
