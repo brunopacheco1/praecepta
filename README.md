@@ -173,7 +173,11 @@ declares its values or uses comparisons or intervals (any other string then fall
 With map-based inputs, declare non-string columns with `.columnType("age", ColumnType.NUMBER)`;
 their text is parsed. A time or date-time column then takes values with and without a time zone
 (`08:30`, `08:30Z`, `2025-01-31T08:30@Europe/Paris`), and its gaps are looked for among both, while
-a typed getter gives one kind only.
+a typed getter gives one kind only. So a table whose cells all lack a zone reports a gap such as
+`cutOff = any time with a time zone`: such an input really matches no rule. To keep the column to
+values without a zone, declare its input values without one
+(`.allowedValues("cutOff", "[time(\"00:00:00\")..time(\"23:59:59\")]")`), which makes a zoned value
+invalid input, or bind the inputs per column, with `timeInput` or `dateTimeInput` for such columns.
 
 Notes:
 - `PRIORITY` and `OUTPUT_ORDER` need DMN output value lists:
@@ -210,7 +214,8 @@ var engine = PraeceptaEngine.<Customer, String>builder()
 | `-` | yes | yes | yes | yes |
 
 These are the semantics of FEEL's `list contains`: a missing list makes every test unknown, while an
-empty one passes none. Elements may not be missing, and declared input values apply to each element.
+empty one passes none. Elements may not be missing, must be values of the element type (as its
+single-value getter returns them, or text), and declared input values apply to each element.
 The elements of a list of times or date-times may have a time zone or not; each is compared as a
 single value is, so an element FEEL cannot compare with a cell leaves that test unknown.
 With map-based inputs, declare the column with `.listColumnType("nationalities", ColumnType.STRING)`
@@ -251,7 +256,8 @@ list input (`Flu Symptoms`, typed by its `inputData`), which hold when the value
 output entries that are literals, name one of the table's inputs (`a` returns the input `a`), or
 compute their value from literals and inputs with `+`, `-`, `*`, `/` and parentheses
 (`Symptom + " is listed"`, `(price - discount) * 1.2`: `+` joins strings or adds numbers, a missing
-operand gives a missing output); times and date-times with or without a time zone; every hit policy,
+operand gives a missing output), where an input is a column or an input the cells compare with that
+holds single values; times and date-times with or without a time zone; every hit policy,
 with SUM, MIN, MAX and COUNT aggregation. Anything else (a time with a zone id, function calls such
 as `upper case(a)`, `if`, inputs computed by other decisions) is rejected with a message naming the
 decision, rule and column. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools

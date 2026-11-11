@@ -262,7 +262,7 @@ final class ColumnIndex {
 
     /** Whether some cell compares or tests an interval, which makes a STRING column ordered. */
     private static boolean hasOrderTests(List<UnaryTests> cellsByBit) {
-        return cellsByBit.stream().flatMap(cell -> tests(cell).stream()).anyMatch(test -> test instanceof Compare || test instanceof Range);
+        return cellsByBit.stream().flatMap(cell -> cell.tests().stream()).anyMatch(test -> test instanceof Compare || test instanceof Range);
     }
 
     /** Ordered STRING column: the class of each boundary, which is class {@code 2i + 1} for boundary {@code i}. */
@@ -304,7 +304,7 @@ final class ColumnIndex {
     }
 
     private static void collectStrings(UnaryTests cell, Set<String> into) {
-        for (var test : tests(cell)) {
+        for (var test : cell.tests()) {
             if (test instanceof Equals(var value)) {
                 into.add((String) value);
             }
@@ -313,27 +313,7 @@ final class ColumnIndex {
 
     /** Adds the values of every test; values from both lines go into one set, so it compares them only within a line. */
     private static void collectBoundaries(UnaryTests cell, List<Comparable<?>> into) {
-        for (var test : tests(cell)) {
-            switch (test) {
-                case Equals(var value) -> into.add(value);
-                case Compare c -> into.add(c.value());
-                case Range r -> {
-                    into.add(r.low());
-                    into.add(r.high());
-                }
-                case NullTest n -> {
-                    // no boundary
-                }
-            }
-        }
-    }
-
-    private static List<Test> tests(UnaryTests cell) {
-        return switch (cell) {
-            case UnaryTests.Any any -> List.of();
-            case UnaryTests.Positive(var tests) -> tests;
-            case UnaryTests.Negated(var tests) -> tests;
-        };
+        cell.tests().forEach(test -> into.addAll(UnaryTests.values(test)));
     }
 
     /** Ordered columns: the interval before each boundary, the boundary itself, and the interval after the last one. */
@@ -400,14 +380,13 @@ final class ColumnIndex {
      * LocalDate, Boolean, LocalTime, OffsetTime, LocalDateTime, ZonedDateTime, Duration or Period) or its
      * text. Blank text counts as missing.
      *
-     * @return the class's mask, dense or sparse ({@link Masks}); shared, so never to be changed
+     * @return the class's mask, dense or sparse ({@link Masks}); shared, so never to be changed (a list
+     *         column's mask, see {@link ListColumn#maskFor}, is dense, and shared for a missing or empty list)
      * @throws InvalidInputException if the value is outside the declared input values, or text that
-     *                               is not a valid value of the column's type
+     *                               is not a valid value of the column's type (for a list, an element)
      */
     long[] maskFor(Object raw) {
-        if (lists != null) {
-            return lists.maskFor(raw);
-        }
+        // a list column is not a STRING column (isString is false), so the STRING hot path below never asks
         if (isString) {
             if (ordinalMasks != null) {
                 // int-coded path: enum constants were checked against the declared values when built
@@ -421,6 +400,9 @@ final class ColumnIndex {
                 }
             }
             return stringMaskSlow((String) raw);
+        }
+        if (lists != null) {
+            return lists.maskFor(raw);
         }
         return maskOf(convert(raw));
     }

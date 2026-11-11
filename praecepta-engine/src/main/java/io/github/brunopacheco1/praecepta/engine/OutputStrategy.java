@@ -17,7 +17,12 @@ public interface OutputStrategy<O> {
 
     /**
      * Converts one rule's outputs. Called once per rule, when the engine is built, except for a rule
-     * whose output names an input: its output is converted on every evaluation, with that input's value.
+     * whose output reads inputs (names an input or is an expression): its output is converted on every
+     * evaluation that selects it, with the inputs' values. Such an output is null in
+     * {@link PraeceptaOutput#values()} when the input it names is missing, or the expression gives null
+     * (a missing operand, a division by zero); under a COLLECT aggregation, the strategy decides what that
+     * adds up to, for example by converting it to a value that {@link #sum}, {@link #min} and
+     * {@link #max} skip. The result may not be null.
      */
     O transform(PraeceptaOutput output);
 

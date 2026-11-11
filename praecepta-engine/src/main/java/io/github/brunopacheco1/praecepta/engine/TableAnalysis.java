@@ -15,11 +15,13 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Issue;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
+import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 
 /**
@@ -56,15 +58,23 @@ final class TableAnalysis {
      * count as overlapping, never cover another rule, and while there are any, gaps are not searched.
      */
     private final long[] variableRules;
+    /** ANY: a rule's outputs as they are compared; two rules conflict when theirs differ. */
+    private final Function<PraeceptaOutput, ?> comparableOutput;
 
-    private TableAnalysis(BitsetIndex index, List<Praeceptum> rules, long[] variableRules) {
+    private TableAnalysis(BitsetIndex index, List<Praeceptum> rules, long[] variableRules, Function<PraeceptaOutput, ?> comparableOutput) {
         this.index = index;
         this.rules = rules;
         this.variableRules = variableRules;
+        this.comparableOutput = comparableOutput;
     }
 
-    static List<Issue> analyse(BitsetIndex index, List<Praeceptum> rules, HitPolicy policy, long[] variableRules) {
-        var analysis = new TableAnalysis(index, rules, variableRules);
+    /**
+     * @param comparableOutput a rule's outputs as ANY compares them (number outputs by value), so that
+     *                         rules conflict exactly when evaluation would find them different
+     */
+    static List<Issue> analyse(BitsetIndex index, List<Praeceptum> rules, HitPolicy policy, long[] variableRules,
+            Function<PraeceptaOutput, ?> comparableOutput) {
+        var analysis = new TableAnalysis(index, rules, variableRules, comparableOutput);
         var issues = new ArrayList<Issue>(switch (policy) {
             case UNIQUE -> analysis.overlaps(Kind.OVERLAPPING_RULES, false);
             case ANY -> analysis.overlaps(Kind.CONFLICTING_OUTPUTS, true);
@@ -89,7 +99,8 @@ final class TableAnalysis {
             for (int other = BitsetIndex.next(overlapping, bit + 1); other >= 0; other = BitsetIndex.next(overlapping, other + 1)) {
                 int first = Math.min(index.ruleAt(bit), index.ruleAt(other));
                 int second = Math.max(index.ruleAt(bit), index.ruleAt(other));
-                if (!onlyConflictingOutputs || !Objects.equals(rules.get(first).output(), rules.get(second).output())) {
+                if (!onlyConflictingOutputs || !Objects.equals(comparableOutput.apply(rules.get(first).output()),
+                        comparableOutput.apply(rules.get(second).output()))) {
                     pairs.add(new int[] {first, second});
                 }
             }

@@ -5,6 +5,13 @@
  */
 package io.github.brunopacheco1.praecepta.engine;
 
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetTime;
+import java.time.Period;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -14,6 +21,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
+import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 
 /**
  * The matching of a column whose values are lists, such as a customer's nationalities. A cell holds
@@ -45,6 +53,8 @@ final class ListColumn {
     private final long[] anyRules;
     private final long[] positiveRules;
     private final long[] negatedRules;
+    /** Whether some cell is a {@code not(...)}: if none is, an element's sparse mask is read only on its own words. */
+    private final boolean hasNegatedRules;
     /** The rules a missing list matches: {@code -}, and positive cells with {@code null}. */
     private final long[] missingMask;
     /** The rules an empty list matches: {@code -} and every {@code not(...)}. */
@@ -67,6 +77,7 @@ final class ListColumn {
         }
         // a missing element's class: positive cells with null pass, comparisons are unknown; not(...) of an
         // unknown list is unknown, so no negated rule matches
+        hasNegatedRules = !BitsetIndex.isEmpty(negatedRules);
         missingMask = Masks.dense(elements.masks[elements.nullClass], words).clone();
         BitsetIndex.andNot(missingMask, negatedRules);
         emptyMask = anyRules.clone();
@@ -77,10 +88,13 @@ final class ListColumn {
      * The mask of the rules accepting a raw list: a {@code Collection} of the element type's values (as a
      * getter of a single value returns them), or text holding a FEEL list such as {@code ["PT", "BR"]}
      * (the brackets may be left out, and the elements follow Praecepta's cell syntax, so {@code PT, BR}
-     * works too). Null or blank text is a missing list, and {@code []} an empty one. A fresh mask.
+     * works too). Null or blank text is a missing list, and {@code []} an empty one.
      *
-     * @throws InvalidInputException if an element is missing, outside the declared input values or not a
-     *                               valid value of the type, or the text is not a list
+     * @return the list's mask, dense; a fresh one for a list with elements, and for a missing or an empty
+     *         list a shared one, so never to be changed (as {@link ColumnIndex#maskFor} says of its masks)
+     * @throws InvalidInputException if an element is missing, of another Java type than the column's
+     *                               values, outside the declared input values or not a valid value of the
+     *                               type, or the text is not a list
      */
     long[] maskFor(Object raw) {
         var values = elementsOf(raw);
@@ -100,6 +114,14 @@ final class ListColumn {
                 continue;
             }
             // a sparse mask (see Masks): the words it leaves out are zero
+            if (!hasNegatedRules) {
+                // only the mask's own words can pass a positive rule
+                for (int pair = 0; pair < mask.length; pair += 2) {
+                    int w = (int) mask[pair];
+                    passed[w] |= mask[pair + 1] & positiveRules[w];
+                }
+                continue;
+            }
             int pair = 0;
             for (int w = 0; w < words; w++) {
                 long bits = 0;
@@ -175,11 +197,31 @@ final class ListColumn {
         };
     }
 
-    /** An element, which may not be missing: a list holds values. */
+    /**
+     * An element, which may not be missing (a list holds values) and must be of a Java type the column
+     * takes: what a getter of a single value of its type returns, or text, which the element index parses.
+     */
     private Object element(Object value, Object list) {
         if (value == null || value instanceof String text && text.isBlank()) {
             throw new InvalidInputException(name, list, "holds a missing value; the elements of a list must be values");
         }
+        if (!(value instanceof String) && !takes(value)) {
+            throw new InvalidInputException(name, list, "holds a %s, not a %s".formatted(value.getClass().getName(), type.feelName()));
+        }
         return value;
+    }
+
+    /** Whether an element that is not text is of a Java type of the column's type, as its single-value getter returns it. */
+    private boolean takes(Object value) {
+        return switch (type) {
+            case STRING -> false; // text only
+            case NUMBER -> value instanceof Number;
+            case DATE -> value instanceof LocalDate;
+            case BOOLEAN -> value instanceof Boolean;
+            case TIME -> value instanceof LocalTime || value instanceof OffsetTime;
+            case DATE_TIME -> value instanceof LocalDateTime || value instanceof ZonedDateTime;
+            case DAY_TIME_DURATION -> value instanceof Duration;
+            case YEAR_MONTH_DURATION -> value instanceof Period || value instanceof YearsAndMonths;
+        };
     }
 }

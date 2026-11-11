@@ -10,8 +10,10 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
@@ -175,8 +177,9 @@ public final class DmnWriter {
             output(xml, c, outputs.get(c));
         }
         var rules = table.rules();
+        var readable = readableInputs(table);
         for (int r = 0; r < rules.size(); r++) {
-            rule(xml, r, rules.get(r), table);
+            rule(xml, r, rules.get(r), table, readable);
         }
         xml.append("    </decisionTable>\n");
     }
@@ -206,8 +209,26 @@ public final class DmnWriter {
         xml.append("      </output>\n");
     }
 
-    /** @param r the rule's index, from 0 */
-    private static void rule(StringBuilder xml, int r, Praeceptum rule, DecisionTable table) {
+    /**
+     * The inputs an output entry may name: the table's columns, and the inputs its cells compare with
+     * (as {@code DmnReader} reads them, and the engine evaluates them).
+     */
+    private static Set<String> readableInputs(DecisionTable table) {
+        var names = new HashSet<String>();
+        table.inputs().forEach(input -> names.add(input.name()));
+        try {
+            names.addAll(table.namedInputs().keySet());
+        } catch (IllegalArgumentException e) {
+            // an invalid cell, which writing the cells reports with its location
+        }
+        return names;
+    }
+
+    /**
+     * @param r        the rule's index, from 0
+     * @param readable the inputs an output entry may name (see {@link #readableInputs})
+     */
+    private static void rule(StringBuilder xml, int r, Praeceptum rule, DecisionTable table, Set<String> readable) {
         var where = "Rule " + rule.priority();
         xml.append("      <rule").append(id("rule_" + r)).append(">\n");
         var inputs = table.inputs();
@@ -226,7 +247,7 @@ public final class DmnWriter {
             var expression = rule.output().expressions().get(output.name());
             String value;
             if (input != null) {
-                value = namedInput(input, inputs, outputWhere);
+                value = namedInput(input, readable, outputWhere);
             } else if (expression != null) {
                 value = expression; // as written: FEEL already
             } else {
@@ -237,9 +258,9 @@ public final class DmnWriter {
         xml.append("      </rule>\n");
     }
 
-    /** An output entry that names an input: the input's name, which must be one of the table's columns. */
-    private static String namedInput(String input, List<InputColumn> inputs, String where) {
-        if (inputs.stream().noneMatch(column -> column.name().equals(input))) {
+    /** An output entry that names an input: the input's name, which must be a column or an input the cells compare with. */
+    private static String namedInput(String input, Set<String> readable, String where) {
+        if (!readable.contains(input)) {
             throw new InvalidDecisionTableException("%s: names '%s', which is not an input of the table".formatted(where, input));
         }
         return input;

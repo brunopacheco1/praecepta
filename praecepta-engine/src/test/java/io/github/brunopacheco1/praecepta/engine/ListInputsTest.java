@@ -7,6 +7,7 @@ package io.github.brunopacheco1.praecepta.engine;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -100,6 +101,24 @@ class ListInputsTest {
         // an empty list fails every test, a missing one makes them unknown
         Assertions.assertThat(engine.evaluate(new Customer(null, List.of()))).containsExactly("no-adult");
         Assertions.assertThat(engine.evaluate(new Customer(null, null))).isEmpty();
+    }
+
+    @Test
+    void elements_must_be_of_a_java_type_of_the_element_type() {
+        record Values(List<?> values) {
+        }
+        var engine = PraeceptaEngine.<Values, String>builder()
+                .hitPolicy(HitPolicy.COLLECT)
+                .listInput("ages", ColumnType.NUMBER, Values::values)
+                .output(output -> output.values().get("id"))
+                .rules(List.of(rule(1, Map.of("ages", "< 18"), "minor")))
+                .build();
+        // numbers of any class, and text, which is parsed as a number
+        Assertions.assertThat(engine.evaluate(new Values(List.of(10L, 40.5, "12")))).containsExactly("minor");
+        var date = new Values(List.of(40, LocalDate.of(2025, 1, 1)));
+        Assertions.assertThatThrownBy(() -> engine.evaluate(date))
+                .isInstanceOf(InvalidInputException.class)
+                .hasMessageContaining("holds a java.time.LocalDate, not a number");
     }
 
     @Test
@@ -204,6 +223,39 @@ class ListInputsTest {
         Assertions.assertThatThrownBy(builder::build)
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("input 'Flu Symptoms' holds lists in the table; bind it with listInput(...)");
+    }
+
+    @Test
+    void an_input_of_single_values_cannot_be_bound_as_a_list() {
+        // a column of the table
+        var column = PraeceptaEngine.<Patient, String>builder()
+                .table(SYMPTOMS)
+                .listInput("Symptom", Patient::fluSymptoms)
+                .listInput("Flu Symptoms", Patient::fluSymptoms)
+                .output(output -> output.values().get("id"));
+        Assertions.assertThatThrownBy(column::build)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("input 'Symptom' holds single values in the table but is bound with listInput(...)");
+        // an input a cell compares with, which would otherwise turn equality into membership
+        var limit = new DecisionTable("t", HitPolicy.FIRST, null, List.of(new DecisionTable.InputColumn("s", ColumnType.STRING)),
+                List.of(new DecisionTable.OutputColumn("id", ColumnType.STRING)), List.of(rule(1, Map.of("s", "limit"), "x")), true);
+        var named = PraeceptaEngine.<Patient, String>builder()
+                .table(limit)
+                .input("s", Patient::symptom)
+                .listInput("limit", Patient::fluSymptoms)
+                .output(output -> output.values().get("id"));
+        Assertions.assertThatThrownBy(named::build)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("input 'limit' holds single values in the table but is bound with listInput(...)");
+        // with map-based inputs, listColumnType(...) cannot make one a list either
+        var mapBased = PraeceptaEngine.<Map<String, String>, String>builder()
+                .table(limit)
+                .inputs(PraeceptaInput::new)
+                .listColumnType("limit", ColumnType.STRING)
+                .output(output -> output.values().get("id"));
+        Assertions.assertThatThrownBy(mapBased::build)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("input 'limit' holds single values in the table; listColumnType(...) cannot make it a list");
     }
 
     @Test

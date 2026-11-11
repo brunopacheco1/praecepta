@@ -195,7 +195,7 @@ public final class CellParser {
             var tests = new ArrayList<Test>();
             for (var part : splitDisjunction(text)) {
                 var test = listTest(part.strip());
-                var names = UnaryTests.names(new UnaryTests.Positive(List.of(test)));
+                var names = UnaryTests.names(test);
                 if (!names.isEmpty()) {
                     throw new CellSyntaxException(cell, "a list column's cells test its elements against literals, not against '"
                             + names.getFirst() + "'");

@@ -57,7 +57,8 @@ builds an engine once and calls it.
      every class of a line. A column has only the lines its input can reach (`Zoning`): `timeInput`
      and `dateTimeInput` give values without a zone, `offsetTimeInput` and `zonedDateTimeInput` with
      one, and map-based inputs, read from text, either; so the analysis looks for gaps among the
-     values that can really occur.
+     values that can really occur, and reports a map-based column whose cells all lack a zone as
+     leaving every zoned value unmatched (declared input values without a zone remove that line).
    - **Lists** (`ListColumn`): an ordinary column index over the same cells classifies one element.
      For each element, its class mask gives the positive cells it passes and the `not(...)` cells it
      breaks; ORing those over the elements gives "some element passes", and the list's mask is the
@@ -163,6 +164,10 @@ code, the Java baseline, DMN as the exchange format, the licence) are recorded i
   without such outputs keep their outputs converted once.
 - **FEEL's null and decimal semantics**: a missing operand or a division by zero gives null, a
   quotient keeps 34 digits, and computed numbers are written without trailing zeros, since a FEEL
-  number is a value, not a scale.
-- **ANY compares evaluated outputs**; an output with a priority list cannot be an expression, since
-  its rank must be known when the engine is built.
+  number is a value, not a scale. Literal outputs and outputs that name an input keep the text they
+  were given (`1.50`), so the output strategy sees what the table says.
+- **ANY compares evaluated outputs**, and compares number outputs by value, as FEEL's `=` does
+  (those a table declares as numbers, or that a rule computes as one), so `1.50`, `1.5` and
+  `price * 1` agree, at build time as at evaluation; output priority lists find number outputs by
+  value too. An output with a priority list cannot be an expression, since its rank must be known
+  when the engine is built.

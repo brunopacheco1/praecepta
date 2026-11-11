@@ -68,7 +68,7 @@ class OutputExpressionTest {
         Assertions.assertThat(OutputExpression.parse("s + \"!\"").type(types::get)).isEqualTo(ColumnType.STRING);
         Assertions.assertThat(OutputExpression.parse("-n * 2").type(types::get)).isEqualTo(ColumnType.NUMBER);
         Assertions.assertThatThrownBy(() -> OutputExpression.parse("s + n").type(types::get))
-                .isInstanceOf(ExpressionSyntaxException.class)
+                .isInstanceOf(ExpressionTypeException.class)
                 .hasMessage("+ combines a string and a number, which gives null in FEEL");
         Assertions.assertThatThrownBy(() -> OutputExpression.parse("s * 2").type(types::get))
                 .hasMessage("* combines a string and a number, which gives null in FEEL");
@@ -78,6 +78,14 @@ class OutputExpressionTest {
                 .hasMessage("- applies to numbers, not strings");
         Assertions.assertThatThrownBy(() -> OutputExpression.parse("d + 1").type(types::get))
                 .hasMessage("'d' is a date; output expressions combine strings and numbers");
+    }
+
+    @Test
+    void a_name_that_is_not_an_input_is_reported_by_name() {
+        Map<String, ColumnType> types = Map.of("n", ColumnType.NUMBER);
+        Assertions.assertThatThrownBy(() -> OutputExpression.parse("n + limit").type(types::get))
+                .isInstanceOf(ExpressionTypeException.class)
+                .hasMessage("'limit' is not an input");
     }
 
     @ParameterizedTest(name = "{0}")

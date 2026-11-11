@@ -33,12 +33,14 @@ over the value types of a cell (`UnaryTests`), or feed map-based inputs to table
   holding `"PT"` or `"ES"`, `>= 18` one with an element of at least 18. `not(...)` holds when **no
   element** does, so `not("PT")` reads "without PT". As in FEEL's `list contains`, a missing (null)
   list makes every test unknown, so it matches only `-` and `null`, while an empty list matches no
-  test, and so every `not(...)`. Elements may not be missing, and declared input values apply to the
-  elements. The elements of a TIME or DATE_TIME list may have a time zone or not, each compared as a
-  single value of its kind is: an element that cannot be compared with a cell's literal leaves its
-  test unknown, so a `not(...)` holds only when every element is known to fail. The index ORs the
-  masks of the elements' values, a few word operations per element, then ANDs across columns as
-  usual. `DecisionTable` gains `listInputs`, and `DecisionTable.cell(rule, column)` parses a cell as
+  test, and so every `not(...)`. Elements may not be missing, must be of the Java types a getter of
+  a single value returns (or text), and declared input values apply to them; a table's input of single
+  values cannot be bound as a list. The elements of a TIME or DATE_TIME list may have a time zone or
+  not, each compared as a single value of its kind is: an element that cannot be compared with a
+  cell's literal leaves its test unknown, so a `not(...)` holds only when every element is known to
+  fail. The index ORs the masks of the elements' values, a few word operations per element (only on
+  an element's own words when its mask is sparse and no cell of the column is a `not(...)`), then
+  ANDs across columns as usual, list columns after the others with as many `-` cells. `DecisionTable` gains `listInputs`, and `DecisionTable.cell(rule, column)` parses a cell as
   the table holds it.
   - **DMN:** strict FEEL compares a list as a whole (`"PT"` never equals `["PT","BR"]`), so a list
     column's entries are written with FEEL's list functions, joined with `or`:
@@ -66,8 +68,12 @@ over the value types of a cell (`UnaryTests`), or feed map-based inputs to table
   as written). The engine parses each expression and checks the types of the inputs it names when it
   is built (a string and a number never combine; inputs of other types are rejected), and evaluates
   it only for the rules that match, as it does for outputs that name an input. Under ANY the evaluated
-  outputs are compared; an output with a priority list cannot be an expression. `DmnReader` reads such
-  entries, checking that the value has the output's type (a string output takes a number as its text),
+  outputs are compared, number outputs by value as FEEL's `=` compares them (`1.50` agrees with
+  `price * 1` for a price of 1.5, although each output keeps its text), and so are the values of a
+  table's number outputs in their priority lists; an output with a priority list cannot be an expression. `DmnReader` reads such
+  entries, checking that the value has the output's type (a string output takes a number as its text)
+  and that they read only inputs of single values the engine has: the table's columns and the inputs
+  its cells compare with (so may an entry that names an input),
   and `DmnWriter` writes them back unchanged. Other FEEL (function calls, comparisons, `if`, lists) is
   still rejected with a message saying what is not supported. With list inputs above, both checks of
   the DMN TCK's `0039-dt-list-semantics` pass.
@@ -80,7 +86,10 @@ over the value types of a cell (`UnaryTests`), or feed map-based inputs to table
   is undefined: the test is unknown, so neither `time("08:00:00")` nor its `not(...)` matches
   `08:00Z`. The builder gains `offsetTimeInput` and `zonedDateTimeInput` (bind an `OffsetDateTime`
   through `toZonedDateTime()`); map-based inputs read both kinds from text, including the
-  `[Europe/Paris]` form `ZonedDateTime.toString()` writes. In the index, values with a zone lie on a
+  `[Europe/Paris]` form `ZonedDateTime.toString()` writes. A zoned date-time is written as FEEL
+  writes it (`2025-12-24T09:00:00@Europe/Paris`), except the later of two equal local times when
+  clocks go back, which also takes its offset (`2025-10-26T02:30:00+01:00[Europe/Paris]`, and in a
+  FEEL literal `date and time("2025-10-26T02:30:00+01:00")`), so it reads back as the same instant. In the index, values with a zone lie on a
   line of their own, ordered by instant and keyed in `PrimitiveKeys` by nanoseconds, and a column
   has only the lines its binding can give, so gap analysis stays exact: a typed getter's column
   is searched for gaps among its own kind only, a map-based one among both (a gap there reads, for
@@ -115,9 +124,14 @@ over the value types of a cell (`UnaryTests`), or feed map-based inputs to table
   these cases.
 - **Map-based inputs accept times and date-times with a time zone**, which they used to reject as
   invalid: they now match only the cells that accept any value (or test with zoned literals), and
-  the validation report may list gaps among them for tables with time or date-time comparisons. Bind
-  such columns with `timeInput` or `dateTimeInput`, or declare their input values, to keep to values
-  without a zone.
+  the validation report may list gaps among them for tables with time or date-time comparisons
+  (`cutOff = any time with a time zone`), so a table built with `failOn(WARNING)` in 0.3 may now
+  fail. The warning is real: a zoned input matches no rule whose cells all lack a zone. To keep a
+  map-based column to values without a zone, declare its input values without one, such as
+  `allowedValues("cutOff", "[time(\"00:00:00\")..time(\"23:59:59\")]")`: zoned values are then
+  invalid input, and no gap is searched among them. Otherwise bind the inputs with typed getters,
+  `timeInput` or `dateTimeInput` for such columns (`inputs(...)` does not mix with per-column
+  bindings, so every input is then bound per column).
 - **`DmnReader` reads columns typed by a collection** instead of rejecting them; an output of a
   collection type, a collection of collections, and allowed values on a collection itself are still
   rejected.

@@ -27,6 +27,9 @@ import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 
 /** Times and date-times with a time zone (#70): compared by instant, and never with values without a zone. */
 class ZonedTimesTest {
@@ -108,6 +111,54 @@ class ZonedTimesTest {
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "11:00Z"))).isEmpty();
         Assertions.assertThat(engine.validationReport().issues(Kind.GAP)).extracting(ValidationReport.Issue::detail)
                 .containsExactly("cutOff in {[time(\"12:00:00\")..+inf), any time with a time zone}");
+    }
+
+    @Test
+    void map_inputs_keep_to_times_without_a_zone_when_the_input_values_have_none() {
+        var engine = PraeceptaEngine.<Map<String, String>, String>builder()
+                .hitPolicy(HitPolicy.UNIQUE)
+                .inputs(PraeceptaInput::new)
+                .columnType("cutOff", ColumnType.TIME)
+                .allowedValues("cutOff", "[time(\"00:00:00\")..time(\"23:59:59\")]")
+                .output(output -> output.values().get("slot"))
+                .rules(List.of(new Praeceptum(1, new PraeceptaInput(Map.of("cutOff", "< time(\"12:00:00\")")),
+                                new PraeceptaOutput(Map.of("slot", "morning"))),
+                        new Praeceptum(2, new PraeceptaInput(Map.of("cutOff", ">= time(\"12:00:00\")")),
+                                new PraeceptaOutput(Map.of("slot", "afternoon")))))
+                .build();
+        Assertions.assertThat(engine.validationReport().isEmpty()).as("%s", engine.validationReport()).isTrue();
+        Assertions.assertThat(engine.evaluate(Map.of("cutOff", "13:00"))).containsExactly("afternoon");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("cutOff", "13:00Z"))).isInstanceOf(InvalidInputException.class);
+    }
+
+    @Test
+    void an_output_naming_a_zoned_input_keeps_its_instant_when_clocks_go_back() {
+        // 02:30 happens twice in Paris on 2025-10-26: at +02:00 (00:30Z), then at +01:00 (01:30Z)
+        var earlier = ZonedDateTime.of(2025, 10, 26, 2, 30, 0, 0, PARIS);
+        var later = earlier.withLaterOffsetAtOverlap();
+        var engine = PraeceptaEngine.<Delivery, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .zonedDateTimeInput("at", Delivery::at)
+                .output(output -> output.values().get("due"))
+                .rules(List.of(new Praeceptum(1, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of(), Map.of("due", "at")))))
+                .build();
+        var earlierText = engine.evaluate(new Delivery(null, earlier)).getFirst();
+        var laterText = engine.evaluate(new Delivery(null, later)).getFirst();
+        Assertions.assertThat(earlierText).isEqualTo("2025-10-26T02:30:00@Europe/Paris");
+        Assertions.assertThat(laterText).isEqualTo("2025-10-26T02:30:00+01:00[Europe/Paris]");
+        Assertions.assertThat(FeelTemporals.parseZonedDateTime(earlierText)).isEqualTo(earlier);
+        Assertions.assertThat(FeelTemporals.parseZonedDateTime(laterText)).isEqualTo(later);
+        // FEEL has no literal for it with the zone id: it is written with its offset, which keeps the instant
+        Assertions.assertThat(FeelLiterals.literal(later)).isEqualTo("date and time(\"2025-10-26T02:30:00+01:00\")");
+    }
+
+    @Test
+    void zoned_date_times_beyond_the_keys_range_are_still_compared_by_instant() {
+        var engine = deliveries(HitPolicy.FIRST, DELIVERIES);
+        var farFuture = ZonedDateTime.of(3000, 1, 1, 0, 0, 0, 0, PARIS);
+        Assertions.assertThat(engine.evaluate(new Delivery(OffsetTime.of(11, 0, 0, 0, ZoneOffset.UTC), farFuture))).containsExactly("holiday");
+        Assertions.assertThat(engine.evaluate(new Delivery(OffsetTime.of(11, 0, 0, 0, ZoneOffset.UTC), farFuture.withYear(1000))))
+                .containsExactly("afternoon");
     }
 
     @Test

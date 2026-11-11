@@ -37,6 +37,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableE
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.ExpressionTypeException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
@@ -57,7 +58,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * named inputs whose {@code inputData} is such a collection (see {@link DecisionTable#listInputs}); input
  * entries in Praecepta's FEEL subset (lists, {@code not(...)}, {@code null}, comparisons, intervals, {@code -}); input and output value
  * lists; output entries that are literals or name one of the table's inputs (of the output's type, or
- * any input for a string output), or that join string and number literals and the table's inputs with
+ * any input for a string output; an input is a column or an input the cells compare with, and holds single
+ * values), or that join string and number literals and the table's inputs with
  * {@code +}, {@code -}, {@code *} and {@code /} ({@link OutputExpression}, kept as written in
  * {@link PraeceptaOutput#expressions()}); every hit policy; SUM, MIN, MAX and COUNT aggregation. Anything else is rejected with an
  * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered
@@ -142,12 +144,15 @@ public final class DmnReader {
         }
         // cells stay strict FEEL, where a name compares with another input
         var read = new DecisionTable(name, hitPolicy, aggregation, inputs, outputs, rules, true, lists);
-        var namedLists = namedListInputs(decision.getOwnerDocument().getDocumentElement(), read, types, where);
-        if (namedLists.isEmpty()) {
-            return read;
+        Map<String, ColumnType> named;
+        try {
+            named = read.namedInputs();
+        } catch (IllegalArgumentException e) {
+            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }
-        lists.addAll(namedLists);
-        return new DecisionTable(name, hitPolicy, aggregation, inputs, outputs, rules, true, lists);
+        lists.addAll(namedListInputs(decision.getOwnerDocument().getDocumentElement(), named, types, where));
+        var checked = checkComputedOutputs(rules, inputs, named, lists, outputs, where);
+        return new DecisionTable(name, hitPolicy, aggregation, inputs, outputs, checked, true, lists);
     }
 
     /**
@@ -155,13 +160,7 @@ public final class DmnReader {
      * type of the type of the column that names them, as {@code Flu Symptoms} in
      * {@code Flu Symptoms} (a cell that holds when the column's value is in that list).
      */
-    private static List<String> namedListInputs(Element root, DecisionTable table, ItemDefinitions types, String where) {
-        Map<String, ColumnType> named;
-        try {
-            named = table.namedInputs();
-        } catch (IllegalArgumentException e) {
-            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
-        }
+    private static List<String> namedListInputs(Element root, Map<String, ColumnType> named, ItemDefinitions types, String where) {
         var lists = new ArrayList<String>();
         for (var inputData : descendants(root, "inputData")) {
             var variable = child(inputData, "variable");
@@ -304,10 +303,8 @@ public final class DmnReader {
             var text = textOf(outputEntries.get(c)).strip();
             var outputWhere = ruleWhere + ", output '" + column.name() + "'";
             var input = namedInput(text, inputs, column, outputWhere);
-            if (input != null && lists.contains(input.name())) {
-                throw new InvalidDecisionTableException("%s: names input '%s', a list, which outputs cannot hold".formatted(outputWhere, text));
-            }
             if (input != null) {
+                checkReference(input, lists, outputWhere);
                 references.put(column.name(), input.name());
                 continue;
             }
@@ -315,28 +312,74 @@ public final class DmnReader {
             if (literal != null) {
                 values.put(column.name(), literal.text());
             } else {
-                checkExpression(text, inputs, lists, column, outputWhere);
+                // checked once the inputs the cells compare with are known (see checkComputedOutputs)
+                parseExpression(text, outputWhere);
                 expressions.put(column.name(), text);
             }
         }
         return new Praeceptum(number, new PraeceptaInput(cells), new PraeceptaOutput(values, references, expressions));
     }
 
+    /** An output entry may name an input that holds single values only: an output holds one value. */
+    private static void checkReference(InputColumn input, Set<String> lists, String where) {
+        if (lists.contains(input.name())) {
+            throw new InvalidDecisionTableException("%s: names input '%s', a list, which outputs cannot hold".formatted(where, input.name()));
+        }
+    }
+
     /**
-     * Checks an output entry that computes its value ({@link OutputExpression}): it parses, it names
-     * only the table's inputs of single values, their types go together, and the value has the output's
-     * type, or any type for a string output (which takes a number as its text, as it takes number literals).
+     * Checks the output entries that compute their value, now that the inputs the cells compare with are
+     * known: an expression may read the table's columns and those inputs, as the engine evaluates it,
+     * and an entry that is just the name of such an input names it, as an entry naming a column does.
      */
-    private static void checkExpression(String text, List<InputColumn> inputs, Set<String> lists, OutputColumn output, String where) {
-        OutputExpression expression;
+    private static List<Praeceptum> checkComputedOutputs(List<Praeceptum> rules, List<InputColumn> inputs, Map<String, ColumnType> named,
+            Set<String> lists, List<OutputColumn> outputs, String where) {
+        var types = new HashMap<>(named);
+        inputs.forEach(input -> types.put(input.name(), input.type()));
+        var outputsByName = new HashMap<String, OutputColumn>();
+        outputs.forEach(output -> outputsByName.put(output.name(), output));
+        var checked = new ArrayList<Praeceptum>();
+        for (var rule : rules) {
+            var output = rule.output();
+            var references = new HashMap<>(output.references());
+            var expressions = new HashMap<String, String>();
+            output.expressions().forEach((column, text) -> {
+                var outputWhere = where + ", rule " + rule.priority() + ", output '" + column + "'";
+                var input = named.containsKey(text)
+                        ? namedInput(text, List.of(new InputColumn(text, named.get(text))), outputsByName.get(column), outputWhere)
+                        : null;
+                if (input != null) {
+                    checkReference(input, lists, outputWhere);
+                    references.put(column, text);
+                } else {
+                    checkExpression(text, types, lists, outputsByName.get(column), outputWhere);
+                    expressions.put(column, text);
+                }
+            });
+            checked.add(new Praeceptum(rule.priority(), rule.input(), new PraeceptaOutput(output.values(), references, expressions)));
+        }
+        return checked;
+    }
+
+    private static OutputExpression parseExpression(String text, String where) {
         try {
-            expression = OutputExpression.parse(text);
+            return OutputExpression.parse(text);
         } catch (ExpressionSyntaxException e) {
             throw new InvalidDecisionTableException(("%s: '%s' is not supported; output entries must be literals, name an input, "
                     + "or join literals and inputs with +, -, * and / (%s)").formatted(where, text, e.getMessage()));
         }
-        var types = new HashMap<String, ColumnType>();
-        inputs.forEach(input -> types.put(input.name(), input.type()));
+    }
+
+    /**
+     * Checks an output entry that computes its value ({@link OutputExpression}): it parses, it names
+     * only inputs of single values (the table's columns, or inputs its cells compare with: those the
+     * engine reads), their types go together, and the value has the output's type, or any type for a
+     * string output (which takes a number as its text, as it takes number literals).
+     *
+     * @param types the type of each input an expression may read
+     */
+    private static void checkExpression(String text, Map<String, ColumnType> types, Set<String> lists, OutputColumn output, String where) {
+        var expression = parseExpression(text, where);
         for (var name : expression.names()) {
             if (!types.containsKey(name) || lists.contains(name)) {
                 throw new InvalidDecisionTableException(("%s: '%s' names '%s', which is not one of the table's inputs of single values; "
@@ -346,7 +389,7 @@ public final class DmnReader {
         ColumnType type;
         try {
             type = expression.type(types::get);
-        } catch (ExpressionSyntaxException e) {
+        } catch (ExpressionTypeException e) {
             throw new InvalidDecisionTableException("%s: '%s' %s".formatted(where, text, e.getMessage()));
         }
         if (type != output.type() && output.type() != ColumnType.STRING) {

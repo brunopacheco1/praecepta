@@ -41,7 +41,9 @@ public final class FeelLiterals {
             case LocalTime time -> "time(\"" + text(time) + "\")";
             case OffsetTime time -> "time(\"" + text(time) + "\")";
             case LocalDateTime dateTime -> "date and time(\"" + text(dateTime) + "\")";
-            case ZonedDateTime dateTime -> "date and time(\"" + text(dateTime) + "\")";
+            // FEEL has no literal for the later of two equal local times in a zone: the offset keeps its instant
+            case ZonedDateTime dateTime -> "date and time(\"" + (isLaterAtOverlap(dateTime)
+                    ? DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(dateTime) : text(dateTime)) + "\")";
             case Duration duration -> "duration(\"" + text(duration) + "\")";
             case YearsAndMonths duration -> "duration(\"" + duration + "\")";
             default -> text(value); // numbers and booleans
@@ -52,7 +54,10 @@ public final class FeelLiterals {
      * The plain text of a value: decimals without an exponent, ISO dates and times with their seconds
      * and, if they have one, their offset ({@code 08:30:00Z}, {@code 2025-01-31T08:30:00+01:00}) or zone
      * id as FEEL writes it ({@code 2025-01-31T08:30:00@Europe/Paris}), ISO durations as FEEL writes them
-     * ({@code P1DT2H}, {@code P1Y2M}).
+     * ({@code P1DT2H}, {@code P1Y2M}). A date-time whose local time occurs twice in its zone, as clocks go
+     * back, and that is the later of the two, is written with its offset and zone id
+     * ({@code 2025-10-26T02:30:00+01:00[Europe/Paris]}): the zone id alone would read back as the earlier
+     * one. {@link FeelTemporals#parseDateTime} reads all of them back to the same instant.
      */
     public static String text(Object value) {
         return switch (value) {
@@ -61,11 +66,16 @@ public final class FeelLiterals {
             case LocalTime time -> DateTimeFormatter.ISO_LOCAL_TIME.format(time);
             case OffsetTime time -> DateTimeFormatter.ISO_OFFSET_TIME.format(time);
             case LocalDateTime dateTime -> DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime);
-            case ZonedDateTime dateTime -> dateTime.getZone() instanceof ZoneOffset
-                    ? DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(dateTime)
-                    : DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime) + "@" + dateTime.getZone().getId();
+            case ZonedDateTime dateTime when dateTime.getZone() instanceof ZoneOffset -> DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(dateTime);
+            case ZonedDateTime dateTime when isLaterAtOverlap(dateTime) -> DateTimeFormatter.ISO_ZONED_DATE_TIME.format(dateTime);
+            case ZonedDateTime dateTime -> DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime) + "@" + dateTime.getZone().getId();
             default -> value.toString();
         };
+    }
+
+    /** Whether the date-time's local time occurs twice in its zone (clocks going back), and it is the later one. */
+    private static boolean isLaterAtOverlap(ZonedDateTime dateTime) {
+        return !dateTime.equals(dateTime.withEarlierOffsetAtOverlap());
     }
 
     /** A days and time duration with its days, as FEEL writes it: {@code P1DT2H30M}, {@code -PT0.5S}, {@code PT0S}. */

@@ -152,25 +152,8 @@ final class TimeZones {
 
     /** The literal values of a cell, in the order written; names of other inputs are left out. */
     private static List<Comparable<?>> literals(UnaryTests cell) {
-        var tests = switch (cell) {
-            case UnaryTests.Any any -> List.<UnaryTests.Test>of();
-            case UnaryTests.Positive(var positive) -> positive;
-            case UnaryTests.Negated(var negated) -> negated;
-        };
         var values = new ArrayList<Comparable<?>>();
-        for (var test : tests) {
-            switch (test) {
-                case UnaryTests.NullTest n -> {
-                    // no value
-                }
-                case UnaryTests.Equals(var value) -> values.add(value);
-                case UnaryTests.Compare(var operator, var value) -> values.add(value);
-                case UnaryTests.Range(var low, var lowClosed, var high, var highClosed) -> {
-                    values.add(low);
-                    values.add(high);
-                }
-            }
-        }
+        cell.tests().forEach(test -> values.addAll(UnaryTests.values(test)));
         values.removeIf(UnaryTests.Name.class::isInstance);
         return values;
     }

@@ -12,11 +12,13 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
@@ -98,6 +100,79 @@ class OutputExpressionsTest {
         Assertions.assertThatThrownBy(() -> other.evaluate(new Order("PT", new BigDecimal(3), null, null)))
                 .isInstanceOf(HitPolicyViolationException.class);
         Assertions.assertThat(other.evaluate(new Order("PT", BigDecimal.ZERO, null, null))).as("both give 0").containsExactly(values("total", "0"));
+    }
+
+    @Test
+    void any_compares_numbers_by_value_however_the_rules_write_them() {
+        // a literal keeps its scale, as does an output naming an input; a computed number has no trailing zeros
+        var engine = byColumn(HitPolicy.ANY, List.of(
+                rule(1, Map.of(), Map.of("total", "1.50"), Map.of()),
+                rule(2, Map.of(), Map.of(), Map.of("total", "price * 1")),
+                new Praeceptum(3, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of(), Map.of("total", "price")))));
+        Assertions.assertThat(engine.evaluate(new Order("PT", new BigDecimal("1.5"), null, null))).containsExactly(values("total", "1.50"));
+        Assertions.assertThat(engine.evaluate(new Order("PT", new BigDecimal("1.500"), null, null))).containsExactly(values("total", "1.50"));
+        Assertions.assertThatThrownBy(() -> engine.evaluate(new Order("PT", new BigDecimal("1.6"), null, null)))
+                .isInstanceOf(HitPolicyViolationException.class);
+
+        // outputs that read no input: a table's number output is compared by value, an untyped output as text
+        var rules = List.of(rule(1, Map.of(), Map.of("total", "1.50"), Map.of()), rule(2, Map.of(), Map.of("total", "1.5"), Map.of()));
+        var table = new DecisionTable("t", HitPolicy.ANY, null, List.of(new DecisionTable.InputColumn("country", ColumnType.STRING)),
+                List.of(new DecisionTable.OutputColumn("total", ColumnType.NUMBER)), rules);
+        var typed = PraeceptaEngine.<Order, Map<String, String>>builder()
+                .table(table)
+                .input("country", Order::country)
+                .output(PraeceptaOutput::values)
+                .build();
+        Assertions.assertThat(typed.validationReport().isEmpty()).isTrue();
+        Assertions.assertThat(typed.evaluate(new Order("PT", null, null, null))).containsExactly(values("total", "1.50"));
+        var untyped = byColumn(HitPolicy.ANY, rules);
+        Assertions.assertThat(untyped.validationReport().issues(ValidationReport.Kind.CONFLICTING_OUTPUTS)).hasSize(1);
+        Assertions.assertThatThrownBy(() -> untyped.evaluate(new Order("PT", null, null, null)))
+                .isInstanceOf(HitPolicyViolationException.class);
+    }
+
+    @Test
+    void an_aggregation_gets_a_computed_output_that_is_missing_as_null() {
+        // the strategy skips missing values, as a sum over FEEL's nulls would leave them out
+        var engine = PraeceptaEngine.<Order, Optional<BigDecimal>>builder()
+                .hitPolicy(HitPolicy.COLLECT)
+                .aggregation(AggregationOperator.SUM)
+                .numberInput("price", Order::price)
+                .numberInput("discount", Order::discount)
+                .output(new OutputStrategy<>() {
+                    @Override
+                    public Optional<BigDecimal> transform(PraeceptaOutput output) {
+                        return Optional.ofNullable(output.values().get("fee")).map(BigDecimal::new);
+                    }
+
+                    @Override
+                    public Optional<BigDecimal> sum(Optional<BigDecimal> a, Optional<BigDecimal> b) {
+                        return a.isEmpty() ? b : b.isEmpty() ? a : Optional.of(a.get().add(b.get()));
+                    }
+                })
+                .rules(List.of(rule(1, Map.of(), Map.of("fee", "5"), Map.of()), rule(2, Map.of(), Map.of(), Map.of("fee", "price * 0.1")),
+                        rule(3, Map.of(), Map.of(), Map.of("fee", "price / discount"))))
+                .build();
+        Assertions.assertThat(engine.evaluate(new Order("PT", new BigDecimal(30), new BigDecimal(2), null)))
+                .containsExactly(Optional.of(new BigDecimal("23")));
+        // no discount: price / discount is missing
+        Assertions.assertThat(engine.evaluate(new Order("PT", new BigDecimal(30), null, null))).containsExactly(Optional.of(new BigDecimal("8")));
+        // no price: only the literal fee is left
+        Assertions.assertThat(engine.evaluate(new Order("PT", null, null, null))).containsExactly(Optional.of(new BigDecimal("5")));
+    }
+
+    @Test
+    void priority_lists_find_number_outputs_by_value() {
+        var rules = List.of(rule(1, Map.of(), Map.of("rate", "1.50"), Map.of()), rule(2, Map.of(), Map.of("rate", "10"), Map.of()));
+        var table = new DecisionTable("t", HitPolicy.PRIORITY, null, List.of(new DecisionTable.InputColumn("country", ColumnType.STRING)),
+                List.of(new DecisionTable.OutputColumn("rate", ColumnType.NUMBER, List.of("10.0", "1.5"))), rules);
+        var engine = PraeceptaEngine.<Order, Map<String, String>>builder()
+                .table(table)
+                .input("country", Order::country)
+                .output(PraeceptaOutput::values)
+                .build();
+        // the output keeps its text; 1.50 is the list's 1.5, and 10 its 10.0, which ranks first
+        Assertions.assertThat(engine.evaluate(new Order("PT", null, null, null))).containsExactly(values("rate", "10"));
     }
 
     @Test

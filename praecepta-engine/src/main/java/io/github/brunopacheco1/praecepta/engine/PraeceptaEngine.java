@@ -48,6 +48,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.ExpressionTypeException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
@@ -113,16 +114,18 @@ public final class PraeceptaEngine<I, O> {
     private final OutputStrategy<O> outputStrategy;
 
     // Indexed by bit, i.e. by rule in the index's bit order (see bitToRule):
-    /** The rule's converted output; null if it reads an input (see namedInputsByBit). */
+    /** The rule's converted output; null if it reads an input (see computedByBit). */
     private final Object[] outputByBit;
     /** The rule's output as a ready-made single-hit result, so that evaluation does not allocate one; null as above. */
     private final List<O>[] singleByBit;
     /** The rule's outputs as written, for ANY when outputs read inputs. */
     private final PraeceptaOutput[] ruleOutputByBit;
-    /** The rule's outputs that name an input or are expressions, filled in on every evaluation; null if it has none. */
-    private final NamedInputs[] namedInputsByBit;
-    /** Whether some rule's output names an input or is an expression. */
-    private final boolean namesInputs;
+    /** The rule's outputs that read inputs (name an input or are expressions), computed on every evaluation; null if it has none. */
+    private final ComputedOutputs[] computedByBit;
+    /** Whether some rule's output reads inputs. */
+    private final boolean readsInputs;
+    /** The outputs that hold numbers, which ANY compares by value. */
+    private final Set<String> numericOutputs;
     /** The rule's cells that compare with another input, checked after the index; null if it has none. */
     private final VariableCell[][] variableCellsByBit;
     /** The rules with such cells. */
@@ -152,9 +155,10 @@ public final class PraeceptaEngine<I, O> {
         var variableCells = takeVariableCells(rules, types, cells, builder.inputStrategy != null, lists);
         var allowedValues = allowedValues(builder, types.keySet());
         inputs = List.copyOf(types.keySet());
-        var evaluationOrder = orderByWildcards(inputs, cells);
+        var evaluationOrder = orderByWildcards(inputs, cells, lists);
 
-        int[] bitToRule = bitToRule(rules, builder.outputPriority);
+        var numeric = numericOutputs(builder.tableOutputTypes, rules, types);
+        int[] bitToRule = bitToRule(rules, builder.outputPriority, numeric);
         int words = BitsetIndex.wordsFor(rules.size());
         var enumValues = enumValuesByColumn(builder.bindings);
         var columnIndexes = evaluationOrder.stream()
@@ -181,10 +185,10 @@ public final class PraeceptaEngine<I, O> {
         @SuppressWarnings({"rawtypes", "unchecked"}) // a generic array cannot be created otherwise
         List<O>[] singles = new List[ruleCount];
         singleByBit = singles;
-        namedInputsByBit = new NamedInputs[ruleCount];
+        computedByBit = new ComputedOutputs[ruleCount];
         ruleOutputByBit = new PraeceptaOutput[ruleCount];
         idByBit = new Integer[ruleCount];
-        boolean anyNamed = false;
+        boolean anyReads = false;
         for (int bit = 0; bit < ruleCount; bit++) {
             var rule = rules.get(bitToRule[bit]);
             idByBit[bit] = rule.priority();
@@ -194,14 +198,15 @@ public final class PraeceptaEngine<I, O> {
                 outputByBit[bit] = output;
                 singleByBit[bit] = List.of(output);
             } else {
-                namedInputsByBit[bit] = namedInputs(rule, evaluationOrder, lists, types);
-                anyNamed = true;
+                computedByBit[bit] = computedOutputs(rule, evaluationOrder, lists, types);
+                anyReads = true;
             }
         }
-        namesInputs = anyNamed;
+        readsInputs = anyReads;
+        numericOutputs = numeric;
         // with outputs that read inputs, ANY compares the outputs of each evaluation instead
-        sameOutputsByBit = hitPolicy == HitPolicy.ANY && !namesInputs
-                ? sameOutputMasks(rules, bitToRule, index.words(), builder.maskForm)
+        sameOutputsByBit = hitPolicy == HitPolicy.ANY && !readsInputs
+                ? sameOutputMasks(rules, bitToRule, index.words(), builder.maskForm, numericOutputs)
                 : null;
         reduce = reducer(builder.aggregation, builder.outputStrategy);
         count = builder.aggregation == AggregationOperator.COUNT ? builder.outputStrategy::count : null;
@@ -212,7 +217,7 @@ public final class PraeceptaEngine<I, O> {
         // rules that test a list column match lists the index's classes cannot describe: the analysis leaves them out too
         var unseenRules = listRules(index);
         BitsetIndex.or(unseenRules, variableRules);
-        report = validate(index, rules, hitPolicy, unseenRules, builder.failOn);
+        report = validate(index, rules, hitPolicy, unseenRules, numericOutputs, builder.failOn);
     }
 
     /** Starts configuring an engine. */
@@ -229,7 +234,8 @@ public final class PraeceptaEngine<I, O> {
      * @throws HitPolicyViolationException if the input matches several rules under UNIQUE, or rules
      *                                     with different outputs under ANY
      * @throws InvalidInputException       if a value is outside its column's declared input values, or
-     *                                     not a valid value of the column's type
+     *                                     not a valid value of the column's type (for a list, if an
+     *                                     element is missing or of another type)
      */
     public List<O> evaluate(I input) {
         return inputStrategy == null
@@ -256,7 +262,7 @@ public final class PraeceptaEngine<I, O> {
             }
             case ANY -> {
                 int bit = BitsetIndex.first(matches);
-                if (namesInputs ? !sameOutputs(matches, input, reader) : !Masks.isSubset(matches, sameOutputsByBit[bit])) {
+                if (readsInputs ? !sameOutputs(matches, input, reader) : !Masks.isSubset(matches, sameOutputsByBit[bit])) {
                     throw violation(matches);
                 }
                 yield single(bit, input, reader);
@@ -268,7 +274,7 @@ public final class PraeceptaEngine<I, O> {
                 var selected = new Object[BitsetIndex.count(matches)];
                 int i = 0;
                 for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
-                    selected[i++] = namedInputsByBit[bit] == null ? outputByBit[bit] : outputStrategy.transform(output(bit, input, reader));
+                    selected[i++] = computedByBit[bit] == null ? outputByBit[bit] : outputStrategy.transform(output(bit, input, reader));
                 }
                 if (reduce != null) {
                     var total = (O) selected[0];
@@ -374,16 +380,11 @@ public final class PraeceptaEngine<I, O> {
      * list, so {@code > limits} or {@code [low..limits]} would never hold.
      */
     private static void rejectComparisonsWithLists(Praeceptum rule, String column, UnaryTests cell, Set<String> lists) {
-        var tests = switch (cell) {
-            case UnaryTests.Any any -> List.<UnaryTests.Test>of();
-            case UnaryTests.Positive(var positive) -> positive;
-            case UnaryTests.Negated(var negated) -> negated;
-        };
-        for (var test : tests) {
+        for (var test : cell.tests()) {
             if (test instanceof UnaryTests.Equals) {
                 continue;
             }
-            for (var name : UnaryTests.names(new UnaryTests.Positive(List.of(test)))) {
+            for (var name : UnaryTests.names(test)) {
                 if (lists.contains(name)) {
                     throw new InvalidDecisionTableException(("Rule %s, column '%s': compares with '%s', which holds lists; "
                             + "a cell can only ask whether the value is in it, as '%s' does").formatted(rule.priority(), column, name, name));
@@ -470,73 +471,63 @@ public final class PraeceptaEngine<I, O> {
         return index.column(column).value(reader.read(input, column));
     }
 
-    // ---- outputs that name an input or are expressions ----------------------------------------
+    // ---- outputs that read inputs: outputs that name an input, and expressions ---------------------
 
     /**
-     * A rule's outputs that read inputs: its other outputs; for each output that names an input, the
-     * output column and the input column's position in the evaluation order; and for each expression,
-     * the output column, the parsed expression and the position of each input it names. A class, not a
-     * record: it holds arrays and is never compared.
+     * One output of a rule that reads inputs: the output column, the expression that computes it (a
+     * {@link OutputExpression.Name} for an output that names an input), and the position, in the
+     * evaluation order, of each input it reads.
+     *
+     * @param reference whether the output names an input, so it takes that input's value as its text
+     *                  ({@link FeelLiterals#text}, a number keeping its scale); else it is an expression,
+     *                  and a computed number is written without trailing zeros
      */
-    private static final class NamedInputs {
-        private final Map<String, String> values;
-        private final String[] outputs;
-        private final int[] columns;
-        private final String[] expressionOutputs;
-        private final OutputExpression[] expressions;
-        private final Map<String, Integer>[] expressionColumns;
+    private record Computed(String output, OutputExpression expression, Map<String, Integer> columns, boolean reference) {
+    }
 
-        NamedInputs(Map<String, String> values, String[] outputs, int[] columns, String[] expressionOutputs,
-                OutputExpression[] expressions, Map<String, Integer>[] expressionColumns) {
+    /**
+     * A rule's outputs that read inputs: its other outputs, as written, and the computed ones. A class,
+     * not a record: it holds an array and is never compared.
+     */
+    private static final class ComputedOutputs {
+        private final Map<String, String> values;
+        private final Computed[] computed;
+
+        ComputedOutputs(Map<String, String> values, Computed[] computed) {
             this.values = values;
-            this.outputs = outputs;
-            this.columns = columns;
-            this.expressionOutputs = expressionOutputs;
-            this.expressions = expressions;
-            this.expressionColumns = expressionColumns;
+            this.computed = computed;
         }
     }
 
     /**
-     * The outputs of {@code rule} that read inputs, checked: each names an input that holds single
-     * values, an expression parses and its inputs' types go together, and none is in an output priority
-     * list (see {@link #priorityKey}), where its place cannot be known before evaluation.
+     * The outputs of {@code rule} that read inputs, checked: each reads inputs of the engine that hold
+     * single values (the table's columns, or inputs its cells compare with), an expression parses and its
+     * inputs' types go together, and none is in an output priority list (see {@link #priorityKey}), where
+     * its place cannot be known before evaluation. {@code DmnReader} accepts the same names.
      */
-    private static NamedInputs namedInputs(Praeceptum rule, List<String> evaluationOrder, Set<String> lists,
+    private static ComputedOutputs computedOutputs(Praeceptum rule, List<String> evaluationOrder, Set<String> lists,
             Map<String, ColumnType> types) {
-        var references = rule.output().references();
-        var outputs = new String[references.size()];
-        var columns = new int[references.size()];
-        int i = 0;
-        for (var reference : references.entrySet()) {
-            outputs[i] = reference.getKey();
-            columns[i++] = inputColumn(rule, reference.getKey(), reference.getValue(), evaluationOrder, lists);
-        }
-        var expressions = rule.output().expressions();
-        var expressionOutputs = new String[expressions.size()];
-        var parsed = new OutputExpression[expressions.size()];
-        @SuppressWarnings({"rawtypes", "unchecked"}) // a generic array cannot be created otherwise
-        Map<String, Integer>[] expressionColumns = new Map[expressions.size()];
-        int e = 0;
-        for (var expression : expressions.entrySet()) {
-            var output = expression.getKey();
+        var computed = new ArrayList<Computed>();
+        rule.output().references().forEach((output, input) -> computed.add(new Computed(output, new OutputExpression.Name(input),
+                Map.of(input, inputColumn(rule, output, input, evaluationOrder, lists)), true)));
+        rule.output().expressions().forEach((output, text) -> {
             var where = "Rule %s, output '%s'".formatted(rule.priority(), output);
+            OutputExpression expression;
             try {
-                parsed[e] = OutputExpression.parse(expression.getValue());
-            } catch (ExpressionSyntaxException ex) {
-                throw new InvalidDecisionTableException(where + ": " + ex.getMessage());
+                expression = OutputExpression.parse(text);
+            } catch (ExpressionSyntaxException e) {
+                throw new InvalidDecisionTableException(where + ": " + e.getMessage());
             }
-            var names = new HashMap<String, Integer>();
-            parsed[e].names().forEach(name -> names.put(name, inputColumn(rule, output, name, evaluationOrder, lists)));
+            var columns = new HashMap<String, Integer>();
+            expression.names().forEach(name -> columns.put(name, inputColumn(rule, output, name, evaluationOrder, lists)));
             try {
-                parsed[e].type(types::get);
-            } catch (ExpressionSyntaxException ex) {
-                throw new InvalidDecisionTableException(where + ": " + ex.getMessage());
+                expression.type(types::get);
+            } catch (ExpressionTypeException e) {
+                throw new InvalidDecisionTableException(where + ": " + e.getMessage());
             }
-            expressionOutputs[e] = output;
-            expressionColumns[e++] = Map.copyOf(names);
-        }
-        return new NamedInputs(rule.output().values(), outputs, columns, expressionOutputs, parsed, expressionColumns);
+            computed.add(new Computed(output, expression, Map.copyOf(columns), false));
+        });
+        return new ComputedOutputs(rule.output().values(), computed.toArray(Computed[]::new));
     }
 
     /** The position, in the evaluation order, of the input an output reads, which must hold single values. */
@@ -553,6 +544,76 @@ public final class PraeceptaEngine<I, O> {
         return column;
     }
 
+    /**
+     * The outputs that hold numbers, which ANY compares by value ({@code 1.50} equals {@code 1.5}): those
+     * a {@linkplain Builder#table table} declares as numbers and, for outputs the table does not declare,
+     * those some rule computes as a number (naming a number input, or a number expression).
+     */
+    private static Set<String> numericOutputs(Map<String, ColumnType> declared, List<Praeceptum> rules, Map<String, ColumnType> types) {
+        var numeric = new HashSet<String>();
+        for (var rule : rules) {
+            rule.output().references().forEach((output, input) -> {
+                if (types.get(input) == ColumnType.NUMBER) {
+                    numeric.add(output);
+                }
+            });
+            rule.output().expressions().forEach((output, text) -> {
+                if (isNumber(text, types)) {
+                    numeric.add(output);
+                }
+            });
+        }
+        declared.forEach((output, type) -> {
+            if (type == ColumnType.NUMBER) {
+                numeric.add(output);
+            } else {
+                numeric.remove(output);
+            }
+        });
+        return Set.copyOf(numeric);
+    }
+
+    /** Whether an expression gives a number; false if it is invalid, which indexing its rule reports. */
+    private static boolean isNumber(String expression, Map<String, ColumnType> types) {
+        try {
+            return OutputExpression.parse(expression).type(types::get) == ColumnType.NUMBER;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    /** Whether two texts of an output are the same value: for a number output, the same number ({@code 1.50} is {@code 1.5}). */
+    private static boolean sameValue(String a, String b, boolean number) {
+        return number && a != null && b != null ? Objects.equals(normalisedNumber(a), normalisedNumber(b)) : Objects.equals(a, b);
+    }
+
+    /**
+     * A rule's outputs as ANY compares them: as written, but each number output's value as a computed
+     * number is written ({@link #numberText}), so that {@code 1.50} and {@code 1.5} are the same; text that
+     * is not a number is kept.
+     */
+    static PraeceptaOutput comparable(PraeceptaOutput output, Set<String> numericOutputs) {
+        if (numericOutputs.isEmpty()) {
+            return output;
+        }
+        var values = new HashMap<>(output.values());
+        values.replaceAll((column, text) -> numericOutputs.contains(column) && text != null ? normalisedNumber(text) : text);
+        return new PraeceptaOutput(values, output.references(), output.expressions());
+    }
+
+    private static String normalisedNumber(String text) {
+        try {
+            return numberText(new BigDecimal(text.strip()));
+        } catch (NumberFormatException e) {
+            return text;
+        }
+    }
+
+    /** A number as a computed output is written: without trailing zeros or an exponent, and 0 as {@code 0}. */
+    private static String numberText(BigDecimal number) {
+        return number.signum() == 0 ? "0" : number.stripTrailingZeros().toPlainString();
+    }
+
     /** The single-hit result of the rule at {@code bit}: ready-made, unless it reads inputs. */
     private <T> List<O> single(int bit, T input, BitsetIndex.ColumnReader<T> reader) {
         var ready = singleByBit[bit];
@@ -561,35 +622,37 @@ public final class PraeceptaEngine<I, O> {
 
     /**
      * The outputs of a rule that reads inputs, filled in with the text of the input's values and of the
-     * expressions' values; a computed number has no trailing zeros, since FEEL numbers are values.
+     * expressions' values; a computed number has no trailing zeros, since FEEL numbers are values. An
+     * output that names an input gives the input's value as {@link FeelLiterals#text} writes it, a number
+     * keeping its scale, as a literal output keeps it.
      */
     private <T> PraeceptaOutput output(int bit, T input, BitsetIndex.ColumnReader<T> reader) {
-        var named = namedInputsByBit[bit];
-        var values = new HashMap<>(named.values);
-        for (int i = 0; i < named.outputs.length; i++) {
-            var value = valueOf(named.columns[i], input, reader);
-            values.put(named.outputs[i], value == null ? null : FeelLiterals.text(value));
-        }
-        for (int e = 0; e < named.expressions.length; e++) {
-            var columns = named.expressionColumns[e];
-            var value = named.expressions[e].evaluate(name -> valueOf(columns.get(name), input, reader));
-            values.put(named.expressionOutputs[e], switch (value) {
+        var computedOutputs = computedByBit[bit];
+        var values = new HashMap<>(computedOutputs.values);
+        for (var computed : computedOutputs.computed) {
+            var columns = computed.columns();
+            var value = computed.expression().evaluate(name -> valueOf(columns.get(name), input, reader));
+            values.put(computed.output(), switch (value) {
                 case null -> null;
-                case BigDecimal number -> number.signum() == 0 ? "0" : number.stripTrailingZeros().toPlainString();
-                default -> value.toString();
+                case BigDecimal number when !computed.reference() -> numberText(number);
+                default -> FeelLiterals.text(value);
             });
         }
         return new PraeceptaOutput(values);
     }
 
-    /** ANY, when outputs name inputs: whether every matching rule gives this input the same outputs. */
+    /**
+     * ANY, when outputs read inputs: whether every matching rule gives this input the same outputs, number
+     * outputs compared by value.
+     */
     private <T> boolean sameOutputs(long[] matches, T input, BitsetIndex.ColumnReader<T> reader) {
-        PraeceptaOutput first = null;
+        Map<String, String> first = null;
         for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
-            var output = namedInputsByBit[bit] == null ? ruleOutputByBit[bit] : output(bit, input, reader);
+            var output = computedByBit[bit] == null ? ruleOutputByBit[bit] : output(bit, input, reader);
+            var values = comparable(output, numericOutputs).values();
             if (first == null) {
-                first = output;
-            } else if (!first.values().equals(output.values())) {
+                first = values;
+            } else if (!first.equals(values)) {
                 return false;
             }
         }
@@ -601,12 +664,14 @@ public final class PraeceptaEngine<I, O> {
     /**
      * The rule at each bit. The lowest set bit wins, so bits follow rule order or, with output
      * priorities, priority order (ties keep rule order).
+     *
+     * @param numericOutputs the outputs whose values are found in their priority lists by number
      */
-    private static int[] bitToRule(List<Praeceptum> rules, Map<String, List<String>> outputPriority) {
+    private static int[] bitToRule(List<Praeceptum> rules, Map<String, List<String>> outputPriority, Set<String> numericOutputs) {
         if (outputPriority.isEmpty()) {
             return IntStream.range(0, rules.size()).toArray();
         }
-        var keys = rules.stream().map(rule -> priorityKey(rule, outputPriority)).toArray(int[][]::new);
+        var keys = rules.stream().map(rule -> priorityKey(rule, outputPriority, numericOutputs)).toArray(int[][]::new);
         Comparator<int[]> lexicographic = Arrays::compare;
         return IntStream.range(0, rules.size()).boxed()
                 .sorted(Comparator.comparing(rule -> keys[rule], lexicographic)) // stable: ties keep rule order
@@ -616,9 +681,10 @@ public final class PraeceptaEngine<I, O> {
 
     /**
      * The position of each of the rule's outputs in its priority list, in the order the lists were
-     * declared. Compared lexicographically, a smaller key is a higher priority.
+     * declared; a number output's value is found by number ({@code 1.50} in a list that holds {@code 1.5}).
+     * Compared lexicographically, a smaller key is a higher priority.
      */
-    private static int[] priorityKey(Praeceptum rule, Map<String, List<String>> outputPriority) {
+    private static int[] priorityKey(Praeceptum rule, Map<String, List<String>> outputPriority, Set<String> numericOutputs) {
         var key = new int[outputPriority.size()];
         int i = 0;
         for (var priorityList : outputPriority.entrySet()) {
@@ -634,7 +700,9 @@ public final class PraeceptaEngine<I, O> {
                         .formatted(rule.priority(), output, expression));
             }
             var value = rule.output().values().get(output);
-            int position = priorityList.getValue().indexOf(value);
+            var values = priorityList.getValue();
+            boolean number = numericOutputs.contains(output);
+            int position = IntStream.range(0, values.size()).filter(p -> sameValue(values.get(p), value, number)).findFirst().orElse(-1);
             if (position < 0) {
                 throw new InvalidDecisionTableException("Rule %s: output %s=%s is not in its priority list %s"
                         .formatted(rule.priority(), output, value, priorityList.getValue()));
@@ -645,18 +713,21 @@ public final class PraeceptaEngine<I, O> {
     }
 
     /**
-     * Per bit, the mask of the rules with the same outputs as the bit's rule; equal outputs share one
-     * mask, stored in its form ({@link Masks}): a rule whose outputs no other rule has holds one bit.
+     * Per bit, the mask of the rules with the same outputs as the bit's rule (number outputs compared by
+     * value); equal outputs share one mask, stored in its form ({@link Masks}): a rule whose outputs no
+     * other rule has holds one bit.
      */
-    private static long[][] sameOutputMasks(List<Praeceptum> rules, int[] bitToRule, int words, Masks.Form form) {
-        var maskByOutput = new HashMap<Object, long[]>();
+    private static long[][] sameOutputMasks(List<Praeceptum> rules, int[] bitToRule, int words, Masks.Form form,
+            Set<String> numericOutputs) {
+        var maskByOutput = new HashMap<PraeceptaOutput, long[]>();
         for (int bit = 0; bit < bitToRule.length; bit++) {
-            BitsetIndex.set(maskByOutput.computeIfAbsent(rules.get(bitToRule[bit]).output(), output -> new long[words]), bit);
+            var output = comparable(rules.get(bitToRule[bit]).output(), numericOutputs);
+            BitsetIndex.set(maskByOutput.computeIfAbsent(output, any -> new long[words]), bit);
         }
         maskByOutput.replaceAll((output, mask) -> Masks.compact(mask, form));
         var masks = new long[bitToRule.length][];
         for (int bit = 0; bit < bitToRule.length; bit++) {
-            masks[bit] = maskByOutput.get(rules.get(bitToRule[bit]).output());
+            masks[bit] = maskByOutput.get(comparable(rules.get(bitToRule[bit]).output(), numericOutputs));
         }
         return masks;
     }
@@ -843,15 +914,19 @@ public final class PraeceptaEngine<I, O> {
 
     /**
      * Columns with fewer wildcards first: evaluation stops as soon as no rule is left, so selective
-     * columns first make that happen sooner. The result does not depend on the order.
+     * columns first make that happen sooner, and once a sparse column has confined the candidates to a
+     * few words, later columns only intersect those. Columns that hold lists go after the others with as
+     * many wildcards, since a list's mask is built whole, element by element. The result does not depend
+     * on the order.
      */
-    private static List<String> orderByWildcards(List<String> columns, Map<String, List<UnaryTests>> cells) {
+    private static List<String> orderByWildcards(List<String> columns, Map<String, List<UnaryTests>> cells, Set<String> lists) {
         var wildcards = new LinkedHashMap<String, Long>();
         for (var column : columns) {
             wildcards.put(column, cells.get(column).stream().filter(UnaryTests.Any.class::isInstance).count());
         }
+        Comparator<Map.Entry<String, Long>> byWildcards = Map.Entry.comparingByValue();
         return wildcards.entrySet().stream()
-                .sorted(Map.Entry.comparingByValue()) // stable: ties keep declaration order
+                .sorted(byWildcards.thenComparing(column -> lists.contains(column.getKey()))) // stable: ties keep declaration order
                 .map(Map.Entry::getKey)
                 .toList();
     }
@@ -881,8 +956,9 @@ public final class PraeceptaEngine<I, O> {
      * as {@code failOn}; otherwise logs the findings as a warning.
      */
     private static ValidationReport validate(BitsetIndex index, List<Praeceptum> rules, HitPolicy hitPolicy, long[] variableRules,
-            Severity failOn) {
-        var report = new ValidationReport(TableAnalysis.analyse(index, rules, hitPolicy, variableRules).stream()
+            Set<String> numericOutputs, Severity failOn) {
+        var analysed = TableAnalysis.analyse(index, rules, hitPolicy, variableRules, output -> comparable(output, numericOutputs));
+        var report = new ValidationReport(analysed.stream()
                 .sorted(Comparator.comparing(Issue::severity).reversed())
                 .toList());
         if (failOn != null && report.hasIssuesAtLeast(failOn)) {
@@ -918,6 +994,13 @@ public final class PraeceptaEngine<I, O> {
         private Map<String, ColumnType> tableTypes;
         /** The inputs a {@link #table(DecisionTable)} declares as lists, checked against the bindings. */
         private Set<String> tableLists = Set.of();
+        /**
+         * The inputs of a {@link #table(DecisionTable)} that hold single values: its columns, and the inputs
+         * its cells compare with, but for its lists; checked against the bindings.
+         */
+        private Set<String> tableSingles = Set.of();
+        /** Output column types of a {@link #table(DecisionTable)}: its number outputs are compared by value. */
+        private Map<String, ColumnType> tableOutputTypes = Map.of();
         /** With {@link #inputs(InputStrategy)}: the inputs that hold lists. */
         private final Set<String> listColumns = new LinkedHashSet<>();
         /** Whether the rules' cells are strict FEEL, as a DMN table's are. */
@@ -952,6 +1035,13 @@ public final class PraeceptaEngine<I, O> {
             }
             tableTypes = types;
             tableLists = table.listInputs();
+            var singles = new HashSet<>(types.keySet());
+            singles.addAll(namedInputs(table));
+            singles.removeAll(tableLists);
+            tableSingles = singles;
+            var outputTypes = new LinkedHashMap<String, ColumnType>();
+            table.outputs().forEach(output -> outputTypes.put(output.name(), output.type()));
+            tableOutputTypes = outputTypes;
             listColumns.addAll(table.listInputs());
             feelCells = table.feelCells();
             if (usesOutputPriority(table.hitPolicy())) {
@@ -962,6 +1052,15 @@ public final class PraeceptaEngine<I, O> {
                 }
             }
             return this;
+        }
+
+        /** The inputs a table's cells compare with; none if a cell is invalid, which {@link #build()} reports. */
+        private static Set<String> namedInputs(DecisionTable table) {
+            try {
+                return table.namedInputs().keySet();
+            } catch (IllegalArgumentException e) {
+                return Set.of();
+            }
         }
 
         /** The hit policy (required). */
@@ -1079,8 +1178,9 @@ public final class PraeceptaEngine<I, O> {
 
         /**
          * {@link #listInput(String, Function)} for lists of {@code elementType}, whose elements are what the
-         * getter of a single value of that type returns ({@code Number}, {@code LocalDate}, {@code Period}...).
-         * The elements of a TIME or DATE_TIME list may come with a time zone ({@code OffsetTime},
+         * getter of a single value of that type returns ({@code Number}, {@code LocalDate}, {@code Period}...),
+         * or their text; evaluating a list with an element of another class throws an
+         * {@link InvalidInputException}. The elements of a TIME or DATE_TIME list may come with a time zone ({@code OffsetTime},
          * {@code ZonedDateTime}) or without one, each compared as a single value of its kind is.
          */
         public Builder<I, O> listInput(String column, ColumnType elementType, Function<? super I, ? extends Collection<?>> extractor) {
@@ -1207,7 +1307,14 @@ public final class PraeceptaEngine<I, O> {
                     "bind inputs either per column with input(...) or with inputs(...), not both and not neither");
             require(columnTypes.isEmpty() || inputStrategy != null,
                     "columnType(...) and listColumnType(...) only apply with inputs(...); per-column bindings carry their type");
-            if (tableTypes == null || inputStrategy != null) {
+            if (tableTypes == null) {
+                return;
+            }
+            if (inputStrategy != null) {
+                for (var column : listColumns) {
+                    require(!tableSingles.contains(column), "input '%s' holds single values in the table; listColumnType(...) cannot make it a list"
+                            .formatted(column));
+                }
                 return;
             }
             for (var tableColumn : tableTypes.entrySet()) {
@@ -1220,7 +1327,7 @@ public final class PraeceptaEngine<I, O> {
             }
             bindings.forEach((input, binding) -> {
                 // the table's columns, and the inputs its cells compare with
-                if (tableTypes.containsKey(input) || tableLists.contains(input)) {
+                if (tableSingles.contains(input) || tableLists.contains(input)) {
                     boolean list = tableLists.contains(input);
                     require(binding.list() == list, list
                             ? "input '%s' holds lists in the table; bind it with listInput(...)".formatted(input)

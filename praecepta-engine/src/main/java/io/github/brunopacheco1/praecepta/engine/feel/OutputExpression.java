@@ -93,23 +93,27 @@ public sealed interface OutputExpression {
      * The type of the expression's value, {@code STRING} or {@code NUMBER}, given the type of each input
      * it names.
      *
-     * @throws ExpressionSyntaxException if an input is of another type, or an operator gets a string and
-     *                                   a number, or a string where only numbers go
+     * @param inputs the type of each input the expression names; null for a name that is not an input
+     * @throws ExpressionTypeException if a name is not an input, an input is of another type, or an operator
+     *                                 gets a string and a number, or a string where only numbers go
      */
     default ColumnType type(Function<String, ColumnType> inputs) {
         return switch (this) {
             case Literal(var value) -> value instanceof String ? ColumnType.STRING : ColumnType.NUMBER;
             case Name(var name) -> {
                 var type = inputs.apply(name);
+                if (type == null) {
+                    throw new ExpressionTypeException("'%s' is not an input".formatted(name));
+                }
                 if (type != ColumnType.STRING && type != ColumnType.NUMBER) {
-                    throw new ExpressionSyntaxException("'%s' is a %s; output expressions combine strings and numbers"
+                    throw new ExpressionTypeException("'%s' is a %s; output expressions combine strings and numbers"
                             .formatted(name, type.feelName()));
                 }
                 yield type;
             }
             case Negation(var operand) -> {
                 if (operand.type(inputs) != ColumnType.NUMBER) {
-                    throw new ExpressionSyntaxException("- applies to numbers, not strings");
+                    throw new ExpressionTypeException("- applies to numbers, not strings");
                 }
                 yield ColumnType.NUMBER;
             }
@@ -117,11 +121,11 @@ public sealed interface OutputExpression {
                 var leftType = left.type(inputs);
                 var rightType = right.type(inputs);
                 if (leftType != rightType) {
-                    throw new ExpressionSyntaxException("%s combines a %s and a %s, which gives null in FEEL"
+                    throw new ExpressionTypeException("%s combines a %s and a %s, which gives null in FEEL"
                             .formatted(operator.symbol(), leftType.feelName(), rightType.feelName()));
                 }
                 if (leftType == ColumnType.STRING && operator != Operator.ADD) {
-                    throw new ExpressionSyntaxException(operator.symbol() + " applies to numbers, not strings");
+                    throw new ExpressionTypeException(operator.symbol() + " applies to numbers, not strings");
                 }
                 yield leftType;
             }
