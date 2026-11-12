@@ -65,8 +65,12 @@ integrations find their tables at runtime, so their engines take maps instead:
   a list column. A missing or blank value is a missing input.
 - **Outputs** are one map per matching rule, in the hit policy's order (an output that is missing, such as
   an expression with a missing operand, maps to null). Under a COLLECT aggregation, the one map holds the
-  aggregate: SUM adds with FEEL's 34 digits, MIN and MAX return the rule's output as written, missing values
-  are skipped, and COUNT is the number of matches. When no rule matches, a table whose outputs declare
+  aggregate, as DMN 1.5 defines it over a single output (`AggregationOperator.check`): SUM adds numbers with
+  FEEL's 34 digits and keeps their scale, as the build plugins' generated classes do; MIN and MAX return the
+  smallest or largest output as written, of any ordered type (numbers, strings by character, dates, times,
+  durations); COUNT is the number of matches, of outputs of any type. Missing values are skipped, where
+  FEEL's `sum`, `min` and `max` would give null (10.3.4): a known deviation, shared with the build plugins'
+  generated classes. When no rule matches, a table whose outputs declare
   default values (`defaultOutputEntry`) gives one map of them, null for an output without one, whatever its
   hit policy or aggregation (DMN 1.5, 10.3.2.10).
 - **Validation** is that of the map-based engine. Times and date-times read from text may have a time zone
@@ -83,16 +87,20 @@ its prefix for extensions, and fixes them when it builds the application.
 | Key | Default | Meaning |
 |---|---|---|
 | `praecepta.enabled` | `true` | Spring Boot and Micronaut: `false` turns the integration off (no beans, no endpoint). Quarkus has no such key: remove the extension instead. |
-| `praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load: a comma-separated list (or a YAML list) of patterns. `classpath:` and `classpath*:` both search every class path root, directories and jars; `file:` searches the file system. `*` matches within a path segment, `**` across segments. |
+| `praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load: a comma-separated list (or a YAML list) of patterns. `classpath:` and `classpath*:` both search every class path root, directories and jars; `file:` searches the file system. `*` matches within a path segment, `**` across segments. A class path pattern with wildcards must start with a directory (`classpath*:rules/...`), since the roots themselves cannot be listed inside jars. |
 | `praecepta.fail-on` | `ERROR` | The validation severity that stops startup (Spring Boot, Micronaut) or the build (Quarkus): `ERROR`, `WARNING` or `NONE`, in any case. Tables that cannot be read or built fail whatever it says. |
 
 With the default location, finding no file gives no decisions and the INFO line
-`No decision tables found at <patterns>`. A location you set yourself must find something. The three
-frameworks word their problems alike, and list them together with the tables' own problems:
+`No decision tables found at <patterns>`; otherwise `Loaded <n> decision(s) from <m> DMN file(s): <names>`.
+A location you set yourself must find something. The three frameworks share this step
+(`DecisionsLoader`), so they word their problems alike, and list them together with the tables' own
+problems:
 - `<pattern>: no DMN file matches this location`, for a location you set that finds nothing;
 - `praecepta.locations is set but names no location` (Spring Boot and Micronaut; Quarkus reads an empty
   value as unset);
-- `Location '<pattern>': expected classpath:, classpath*: or file:`, for a malformed pattern;
+- `Location '<pattern>': expected classpath:, classpath*: or file:`, for a malformed pattern, and
+  `Location '<pattern>': a class path pattern must start with a directory without wildcards, ...`;
+- `<pattern>: cannot be searched (<why>)`;
 - `praecepta.fail-on must be ERROR, WARNING or NONE, not <value>` (`quarkus.praecepta.fail-on` in
   Quarkus); the tables are then still loaded and checked at `ERROR`, so their problems are listed too.
 
@@ -156,7 +164,8 @@ List<Map<String, String>> discount = decisions.evaluate("Discount", Map.of("coun
 
 | Type | Role |
 |---|---|
-| `TableLocations` | Finds DMN files by pattern on the class path (directories, jars, and a native image's resources) or the file system: `find(patterns, classLoader)`, `split("a,b")`, `Location.parse(pattern).matches(path)`. `TableLocations.DEFAULT` is the default pattern. |
+| `TableLocations` | Finds DMN files by pattern on the class path (directories, jars, and a native image's resources) or the file system: `find(patterns, classLoader)`, `find(location, classLoader)`, `split("a,b")`, `Location.parse(pattern).matches(path)`. `TableLocations.DEFAULT` is the default pattern. |
+| `DecisionsLoader` | What a framework does with its settings: `new DecisionsLoader("praecepta", locations, failOn).load(finder, log)` reads `locations` (null for the default) and `fail-on`, finds the files with the framework's lookup (`finder`), loads them, fails with every problem worded as above, and logs what it loaded and the issues below `fail-on`. |
 | `TableSource` | A DMN file: where it is (for messages and reports) and how to open it. `TableSource.of(Path)`, `of(URL)`, `of(location, bytes)`. |
 | `Decisions` | The decisions by name: `Decisions.load(sources, failOn)`, `get(name)`, `find(name)`, `engine(name)`, `evaluate(name, input)`, `names()`, `all()`, `describe()`; `Decisions.failOn("ERROR")` reads a severity as the settings above do. Immutable and thread-safe. |
 | `Decision` | One decision: its `name`, `location`, `table`, `engine` and validation `report`; `describe()` as plain maps. |
@@ -194,7 +203,9 @@ the XML parser's messages, and `praecepta-integration` the files of the default 
 `rules/**/*.dmn`. So an application with its tables there needs no configuration for Praecepta. The
 framework integrations use no reflection; register tables at other locations yourself, through the
 framework's own native support (Spring's `RuntimeHints`, Micronaut's resource configuration) or a
-`resource-config.json` of the application's. The Quarkus extension registers the tables it validated
+`resource-config.json` of the application's. The Spring Boot starter works with Spring AOT, which processes
+it while the application is built (the engine beans are then those of the decisions found at that time,
+and the tables are read again at startup). The Quarkus extension registers the tables it validated
 itself. CI builds and runs a native application that uses the
 engine, the CSV loader, `praecepta-integration` and generated classes, with GraalVM for JDK 21 and 25; it
 does not build a Spring Boot, Micronaut or Quarkus application natively yet. `ExcelLoader` does not work

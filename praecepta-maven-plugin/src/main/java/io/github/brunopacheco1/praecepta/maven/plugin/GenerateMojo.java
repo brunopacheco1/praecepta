@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 
 import org.apache.maven.model.Resource;
 import org.apache.maven.plugin.AbstractMojo;
@@ -149,14 +148,12 @@ public class GenerateMojo extends AbstractMojo {
         }
     }
 
+    /** The severity {@code failOn} names, as every integration reads it ({@link Severity#failOn}); null for NONE. */
     private static Severity severity(String value) throws MojoFailureException {
-        if (value == null || value.equalsIgnoreCase("NONE")) {
-            return null;
-        }
         try {
-            return Severity.valueOf(value.toUpperCase(Locale.ROOT));
+            return Severity.failOn(value);
         } catch (IllegalArgumentException e) {
-            throw new MojoFailureException("<failOn> must be ERROR, WARNING or NONE, not " + value);
+            throw new MojoFailureException("<failOn> " + e.getMessage(), e);
         }
     }
 }

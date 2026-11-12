@@ -24,9 +24,11 @@ value is the result when no rule matches, quoted strings read FEEL's escape sequ
 ordered by character. The DMN conformance kit (TCK) still passes 83 of its 86 decision-table checks;
 the other three need decision requirement graphs
 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)). Read *Fixed* before upgrading if your
-DMN tables declare default output values (they now give that output instead of none) or your quoted
-strings hold a backslash (the path `C:\temp` is now written `"C:\\temp"`), and *Changed* if you
-deconstruct `DecisionTable.OutputColumn` with a record pattern.
+DMN tables declare default output values (they now give that output instead of none), type a single
+output through their decision rather than its output clause (the output, and a generated record's
+component, now take that type), or hold quoted strings with a backslash (`"C:\temp"` now holds a tab,
+silently; a path is written `"C:\\temp"`), and *Changed* if you deconstruct `DecisionTable.OutputColumn`
+with a record pattern.
 
 ### Added
 - **`praecepta-spring-boot-starter`** ([#20](https://github.com/brunopacheco1/praecepta/issues/20)):
@@ -37,7 +39,9 @@ deconstruct `DecisionTable.OutputColumn` with a record pattern.
   application, listing every problem, when a table cannot be loaded or has validation issues at
   `praecepta.fail-on` (`ERROR` by default); other issues are logged as warnings. With Actuator, the
   endpoint `praecepta` reports each decision's columns and validation issues. `praecepta.enabled=false`
-  turns it off. Configuration metadata gives IDEs the keys.
+  turns it off. Configuration metadata gives IDEs the keys. Spring AOT processes the starter (for a
+  Spring native image or the JVM's AOT mode): the tables are validated then, the engine beans are those
+  of the decisions found then, and the tables are read again when the application starts.
 - **Quarkus extension** ([#76](https://github.com/brunopacheco1/praecepta/issues/76)):
   `praecepta-quarkus` (with its build-time module, `praecepta-quarkus-deployment`), for Quarkus 3.40 and
   later. While Quarkus builds the application, it finds the DMN files under `rules/` on the class path
@@ -46,7 +50,8 @@ deconstruct `DecisionTable.OutputColumn` with a record pattern.
   fails the build on the configured issues (`quarkus.praecepta.fail-on`), listing every problem at once.
   The application gets a `Decisions` bean and one map-based engine bean per decision, injected with
   `@Identifier("Discount")` (or `@Named`), with the validation reports at runtime. In dev mode a changed
-  table restarts the application. Apache POI stays in the build; the extension uses no reflection, but
+  table restarts the application (a new file under a `file:` location needs a manual restart, as Quarkus
+  watches files, not directories). Apache POI stays in the build; the extension uses no reflection, but
   the native-image workflow does not build a Quarkus application yet.
 - **`praecepta-micronaut`** ([#77](https://github.com/brunopacheco1/praecepta/issues/77)): Micronaut 4
   applications get their DMN decision tables as beans. At startup the module loads the files
@@ -84,16 +89,28 @@ deconstruct `DecisionTable.OutputColumn` with a record pattern.
   does. `TableCompiler.compile(TableDefinition, CompilerOptions)` returns a `CompiledTable` with the
   table, its validation report, its DMN and the generated sources, and `CompiledTable.write(sourceRoot,
   resourceRoot)` writes them; `CompilerOptions` names the tool in the generated files and how messages
-  name its settings. The Maven plugin's goal, configuration, messages and generated files are unchanged.
+  name its settings. The Maven plugin's goal, configuration and messages are unchanged; for its generated
+  files, see *Fixed*.
 - **`praecepta-integration`**: what the Spring Boot, Micronaut and Quarkus integrations share, with no
   dependency but the engine. `TableLocations` finds DMN files by pattern (`classpath*:rules/**/*.dmn`,
-  `file:...`) in directories and jars; `Decisions.load(sources, failOn)` builds one engine per decision
-  table, bound to maps of text (`PraeceptaEngine<Map<String, String>, Map<String, String>>`), keeps each
-  validation report, and fails with every problem at once (`DecisionsException`): unreadable or invalid
-  files, two decisions with one name, and validation issues at the given severity. COLLECT aggregations
-  give one map with the aggregate (a SUM with FEEL's 34 digits). `Decisions.describe()` gives the
-  reports as plain maps for management endpoints. The design shared by the integrations is in
+  `file:...`) in directories and jars; a class path pattern with wildcards must start with a directory,
+  since the class path's roots cannot be listed inside jars. `Decisions.load(sources, failOn)` builds one
+  engine per decision table, bound to maps of text (`PraeceptaEngine<Map<String, String>, Map<String,
+  String>>`), keeps each validation report, and fails with every problem at once (`DecisionsException`):
+  unreadable or invalid files, two decisions with one name, and validation issues at the given severity.
+  COLLECT aggregations give one map with the aggregate, as DMN 1.5 defines them over a single output:
+  SUM adds numbers with FEEL's 34 digits and keeps their scale (`10.50` and `1.50` give `12.00`), MIN and
+  MAX take the smallest or largest value of any ordered type (a string, a date, a duration...), and COUNT
+  counts outputs of any type. `DecisionsLoader` is what the three frameworks do with their settings
+  (`locations`, `fail-on`): it finds the files through the framework's own resource lookup, loads them,
+  words every problem alike and logs what it loaded. `Decisions.describe()` gives the reports as plain
+  maps for management endpoints. The design shared by the integrations is in
   [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+- `ValidationReport.Severity.failOn(String)` reads a `failOn` setting (`ERROR`, `WARNING` or `NONE`, in
+  any case, surrounding spaces ignored) as every build-tool and framework integration now does.
+- `AggregationOperator.check(outputs)`: whether DMN defines the aggregation for a table's outputs (a single
+  output; SUM over numbers, MIN and MAX over any type but boolean, COUNT over any), with the reason if not.
+- `FeelLiterals.value(String, ColumnType)` reads back the plain text `FeelLiterals.text` writes.
 - `DmnReader.readAll(InputStream)` reads every decision table of a DMN model, in document order.
 - `feel.FeelStrings.compare(String, String)`: FEEL's order of strings, by code point (see *Fixed*,
   [#83](https://github.com/brunopacheco1/praecepta/issues/83)).
@@ -124,8 +141,9 @@ deconstruct `DecisionTable.OutputColumn` with a record pattern.
   needs the new component; `DecisionTable.defaultOutput()` builds the output, and
   `PraeceptaEngine.Builder.defaultOutput(PraeceptaOutput)` sets one for a table built in code
   (`table(...)` takes the table's). `DmnReader` reads defaults that are literals of the output's type
-  (`null` is no default) and rejects any other default naming the decision and output, and `DmnWriter`
-  writes them back. The Maven plugin generates the same classes; a DMN table's default reaches its
+  (`null` is no default) and, when the output lists its values, one of them ("The default output value is
+  one of the output values", Table 46); it rejects any other default naming the decision and output, and
+  `DmnWriter` writes them back. The Maven plugin generates the same classes; a DMN table's default reaches its
   `evaluate`, whose Javadoc then says so, and a time or date-time default counts when deciding whether
   the output's component has a time zone. Gaps are still reported for a table with a default, since no
   rule covers them.
@@ -135,12 +153,16 @@ deconstruct `DecisionTable.OutputColumn` with a record pattern.
   `"a\tb"` was `atb` and `"caf\u00e9"` was `cafu00e9`. They now read as DMN 1.5 has them (grammar rule
   64, 10.3.1.1), in Praecepta's syntax and in strict FEEL alike, and as output expressions have read
   them since 0.4.0: `\n`, `\r`, `\t`, `\"`, `\\`, `\'`, and a character by its code point (`\u00e9`,
-  `\U01F40E`, or a surrogate pair `\uD83D\uDC0E`). A backslash before any other character is rejected
-  (`\q is not an escape sequence; write \\ for a backslash`), so a quoted Windows path needs its
-  backslashes doubled (`"C:\\temp"`); unquoted words keep their backslashes. `FeelLiterals.literal`, and
-  so `DmnWriter`, writes a line feed, a carriage return and a tab as `\n`, `\r` and `\t` (and the other
-  vertical space, U+000B and U+000C, as code points), since a FEEL string literal may not hold a line
-  break.
+  `\U01F40E`, or a surrogate pair `\uD83D\uDC0E`). **This changes some quoted strings silently**: a
+  backslash followed by `n`, `r`, `t`, `'`, `"`, `\`, `u` or `U` and hexadecimal digits is now an escape
+  sequence, so `"C:\temp"` holds a tab (and no longer matches the path `C:\temp`) and `"D:\new"` a line
+  feed; search your tables' quoted strings for backslashes before upgrading. A backslash before any other
+  character is rejected (`\q is not an escape sequence; write \\ for a backslash`). A quoted Windows path
+  needs its backslashes doubled (`"C:\\temp"`); unquoted words keep their backslashes. In strict FEEL (DMN
+  files), a quoted string may no longer hold a line break itself (U+000A to U+000D, grammar rules 33 and
+  62), in cells and output entries alike: it is written `\n` or `\r`. `FeelLiterals.literal`, and so
+  `DmnWriter`, writes a line feed, a carriage return and a tab as `\n`, `\r` and `\t` (and the other
+  vertical space, U+000B and U+000C, as code points).
 - **Strings are ordered by character** ([#83](https://github.com/brunopacheco1/praecepta/issues/83)):
   comparisons and intervals of strings (`< "N"`, `["A".."M"]`) used Java's `String.compareTo`, which
   compares UTF-16 code units, while FEEL orders strings lexicographically by character, a Unicode code
@@ -148,7 +170,23 @@ deconstruct `DecisionTable.OutputColumn` with a record pattern.
   many CJK ideographs), which UTF-16 writes as two surrogates, meets one from U+E000 to U+FFFF: the cell
   `< "～"` (U+FF5E) matched `"🐎"` (U+1F40E), and `["～".."🐎"]` was rejected as starting after it ended.
   The new `feel.FeelStrings.compare` orders strings by code point; the index, the validation report's
-  examples and `FeelTemporals.compare` use it. Other strings compare as before.
+  examples and `FeelTemporals.compare` use it. Other strings compare as before. One known deviation
+  remains: Table 54 pads the shorter string with U+0000 before comparing, so a string followed by U+0000
+  is not after it in FEEL, while here it is.
+- **A single output takes its decision's type**: DMN 1.5 says "The OutputClause of a single output
+  decision table SHALL NOT specify a typeRef" (Table 34), so a conformant table types its result through the
+  decision table's `typeRef` or the decision's `variable`, which `DmnReader` ignored: such an output was
+  read as a string. It now takes that type when its output clause has none: the type itself for a
+  single-hit table or a SUM, MIN or MAX, the item type of a list for a multi-hit table, and none for COUNT
+  (whose result is a number, whatever it counts); a type that says nothing of one output, such as a
+  structure, leaves it a string as before. So the TCK's `0114-min-collect-hitpolicy`,
+  `0115-sum-collect-hitpolicy` and `0020-vacation-days` load in the framework integrations, and the Maven
+  and Gradle plugins generate a `BigDecimal` component for such a number output where they generated a
+  `String`.
+- **Generated aggregations** sum with FEEL's 34 significant digits (DMN 1.5, 10.3.2.3.1), as the framework
+  integrations do, where they added exactly; a sum that needs more digits is rounded, half to even.
+- `failOn` ignores surrounding spaces in the Maven and Gradle plugins too (`"ERROR "`), as in the
+  framework integrations: every integration reads it with `ValidationReport.Severity.failOn`.
 
 ## [0.4.0] - 2026-11-11
 

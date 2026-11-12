@@ -50,14 +50,16 @@ class TableFinderTest {
     }
 
     @Test
-    void a_pattern_without_a_directory_searches_every_root_and_names_without_wildcards_one_file() throws IOException {
+    void names_without_wildcards_name_one_file_even_at_a_roots_top() throws IOException {
         var classes = temp.resolve("classes");
         write(classes.resolve("top.dmn"), "top");
         write(classes.resolve("rules/discount.dmn"), "discount");
         var finder = new TableFinder(List.of(PathTree.ofDirectoryOrArchive(classes)));
 
-        Assertions.assertThat(finder.find(Location.parse("classpath:*.dmn")))
+        Assertions.assertThat(finder.find(Location.parse("classpath:top.dmn")))
                 .extracting(Table::location).singleElement().asString().endsWith("/classes/top.dmn");
+        // as in every integration, a pattern with wildcards must start with a directory
+        Assertions.assertThatThrownBy(() -> Location.parse("classpath:*.dmn")).isInstanceOf(IllegalArgumentException.class);
         Assertions.assertThat(finder.find(Location.parse("classpath:rules/discount.dmn")))
                 .extracting(Table::location).singleElement().asString().endsWith("/classes/rules/discount.dmn");
         Assertions.assertThat(finder.find(Location.parse("classpath:rules/missing.dmn"))).isEmpty();

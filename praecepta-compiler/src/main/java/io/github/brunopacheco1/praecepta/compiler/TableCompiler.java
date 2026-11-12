@@ -161,10 +161,18 @@ public final class TableCompiler {
      * generated enum's constants.
      */
     private static ValidationReport validate(DecisionTable table, Severity failOn) {
-        if (table.aggregation() != null
-                && (table.outputs().size() != 1 || table.outputs().getFirst().type() != ColumnType.NUMBER)) {
-            throw new IllegalArgumentException("Table '%s': %s aggregation needs exactly one NUMBER output"
-                    .formatted(table.name(), table.aggregation()));
+        if (table.aggregation() != null) {
+            try {
+                table.aggregation().check(table.outputs());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Table '%s': %s".formatted(table.name(), e.getMessage()), e);
+            }
+            // the generated classes aggregate a BigDecimal component, though DMN also counts any output and
+            // takes the minimum or maximum of any ordered one, as the framework integrations do
+            if (table.outputs().getFirst().type() != ColumnType.NUMBER) {
+                throw new IllegalArgumentException("Table '%s': the generated code supports %s aggregation over a number output only, not a %s"
+                        .formatted(table.name(), table.aggregation(), table.outputs().getFirst().type().feelName()));
+            }
         }
         var builder = PraeceptaEngine.<Object, PraeceptaOutput>builder()
                 .table(table)

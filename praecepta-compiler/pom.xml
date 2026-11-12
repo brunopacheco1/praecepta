@@ -32,6 +32,13 @@
             <artifactId>praecepta-loader</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- the frameworks' map-based engines, which must agree with the generated classes -->
+        <dependency>
+            <groupId>io.github.brunopacheco1</groupId>
+            <artifactId>praecepta-integration</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

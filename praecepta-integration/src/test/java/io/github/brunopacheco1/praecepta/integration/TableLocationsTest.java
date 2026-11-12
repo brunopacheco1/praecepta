@@ -69,6 +69,15 @@ class TableLocationsTest {
         Assertions.assertThatThrownBy(() -> TableLocations.Location.parse("classpath:"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("names no files");
+        // every framework would list the class path's roots differently, and none can inside jars
+        for (var rootless : List.of("classpath*:**/*.dmn", "classpath:*.dmn", "rules*/a.dmn")) {
+            Assertions.assertThatThrownBy(() -> TableLocations.Location.parse(rootless))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Location '%s': a class path pattern must start with a directory without wildcards, "
+                            + "such as classpath*:rules/**/*.dmn", rootless);
+        }
+        Assertions.assertThat(TableLocations.Location.parse("classpath:top.dmn").isSingleFile()).isTrue();
+        Assertions.assertThat(TableLocations.Location.parse("file:*.dmn").root()).isEmpty();
         Assertions.assertThat(TableLocations.split(" classpath:a/*.dmn, ,file:/b/*.dmn ")).containsExactly("classpath:a/*.dmn", "file:/b/*.dmn");
         Assertions.assertThat(TableLocations.split(null)).isEmpty();
     }

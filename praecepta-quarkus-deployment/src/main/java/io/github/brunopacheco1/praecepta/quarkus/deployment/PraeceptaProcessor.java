@@ -5,19 +5,17 @@
  */
 package io.github.brunopacheco1.praecepta.quarkus.deployment;
 
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
-import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 import io.github.brunopacheco1.praecepta.integration.Decisions;
 import io.github.brunopacheco1.praecepta.integration.DecisionsException;
-import io.github.brunopacheco1.praecepta.integration.TableLocations;
+import io.github.brunopacheco1.praecepta.integration.DecisionsLoader;
 import io.github.brunopacheco1.praecepta.integration.TableLocations.Location;
 import io.github.brunopacheco1.praecepta.integration.TableSource;
 import io.github.brunopacheco1.praecepta.quarkus.PraeceptaRecorder;
@@ -54,6 +52,9 @@ public class PraeceptaProcessor {
     /** The feature's name in Quarkus' startup log. */
     static final String FEATURE = "praecepta";
 
+    /** The prefix of the extension's settings, as messages name them. */
+    static final String PREFIX = "quarkus.praecepta";
+
     /** Where the validated DMN documents go in the application, one resource per table. */
     static final String RESOURCES = "META-INF/praecepta/tables/";
 
@@ -78,33 +79,47 @@ public class PraeceptaProcessor {
     @BuildStep
     PraeceptaTablesBuildItem validate(PraeceptaBuildTimeConfig config, ApplicationArchivesBuildItem archives,
             CurateOutcomeBuildItem curateOutcome, BuildProducer<HotDeploymentWatchedFileBuildItem> watched) {
+        var tables = new TreeMap<String, Table>();
         var problems = new ArrayList<String>();
-        var failOn = Severity.ERROR;
-        try {
-            failOn = Decisions.failOn(config.failOn());
-        } catch (IllegalArgumentException e) {
-            problems.add("quarkus.praecepta." + e.getMessage());
-        }
-        var tables = new ArrayList<Table>();
-        findDmnFiles(config, classPath(archives, curateOutcome), watched, problems, tables);
-        compileDeclaredTables(config, projectDirectory(curateOutcome), watched, problems, tables);
+        var declared = compileDeclaredTables(config, projectDirectory(curateOutcome), watched, problems);
+        var finder = new TableFinder(classPath(archives, curateOutcome));
+        var decisions = new DecisionsLoader(PREFIX, config.locations().orElse(null), config.failOn())
+                .declared(declared.stream().map(PraeceptaProcessor::source).toList(), problems)
+                .load(location -> {
+                    var matches = finder.find(location);
+                    watch(location, matches, watched);
+                    matches.forEach(table -> tables.putIfAbsent(table.location(), table));
+                    return matches.stream().map(PraeceptaProcessor::source).toList();
+                }, new DecisionsLoader.Log() {
+                    @Override
+                    public void info(String message) {
+                        LOG.info(message);
+                    }
 
-        Decisions decisions = Decisions.empty();
-        try {
-            decisions = Decisions.load(tables.stream().map(table -> TableSource.of(table.location(), table.dmn())).toList(), failOn);
-        } catch (DecisionsException e) {
-            problems.addAll(e.problems());
+                    @Override
+                    public void warn(String message) {
+                        LOG.warn(message);
+                    }
+                });
+        declared.forEach(table -> tables.putIfAbsent(table.location(), table));
+        return new PraeceptaTablesBuildItem(List.copyOf(tables.values()), decisions);
+    }
+
+    private static TableSource source(Table table) {
+        return TableSource.of(table.location(), table.dmn());
+    }
+
+    /**
+     * Dev mode restarts the application when a table changes: for a class path pattern, when a matching resource
+     * changes or one is added; for a {@code file:} pattern, when one of the files it found changes (a file added
+     * there needs a manual restart, as Quarkus watches files, not directories).
+     */
+    private static void watch(Location location, List<Table> matches, BuildProducer<HotDeploymentWatchedFileBuildItem> watched) {
+        if (location.classpath()) {
+            watched.produce(HotDeploymentWatchedFileBuildItem.builder().setLocationPredicate(location::matches).build());
+        } else {
+            matches.forEach(table -> watched.produce(new HotDeploymentWatchedFileBuildItem(table.location())));
         }
-        if (!problems.isEmpty()) {
-            throw new DecisionsException(problems);
-        }
-        for (var decision : decisions.all()) {
-            for (var issue : decision.report().issues()) {
-                LOG.warnf("%s: %s", decision.name(), issue);
-            }
-        }
-        LOG.debugf("Praecepta validated %d decision(s): %s", decisions.names().size(), decisions.names());
-        return new PraeceptaTablesBuildItem(tables, decisions);
     }
 
     /**
@@ -146,46 +161,10 @@ public class PraeceptaProcessor {
         }
     }
 
-    private static void findDmnFiles(PraeceptaBuildTimeConfig config, List<PathTree> classPath,
-            BuildProducer<HotDeploymentWatchedFileBuildItem> watched, List<String> problems, List<Table> tables) {
-        var explicit = config.locations().isPresent();
-        var patterns = config.locations().orElse(List.of(TableLocations.DEFAULT)).stream()
-                .map(String::strip)
-                .filter(pattern -> !pattern.isEmpty())
-                .toList();
-        var finder = new TableFinder(classPath);
-        var found = new LinkedHashMap<String, Table>();
-        for (var pattern : patterns) {
-            Location location;
-            List<Table> matches;
-            try {
-                location = Location.parse(pattern);
-                matches = finder.find(location);
-            } catch (IllegalArgumentException | UncheckedIOException e) {
-                // the message names the location or the file
-                problems.add(e.getMessage());
-                continue;
-            }
-            if (location.classpath()) {
-                // dev mode restarts when a matching resource changes, or one is added
-                watched.produce(HotDeploymentWatchedFileBuildItem.builder().setLocationPredicate(location::matches).build());
-            } else {
-                matches.forEach(table -> watched.produce(new HotDeploymentWatchedFileBuildItem(table.location())));
-            }
-            if (matches.isEmpty()) {
-                if (explicit) {
-                    problems.add(pattern + ": no DMN file matches this location");
-                } else {
-                    LOG.infof("No decision tables found at %s", pattern);
-                }
-            }
-            matches.forEach(table -> found.putIfAbsent(table.location(), table));
-        }
-        tables.addAll(found.values());
-    }
-
-    private static void compileDeclaredTables(PraeceptaBuildTimeConfig config, Path projectDirectory,
-            BuildProducer<HotDeploymentWatchedFileBuildItem> watched, List<String> problems, List<Table> tables) {
+    /** Compiles the Excel and CSV tables declared under {@code quarkus.praecepta.tables}, adding their mistakes to {@code problems}. */
+    private static List<Table> compileDeclaredTables(PraeceptaBuildTimeConfig config, Path projectDirectory,
+            BuildProducer<HotDeploymentWatchedFileBuildItem> watched, List<String> problems) {
+        var tables = new ArrayList<Table>();
         for (var entry : config.tables().entrySet()) {
             entry.getValue().source().ifPresent(source -> watched.produce(new HotDeploymentWatchedFileBuildItem(
                     DeclaredTables.resolve(source, projectDirectory).toString())));
@@ -195,6 +174,7 @@ public class PraeceptaProcessor {
                 problems.add(e.getMessage());
             }
         }
+        return tables;
     }
 
     /**

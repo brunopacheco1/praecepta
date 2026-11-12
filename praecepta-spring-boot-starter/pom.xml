@@ -89,6 +89,13 @@
             <artifactId>jakarta.inject-api</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- processes the auto-configuration ahead of time and compiles the generated code, as Spring AOT does;
+             the version is Spring Framework's, through Spring Boot's BOM -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-core-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

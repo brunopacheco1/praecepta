@@ -27,8 +27,7 @@ class NoTablesTest {
             .assertLogRecords(records -> Assertions.assertThat(records)
                     .anySatisfy(record -> {
                         Assertions.assertThat(record.getLevel()).isEqualTo(Level.INFO);
-                        Assertions.assertThat(record.getMessage()).isEqualTo("No decision tables found at %s");
-                        Assertions.assertThat(record.getParameters()).containsExactly("classpath*:rules/**/*.dmn");
+                        Assertions.assertThat(record.getMessage()).isEqualTo("No decision tables found at classpath*:rules/**/*.dmn");
                     }));
 
     @Inject

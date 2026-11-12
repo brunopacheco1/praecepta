@@ -197,7 +197,7 @@ class PraeceptaAutoConfigurationTest {
         Assertions.assertThat(output)
                 .contains("WARN  PraeceptaAutoConfiguration - Tier: ERROR rules [1, 2] both match some inputs (UNIQUE)")
                 .contains("WARN  PraeceptaAutoConfiguration - Grade: WARNING rule 2 can never be selected")
-                .contains("Loaded 2 decision(s) from 2 file(s): [Grade, Tier]");
+                .contains("Loaded 2 decision(s) from 2 DMN file(s): Grade, Tier");
     }
 
     @Test

@@ -18,7 +18,15 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
+import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
+import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
+import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
+import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
+import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
+import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 
@@ -181,19 +189,110 @@ class DecisionsTest {
                 .hasMessageStartingWith("Cannot load decision tables (4 problems):");
     }
 
+    /** DMN 1.5, Table 75: count takes any list, min and max "comparable items", sum numbers only. */
     @Test
-    void aggregations_need_one_number_output() {
-        var table = DmnReader.readAll(stream("""
+    void count_takes_outputs_of_any_type_and_min_and_max_any_ordered_type() {
+        var names = Decision.of("names", typed("COUNT", "string", "\"b\"", "\"a\"")).engine();
+        Assertions.assertThat(names.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "2"));
+        Assertions.assertThat(names.evaluate(Map.of("zone", "mainland"))).containsExactly(Map.of("out", "1"));
+
+        // strings by character: U+1F40E comes after U+FF5E, though not by UTF-16 code unit
+        var strings = Decision.of("strings", typed("MAX", "string", "\"～\"", "\"🐎\"")).engine();
+        Assertions.assertThat(strings.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "🐎"));
+        var earliest = Decision.of("dates", typed("MIN", "date", "date(\"2025-03-01\")", "date(\"2024-12-31\")")).engine();
+        Assertions.assertThat(earliest.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "2024-12-31"));
+        var longest = Decision.of("durations", typed("MAX", "dayTimeDuration", "duration(\"P1D\")", "duration(\"PT25H\")")).engine();
+        Assertions.assertThat(longest.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "P1DT1H"));
+        // times with an offset by instant
+        var latest = Decision.of("times", typed("MAX", "time", "time(\"10:00:00+02:00\")", "time(\"09:00:00Z\")")).engine();
+        Assertions.assertThat(latest.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "09:00:00Z"));
+    }
+
+    @Test
+    void aggregations_dmn_does_not_define_are_rejected() {
+        Assertions.assertThatThrownBy(() -> Decision.of("names", typed("SUM", "string", "\"a\"", "\"b\"")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Table 'Out': SUM aggregation needs a number output, not a string");
+        Assertions.assertThatThrownBy(() -> Decision.of("flags", typed("MIN", "boolean", "true", "false")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Table 'Out': MIN aggregation needs an output whose values are ordered, not a boolean");
+        var twoOutputs = DmnReader.readAll(stream("""
                 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
-                  <decision id="names" name="Names"><decisionTable hitPolicy="COLLECT" aggregation="MAX">
+                  <decision id="pair" name="Pair"><decisionTable hitPolicy="COLLECT" aggregation="COUNT">
                     <input><inputExpression typeRef="string"><text>zone</text></inputExpression></input>
-                    <output name="name" typeRef="string"/>
-                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"a"</text></outputEntry></rule>
+                    <output name="a" typeRef="number"/><output name="b" typeRef="number"/>
+                    <rule><inputEntry><text>-</text></inputEntry>
+                      <outputEntry><text>1</text></outputEntry><outputEntry><text>2</text></outputEntry></rule>
                   </decisionTable></decision>
                 </definitions>""")).getFirst();
-        Assertions.assertThatThrownBy(() -> Decision.of("names", table))
+        Assertions.assertThatThrownBy(() -> Decision.of("pair", twoOutputs))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Table 'Names': MAX aggregation needs exactly one NUMBER output");
+                .hasMessage("Table 'Pair': COUNT aggregation needs exactly one output; DMN does not aggregate 2 outputs");
+        // what the engine's builder rejects is named after the table too
+        var table = new DecisionTable("Odd", HitPolicy.FIRST, AggregationOperator.COUNT,
+                List.of(new InputColumn("zone", ColumnType.STRING)), List.of(new OutputColumn("n", ColumnType.NUMBER)),
+                List.of(new Praeceptum(1, new PraeceptaInput(Map.of("zone", "-")), new PraeceptaOutput(Map.of("n", "1")))));
+        Assertions.assertThatThrownBy(() -> Decision.of("odd", table))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageStartingWith("Table 'Odd': ")
+                .hasMessageContaining("COLLECT");
+    }
+
+    @Test
+    void a_table_that_cannot_be_built_fails_loading_and_its_file_gives_no_decision() {
+        var file = """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="good" name="Good"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="string"><text>zone</text></inputExpression></input>
+                    <output name="out" typeRef="string"/>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"a"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                  <decision id="bad" name="Bad"><decisionTable hitPolicy="COLLECT" aggregation="MAX">
+                    <input><inputExpression typeRef="string"><text>zone</text></inputExpression></input>
+                    <output name="out" typeRef="boolean"/>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>true</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""";
+        var source = TableSource.of("both.dmn", file.getBytes(StandardCharsets.UTF_8));
+        Assertions.assertThatThrownBy(() -> Decisions.load(List.of(source), Severity.ERROR))
+                .isInstanceOfSatisfying(DecisionsException.class, e -> Assertions.assertThat(e.problems()).containsExactly(
+                        "both.dmn: Table 'Bad': MAX aggregation needs an output whose values are ordered, not a boolean"));
+    }
+
+    @Test
+    void a_count_that_no_rule_matches_is_zero() {
+        var table = DmnReader.readAll(stream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="fee" name="Fee"><decisionTable hitPolicy="COLLECT" aggregation="COUNT">
+                    <input><inputExpression typeRef="string"><text>zone</text></inputExpression></input>
+                    <output name="fee" typeRef="number"/>
+                    <rule><inputEntry><text>"islands"</text></inputEntry><outputEntry><text>12.5</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""")).getFirst();
+        var count = Decision.of("count", table).engine();
+        Assertions.assertThat(count.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("fee", "1"));
+        Assertions.assertThat(count.evaluate(Map.of("zone", "nowhere"))).containsExactly(Map.of("fee", "0"));
+    }
+
+    /**
+     * A single output's type is the decision's, as DMN 1.5 has it (Table 34: its OutputClause SHALL NOT specify
+     * one), so the conformant aggregation tables of the TCK load: here 0115-sum-collect-hitpolicy's pattern.
+     */
+    @Test
+    void a_single_output_typed_by_its_decision_can_be_summed() {
+        var table = DmnReader.readAll(stream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="salary" name="Salary"><variable name="Salary" typeRef="number"/>
+                    <decisionTable hitPolicy="COLLECT" aggregation="SUM">
+                      <input><inputExpression typeRef="number"><text>years</text></inputExpression></input>
+                      <output/>
+                      <rule><inputEntry><text>&gt; 1</text></inputEntry><outputEntry><text>100.50</text></outputEntry></rule>
+                      <rule><inputEntry><text>&gt; 2</text></inputEntry><outputEntry><text>200.50</text></outputEntry></rule>
+                    </decisionTable></decision>
+                </definitions>""")).getFirst();
+        var salary = Decision.of("salary", table).engine();
+        Assertions.assertThat(salary.evaluate(Map.of("years", "5"))).containsExactly(Map.of("Salary", "301.00"));
+        Assertions.assertThat(salary.evaluate(Map.of("years", "2"))).containsExactly(Map.of("Salary", "100.50"));
     }
 
     @Test
@@ -246,6 +345,23 @@ class DecisionsTest {
                     <rule><inputEntry><text>"islands"</text></inputEntry><outputEntry><text>12.5</text></outputEntry></rule>
                   </decisionTable></decision>
                 </definitions>""".formatted(operator))).getFirst();
+    }
+
+    /** A COLLECT table named Out of one output, {@code out}, of a type, aggregated; rules: any zone, then the islands. */
+    private static DecisionTable typed(String operator, String type, String always, String islands) {
+        return DmnReader.readAll(stream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="out" name="Out"><decisionTable hitPolicy="COLLECT" aggregation="%s">
+                    <input><inputExpression typeRef="string"><text>zone</text></inputExpression></input>
+                    <output name="out" typeRef="%s"/>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>%s</text></outputEntry></rule>
+                    <rule><inputEntry><text>"islands"</text></inputEntry><outputEntry><text>%s</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""".formatted(operator, type, xml(always), xml(islands)))).getFirst();
+    }
+
+    private static String xml(String text) {
+        return text.replace("&", "&amp;").replace("<", "&lt;");
     }
 
     private static InputStream stream(String dmn) {

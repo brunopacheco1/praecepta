@@ -221,15 +221,12 @@ public abstract class GeneratePraecepta extends DefaultTask {
         }
     }
 
-    /** The severity {@code failOn} names; null for NONE, which never fails on validation. */
+    /** The severity {@code failOn} names, as every integration reads it ({@link Severity#failOn}); null for NONE. */
     static Severity severity(String value) {
-        if (value.equalsIgnoreCase("NONE")) {
-            return null;
-        }
         try {
-            return Severity.valueOf(value.toUpperCase(Locale.ROOT));
+            return Severity.failOn(value);
         } catch (IllegalArgumentException e) {
-            throw new GradleException("%s must be ERROR, WARNING or NONE, not %s".formatted(SETTING_NAMES.apply("failOn"), value), e);
+            throw new GradleException(SETTING_NAMES.apply("failOn") + " " + e.getMessage(), e);
         }
     }
 }

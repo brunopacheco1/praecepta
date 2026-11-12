@@ -42,9 +42,14 @@ final class TableFinder {
         var found = new LinkedHashMap<String, Table>();
         if (location.classpath()) {
             for (var tree : classPath) {
-                if (location.root().isEmpty()) {
-                    tree.walk(visit -> add(location, visit, found));
+                if (location.isSingleFile()) {
+                    tree.accept(location.pattern(), visit -> {
+                        if (visit != null) {
+                            add(location, visit, found);
+                        }
+                    });
                 } else {
+                    // Location.parse rejects a pattern with wildcards and no directory to start from
                     tree.walkIfContains(location.root(), visit -> add(location, visit, found));
                 }
             }

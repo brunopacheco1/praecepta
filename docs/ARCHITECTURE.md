@@ -120,7 +120,9 @@ An engine is **immutable** once built: any number of threads may share it withou
 ## DMN
 - `DmnReader` reads DMN 1.1 to 1.5 (as written by Camunda Modeler, Drools, Trisotech and
   `DmnWriter`) into a `DecisionTable`: hit policy, aggregation, column types, value lists, default
-  output values and rules. A table's default output (`DecisionTable.defaultOutput`, from each output's
+  output values and rules. A single output takes the type of the decision's result when its output
+  clause names none, as DMN 1.5 requires of it (Table 34): the decision table's `typeRef`, else the
+  decision variable's, whose item type for a multi-hit table, and none for COUNT. A table's default output (`DecisionTable.defaultOutput`, from each output's
   `defaultOutputEntry`) is converted once when the engine is built and returned when no rule matches,
   before the hit policy or the aggregation is applied (DMN 1.5, 10.3.2.10), so it costs nothing at
   evaluation.
@@ -173,13 +175,21 @@ reads every decision table of every file (`DmnReader.readAll`) and builds one `D
 an engine bound to maps of text (`PraeceptaEngine<Map<String, String>, Map<String, String>>`) and its
 validation report, and fails with every problem at once (`DecisionsException`): unreadable files, invalid
 tables, duplicate names, and validation issues at the configured severity. Maps rather than records,
-because a container finds its tables at runtime; typed records remain the build plugins' job.
+because a container finds its tables at runtime; typed records remain the build plugins' job. What each
+framework does with its settings, from `locations` and `fail-on` to the log lines, is one class,
+`DecisionsLoader`, given the framework's resource lookup and logger, so the three word their problems
+alike. Aggregations follow `AggregationOperator.check`, the engine's statement of where DMN defines them,
+and compare values of the output's type (`FeelLiterals.value`, `FeelTemporals.compare`).
 
 The Spring Boot starter loads the tables while the context registers its bean definitions (an
 `ImportBeanDefinitionRegistrar`), because each decision becomes a bean of its own, named
 `praecepta.<name>` and qualified by the decision's name; its resources are found with Spring's
 `ResourcePatternResolver`, so the nested jars of an executable jar are searched too. A table that fails
-stops the refresh before any application bean is created.
+stops the refresh before any application bean is created. Its bean definitions have instance suppliers,
+the loaded engines, which Spring AOT cannot write as code; `DecisionsAotProcessor` (registered in
+`META-INF/spring/aot.factories`) generates in their place calls that load the tables when the application
+starts (`DecisionsRegistrar.decisions`, `engine`), keeping the names, types and qualifiers the registrar
+gave the beans while the application was processed.
 
 The Micronaut module (`praecepta-micronaut`) creates `Decisions` as the first context-scoped bean
 (`@Context`, highest precedence) and, while doing so, registers one singleton bean definition per
@@ -228,7 +238,9 @@ runs its checks on the JVM, and the `Native image` workflow (`-Pnative`) builds 
 and 25 and runs the executable, with `--exact-reachability-metadata` on 25, so a resource no metadata
 registers fails the run instead of reading as absent. The framework modules use no reflection and rely
 on the integration core's metadata for the default location (the Quarkus extension registers the tables
-it validated), but no CI job builds a Spring Boot, Micronaut or Quarkus application natively yet.
+it validated, which its tests check at build-step level, and the Spring Boot starter's tests run Spring
+AOT and start an application from the generated code), but no CI job builds a Spring Boot, Micronaut or
+Quarkus application natively yet.
 
 ## Design decisions
 The main decisions and their reasons (strict DMN semantics, bitsets instead of a trie or generated

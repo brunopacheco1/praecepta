@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.compiler;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.net.URISyntaxException;
@@ -25,6 +26,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import javax.tools.ToolProvider;
@@ -32,6 +34,8 @@ import javax.tools.ToolProvider;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
@@ -39,6 +43,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
+import io.github.brunopacheco1.praecepta.integration.Decision;
 
 /**
  * Compiles tables, then compiles the generated sources with the JDK's compiler and runs them against
@@ -176,6 +181,69 @@ class TableCompilerTest {
         var result = compile(new TableDefinition(first, "Approvals", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
         Assertions.assertThat(result.sources().get("Approvals"))
                 .contains("@return the selected output, or the table's default output if no rule matches");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".ApprovalsInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Approvals").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(new BigDecimal(500))))
+                    .get().hasToString("ApprovalsOutput[status=declined, rate=null, until=17:00Z]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(new BigDecimal(650))))
+                    .get().hasToString("ApprovalsOutput[status=approved, rate=standard, until=null]");
+        }
+    }
+
+    /** The default output is a COLLECT aggregation's result when no rule matches, COUNT's too (DMN 1.5, 10.3.2.10). */
+    @ParameterizedTest
+    @CsvSource({"SUM, 1234567890123456789012345678901235", "COUNT, 2", "MAX, 1234567890123456789012345678901234"})
+    void a_generated_aggregation_gives_the_default_output_when_no_rule_matches(String aggregation, String islands) throws Exception {
+        var result = compile(new TableDefinition(totals(aggregation), "Total", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".TotalInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Total").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("mainland")))
+                    .get().hasToString("TotalOutput[total=9.90]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("islands")))
+                    .get().hasToString("TotalOutput[total=" + islands + "]");
+        }
+    }
+
+    /**
+     * A sum of more than 34 digits is rounded to FEEL's precision (DMN 1.5, 10.3.2.3.1) in the generated class, as
+     * the framework integrations' map-based engine rounds it, so the same table gives the same sum in both.
+     */
+    @Test
+    void a_generated_sum_and_the_frameworks_map_based_sum_agree() throws Exception {
+        var dmn = totals("SUM");
+        var result = compile(new TableDefinition(dmn, "Total", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        var decision = Decision.of("total", DmnReader.read(Files.newInputStream(dmn)));
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".TotalInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Total").getMethod("evaluate", input);
+            var output = ((Optional<?>) evaluate.invoke(null, input.getDeclaredConstructors()[0].newInstance("islands"))).orElseThrow();
+            var generated = (BigDecimal) output.getClass().getMethod("total").invoke(output);
+            Assertions.assertThat(decision.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("total", generated.toPlainString()));
+            Assertions.assertThat(generated).isEqualByComparingTo("1234567890123456789012345678901235");
+        }
+    }
+
+    /** A COLLECT table aggregating one number output whose default is 9.90; on the islands, two rules sum to 35 digits. */
+    private Path totals(String aggregation) throws IOException {
+        var dmn = out.resolve("totals-" + aggregation + ".dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="total" name="total"><decisionTable hitPolicy="COLLECT" aggregation="%s">
+                    <input><inputExpression typeRef="string"><text>zone</text></inputExpression></input>
+                    <output name="total" typeRef="number"><defaultOutputEntry><text>9.90</text></defaultOutputEntry></output>
+                    <rule><inputEntry><text>"islands"</text></inputEntry>
+                      <outputEntry><text>1234567890123456789012345678901234</text></outputEntry></rule>
+                    <rule><inputEntry><text>"islands"</text></inputEntry><outputEntry><text>0.6</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""".formatted(aggregation));
+        return dmn;
     }
 
     @Test
@@ -490,7 +558,13 @@ class TableCompilerTest {
                 List.of(new ColumnDefinition("zone", ColumnType.STRING, null, List.of())),
                 List.of(new ColumnDefinition("fee", ColumnType.STRING, null, List.of())));
         Assertions.assertThatThrownBy(() -> compile(sumOfText, PACKAGE, Severity.ERROR))
-                .hasMessageContaining("SUM aggregation needs exactly one NUMBER output");
+                .hasMessageContaining("SUM aggregation needs a number output, not a string");
+
+        var countOfText = new TableDefinition(table("fees.csv"), null, null, HitPolicy.COLLECT, AggregationOperator.COUNT,
+                List.of(new ColumnDefinition("zone", ColumnType.STRING, null, List.of())),
+                List.of(new ColumnDefinition("fee", ColumnType.STRING, null, List.of())));
+        Assertions.assertThatThrownBy(() -> compile(countOfText, PACKAGE, Severity.ERROR))
+                .hasMessageContaining("the generated code supports COUNT aggregation over a number output only, not a string");
 
         var missing = new TableDefinition(Path.of("nope.xlsx"), null, null, HitPolicy.FIRST, null, List.of(), List.of());
         Assertions.assertThatThrownBy(() -> compile(missing, PACKAGE, Severity.ERROR))

@@ -38,9 +38,10 @@ import java.util.regex.Pattern;
  * </ul>
  *
  * In a pattern, {@code *} matches any characters within a path segment, {@code ?} one character, and
- * {@code **} any number of whole segments, as in Ant and Spring patterns. A class path pattern should start
- * with a directory ({@code rules/...}): the class path's roots themselves cannot be listed inside jars. A
- * location without wildcards names one file. Frameworks with their own resource lookup (Spring's
+ * {@code **} any number of whole segments, as in Ant and Spring patterns. A class path pattern with wildcards
+ * must start with a directory ({@code rules/...}), since the class path's roots themselves cannot be listed
+ * inside jars; {@link Location#parse} rejects one that does not. A location without wildcards names one file.
+ * Frameworks with their own resource lookup (Spring's
  * {@code ResourcePatternResolver}, Quarkus's application archives) use that instead, and may still use
  * {@link Location#matches(String)} to filter paths.
  */
@@ -66,8 +67,10 @@ public final class TableLocations {
          * Parses {@code classpath:...}, {@code classpath*:...}, {@code file:...} or a class path pattern
          * without a prefix.
          *
-         * @throws IllegalArgumentException if the pattern is blank or has another prefix (such as
-         *                                  {@code http:})
+         * @throws IllegalArgumentException if the pattern is blank, has another prefix (such as
+         *                                  {@code http:}), or is a class path pattern with wildcards that does
+         *                                  not start with a directory ({@code classpath*:**}{@code /*.dmn}):
+         *                                  the class path's roots cannot be listed inside jars
          */
         public static Location parse(String text) {
             var trimmed = text == null ? "" : text.strip();
@@ -95,7 +98,13 @@ public final class TableLocations {
             if (path.isBlank()) {
                 throw new IllegalArgumentException("Location '%s' names no files".formatted(text));
             }
-            return new Location(classpath, root(path), path);
+            var root = root(path);
+            if (classpath && root.isEmpty() && hasWildcard(path)) {
+                // the class path's roots cannot be listed inside jars, and each framework would list them differently
+                throw new IllegalArgumentException(("Location '%s': a class path pattern must start with a directory without wildcards, "
+                        + "such as classpath*:rules/**/*.dmn").formatted(text));
+            }
+            return new Location(classpath, root, path);
         }
 
         /** Whether the pattern has no wildcards, and so names a single file. */
@@ -184,12 +193,22 @@ public final class TableLocations {
     public static List<TableSource> find(String location, ClassLoader loader) {
         var parsed = Location.parse(location);
         try {
-            var found = parsed.classpath() ? onClasspath(parsed, loader) : onFileSystem(parsed);
-            found.sort((a, b) -> a.location().compareTo(b.location()));
-            return Collections.unmodifiableList(found);
+            return find(parsed, loader);
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot list the tables at " + location + ": " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * The DMN files a parsed pattern finds, ordered by location: what {@link DecisionsLoader} is given as the
+     * finder of an application without a framework, or of a framework without a resource lookup of its own.
+     *
+     * @throws IOException if a directory or jar cannot be listed
+     */
+    public static List<TableSource> find(Location location, ClassLoader loader) throws IOException {
+        var found = location.classpath() ? onClasspath(location, loader) : onFileSystem(location);
+        found.sort((a, b) -> a.location().compareTo(b.location()));
+        return Collections.unmodifiableList(found);
     }
 
     private static List<TableSource> onFileSystem(Location location) throws IOException {

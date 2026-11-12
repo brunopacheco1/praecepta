@@ -32,9 +32,7 @@ class FailOnNoneTest {
             .assertLogRecords(records -> Assertions.assertThat(records)
                     .anySatisfy(record -> {
                         Assertions.assertThat(record.getLevel()).isEqualTo(Level.WARNING);
-                        Assertions.assertThat(record.getMessage()).isEqualTo("%s: %s");
-                        Assertions.assertThat(record.getParameters()[0]).isEqualTo("Tier");
-                        Assertions.assertThat(record.getParameters()[1].toString()).startsWith("ERROR ");
+                        Assertions.assertThat(record.getMessage()).startsWith("Tier: ERROR ");
                     }));
 
     @Inject

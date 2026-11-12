@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine.feel;
 
 import java.math.BigDecimal;
+import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -14,6 +15,8 @@ import java.time.OffsetTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+
+import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 
 /**
  * Writes column values ({@code String}, {@code BigDecimal}, {@code LocalDate}, {@code Boolean},
@@ -70,6 +73,47 @@ public final class FeelLiterals {
             case ZonedDateTime dateTime when isLaterAtOverlap(dateTime) -> DateTimeFormatter.ISO_ZONED_DATE_TIME.format(dateTime);
             case ZonedDateTime dateTime -> DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime) + "@" + dateTime.getZone().getId();
             default -> value.toString();
+        };
+    }
+
+    /**
+     * Reads a value of a column type back from its plain text, as {@link #text} writes it and as rules' outputs
+     * and map-based inputs hold it: a number ({@code 2.5}), {@code true} or {@code false}, an ISO date, a time
+     * or date-time with or without a time zone (as {@link FeelTemporals} reads them), or a duration
+     * ({@code P1DT2H}, {@code P1Y2M}). A string is its own value; other text is read without its surrounding
+     * whitespace.
+     *
+     * @return a {@code String}, {@code BigDecimal}, {@code Boolean}, {@code LocalDate}, {@code LocalTime} or
+     *         {@code OffsetTime}, {@code LocalDateTime} or {@code ZonedDateTime}, {@code Duration}, or
+     *         {@link YearsAndMonths}
+     * @throws IllegalArgumentException if the text is not a value of the type
+     */
+    public static Object value(String text, ColumnType type) {
+        if (type == ColumnType.STRING) {
+            return text;
+        }
+        var value = text.strip();
+        try {
+            return switch (type) {
+                case NUMBER -> new BigDecimal(value);
+                case BOOLEAN -> bool(value);
+                case DATE -> LocalDate.parse(value);
+                case TIME -> FeelTemporals.parseTime(value);
+                case DATE_TIME -> FeelTemporals.parseDateTime(value);
+                case DAY_TIME_DURATION -> Duration.parse(value);
+                case YEAR_MONTH_DURATION -> YearsAndMonths.parse(value);
+                case STRING -> text;
+            };
+        } catch (IllegalArgumentException | DateTimeException e) {
+            throw new IllegalArgumentException("'%s' is not a %s".formatted(text, type.feelName()), e);
+        }
+    }
+
+    private static Boolean bool(String text) {
+        return switch (text) {
+            case "true" -> Boolean.TRUE;
+            case "false" -> Boolean.FALSE;
+            default -> throw new IllegalArgumentException("not a boolean");
         };
     }
 

@@ -161,9 +161,11 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 
 Quoted strings take FEEL's escape sequences (DMN 1.5, grammar rule 64): `\"`, `\\`, `\'`, `\n` (a line
 feed), `\r`, `\t` (a tab), and a character by its code point, `\u00e9` or `\U01F40E`. A backslash before
-any other character is an error, so a Windows path is written `"C:\\temp"`; unquoted words keep their
-backslashes as they are. `DmnWriter` writes line breaks and tabs back as `\n`, `\r` and `\t`, since a FEEL
-string literal may not hold a line break.
+any other character is an error; unquoted words keep their backslashes as they are. So a quoted Windows
+path is written `"C:\\temp"`: written `"C:\temp"`, it is read without an error as `C:`, a tab and `emp`
+(and `"D:\new"` holds a line feed). Before upgrading from 0.4, search your tables' quoted strings for
+backslashes. In strict FEEL (DMN files), a quoted string may not hold a line break itself (grammar rule
+33): write `\n` or `\r`. `DmnWriter` writes line breaks and tabs back as `\n`, `\r` and `\t`.
 
 Missing values follow FEEL: they fail comparisons and intervals, equal only `null`, and so satisfy
 `not("FR")`. Blank text counts as missing. Strings compare as FEEL orders them, character by
@@ -298,11 +300,18 @@ Supported:
   (`Symptom + " is listed"`, `(price - discount) * 1.2`, `amount * (1 + rate) ** years`): `+` joins
   strings or adds numbers, results have FEEL's 34 digits, and a missing operand gives a missing output.
   The inputs they name are columns, or inputs the cells compare with, that hold single values.
-- **Default output values** (`defaultOutputEntry`, literals of the output's type), which are the result
-  when no rule matches, whatever the hit policy or aggregation (`[{Status=Declined, Rate=null}]` rather
-  than `[]`; an output without a default is null in it). `Builder.defaultOutput(...)` gives a table built
-  in code the same.
-- **Every hit policy**, with SUM, MIN, MAX and COUNT aggregation.
+- **Default output values** (`defaultOutputEntry`, literals of the output's type, and one of its output
+  values when it lists them), which are the result when no rule matches, whatever the hit policy or
+  aggregation (`[{Status=Declined, Rate=null}]` rather than `[]`; an output without a default is null in
+  it). `Builder.defaultOutput(...)` gives a table built in code the same.
+- **A single output typed by its decision**: DMN 1.5 says the output clause of a single-output table has
+  no `typeRef` of its own (Table 34), so its type is the decision table's `typeRef`, or else the decision
+  variable's (the item type of a list for a multi-hit table; nothing for COUNT, whose result is a number).
+- **Every hit policy**, with SUM, MIN, MAX and COUNT aggregation. The engine leaves what they mean to the
+  output strategy; `AggregationOperator.check(outputs)` says where DMN defines them: on a single output,
+  SUM over numbers, MIN and MAX over any ordered type, COUNT over any. As in Praecepta's generated classes
+  and framework integrations, an aggregation skips missing outputs, where FEEL's `sum`, `min` and `max`
+  would give null (10.3.4): a known deviation.
 
 Anything else is rejected with a message naming the decision, rule and column: function calls such as
 `upper case(a)`, `if`, `=` and `!=` tests and other FEEL literal forms
@@ -492,7 +501,7 @@ injects them too, as in the Micronaut and Quarkus integrations.
 
 | Property | Default | Meaning |
 |---|---|---|
-| `praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load: patterns with `classpath:` or `classpath*:` (both search every class path root), or `file:`; `*` matches within a path segment, `**` across segments. A comma-separated list or a YAML list. |
+| `praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load: patterns with `classpath:` or `classpath*:` (both search every class path root, from a directory: `classpath*:rules/...`), or `file:`; `*` matches within a path segment, `**` across segments. A comma-separated list or a YAML list. |
 | `praecepta.fail-on` | `ERROR` | The validation severity that stops startup: `ERROR`, `WARNING` or `NONE`. |
 | `praecepta.enabled` | `true` | `false` turns the starter off. |
 
@@ -505,6 +514,12 @@ With Actuator, the endpoint `praecepta` reports each decision's columns, hit pol
 issues (`/actuator/praecepta`, and `/actuator/praecepta/{name}` for one). Like every Actuator endpoint
 it is exposed only when you say so, for example with
 `management.endpoints.web.exposure.include=health,praecepta`. Nothing is evaluated through it.
+
+Spring AOT (`spring-boot:process-aot`, for a native image or the JVM's AOT mode) processes the starter like
+any other configuration: the tables are validated while the application is built, its engine beans are
+those of the decisions found then, and the tables are read again when it starts (a decision missing then
+fails that engine bean). As AOT fixes the beans and their conditions at build time, set
+`praecepta.locations` and `praecepta.enabled` for the build as for the application.
 
 To keep tables in Excel or CSV, convert them at build time with the [Maven plugin](#praecepta-maven-plugin)
 or the [Gradle plugin](#praecepta-gradle-plugin): the DMN resources they write are found by a pattern that
@@ -559,7 +574,7 @@ Settings, in `application.yml` (the same keys as the other framework integration
 | Key | Default | Meaning |
 |---|---|---|
 | `praecepta.enabled` | `true` | `false` turns the module off: no beans, no endpoint. |
-| `praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load, as a comma-separated list or a YAML list. `classpath:` and `classpath*:` search every class path root, `file:` the file system; `*` matches within a directory, `**` across directories. When set, a location that finds no file stops startup. |
+| `praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load, as a comma-separated list or a YAML list. `classpath:` and `classpath*:` search every class path root from a directory (`classpath*:rules/...`), `file:` the file system; `*` matches within a directory, `**` across directories. When set, a location that finds no file stops startup. |
 | `praecepta.fail-on` | `ERROR` | The validation severity that stops startup: `ERROR`, `WARNING` or `NONE`. Unreadable or invalid tables stop it whatever this says. |
 
 A failed startup lists every problem at once (a `DecisionsException`). Issues below `fail-on` are logged
@@ -620,7 +635,7 @@ typed input and output records, use the [Maven](#praecepta-maven-plugin) or
 
 | Property | Default | Meaning |
 |---|---|---|
-| `quarkus.praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load: patterns, comma-separated. `classpath:` and `classpath*:` search the application and its dependencies, `file:` the file system; `*` matches within a directory, `**` across them. A pattern set here that finds nothing fails the build. |
+| `quarkus.praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load: patterns, comma-separated. `classpath:` and `classpath*:` search the application and its dependencies from a directory (`classpath*:rules/...`), `file:` the file system; `*` matches within a directory, `**` across them. A pattern set here that finds nothing fails the build. |
 | `quarkus.praecepta.fail-on` | `ERROR` | The validation severity that fails the build: `ERROR`, `WARNING` or `NONE`. Tables that cannot be read fail it whatever this says. |
 | `quarkus.praecepta.tables."<key>".*` | | An Excel or CSV table to compile, with the Maven plugin's settings in kebab-case (below). |
 
@@ -638,8 +653,11 @@ quarkus.praecepta.tables.discount.outputs[0].type=NUMBER
 A relative `source` is resolved against the project's directory; keep spreadsheets out of
 `src/main/resources` so they are not packaged. Apache POI is used at build time only and never reaches
 the application. In dev mode, changing a DMN file or a declared spreadsheet restarts the application
-with the new table, and a table that fails validation shows on the error page until it is fixed. The
-extension needs `quarkus-arc`, which every Quarkus application has. It uses no reflection; the tables
+with the new table, as does adding a DMN file a class path location matches, and a table that fails
+validation shows on the error page until it is fixed. A file added under a `file:` location needs a
+manual restart (press `s`), since Quarkus watches files, not directories. The extension needs
+`quarkus-arc`, which it leaves to the application (`provided`) as every Quarkus application has it, so
+Quarkus' tools do not check which Quarkus version the extension was built for. It uses no reflection; the tables
 are read while the application initialises, and in a native executable while the image is built, but
 the native-image workflow does not build a Quarkus application yet (see [Native images](#native-images)).
 
@@ -705,9 +723,12 @@ in module `java.logging`): register those for your locale, or limit exact handli
 (`--exact-reachability-metadata=com.acme`).
 
 The framework integrations use no reflection either, and with the default `praecepta.locations` the
-integration core's metadata covers their files. CI does not yet build a Spring Boot, Micronaut or Quarkus
-application natively, so those combinations are untested; files at other locations must be registered
-through the framework's own native support.
+integration core's metadata covers their files. The Spring Boot starter works with Spring AOT, which a
+Spring native image needs, and its tests run the AOT processing and start an application from the
+generated code; Quarkus' tests check that the validated tables become resources registered for the image.
+CI does not yet build a Spring Boot, Micronaut or Quarkus application natively, though, so those native
+executables are untested; files at other locations must be registered through the framework's own native
+support.
 
 # Building and Testing
 Building Praecepta needs **Java 21** or later and Maven 3.9+; CI builds on Java 21, 25 and 27. From the repository root:

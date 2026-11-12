@@ -18,10 +18,13 @@ import io.github.brunopacheco1.praecepta.engine.OutputStrategy;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Issue;
-import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 
 /**
  * One decision table loaded by a framework integration, with a map-based engine: inputs and outputs are the
@@ -59,22 +62,19 @@ public record Decision(String name, String location, DecisionTable table, Praece
      * Builds a table's map-based engine and validates it. Validation never fails here;
      * {@link Decisions#load} decides what fails.
      *
-     * @throws IllegalArgumentException if the table cannot be built into an engine (such as an aggregation
-     *                                  over anything but one NUMBER output, the only one the build plugins
-     *                                  generate code for)
+     * @throws IllegalArgumentException if the table cannot be built into an engine, such as an aggregation
+     *                                  that DMN does not define for its outputs ({@link AggregationOperator#check})
      */
     public static Decision of(String location, DecisionTable table) {
-        if (table.aggregation() != null
-                && (table.outputs().size() != 1 || table.outputs().getFirst().type() != ColumnType.NUMBER)) {
-            throw new IllegalArgumentException("Table '%s': %s aggregation needs exactly one NUMBER output"
-                    .formatted(table.name(), table.aggregation()));
-        }
         PraeceptaEngine<Map<String, String>, Map<String, String>> engine;
         try {
+            if (table.aggregation() != null) {
+                table.aggregation().check(table.outputs());
+            }
             engine = PraeceptaEngine.<Map<String, String>, Map<String, String>>builder()
                     .table(table)
                     .inputs(PraeceptaInput::new)
-                    .output(new MapOutput(table.outputs().isEmpty() ? "" : table.outputs().getFirst().name()))
+                    .output(new MapOutput(table.aggregation() == null ? null : table.outputs().getFirst()))
                     .build();
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("Table '%s': %s".formatted(table.name(), e.getMessage()), e);
@@ -131,11 +131,16 @@ public record Decision(String name, String location, DecisionTable table, Praece
     }
 
     /**
-     * A rule's outputs as a map of text. Under SUM, MIN and MAX (over the table's one NUMBER output) a missing
-     * value is skipped, as the generated code of the build plugins skips it; SUM adds with FEEL's precision
-     * (34 digits, DMN 1.5, 10.3.2.3.1).
+     * A rule's outputs as a map of text, and the aggregates of a COLLECT table's one output (DMN 1.5,
+     * 10.3.2.10): SUM adds numbers with FEEL's precision (34 significant digits, 10.3.2.3.1) and keeps their
+     * scale ({@code 10.50} and {@code 1.50} give {@code 12.00}), as the generated code of the build plugins
+     * does; MIN and MAX keep the smallest or the largest value as written, ordered as FEEL orders values of the
+     * output's type ({@link FeelTemporals#compare}); COUNT gives the number of matches. A missing value is
+     * skipped, as the generated code skips it.
+     *
+     * @param aggregated the output a COLLECT aggregation aggregates, or null for none
      */
-    private record MapOutput(String aggregated) implements OutputStrategy<Map<String, String>> {
+    private record MapOutput(OutputColumn aggregated) implements OutputStrategy<Map<String, String>> {
 
         @Override
         public Map<String, String> transform(PraeceptaOutput output) {
@@ -144,29 +149,29 @@ public record Decision(String name, String location, DecisionTable table, Praece
 
         @Override
         public Map<String, String> sum(Map<String, String> a, Map<String, String> b) {
-            var x = number(a);
-            var y = number(b);
+            var x = value(a);
+            var y = value(b);
             if (x == null) {
                 return b;
             }
             if (y == null) {
                 return a;
             }
-            return single(x.add(y, MathContext.DECIMAL128).stripTrailingZeros().toPlainString());
+            return single(((BigDecimal) x).add((BigDecimal) y, MathContext.DECIMAL128).toPlainString());
         }
 
         @Override
         public Map<String, String> min(Map<String, String> a, Map<String, String> b) {
-            var x = number(a);
-            var y = number(b);
-            return x == null ? b : y == null || x.compareTo(y) <= 0 ? a : b;
+            var x = value(a);
+            var y = value(b);
+            return x == null ? b : y == null || FeelTemporals.compare(x, y) <= 0 ? a : b;
         }
 
         @Override
         public Map<String, String> max(Map<String, String> a, Map<String, String> b) {
-            var x = number(a);
-            var y = number(b);
-            return x == null ? b : y == null || x.compareTo(y) >= 0 ? a : b;
+            var x = value(a);
+            var y = value(b);
+            return x == null ? b : y == null || FeelTemporals.compare(x, y) >= 0 ? a : b;
         }
 
         @Override
@@ -174,13 +179,14 @@ public record Decision(String name, String location, DecisionTable table, Praece
             return single(Integer.toString(matches));
         }
 
-        private BigDecimal number(Map<String, String> output) {
-            var value = output.get(aggregated);
-            return value == null ? null : new BigDecimal(value);
+        /** The aggregated output's value, of the output's type; null if it is missing. */
+        private Object value(Map<String, String> output) {
+            var text = output.get(aggregated.name());
+            return text == null ? null : FeelLiterals.value(text, aggregated.type());
         }
 
         private Map<String, String> single(String value) {
-            return Map.of(aggregated, value);
+            return Map.of(aggregated.name(), value);
         }
     }
 }

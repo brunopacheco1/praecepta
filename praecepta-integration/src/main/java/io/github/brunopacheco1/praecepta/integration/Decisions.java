@@ -11,7 +11,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -152,18 +151,18 @@ public final class Decisions {
     }
 
     /**
-     * Parses a {@code fail-on} setting: {@code ERROR}, {@code WARNING}, or {@code NONE} (null), in any case.
+     * Parses a {@code fail-on} setting: {@code ERROR}, {@code WARNING}, or {@code NONE} (null), in any case, as
+     * {@link Severity#failOn} reads it for every integration.
      *
-     * @throws IllegalArgumentException for any other value, null included
+     * @throws IllegalArgumentException for any other value, null included:
+     *                                  {@code fail-on must be ERROR, WARNING or NONE, not <value>}
      */
     public static Severity failOn(String value) {
-        var text = value == null ? "" : value.strip().toUpperCase(Locale.ROOT);
-        return switch (text) {
-            case "NONE" -> null;
-            case "ERROR" -> Severity.ERROR;
-            case "WARNING" -> Severity.WARNING;
-            default -> throw new IllegalArgumentException("fail-on must be ERROR, WARNING or NONE, not " + value);
-        };
+        try {
+            return Severity.failOn(value);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("fail-on " + e.getMessage(), e);
+        }
     }
 
     @Override

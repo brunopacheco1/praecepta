@@ -56,7 +56,8 @@ public final class Fees {
 
                         @Override
                         public FeesOutput sum(FeesOutput a, FeesOutput b) {
-                            return a.fee() == null ? b : b.fee() == null ? a : new FeesOutput(a.fee().add(b.fee()));
+                            return a.fee() == null ? b : b.fee() == null ? a
+                                    : new FeesOutput(a.fee().add(b.fee(), java.math.MathContext.DECIMAL128));
                         }
 
                         @Override

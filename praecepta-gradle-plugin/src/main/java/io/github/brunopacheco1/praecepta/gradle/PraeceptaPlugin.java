@@ -77,7 +77,8 @@ public class PraeceptaPlugin implements Plugin<Project> {
             generate.getFailOn().set(extension.getFailOn());
             generate.getFileHeader().set(extension.getFileHeader());
             generate.getSkip().set(extension.getSkip());
-            // in declaration order, read when the task runs, so tables registered after this are included
+            // in the order of their names (as a NamedDomainObjectContainer iterates), read when the task runs, so
+            // tables registered after this are included
             generate.getTables().set(providers.provider(() -> List.copyOf(extension.getTables())));
             generate.getSourceDirectory().convention(buildDirectory.dir("generated/sources/praecepta/java/main"));
             generate.getResourceDirectory().convention(buildDirectory.dir("generated/resources/praecepta/main"));
