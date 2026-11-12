@@ -40,7 +40,8 @@ Quarkus or Micronaut.
   (`(price - discount) * 1.2`, `Symptom + " is listed"`), evaluated only for the rules that match
 - Optional DMN input value lists: values outside them are rejected
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
-  rules that can never be selected (FIRST, PRIORITY), and gaps (declared inputs no rule matches)
+  rules that can never be selected (FIRST, PRIORITY), gaps (declared inputs no rule matches), and
+  default outputs no input can reach (a complete table)
 - Bitset matching: memory grows linearly with the table (10,000 rules take 1.5 to 5 MB of heap,
   against about 90 to 130 MB for Camunda and Drools) and most engines build in milliseconds; the
   mask of a value only a few rules accept, such as a product code, is stored compactly, so even a
@@ -310,7 +311,10 @@ Supported:
   aggregation (`[{Status=Declined, Rate=null}]` rather than `[]`; an output without a default is null in
   it). A default of `null` is a default too: a table whose outputs all default to `null` gives
   `[{Status=null, Rate=null}]`, and one whose outputs declare no default gives `[]` (DMN 1.5, 10.3.2.10).
-  `Builder.defaultOutput(...)` gives a table built in code the same.
+  `Builder.defaultOutput(...)` gives a table built in code the same. "A complete decision table SHALL NOT
+  specify a default output value" (10.3.2.10): when every input matches a rule, a missing value in any
+  column included, the validation report has the ERROR `UNREACHABLE_DEFAULT_OUTPUT`, so the build plugins
+  and the framework integrations reject the table by default.
 - **A single output typed by its decision**: DMN 1.5 says the output clause of a single-output table has
   no `typeRef` of its own (Table 34), so its type is the decision table's `typeRef`, or else the decision
   variable's (the item type of a list for a multi-hit table; nothing for COUNT, whose result is a number).

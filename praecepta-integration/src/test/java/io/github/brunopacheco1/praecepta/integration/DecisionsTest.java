@@ -358,6 +358,36 @@ class DecisionsTest {
         Assertions.assertThat(decisions).hasToString("Decisions[Grade]");
     }
 
+    /**
+     * DMN 1.5, 10.3.2.10: "A complete decision table SHALL NOT specify a default output value" (#91). A table that every
+     * input matches, a missing score included, and that declares a default fails to load at ERROR, the default
+     * fail-on, and describes the issue for the management endpoints.
+     */
+    @Test
+    void a_default_output_on_a_complete_table_fails_loading_and_is_described() {
+        var complete = TableSource.of("grade.dmn", """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="grade" name="Grade"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="number"><text>score</text></inputExpression></input>
+                    <output name="grade" typeRef="string"><defaultOutputEntry><text>"C"</text></defaultOutputEntry></output>
+                    <rule><inputEntry><text>&gt;= 5</text></inputEntry><outputEntry><text>"A"</text></outputEntry></rule>
+                    <rule><inputEntry><text>&lt; 5, null</text></inputEntry><outputEntry><text>"B"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""".getBytes(StandardCharsets.UTF_8));
+        var message = "ERROR every input matches a rule, so the default output is never given "
+                + "(a complete table declares no default output: DMN 1.5, 10.3.2.10)";
+        Assertions.assertThatThrownBy(() -> Decisions.load(List.of(complete), Severity.ERROR))
+                .isInstanceOf(DecisionsException.class)
+                .hasMessageStartingWith("Cannot load decision tables: grade.dmn: decision 'Grade' has validation issues at ERROR")
+                .hasMessageContaining(message);
+
+        var lenient = Decisions.load(List.of(complete), null);
+        Assertions.assertThat(lenient.get("Grade").describe().get("issues"))
+                .isEqualTo(List.of(issue("ERROR", "UNREACHABLE_DEFAULT_OUTPUT", List.of(), message)));
+        // the default is never given
+        Assertions.assertThat(lenient.evaluate("Grade", Map.of())).containsExactly(Map.of("grade", "B"));
+    }
+
     @Test
     void fail_on_settings_are_parsed_strictly() {
         Assertions.assertThat(Decisions.failOn("ERROR")).isEqualTo(Severity.ERROR);

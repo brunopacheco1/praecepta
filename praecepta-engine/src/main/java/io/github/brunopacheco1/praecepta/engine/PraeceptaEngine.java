@@ -233,7 +233,8 @@ public final class PraeceptaEngine<I, O> {
         // rules that test a list column match lists the index's classes cannot describe: the analysis leaves them out too
         var unseenRules = listRules(index);
         BitsetIndex.or(unseenRules, variableRules);
-        report = validate(index, rules, hitPolicy, unseenRules, numericOutputs, builder.failOn, builder.logValidationReport);
+        report = validate(index, rules, hitPolicy, unseenRules, numericOutputs, builder.defaultOutput != null, builder.failOn,
+                builder.logValidationReport);
     }
 
     /** Starts configuring an engine. */
@@ -1019,8 +1020,17 @@ public final class PraeceptaEngine<I, O> {
      * as {@code failOn}; otherwise logs the findings as a warning, unless {@code log} is false.
      */
     private static ValidationReport validate(BitsetIndex index, List<Praeceptum> rules, HitPolicy hitPolicy, long[] variableRules,
-            Set<String> numericOutputs, Severity failOn, boolean log) {
-        var analysed = TableAnalysis.analyse(index, rules, hitPolicy, variableRules, output -> comparable(output, numericOutputs));
+            Set<String> numericOutputs, boolean hasDefaultOutput, Severity failOn, boolean log) {
+        var analysed = new ArrayList<>(
+                TableAnalysis.analyse(index, rules, hitPolicy, variableRules, output -> comparable(output, numericOutputs)));
+        if (hasDefaultOutput) {
+            // DMN 1.5, 10.3.2.10: "A complete decision table SHALL NOT specify a default output value"
+            var seen = index.allRules();
+            BitsetIndex.andNot(seen, variableRules);
+            if (Completeness.isComplete(index, seen)) {
+                analysed.add(new Issue(ValidationReport.Kind.UNREACHABLE_DEFAULT_OUTPUT, List.of()));
+            }
+        }
         var report = new ValidationReport(analysed.stream()
                 .sorted(Comparator.comparing(Issue::severity).reversed())
                 .toList());
@@ -1161,7 +1171,10 @@ public final class PraeceptaEngine<I, O> {
          * policy, and as the result of a COLLECT aggregation (COUNT included), not aggregated. It is converted
          * once, when the engine is built, like a rule's output. Its values are plain text, as a rule's are, and
          * null for an output without a default. {@link #table} takes it from the table's output columns
-         * ({@link DecisionTable#defaultOutput}).
+         * ({@link DecisionTable#defaultOutput}). When every input, a missing value in any column included, matches a
+         * rule, the default can never be given, and the validation report has the ERROR
+         * {@link ValidationReport.Kind#UNREACHABLE_DEFAULT_OUTPUT} ("A complete decision table SHALL NOT specify a
+         * default output value").
          *
          * @throws IllegalArgumentException if the output names an input or is an expression: a default is a value
          */

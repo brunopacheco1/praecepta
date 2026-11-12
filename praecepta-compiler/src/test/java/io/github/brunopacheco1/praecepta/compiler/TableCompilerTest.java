@@ -670,6 +670,34 @@ class TableCompilerTest {
         Assertions.assertThat(compile(config, PACKAGE, null).report().issues()).isNotEmpty();
     }
 
+    /** DMN 1.5, 10.3.2.10: "A complete decision table SHALL NOT specify a default output value" (#91): an ERROR. */
+    @Test
+    void a_default_output_on_a_complete_table_fails_the_build() throws IOException {
+        var dmn = out.resolve("complete.dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="grade" name="grade"><decisionTable hitPolicy="UNIQUE">
+                    <input><inputExpression typeRef="boolean"><text>vip</text></inputExpression></input>
+                    <output name="grade" typeRef="string"><defaultOutputEntry><text>"C"</text></defaultOutputEntry></output>
+                    <rule><inputEntry><text>true</text></inputEntry><outputEntry><text>"A"</text></outputEntry></rule>
+                    <rule><inputEntry><text>false</text></inputEntry><outputEntry><text>"B"</text></outputEntry></rule>
+                    <rule><inputEntry><text>null</text></inputEntry><outputEntry><text>"B"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var config = new TableDefinition(dmn, "Grade", null, null, null, List.of(), List.of());
+        Assertions.assertThatThrownBy(() -> compile(config, PACKAGE, Severity.ERROR))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Table 'grade'")
+                .hasMessageContaining("ERROR every input matches a rule, so the default output is never given");
+        Assertions.assertThat(compile(config, PACKAGE, null).report().issues())
+                .extracting(issue -> issue.kind().name())
+                .containsExactly("UNREACHABLE_DEFAULT_OUTPUT");
+        // without the rule for a missing value, a missing vip gives the default
+        Files.writeString(dmn, Files.readString(dmn).replace("<rule><inputEntry><text>null</text></inputEntry>"
+                + "<outputEntry><text>\"B\"</text></outputEntry></rule>", ""));
+        Assertions.assertThat(compile(config, PACKAGE, Severity.ERROR).report().issues()).isEmpty();
+    }
+
     @Test
     void configuration_mistakes_are_explained() {
         var dmnWithPolicy = new TableDefinition(table("camunda-modeler-discount.dmn"), null, null, HitPolicy.FIRST, null, List.of(), List.of());

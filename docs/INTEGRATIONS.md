@@ -153,7 +153,10 @@ the build logged. The endpoints return `Decisions.describe()`,
 `{"decisions": {"Discount": {...}}}`, or one decision's description (404 for an unknown name): `name`,
 `location`, `hitPolicy`, `aggregation`, `rules` (the number of rules), `inputs` and `outputs` (`name`,
 `type`, and `list` for inputs), and `issues` (`severity`, `kind`, `rules`, `detail`, `example`,
-`message`). They only read; nothing is evaluated through them. The descriptions show the rules'
+`message`). An issue's `kind` is one of `ValidationReport.Kind`: `OVERLAPPING_RULES`, `CONFLICTING_OUTPUTS`
+and `UNREACHABLE_DEFAULT_OUTPUT` (a default output on a table that every input matches, which DMN 1.5,
+10.3.2.10, forbids) are errors, so they fail the build or the startup at the default `fail-on`;
+`UNREACHABLE_RULE` and `GAP` are warnings. They only read; nothing is evaluated through them. The descriptions show the rules'
 conditions, so expose the endpoints as you would any other that shows configuration.
 
 In Quarkus, the application builds its engines from the DMN the build validated, so it cannot fail

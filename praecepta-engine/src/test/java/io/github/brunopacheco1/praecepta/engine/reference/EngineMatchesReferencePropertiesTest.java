@@ -229,7 +229,7 @@ class EngineMatchesReferencePropertiesTest {
             var engine = engine(s, rules, policy, priority, perColumn);
             var reference = s.reference(rules, policy, DecisionTableScenario.outputPriority(policy, priority), perColumn);
             var actual = engine.validationReport().issues().stream()
-                    .filter(issue -> issue.kind() != Kind.GAP)
+                    .filter(issue -> issue.kind() != Kind.GAP && issue.kind() != Kind.UNREACHABLE_DEFAULT_OUTPUT)
                     .map(issue -> new Finding(issue.kind().name(), issue.ruleIds()))
                     .collect(Collectors.toSet());
             Assertions.assertThat(actual).as("policy %s", policy)
@@ -279,6 +279,41 @@ class EngineMatchesReferencePropertiesTest {
                 var noMatch = reference.defaultOutput() == null ? List.<PraeceptaOutput>of() : List.of(reference.defaultOutput());
                 Assertions.assertThat(engine.evaluate(input)).as("gap %s, input %s", gap.detail(), input).isEqualTo(noMatch);
             }
+        }
+    }
+
+    /**
+     * DMN 1.5, 10.3.2.10: "A complete decision table SHALL NOT specify a default output value." The engine reports a
+     * default output exactly when every valid input, a missing value in any column included, matches one of the rules
+     * its analysis sees; half of the tables get a rule of {@code -} cells, which makes them complete.
+     */
+    @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void a_default_output_is_reported_unreachable_exactly_when_every_input_matches_a_rule(@ForAll("scenarios") DecisionTableScenario s,
+            @ForAll boolean catchAll, @ForAll boolean perColumn) {
+        assertUnreachableDefaultMatchesCompleteness(s, catchAll, perColumn);
+    }
+
+    @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void a_temporal_tables_default_output_is_reported_unreachable_exactly_when_it_is_complete(
+            @ForAll("temporalScenarios") DecisionTableScenario s, @ForAll boolean catchAll, @ForAll boolean perColumn) {
+        assertUnreachableDefaultMatchesCompleteness(s, catchAll, perColumn);
+    }
+
+    @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void a_default_output_over_declared_values_is_reported_unreachable_exactly_when_it_is_complete(
+            @ForAll("scenariosWithValueLists") DecisionTableScenario s, @ForAll boolean catchAll, @ForAll boolean perColumn) {
+        assertUnreachableDefaultMatchesCompleteness(s, catchAll, perColumn);
+    }
+
+    private static void assertUnreachableDefaultMatchesCompleteness(DecisionTableScenario s, boolean catchAll, boolean perColumn) {
+        var rules = catchAll ? s.withCatchAll(s.rules()) : s.rules();
+        var engine = engine(s, rules, HitPolicy.COLLECT, List.of(), perColumn);
+        var reference = s.reference(rules, HitPolicy.COLLECT, Map.of(), perColumn);
+        var reported = engine.validationReport().issues(Kind.UNREACHABLE_DEFAULT_OUTPUT);
+        boolean expected = reference.defaultOutput() != null && reference.everyInputMatchesAnAnalysedRule(s.columns());
+        Assertions.assertThat(!reported.isEmpty()).as("reported %s, default %s", reported, reference.defaultOutput()).isEqualTo(expected);
+        if (!reported.isEmpty()) {
+            Assertions.assertThat(reference.everyInputMatches(s.columns())).as("a reported table is complete").isTrue();
         }
     }
 

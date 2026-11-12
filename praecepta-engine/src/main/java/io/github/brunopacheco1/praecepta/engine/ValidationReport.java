@@ -61,7 +61,15 @@ public record ValidationReport(List<Issue> issues) {
          * when every string column the rules constrain declares its input values; at most 100 gaps are
          * listed.
          */
-        GAP(Severity.WARNING);
+        GAP(Severity.WARNING),
+        /**
+         * A default output that no input can reach: the table is complete, as every input, with a missing value in
+         * any column too, matches some rule, so the default is never given. DMN 1.5, 10.3.2.10: "A complete decision
+         * table SHALL NOT specify a default output value." Rules that compare with another input or test a column
+         * holding lists are left out of the search, as from the other analyses, so a table that is complete only
+         * through them is not reported.
+         */
+        UNREACHABLE_DEFAULT_OUTPUT(Severity.ERROR);
 
         private final Severity severity;
 
@@ -77,7 +85,7 @@ public record ValidationReport(List<Issue> issues) {
     /**
      * @param kind    what was found
      * @param ruleIds identifiers ({@code Praeceptum.priority}) of the rules involved, in rule order
-     *                (empty for gaps)
+     *                (empty for gaps and for an unreachable default output)
      * @param detail  for gaps, the uncovered region, e.g. {@code country = "FR", age in (18..21)};
      *                columns not mentioned may take any declared value. Null otherwise.
      * @param example for gaps, one concrete uncovered input (columns not mentioned: any value).
@@ -105,6 +113,8 @@ public record ValidationReport(List<Issue> issues) {
                 case OVERLAPPING_RULES -> "ERROR rules %s both match some inputs (UNIQUE)".formatted(ruleIds);
                 case CONFLICTING_OUTPUTS -> "ERROR rules %s both match some inputs but differ in outputs (ANY)".formatted(ruleIds);
                 case GAP -> "WARNING no rule matches " + detail;
+                case UNREACHABLE_DEFAULT_OUTPUT -> "ERROR every input matches a rule, so the default output is never given "
+                        + "(a complete table declares no default output: DMN 1.5, 10.3.2.10)";
             };
         }
     }

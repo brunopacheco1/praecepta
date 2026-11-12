@@ -113,7 +113,10 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
    classes, the framework integrations' map-based engine and any other strategy agree.
 4. **Validation** (`TableAnalysis`, `ValidationReport`), when the engine is built: overlapping rules
    (UNIQUE), conflicting outputs (ANY), rules that can never fire (FIRST, PRIORITY), and gaps
-   (declared inputs that no rule covers, with an example). The analysis is exact, because it searches
+   (declared inputs that no rule covers, with an example), and, for a table with a default output, whether
+   it is complete (`Completeness`): whether every input, a missing value in any column and a string no rule
+   mentions included, matches a rule, so that the default can never be given (an ERROR,
+   `UNREACHABLE_DEFAULT_OUTPUT`). The analysis is exact, because it searches
    the same column classes the index uses. The classes of single values cannot say which lists a rule
    matches (rules `"PT"` and `"BR"` overlap on `["PT","BR"]`), so a list column shows the analysis
    one class, and the rules that constrain it are left out like rules that compare with other inputs.

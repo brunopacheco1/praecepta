@@ -828,6 +828,17 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 .toList();
     }
 
+    /** The rules, then one more whose every cell is {@code -}, so that every input matches some rule. */
+    public List<Praeceptum> withCatchAll(List<Praeceptum> rules) {
+        var cells = new HashMap<String, String>();
+        columns.forEach(column -> cells.put(column, "-"));
+        var catchAll = new Praeceptum(rules.size() + 1, new PraeceptaInput(cells),
+                new PraeceptaOutput(Map.of(ID, String.valueOf(rules.size() + 1), OUT, OUT_VALUES.getFirst(), NUMBER, "1", ECHO, ECHO_VALUE)));
+        var all = new ArrayList<>(rules);
+        all.add(catchAll);
+        return List.copyOf(all);
+    }
+
     /**
      * The rules with {@link #NUMBER} as their only output, a literal or an expression, which may give a missing
      * value: what a COLLECT aggregation aggregates, since DMN aggregates a single output (8.2.11).

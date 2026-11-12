@@ -408,6 +408,28 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return true;
     }
 
+    /**
+     * Whether the table is complete (DMN 1.5, 8.2.4: "its rules cover all combinations of expected input values"):
+     * whether every valid input, with a missing value in any column too, since evaluation accepts one, matches some
+     * rule.
+     */
+    public boolean everyInputMatches(List<String> columns) {
+        return representativeInputs(columns, true).stream()
+                .filter(input -> invalidColumn(input) == null)
+                .allMatch(input -> !matches(input).isEmpty());
+    }
+
+    /**
+     * Whether the table is complete through the rules the engine's analysis sees: those without a cell that names
+     * an input or tests a list, whose matches are known only when evaluating. If so, it is complete.
+     */
+    public boolean everyInputMatchesAnAnalysedRule(List<String> columns) {
+        var analysed = rules.stream().filter(rule -> !isVariable(rule)).toList();
+        return representativeInputs(columns, true).stream()
+                .filter(input -> invalidColumn(input) == null)
+                .allMatch(input -> analysed.stream().anyMatch(rule -> ruleAccepts(rule, input)));
+    }
+
     /** Valid, non-missing representative inputs that no rule matches. */
     public List<Map<String, Object>> uncoveredInputs(List<String> columns) {
         return representativeInputs(columns, false).stream()

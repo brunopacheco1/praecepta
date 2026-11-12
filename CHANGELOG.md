@@ -22,6 +22,20 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `praecepta-integration` gains `Decisions.load(sources, failOn, logReports)` and
   `Decision.of(location, table, logReport)` to build its engines so; `Decisions.load(sources, failOn)` and
   `Decision.of(location, table)` keep the engine's logging.
+- **A default output on a complete table is reported**
+  ([#91](https://github.com/brunopacheco1/praecepta/issues/91)): DMN 1.5, 10.3.2.10, "A complete decision table
+  SHALL NOT specify a default output value", since no input could reach it. The validation report has a new
+  issue kind, `ValidationReport.Kind.UNREACHABLE_DEFAULT_OUTPUT`, an ERROR, when a table declares a default
+  output (`defaultOutputEntry`, or `Builder.defaultOutput`) and every input matches a rule: a search over the
+  index's classes, like the other analyses, that unlike the gap search also visits a missing value in every
+  column (which the engine accepts, and `-` matches) and the strings no rule mentions in a column without
+  declared values. So a table whose rules cover every declared value but not a missing one is not reported:
+  its default is what a missing input gives. Rules that compare with another input or test a list are left
+  out, as from the other analyses, so a table complete only through them is not reported. Its message is
+  `ERROR every input matches a rule, so the default output is never given (a complete table declares no
+  default output: DMN 1.5, 10.3.2.10)`, and `Decisions.describe()` shows it with the kind
+  `UNREACHABLE_DEFAULT_OUTPUT`. The TCK's tables with default outputs are not complete, so its results are
+  unchanged.
 
 ### Changed
 - **`DmnReader` uses the JDK's own XML parser** ([#96](https://github.com/brunopacheco1/praecepta/issues/96)):
@@ -41,6 +55,13 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   no published module depends on JUnit. The parent now declares the JUnit artifacts the build uses
   (`junit-jupiter`, its `-api`, `-engine` and `-params`, and `junit-platform-commons`, `-engine` and
   `-launcher`) each at `junit.version`. Every module resolves the same JUnit as before.
+- **Builds and startups fail on a default output that no input can reach**
+  ([#91](https://github.com/brunopacheco1/praecepta/issues/91)): the new issue is an ERROR, the default `failOn`
+  of the Maven and Gradle plugins and the default `fail-on` of the Spring Boot, Micronaut and Quarkus
+  integrations, so a complete table with a default output that built or started in 0.5 now fails, naming the
+  decision. Remove the default output (it is never given), or set `failOn`/`fail-on` to `NONE` until the table
+  is fixed. Engines built directly fail only with `failOn(Severity.ERROR)`, as before. `ValidationReport.Kind`
+  has a fifth constant, so an exhaustive `switch` over it needs a case for it.
 - `DecisionTable.OutputColumn` has a fifth component, `hasDefault`
   ([#92](https://github.com/brunopacheco1/praecepta/issues/92)): whether the output declares a default value,
   which tells a default of `null` from none. The constructor with four arguments remains and sets it when the
