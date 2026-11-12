@@ -155,6 +155,13 @@
                 <version>2.26.1</version>
             </dependency>
             <dependency>
+                <!-- the fixed version: Quarkus' test framework brings 33.6.0 through maven-embedder
+                     (GHSA-xxph-c9ww-hj94). Tests use it only; no published module depends on it. -->
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>33.7.2-jre</version>
+            </dependency>
+            <dependency>
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
                 <version>${assertj-core.version}</version>
