@@ -438,7 +438,9 @@ public final class CellParser {
         /**
          * The contents of a quoted string, with FEEL's escape sequences ({@link FeelStrings#escape}):
          * {@code \"}, {@code \\}, {@code \'}, {@code \n}, {@code \r}, {@code \t}, and a code point
-         * ({@code \U01F40E}). A backslash before any other character is rejected.
+         * ({@code \U01F40E}). A backslash before any other character is rejected, and so, in strict FEEL, is a
+         * line break: a string literal may not hold vertical space (U+000A to U+000D, grammar rules 33 and 62),
+         * which is written {@code \n} or {@code \r}.
          */
         private String quoted(String text) {
             if (text.length() < 2 || !text.endsWith("\"")) {
@@ -451,6 +453,9 @@ public final class CellParser {
                 char c = text.charAt(i);
                 if (c == '"') {
                     throw new CellSyntaxException(cell, "unexpected quote in " + text);
+                }
+                if (strictFeel && FeelStrings.isVerticalSpace(c)) {
+                    throw new CellSyntaxException(cell, FeelStrings.VERTICAL_SPACE + " in " + text);
                 }
                 if (c != '\\') {
                     value.append(c);

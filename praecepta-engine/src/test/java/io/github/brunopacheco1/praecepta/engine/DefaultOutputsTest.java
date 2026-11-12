@@ -174,6 +174,77 @@ class DefaultOutputsTest {
         Assertions.assertThat(read(feesXml).outputs().getFirst().defaultValue()).isEqualTo("1.50");
     }
 
+    /** A default of every output type is read as plain text, written back as a literal of that type, and read again the same. */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "string                    | \"Declined \\t\\u00e9\"                      | Declined \té",
+            "number                    | -1.50                                       | -1.50",
+            "boolean                   | false                                       | false",
+            "date                      | date(\"2025-01-31\")                       | 2025-01-31",
+            "time                      | time(\"08:30:00\")                         | 08:30:00",
+            "time                      | time(\"17:00:00Z\")                        | 17:00:00Z",
+            "time                      | time(\"17:00:00+05:30\")                   | 17:00:00+05:30",
+            "dateTime                  | date and time(\"2025-01-31T08:30:00\")     | 2025-01-31T08:30:00",
+            "dateTime                  | date and time(\"2025-01-31T08:30:00@Europe/Paris\") | 2025-01-31T08:30:00@Europe/Paris",
+            "dayTimeDuration           | duration(\"P1DT2H\")                       | P1DT2H",
+            "yearMonthDuration         | duration(\"P1Y2M\")                        | P1Y2M",
+    })
+    void a_default_of_every_type_is_read_written_and_read_back(String typeRef, String text, String value) {
+        var table = read(typedDefault(typeRef, text));
+        Assertions.assertThat(table.outputs().getFirst().defaultValue()).isEqualTo(value);
+        var xml = DmnWriter.write(table);
+        var again = read(xml);
+        Assertions.assertThat(again.outputs()).isEqualTo(table.outputs());
+        Assertions.assertThat(DmnWriter.write(again)).isEqualTo(xml);
+        Assertions.assertThat(mapEngine(again).evaluate(Map.of("score", "1"))).containsExactly(Map.of("Out", value));
+    }
+
+    /** A default given as a value of another type is rejected, whatever the output's type. */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "number            | \"x\"                  | a literal number",
+            "boolean           | 1                      | a literal boolean",
+            "date              | \"2025-01-31\"         | a literal date",
+            "time              | date(\"2025-01-31\")   | a literal time",
+            "dateTime          | time(\"08:30:00\")     | a literal date and time",
+            "dayTimeDuration   | duration(\"P1Y\")      | a literal days and time duration",
+            "yearMonthDuration | duration(\"P1D\")      | a literal years and months duration",
+    })
+    void a_default_of_another_type_is_rejected(String typeRef, String text, String expected) {
+        var xml = typedDefault(typeRef, text);
+        Assertions.assertThatThrownBy(() -> read(xml))
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Decision 'Out', output 'Out': default output '%s' is not supported; a default output must be %s", text, expected);
+    }
+
+    /** DMN 1.5, Table 46: "The default output value is one of the output values". */
+    @Test
+    void a_default_outside_the_outputs_value_list_is_rejected() {
+        var xml = APPROVAL.formatted("PRIORITY").replace("<text>\"Declined\"</text></defaultOutputEntry>",
+                "<text>\"Pending\"</text></defaultOutputEntry>");
+        Assertions.assertThatThrownBy(() -> read(xml))
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Decision 'Approval', output 'Status': default output '\"Pending\"' is not in its output values [Approved, Declined]");
+        // numbers are found by value
+        var fees = FEES.formatted("MAX", "1.5").replace("<output typeRef=\"number\">",
+                "<output typeRef=\"number\"><outputValues><text>1.50, 10, 20</text></outputValues>");
+        Assertions.assertThat(read(fees).outputs().getFirst().defaultValue()).isEqualTo("1.5");
+    }
+
+    /** A table whose one output, Out, of a type, has a default; its one rule matches scores above 5. */
+    private static String typedDefault(String typeRef, String text) {
+        return """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="out" name="Out">
+                    <decisionTable hitPolicy="FIRST">
+                      <input><inputExpression typeRef="number"><text>score</text></inputExpression></input>
+                      <output name="Out" typeRef="%s"><defaultOutputEntry><text>%s</text></defaultOutputEntry></output>
+                      <rule><inputEntry><text>&gt; 5</text></inputEntry><outputEntry><text>null</text></outputEntry></rule>
+                    </decisionTable>
+                  </decision>
+                </definitions>""".formatted(typeRef, text.replace("&", "&amp;").replace("<", "&lt;"));
+    }
+
     @Test
     void an_engine_built_from_code_takes_a_default_output() {
         var rules = List.of(new Praeceptum(1, new PraeceptaInput(Map.of("country", "PT")), new PraeceptaOutput(Map.of("grade", "A"))));

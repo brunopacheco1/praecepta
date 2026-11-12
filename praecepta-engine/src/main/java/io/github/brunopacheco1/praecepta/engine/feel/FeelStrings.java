@@ -27,6 +27,11 @@ public final class FeelStrings {
      * Orders two strings as FEEL does: lexicographically by code point, so a string comes before every
      * longer string it starts. An unpaired surrogate counts as the code point of its value.
      *
+     * <p>One known deviation: Table 54 pads the shorter string with U+0000 characters before comparing, so
+     * under it {@code "a"} and {@code "a"} followed by U+0000 are neither before nor after each other, while
+     * here {@code "a"} comes first. Only strings that end in U+0000 are ordered differently; the engine's
+     * intervals rely on this order, taking a string followed by U+0000 as the string just after it.
+     *
      * @return a negative number, zero or a positive number as {@code a} is before, equal to or after {@code b}
      */
     public static int compare(String a, String b) {
@@ -77,6 +82,14 @@ public final class FeelStrings {
             default -> throw error.apply("\\" + kind + " is not an escape sequence; write \\\\ for a backslash");
         }
         return at + 1;
+    }
+
+    /** What a string literal holding vertical space is told, which it may not hold (grammar rules 33 and 62). */
+    static final String VERTICAL_SPACE = "a string literal may not hold a line break; write \\n or \\r";
+
+    /** Whether a character is vertical space (U+000A to U+000D, grammar rule 62), which a string literal may not hold. */
+    static boolean isVerticalSpace(char c) {
+        return c >= '\n' && c <= '\r';
     }
 
     /**

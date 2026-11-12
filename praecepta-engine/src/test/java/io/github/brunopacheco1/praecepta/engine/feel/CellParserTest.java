@@ -111,6 +111,22 @@ class CellParserTest {
         Assertions.assertThat(CellParser.parse("\"C:\\\\temp\"", ColumnType.STRING)).isEqualTo(positive(new Equals("C:\\temp")));
     }
 
+    /** Grammar rule 33: a string literal holds no vertical space (rule 62: U+000A to U+000D); it is written \n or \r. */
+    @ParameterizedTest(name = "U+{0}")
+    @ValueSource(ints = {0x0A, 0x0B, 0x0C, 0x0D})
+    void a_line_break_inside_a_quoted_string_is_rejected_in_strict_feel(int verticalSpace) {
+        var cell = "\"a" + (char) verticalSpace + "b\"";
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel(cell, ColumnType.STRING))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining("a string literal may not hold a line break; write \\n or \\r");
+        Assertions.assertThatThrownBy(() -> OutputExpression.parse(cell + " + x"))
+                .isInstanceOf(ExpressionSyntaxException.class)
+                .hasMessageContaining("a string literal may not hold a line break");
+        // Praecepta's own syntax, as spreadsheets hold it, keeps it
+        Assertions.assertThat(CellParser.parse(cell, ColumnType.STRING)).isEqualTo(positive(new Equals("a" + (char) verticalSpace + "b")));
+        Assertions.assertThat(CellParser.parseFeel("\"a\\nb\"", ColumnType.STRING)).isEqualTo(positive(new Equals("a\nb")));
+    }
+
     @Test
     void unquoted_words_keep_their_backslashes() {
         Assertions.assertThat(CellParser.parse("C:\\temp, a\\nb", ColumnType.STRING))

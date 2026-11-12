@@ -7,6 +7,7 @@ package io.github.brunopacheco1.praecepta.engine.dmn;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -148,9 +149,11 @@ public final class DmnReader {
         if (outputElements.isEmpty()) {
             throw new InvalidDecisionTableException(where + ": the decision table has no output");
         }
-        // a single unnamed output is the decision's result, named after the decision
-        var unnamedOutput = outputElements.size() == 1 ? name : "";
-        var outputs = outputElements.stream().map(output -> outputColumn(output, unnamedOutput, types, where)).toList();
+        // a single unnamed output is the decision's result, named after the decision, and typed by it
+        var single = outputElements.size() == 1;
+        var unnamedOutput = single ? name : "";
+        var resultType = single ? resultType(decision, table, hitPolicy, aggregation, types, where) : ColumnType.STRING;
+        var outputs = outputElements.stream().map(output -> outputColumn(output, unnamedOutput, resultType, types, where)).toList();
 
         var rules = new ArrayList<Praeceptum>();
         var ruleElements = children(table, "rule");
@@ -283,7 +286,11 @@ public final class DmnReader {
         return new InputColumn(column, type.columnType(), allowed);
     }
 
-    private static OutputColumn outputColumn(Element output, String unnamed, ItemDefinitions types, String where) {
+    /**
+     * @param untypedAs the type of an output whose {@code typeRef} is blank: a single output's
+     *                  {@link #resultType}, else a string
+     */
+    private static OutputColumn outputColumn(Element output, String unnamed, ColumnType untypedAs, ItemDefinitions types, String where) {
         var column = nameOr(output, "label");
         if (column.isBlank()) {
             column = unnamed;
@@ -292,29 +299,66 @@ public final class DmnReader {
             throw new InvalidDecisionTableException(where + ": every output of a multi-output table needs a name");
         }
         var outputWhere = outputWhere(where, column);
-        var resolved = types.resolve(output.getAttribute(TYPE_REF), outputWhere);
-        if (resolved.list()) {
-            throw new InvalidDecisionTableException("%s: type '%s' is a collection, which is not supported for outputs"
-                    .formatted(outputWhere, output.getAttribute(TYPE_REF)));
+        var typeRef = output.getAttribute(TYPE_REF);
+        ColumnType type = untypedAs;
+        if (!typeRef.isBlank()) {
+            var resolved = types.resolve(typeRef, outputWhere);
+            if (resolved.list()) {
+                throw new InvalidDecisionTableException("%s: type '%s' is a collection, which is not supported for outputs"
+                        .formatted(outputWhere, typeRef));
+            }
+            type = resolved.columnType();
         }
-        var type = resolved.columnType();
-        var defaultValue = defaultValue(output, type, outputWhere);
         var valueList = nonBlankText(output, "outputValues");
-        if (valueList == null) {
-            return new OutputColumn(column, type, List.of(), defaultValue);
+        List<String> values = List.of();
+        if (valueList != null) {
+            values = parseCell(valueList, type, outputWhere + " value list").values()
+                    .orElseThrow(() -> new InvalidDecisionTableException(outputWhere + ": the output value list must be a list of values"))
+                    .stream().map(FeelLiterals::text).toList();
         }
-        var values = parseCell(valueList, type, outputWhere + " value list").values()
-                .orElseThrow(() -> new InvalidDecisionTableException(outputWhere + ": the output value list must be a list of values"));
-        return new OutputColumn(column, type, values.stream().map(FeelLiterals::text).toList(), defaultValue);
+        return new OutputColumn(column, type, values, defaultValue(output, type, values, outputWhere));
+    }
+
+    /**
+     * The type of a single output whose {@code OutputClause} names none, which DMN 1.5 requires of a single output
+     * (Table 34: "The OutputClause of a single output decision table SHALL NOT specify a typeRef"): the type of the
+     * decision's result, named by the decision table's {@code typeRef}, else by the decision's {@code variable}.
+     * That is the output's type, except that a multi-hit table without aggregation results in a list of outputs,
+     * whose item type is then the output's, and that COUNT results in the number of outputs, which says nothing of
+     * them. Where nothing names a type the output can take (none is given, it is not one Praecepta can hold, or it
+     * is a list for a single result or not a list for a list of results), the output is untyped: a string.
+     */
+    private static ColumnType resultType(Element decision, Element table, HitPolicy hitPolicy, AggregationOperator aggregation,
+            ItemDefinitions types, String where) {
+        if (aggregation == AggregationOperator.COUNT) {
+            return ColumnType.STRING;
+        }
+        var typeRef = table.getAttribute(TYPE_REF);
+        if (typeRef.isBlank()) {
+            var variable = child(decision, "variable");
+            typeRef = variable == null ? "" : variable.getAttribute(TYPE_REF);
+        }
+        if (typeRef.isBlank()) {
+            return ColumnType.STRING;
+        }
+        boolean listOfOutputs = !hitPolicy.isSingleHit() && aggregation == null;
+        return typeIfSupported(types, typeRef, where + ", output")
+                .filter(type -> type.list() == listOfOutputs)
+                .map(Type::columnType)
+                .orElse(ColumnType.STRING);
     }
 
     /**
      * An output's default value ({@code defaultOutputEntry}), the value when no rule matches, as plain text like
      * a literal output entry; null if it has none, or if it is {@code null}, which is what having none gives
      * (DMN 1.5, 10.3.2.10). It must be a literal of the output's type: a default that names an input or
-     * computes a value is rejected, since the engine gives the default without evaluating anything.
+     * computes a value is rejected, since the engine gives the default without evaluating anything. When the output
+     * has a value list, the default must be one of its values (DMN 1.5, Table 46: "The default output value is one of
+     * the output values").
+     *
+     * @param values the output's value list, as plain text; empty if it has none
      */
-    private static String defaultValue(Element output, ColumnType type, String where) {
+    private static String defaultValue(Element output, ColumnType type, List<String> values, String where) {
         var text = nonBlankText(output, "defaultOutputEntry");
         if (text == null) {
             return null;
@@ -324,7 +368,19 @@ public final class DmnReader {
             throw new InvalidDecisionTableException("%s: default output '%s' is not supported; a default output must be a literal %s"
                     .formatted(where, text.strip(), type.feelName()));
         }
+        if (literal.text() != null && !values.isEmpty() && values.stream().noneMatch(value -> sameValue(value, literal.text(), type))) {
+            throw new InvalidDecisionTableException("%s: default output '%s' is not in its output values %s"
+                    .formatted(where, text.strip(), values));
+        }
         return literal.text();
+    }
+
+    /** Whether two values of an output, as plain text, are the same: numbers by value ({@code 1.50} is {@code 1.5}). */
+    private static boolean sameValue(String a, String b, ColumnType type) {
+        if (type == ColumnType.NUMBER) {
+            return new BigDecimal(a).compareTo(new BigDecimal(b)) == 0;
+        }
+        return a.equals(b);
     }
 
     /**

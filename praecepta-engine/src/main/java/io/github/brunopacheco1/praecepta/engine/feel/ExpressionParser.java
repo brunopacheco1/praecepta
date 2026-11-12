@@ -156,12 +156,18 @@ final class ExpressionParser {
         throw unsupported("unexpected '" + c + "'");
     }
 
-    /** A string literal, with FEEL's escape sequences ({@link FeelStrings#escape}), as {@code CellParser} reads one. */
+    /**
+     * A string literal, with FEEL's escape sequences ({@link FeelStrings#escape}) and without a line break, as
+     * {@code CellParser} reads one in strict FEEL.
+     */
     private String string() {
         var value = new StringBuilder();
         int i = position + 1;
         while (i < text.length() && text.charAt(i) != '"') {
             char c = text.charAt(i++);
+            if (FeelStrings.isVerticalSpace(c)) {
+                throw unsupported(FeelStrings.VERTICAL_SPACE);
+            }
             if (c != '\\') {
                 value.append(c);
             } else if (i < text.length()) {
