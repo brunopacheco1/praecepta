@@ -141,8 +141,7 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `0100-arithmetic` literal expressions as output expressions (`OutputExpressionsTckTest`): of their 1,101
   checks, Praecepta reads 489 and gives the kit's result for all but one, a power that is not whole, which the kit
   gives to 13 digits where FEEL's numbers have 34; the other 612 use functions, lists, contexts, booleans, `null`
-  operands or hour 24. The
-  decision-table results in `RESULTS.md` are unchanged.
+  operands or hour 24. The decision-table results in `RESULTS.md` are unchanged.
 
 ### Changed
 - **`DmnReader` uses the JDK's own XML parser** ([#96](https://github.com/brunopacheco1/praecepta/issues/96)):

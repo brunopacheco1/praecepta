@@ -87,7 +87,6 @@ public final class FeelStrings {
     /** What a string literal holding vertical space is told, which it may not hold (grammar rules 33 and 62). */
     static final String VERTICAL_SPACE = "a string literal may not hold a line break; write \\n or \\r";
 
-    /** Whether a character is vertical space (U+000A to U+000D, grammar rule 62), which a string literal may not hold. */
     /**
      * The text with FEEL's comments (DMN 1.5, 10.3.1.2: "Java-style comments can be used, i.e., '//' to end of line
      * and /* ... *&#47;") replaced by a space, outside string literals, whose backslashes escape the next character.
@@ -134,6 +133,7 @@ public final class FeelStrings {
         return result.toString();
     }
 
+    /** Whether a character is vertical space (U+000A to U+000D, grammar rule 62), which a string literal may not hold. */
     static boolean isVerticalSpace(char c) {
         return c >= '\n' && c <= '\r';
     }

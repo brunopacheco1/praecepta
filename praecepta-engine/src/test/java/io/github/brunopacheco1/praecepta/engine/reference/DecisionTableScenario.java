@@ -141,14 +141,14 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     /** The zones date-times with a zone are written in: offsets, the farthest ones, and zone ids with daylight saving time. */
     private static final List<ZoneId> ZONES = List.of(ZoneOffset.UTC, ZoneOffset.ofHours(1), ZoneOffset.ofHours(-5),
             ZoneId.of("Europe/Paris"), ZoneId.of("America/New_York"), ZoneOffset.ofHours(-12), ZoneId.of("Pacific/Kiritimati"));
-    /**
-     * Instants on either side of the 2025 daylight saving changes in Paris and New York: written in their
-     * zone, one falls just after a skipped hour, and the others on a local time that occurs twice.
-     */
     /** The zone ids times with a zone id are written in; inputs are also in a third, which no cell names. */
     private static final List<ZoneId> ZONE_IDS = List.of(ZoneId.of("Europe/Paris"), ZoneId.of("Asia/Dhaka"), ZoneId.of("America/New_York"));
     /** The zone index of {@link #temporal} for the first of {@link #ZONE_IDS}. */
     private static final int ZONE_ID = 100;
+    /**
+     * Instants on either side of the 2025 daylight saving changes in Paris and New York: written in their
+     * zone, one falls just after a skipped hour, and the others on a local time that occurs twice.
+     */
     private static final List<ZonedDateTime> DAYLIGHT_SAVING_CHANGES = List.of(
             ZonedDateTime.of(2025, 3, 30, 1, 30, 0, 0, ZoneOffset.UTC), ZonedDateTime.of(2025, 10, 26, 0, 30, 0, 0, ZoneOffset.UTC),
             ZonedDateTime.of(2025, 10, 26, 1, 30, 0, 0, ZoneOffset.UTC), ZonedDateTime.of(2025, 11, 2, 5, 30, 0, 0, ZoneOffset.UTC),
