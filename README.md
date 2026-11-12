@@ -848,7 +848,8 @@ Drools' experimental alpha-network compilation is not part of the default compar
 `-p engine=drools-alphanetwork`.
 
 # Dependencies
-Praecepta Engine has no runtime dependencies; it reads DMN with the JDK's XML parser.
+Praecepta Engine has no runtime dependencies; it reads DMN with the JDK's own XML parser, even when
+another one, such as Xerces, is on the class path.
 
 Praecepta Loader depends on Apache POI. The Maven and Gradle plugins use it at build time only, through
 `praecepta-compiler`, so an application that compiles its tables needs only the engine at runtime. The

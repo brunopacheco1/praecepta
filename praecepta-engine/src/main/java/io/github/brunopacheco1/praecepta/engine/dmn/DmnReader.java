@@ -46,8 +46,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
 /**
  * Reads decision tables from DMN XML (DMN 1.1 to 1.5, as written by Camunda Modeler, Drools / KIE
- * tools, Trisotech and {@link DmnWriter}). Uses only the JDK's XML parser, with DTDs and external
- * entities disabled.
+ * tools, Trisotech and {@link DmnWriter}). Uses only the JDK's own XML parser, with DTDs and external
+ * entities disabled, even when another JAXP implementation (such as Xerces) is on the class path.
  *
  * <p>Supported: decision tables whose input expressions name an input variable, with
  * {@code string}, {@code number} (or {@code integer}, {@code long}, {@code double}), {@code date},
@@ -620,10 +620,14 @@ public final class DmnReader {
 
     // ---- XML -------------------------------------------------------------------------------------
 
-    /** The model's {@code definitions} element, parsed with DTDs and external entities disabled. */
+    /**
+     * The model's {@code definitions} element, parsed with DTDs and external entities disabled. The parser is
+     * the JDK's own ({@code newDefaultInstance}), which these settings are written for, never one JAXP would
+     * look up on the class path or through the {@code javax.xml.parsers.DocumentBuilderFactory} property.
+     */
     private static Element parseModel(InputStream dmn) {
         try {
-            var factory = DocumentBuilderFactory.newInstance();
+            var factory = DocumentBuilderFactory.newDefaultInstance();
             factory.setNamespaceAware(true);
             factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);

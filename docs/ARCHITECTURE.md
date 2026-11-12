@@ -126,7 +126,8 @@ An engine is **immutable** once built: any number of threads may share it withou
   `defaultOutputEntry`) is converted once when the engine is built and returned when no rule matches,
   before the hit policy or the aggregation is applied (DMN 1.5, 10.3.2.10), so it costs nothing at
   evaluation; without one, no match gives no output under every aggregation, COUNT included.
-  It uses the JDK's XML parser with DTDs and external entities disabled. Anything it does not
+  It uses the JDK's own XML parser (`DocumentBuilderFactory.newDefaultInstance()`, never one JAXP finds
+  on the class path) with DTDs and external entities disabled. Anything it does not
   support (a time with a zone id, function calls, inputs computed by other decisions) is rejected
   with an error naming the decision, rule and column. Output entries may be expressions of
   literals and inputs with `+ - * / **` (`OutputExpression`): they are kept as written, parsed and
@@ -227,9 +228,9 @@ Praecepta needs no reflection, so GraalVM's `native-image` builds applications t
 reads from every jar on its class path, whichever build tool or framework runs it:
 - **`praecepta-engine`** registers the message bundle of the JDK's XML parser
   (`com.sun.org.apache.xerces.internal.impl.msg.XMLMessages`), without which `DmnReader` fails on a
-  malformed file with a `MissingResourceException` instead of its `InvalidDecisionTableException`, and the
-  `javax.xml.parsers.DocumentBuilderFactory` service file that JAXP looks up, which only
-  `--exact-reachability-metadata` requires.
+  malformed file with a `MissingResourceException` instead of its `InvalidDecisionTableException`. It
+  needs nothing for the parser itself: `DmnReader` takes the JDK's own
+  (`DocumentBuilderFactory.newDefaultInstance()`), so JAXP looks up no service file or system property.
 - **`praecepta-integration`** registers `rules` and `rules/**/*.dmn`, the files `TableLocations.DEFAULT`
   finds, so the default location works in a native image; `TableLocations` lists them through the image's
   `resource:` file system.

@@ -23,6 +23,18 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `Decision.of(location, table, logReport)` to build its engines so; `Decisions.load(sources, failOn)` and
   `Decision.of(location, table)` keep the engine's logging.
 
+### Changed
+- **`DmnReader` uses the JDK's own XML parser** ([#96](https://github.com/brunopacheco1/praecepta/issues/96)):
+  it created its parser with `DocumentBuilderFactory.newInstance()`, which JAXP looks up through the
+  `javax.xml.parsers.DocumentBuilderFactory` system property and the class path's service files, and now
+  with `newDefaultInstance()`, the JDK's built-in parser, which its security settings (no DTDs, no external
+  entities) are written for. **Upgrade note:** an application with another DOM parser on the class path,
+  such as Xerces, or with that system property set, used to read DMN files with that parser and now reads
+  them with the JDK's; valid DMN files read the same, but the messages of a malformed file are the JDK
+  parser's. The engine's native-image metadata no longer registers JAXP's service file
+  (`META-INF/services/javax.xml.parsers.DocumentBuilderFactory`), which only that lookup needed; it still
+  keeps the parser's messages.
+
 ### Fixed
 - **Validation issues were logged twice in the integrations**
   ([#95](https://github.com/brunopacheco1/praecepta/issues/95)): the Spring Boot starter and the Micronaut

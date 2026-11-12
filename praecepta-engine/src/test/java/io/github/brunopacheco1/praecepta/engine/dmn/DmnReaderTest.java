@@ -436,6 +436,36 @@ class DmnReaderTest {
                 .hasMessageContaining("Cannot read DMN model");
     }
 
+    /**
+     * The reader uses the JDK's own parser, which its security settings are written for, whatever JAXP would
+     * look up: a factory named by the system property (as here, one that does not exist) or by a service file
+     * on the class path, such as Xerces' (#96).
+     */
+    @Test
+    void the_jdk_parser_reads_the_model_whatever_parser_jaxp_is_configured_with() {
+        var property = "javax.xml.parsers.DocumentBuilderFactory";
+        var configured = System.getProperty(property);
+        System.setProperty(property, "org.example.NoSuchDocumentBuilderFactory");
+        try {
+            var table = DmnReader.read(resource("camunda-modeler-discount.dmn"));
+            Assertions.assertThat(table.name()).isEqualTo("Discount");
+            var xml = """
+                    <?xml version="1.0"?>
+                    <!DOCTYPE definitions [<!ENTITY secret SYSTEM "file:///etc/passwd">]>
+                    <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" name="&secret;"/>""";
+            var dmn = stream(xml);
+            Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
+                    .isInstanceOf(InvalidDecisionTableException.class)
+                    .hasMessageContaining("Cannot read DMN model");
+        } finally {
+            if (configured == null) {
+                System.clearProperty(property);
+            } else {
+                System.setProperty(property, configured);
+            }
+        }
+    }
+
     @Test
     void writer_output_is_read_back_with_hit_policy_value_lists_and_aggregation() {
         var fee = DmnReader.read(resource("dmn11-two-decisions.dmn"), "Fee");
