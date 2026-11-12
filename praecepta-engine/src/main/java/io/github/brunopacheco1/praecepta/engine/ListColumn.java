@@ -192,6 +192,26 @@ final class ListColumn {
         return anyRules.clone();
     }
 
+    /** The rules whose cell holds when some element passes a test (neither {@code -} nor {@code not(...)}). */
+    long[] positiveRules() {
+        return positiveRules.clone();
+    }
+
+    /** The rules whose cell is a {@code not(...)}. */
+    long[] negatedRules() {
+        return negatedRules.clone();
+    }
+
+    /** The rules a missing list matches. */
+    long[] missingRules() {
+        return missingMask.clone();
+    }
+
+    /** The index of a single element, whose classes the static analysis builds lists from ({@link ListAnalysis}). */
+    ColumnIndex elements() {
+        return elements;
+    }
+
     /** Whether a raw list is missing: null or blank text. */
     static boolean isMissing(Object raw) {
         return raw == null || raw instanceof String text && text.isBlank();

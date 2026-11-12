@@ -59,6 +59,20 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   cell naming a list input (`Flu Symptoms`) is `list contains(Flu Symptoms, Symptom)` (Table 55), so a
   missing value is in a list that holds a missing element. The engine, the classes the Maven and Gradle
   plugins generate and the framework integrations' map engines all evaluate them alike.
+- **Analysis of rules that test list columns** ([#78](https://github.com/brunopacheco1/praecepta/issues/78)):
+  the validation report, and so the Maven and Gradle plugins' build-time check, the Quarkus build and the
+  Spring Boot and Micronaut startup checks, now look at rules whose cell in a list column is not `-`, which
+  0.4 and 0.5 left out. A list counts as the set of its elements' classes in the column's index, so rules
+  `"PT"` and `"BR"` overlap under UNIQUE (on `["PT", "BR"]`), `[20..30]` after `>= 18` can never be selected
+  under FIRST, and two rules `"PT"` and `"BR"` with declared values `"PT","BR"` leave the gap `nationalities = []`.
+  Overlaps and unreachable rules count every list, missing lists and lists holding missing elements
+  included; gaps are searched among lists of values (as for single values, missing ones are not) and
+  described by the elements such lists hold, `nationalities has no element in "PT", nationalities has an
+  element in "ES"`, with an example list (`{nationalities=[ES]}`). No bound on the length of lists is
+  needed: each question is decided per rule and element class. A table with several list columns branches
+  on the minimal sets of rules the lists of each but the last can leave; past 1024 of them a rule is not
+  reported unreachable, or the table's gaps are not reported, rather than reported wrongly. Tables without
+  list columns get the same report as before.
 
 ### Changed
 - **`DmnReader` uses the JDK's own XML parser** ([#96](https://github.com/brunopacheco1/praecepta/issues/96)):
@@ -90,6 +104,11 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   which tells a default of `null` from none. The constructor with four arguments remains and sets it when the
   default value is not null; the canonical one rejects a default value without `hasDefault`. A record pattern
   that deconstructs `OutputColumn` needs the new component.
+- **Upgrade note:** tables with list columns may now get validation findings they did not get before
+  ([#78](https://github.com/brunopacheco1/praecepta/issues/78)): overlaps under UNIQUE are errors, so an
+  engine built with `failOn(Severity.ERROR)`, a Maven or Gradle build, a Quarkus build or a Spring Boot or
+  Micronaut application at the default `fail-on` stops on such a table where it did not; the rules involved
+  are named in the report.
 - `UnaryTests.Test` permits a fifth record, `NullElement`
   ([#84](https://github.com/brunopacheco1/praecepta/issues/84)): an exhaustive `switch` over a cell's tests
   needs a case for it. `DmnWriter.render` (of a single-value cell) rejects it with an

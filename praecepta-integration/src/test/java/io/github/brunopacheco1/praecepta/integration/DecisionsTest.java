@@ -186,6 +186,17 @@ class DecisionsTest {
         Assertions.assertThat(engine.evaluate(Map.of("nationalities", "[\"BR\"]"))).isEmpty();
     }
 
+    /** Rules that test different values of a list overlap on a list holding both (#78): an ERROR that stops loading. */
+    @Test
+    void rules_that_test_a_list_column_are_validated() {
+        var source = TableSource.of("offer.dmn", NATIONALITIES.formatted("UNIQUE", "list contains(?, \"BR\")").getBytes(StandardCharsets.UTF_8));
+        Assertions.assertThatThrownBy(() -> Decisions.load(List.of(source), Severity.ERROR))
+                .isInstanceOf(DecisionsException.class)
+                .hasMessageContaining("rules [1, 2] both match some inputs (UNIQUE)");
+        var table = DmnReader.readAll(stream(NATIONALITIES.formatted("UNIQUE", "list contains(?, \"BR\")"))).getFirst();
+        Assertions.assertThat(Decision.of("offer", table).report().issues()).hasSize(1);
+    }
+
     @Test
     void outputs_that_are_missing_map_to_null() {
         var table = DmnReader.readAll(stream("""

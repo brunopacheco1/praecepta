@@ -138,6 +138,99 @@ class TableAnalysisBehaviourTest {
         Assertions.assertThat(gaps.getLast().detail()).isEqualTo("m = 98, n in {(-inf..98), (98..+inf)}");
     }
 
+    // ---- columns that hold lists (#78) ----------------------------------------------------------
+
+    @Test
+    void list_rules_overlap_when_some_list_matches_both() {
+        var rules = List.of(
+                rule(1, "out", "a", "nat", "\"PT\""),
+                rule(2, "out", "b", "nat", "\"BR\""),
+                rule(3, "out", "c", "nat", "not(\"PT\")"),
+                rule(4, "out", "d", "nat", "not(\"BR\")"),
+                rule(5, "out", "e", "nat", "null"));
+        var report = lists(HitPolicy.UNIQUE, rules, Map.of()).validationReport();
+        // ["PT", "BR"], ["PT"], ["BR"] and [] respectively; only a missing list matches null, and nothing else does
+        Assertions.assertThat(report).hasToString("""
+                ERROR rules [1, 2] both match some inputs (UNIQUE)
+                ERROR rules [1, 4] both match some inputs (UNIQUE)
+                ERROR rules [2, 3] both match some inputs (UNIQUE)
+                ERROR rules [3, 4] both match some inputs (UNIQUE)""");
+    }
+
+    @Test
+    void a_list_rule_is_unreachable_when_every_list_it_matches_matches_an_earlier_rule() {
+        var rules = List.of(
+                rule(1, "out", "a", "ages", ">= 18"),
+                rule(2, "out", "b", "ages", "not(< 18)"),
+                rule(3, "out", "c", "ages", "[20..30]"),
+                rule(4, "out", "d", "ages", "-"),
+                rule(5, "out", "e", "ages", "< 5"));
+        var report = lists(HitPolicy.FIRST, rules, Map.of()).validationReport();
+        // a list with an element in [20..30] has one of at least 18; every list matches -; [] reaches rule 2, [10] rule 4
+        Assertions.assertThat(report).hasToString("""
+                WARNING rule 3 can never be selected
+                WARNING rule 5 can never be selected""");
+    }
+
+    @Test
+    void a_gap_in_a_list_column_is_described_by_the_elements_its_lists_hold() {
+        var rules = List.of(
+                rule(1, "out", "a", "nat", "\"PT\""),
+                rule(2, "out", "b", "nat", "not(\"ES\")"));
+        var report = lists(HitPolicy.COLLECT, rules, Map.of("nat", "\"PT\",\"ES\",\"BR\"")).validationReport();
+        // lists without "PT" (rule 1) that hold "ES" (rule 2)
+        Assertions.assertThat(report).hasToString("WARNING no rule matches nat has no element in \"PT\", nat has an element in \"ES\"");
+        Assertions.assertThat(examples(report)).containsExactly("{nat=[ES]}");
+
+        var each = List.of(rule(1, "out", "a", "nat", "\"PT\""), rule(2, "out", "b", "nat", "\"BR\""));
+        var empty = lists(HitPolicy.COLLECT, each, Map.of("nat", "\"PT\",\"BR\"")).validationReport();
+        Assertions.assertThat(empty).hasToString("WARNING no rule matches nat = []");
+        Assertions.assertThat(examples(empty)).containsExactly("{nat=[]}");
+    }
+
+    @Test
+    void list_columns_are_searched_after_the_columns_of_single_values() {
+        // the list column has fewer wildcards, so the index evaluates it first; the analysis fixes x first
+        var rules = List.of(
+                rule(1, "out", "a", "x", "\"a\"", "nat", "\"PT\""),
+                rule(2, "out", "b", "x", "-", "nat", "\"BR\""));
+        var report = lists(HitPolicy.COLLECT, rules, Map.of("x", "\"a\",\"b\"", "nat", "\"PT\",\"BR\",\"ES\"")).validationReport();
+        Assertions.assertThat(report).hasToString("""
+                WARNING no rule matches x = "a", nat has no element in {"PT", "BR"}
+                WARNING no rule matches x = "b", nat has no element in "BR\"""");
+        Assertions.assertThat(examples(report)).containsExactly("{x=a, nat=[]}", "{x=b, nat=[]}");
+    }
+
+    @Test
+    void every_list_column_but_the_last_branches_on_the_rules_its_lists_leave() {
+        var rules = List.of(
+                rule(1, "out", "a", "nat", "\"PT\"", "ages", "-"),
+                rule(2, "out", "b", "nat", "-", "ages", ">= 18"));
+        var report = lists(HitPolicy.COLLECT, rules, Map.of("nat", "\"PT\",\"ES\"")).validationReport();
+        // ages comes first (the map inputs list it first): its lists leave rule 1 alone, or both rules, and only the
+        // first is searched, as it holds fewer rules; nat, the last, is then decided directly
+        Assertions.assertThat(report).hasToString("WARNING no rule matches ages has no element in [18..+inf), nat has no element in \"PT\"");
+        Assertions.assertThat(examples(report)).containsExactly("{ages=[], nat=[]}");
+    }
+
+    /** An engine over map inputs whose columns {@code nat} (strings) and {@code ages} (numbers) hold lists. */
+    private static PraeceptaEngine<Map<String, String>, String> lists(HitPolicy policy, List<Praeceptum> rules, Map<String, String> allowed) {
+        var builder = PraeceptaEngine.<Map<String, String>, String>builder()
+                .hitPolicy(policy)
+                .inputs(PraeceptaInput::new)
+                .output(output -> output.values().get("out"))
+                .rules(rules);
+        var columns = rules.getFirst().input().values().keySet();
+        if (columns.contains("nat")) {
+            builder.listColumnType("nat", ColumnType.STRING);
+        }
+        if (columns.contains("ages")) {
+            builder.listColumnType("ages", ColumnType.NUMBER);
+        }
+        allowed.forEach(builder::allowedValues);
+        return builder.build();
+    }
+
     private static List<String> examples(ValidationReport report) {
         return report.issues(Kind.GAP).stream().map(gap -> gap.example().toString()).toList();
     }

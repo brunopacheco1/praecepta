@@ -353,10 +353,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 .map(allowed -> new Column(ColumnType.YEAR_MONTH_DURATION, List.of(), allowed));
         var single = Arbitraries.frequencyOf(Tuple.of(4, string), Tuple.of(2, number), Tuple.of(2, date),
                 Tuple.of(1, bool), Tuple.of(1, time), Tuple.of(1, dateTime), Tuple.of(1, dayTime), Tuple.of(1, yearMonth));
-        if (declareStrings) {
-            return single; // gaps are analysed: no column holds lists, whose rules the analysis leaves out
-        }
-        // one column in five holds lists of such values
+        // one column in five holds lists of such values, whose gaps are analysed too
         return Combinators.combine(single, Arbitraries.integers().between(0, 4))
                 .as((column, oneInFive) -> new Column(column.type(), column.domain(), column.allowed(), column.zoned(), oneInFive == 0));
     }

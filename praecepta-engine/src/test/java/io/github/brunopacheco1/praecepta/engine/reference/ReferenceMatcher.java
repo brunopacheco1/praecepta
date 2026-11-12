@@ -18,11 +18,13 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +32,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
@@ -151,7 +155,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      */
     public String invalidColumn(Map<String, ?> input) {
         for (var declared : allowedValues.entrySet()) {
-            var allowed = CellParser.parse(declared.getValue(), type(declared.getKey()));
+            var allowed = declared(declared.getKey());
             var value = value(input, declared.getKey());
             var values = value instanceof List<?> elements ? elements : Collections.singletonList(value);
             for (var element : values) {
@@ -324,19 +328,18 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     /**
      * Expected overlap and reachability findings. Every input region is visited by evaluating every
      * combination of {@link #representativeValues representative values}; invalid inputs are skipped,
-     * since evaluation rejects them before matching.
+     * since evaluation rejects them before matching. As the rules that the index sees an input match are those
+     * that every column's value is accepted by, the combinations are visited as the sets of rules they leave,
+     * column by column, each set once ({@link #staticMatchSets}).
      */
     public Set<Finding> expectedFindings(List<String> columns) {
         var findings = new LinkedHashSet<Finding>();
         var selected = new HashSet<Praeceptum>();
-        for (var input : representativeInputs(columns, true)) {
-            if (invalidColumn(input) != null) {
-                continue;
-            }
+        for (var set : staticMatchSets(columns)) {
             // rules with cells naming inputs match inputs known only when evaluating: they never overlap,
             // and never hide another rule, but they are unreachable if their other cells are covered
-            var matches = matches(input).stream().filter(rule -> !isVariable(rule)).toList();
-            var seen = rules.stream().filter(rule -> staticallyAccepts(rule, input)).toList();
+            var seen = set.stream().mapToObj(rules::get).toList();
+            var matches = seen.stream().filter(rule -> !isVariable(rule)).toList();
             switch (hitPolicy) {
                 case UNIQUE -> {
                     for (int a = 0; a < matches.size(); a++) {
@@ -439,15 +442,73 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * missing value.
      */
     public List<Object> representativeValues(String column, boolean withMissing) {
-        var type = type(column);
         if (lists.contains(column)) {
-            // the analysis leaves out the rules that test lists, so to the others every list is alike
-            return withMissing ? Arrays.asList(List.of(), null) : List.of(List.of());
+            var values = new ArrayList<Object>();
+            representativeLists(column, withMissing, values::add);
+            return values;
         }
+        return representativeElements(column, withMissing, bothKinds);
+    }
+
+    /**
+     * Lists that visit every region the cells of a list column distinguish, given to {@code sink}: every list of
+     * at most {@code n + 2} distinct elements drawn from its representative values (both with and without a time
+     * zone, as a list may mix them) that its declared values allow, one per answer the cells give them, where
+     * {@code n} is the number of different sets of those elements that rule out a {@code not(...)} cell (leave
+     * its inside true or unknown); with {@code withMissing}, a missing element among them, and a missing list.
+     *
+     * <p>Lists of more elements add nothing: two elements to which every cell gives the same three-valued
+     * answer are alike in any list, since a cell joins its answers over the elements with {@code or}; and if
+     * some list matches a rule and none of a set of others (or two rules, or none at all), so does one that
+     * keeps, of its elements, one that passes that rule's positive cell, one that passes another's, and one
+     * that rules out each {@code not(...)} cell that must not match (one per set of such elements at most),
+     * for removing an element never makes a positive cell match or a {@code not(...)} cell fail.
+     */
+    private void representativeLists(String column, boolean withMissing, Consumer<Object> sink) {
+        var cells = rules.stream().map(rule -> parse(rule.input().values().get(column), column)).toList();
+        var allowed = allowedValues.containsKey(column) ? CellParser.parse(allowedValues.get(column), type(column)) : null;
+        var bySignature = new LinkedHashMap<List<Boolean>, Object>();
+        for (var element : representativeElements(column, withMissing, true)) {
+            if (element == null || allowed == null || accepts(allowed, single(element), name -> null)) {
+                bySignature.putIfAbsent(cells.stream().map(cell -> some(tests(cell), Collections.singletonList(single(element)))).toList(),
+                        element);
+            }
+        }
+        var pool = new ArrayList<>(bySignature.values());
+        var rulingOut = new HashSet<List<Boolean>>();
+        for (var cell : cells) {
+            if (cell instanceof UnaryTests.Negated) {
+                rulingOut.add(pool.stream().map(e -> some(tests(cell), Collections.singletonList(single(e))) != Boolean.FALSE).toList());
+            }
+        }
+        subLists(pool, 0, new ArrayList<>(), Math.min(rulingOut.size() + 2, pool.size()), sink);
+        if (withMissing) {
+            sink.accept(null);
+        }
+    }
+
+    /** Every list of at most {@code size} elements of {@code pool} from {@code from} on, in pool order, after {@code prefix}. */
+    private static void subLists(List<Object> pool, int from, List<Object> prefix, int size, Consumer<Object> sink) {
+        sink.accept(Collections.unmodifiableList(new ArrayList<>(prefix)));
+        if (prefix.size() == size) {
+            return;
+        }
+        for (int i = from; i < pool.size(); i++) {
+            prefix.add(pool.get(i));
+            subLists(pool, i + 1, prefix, size, sink);
+            prefix.removeLast();
+        }
+    }
+
+    /** The representative single values of a column, of both kinds of time if {@code eitherKind}. */
+    private List<Object> representativeElements(String column, boolean withMissing, boolean eitherKind) {
+        var type = type(column);
         var cells = new ArrayList<UnaryTests>();
         rules.forEach(rule -> cells.add(parse(rule.input().values().get(column), column)));
         if (allowedValues.containsKey(column)) {
-            cells.add(parse(allowedValues.get(column), column));
+            // a list column's declared values test single elements
+            var declared = allowedValues.get(column);
+            cells.add(lists.contains(column) ? CellParser.parse(declared, type) : parse(declared, column));
         }
         var values = new ArrayList<Object>();
         switch (type) {
@@ -457,10 +518,10 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             case YEAR_MONTH_DURATION -> orderedRepresentatives(type, cells, false).forEach(v -> values.add(((YearsAndMonths) v).toPeriod()));
             // a column's times take a zone or none, as its getter does, or either if read from text
             case TIME, DATE_TIME -> {
-                if (bothKinds || !zonedColumns.contains(column)) {
+                if (eitherKind || !zonedColumns.contains(column)) {
                     values.addAll(orderedRepresentatives(type, cells, false));
                 }
-                if (bothKinds || zonedColumns.contains(column)) {
+                if (eitherKind || zonedColumns.contains(column)) {
                     values.addAll(orderedRepresentatives(type, cells, true));
                 }
             }
@@ -480,9 +541,10 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         List<Map<String, Object>> inputs = new ArrayList<>();
         inputs.add(new HashMap<>(partial));
         for (var column : columns) {
+            var options = distinctValues(column, withMissing);
             var next = new ArrayList<Map<String, Object>>();
             for (var shorter : inputs) {
-                for (var option : representativeValues(column, withMissing)) {
+                for (var option : options) {
                     var input = new HashMap<>(shorter);
                     input.put(column, option);
                     next.add(input);
@@ -491,6 +553,75 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             inputs = next;
         }
         return inputs;
+    }
+
+    /**
+     * The {@link #representativeValues representative values} of a column that its declared values allow, one
+     * for each set of rules whose cell in the column accepts it (a cell naming another input accepting any): the
+     * rules an input matches, apart from those with such cells, depend on nothing else, so two values in the same
+     * set are alike to every rule, and an input that combines them with the same values of the other columns
+     * matches the same rules. This keeps the product of several list columns small.
+     */
+    private List<Object> distinctValues(String column, boolean withMissing) {
+        return new ArrayList<>(bySignature(column, withMissing).values());
+    }
+
+    /**
+     * Every set of rules that the index sees some valid representative input match (cells naming other inputs
+     * taken as any value), as rule indices: the sets each column's {@link #distinctValues} leave, intersected
+     * column by column.
+     */
+    private Set<BitSet> staticMatchSets(List<String> columns) {
+        var all = new BitSet();
+        all.set(0, rules.size());
+        Set<BitSet> sets = new LinkedHashSet<>(List.of(all));
+        for (var column : columns) {
+            var accepting = bySignature(column, true).keySet().stream().map(signature -> {
+                var set = new BitSet();
+                for (int r = 0; r < signature.size(); r++) {
+                    set.set(r, signature.get(r));
+                }
+                return set;
+            }).toList();
+            var next = new LinkedHashSet<BitSet>();
+            for (var set : sets) {
+                for (var accepted : accepting) {
+                    var both = (BitSet) set.clone();
+                    both.and(accepted);
+                    next.add(both);
+                }
+            }
+            sets = next;
+        }
+        return sets;
+    }
+
+    /** The {@link #distinctValues} of a column, each by the rules whose cell in the column accepts it. */
+    private Map<List<Boolean>, Object> bySignature(String column, boolean withMissing) {
+        var bySignature = new LinkedHashMap<List<Boolean>, Object>();
+        Consumer<Object> keep = option -> {
+            var alone = new HashMap<String, Object>();
+            alone.put(column, option);
+            if (invalidColumn(alone) == null) {
+                bySignature.putIfAbsent(rules.stream().map(rule -> cellAccepts(rule, column, alone)).toList(), option);
+            }
+        };
+        if (lists.contains(column)) {
+            representativeLists(column, withMissing, keep); // many lists: kept one by one
+        } else {
+            representativeElements(column, withMissing, bothKinds).forEach(keep);
+        }
+        return bySignature;
+    }
+
+    /** Whether a rule's cell in a column accepts the input's value there; a cell naming another input accepts any. */
+    private boolean cellAccepts(Praeceptum rule, String column, Map<String, ?> input) {
+        var parsed = parse(rule.input().values().get(column), column);
+        if (parsed.namesInputs()) {
+            return true;
+        }
+        var value = value(input, column);
+        return lists.contains(column) ? acceptsList(parsed, (List<?>) value) : accepts(parsed, value, name -> null);
     }
 
     private List<Map<String, Object>> representativeInputs(List<String> columns, boolean withMissing) {
@@ -758,22 +889,18 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return some;
     }
 
-    /**
-     * Whether the engine's index cannot see what a rule matches: a cell compares with another input
-     * ({@code > dateE}), or tests a column that holds lists.
-     */
+    /** Whether the engine's index cannot see what a rule matches: a cell compares with another input ({@code > dateE}). */
     private boolean isVariable(Praeceptum rule) {
-        return rule.input().values().entrySet().stream().anyMatch(cell -> {
-            var parsed = parse(cell.getValue(), cell.getKey());
-            return parsed.namesInputs() || lists.contains(cell.getKey()) && !(parsed instanceof UnaryTests.Any);
-        });
+        return rule.input().values().entrySet().stream().anyMatch(cell -> parse(cell.getValue(), cell.getKey()).namesInputs());
     }
 
-    /** What the engine's index sees of a rule: its cells, with those naming inputs or testing lists taken as "any value". */
+    /** What the engine's index sees of a rule: its cells, with those naming inputs taken as "any value". */
     private boolean staticallyAccepts(Praeceptum rule, Map<String, ?> input) {
         for (var cell : rule.input().values().entrySet()) {
             var parsed = parse(cell.getValue(), cell.getKey());
-            if (!parsed.namesInputs() && !lists.contains(cell.getKey()) && !accepts(parsed, value(input, cell.getKey()), name -> null)) {
+            var value = value(input, cell.getKey());
+            boolean accepted = lists.contains(cell.getKey()) ? acceptsList(parsed, (List<?>) value) : accepts(parsed, value, name -> null);
+            if (!parsed.namesInputs() && !accepted) {
                 return false;
             }
         }
@@ -898,11 +1025,25 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return values;
     }
 
+    /** Cells parsed before, by text, type and syntax: the brute force evaluates each many times. */
+    private static final Map<List<Object>, UnaryTests> PARSED = new ConcurrentHashMap<>();
+
+    /** A column's declared input values, which test single values (a list's elements) in Praecepta's syntax. */
+    private UnaryTests declared(String column) {
+        var type = type(column);
+        var text = allowedValues.get(column);
+        return PARSED.computeIfAbsent(Arrays.asList(text, type, "declared"), key -> CellParser.parse(text, type));
+    }
+
     private UnaryTests parse(String cell, String column) {
-        if (!feelCells) {
-            return CellParser.parse(cell, type(column));
-        }
-        return lists.contains(column) ? CellParser.parseFeelList(cell, type(column)) : CellParser.parseFeel(cell, type(column));
+        var type = type(column);
+        boolean list = lists.contains(column);
+        return PARSED.computeIfAbsent(Arrays.asList(cell, type, feelCells, list), key -> {
+            if (!feelCells) {
+                return CellParser.parse(cell, type);
+            }
+            return list ? CellParser.parseFeelList(cell, type) : CellParser.parseFeel(cell, type);
+        });
     }
 
     private ColumnType type(String column) {

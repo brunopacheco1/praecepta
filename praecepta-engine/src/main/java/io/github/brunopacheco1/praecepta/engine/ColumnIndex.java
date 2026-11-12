@@ -76,8 +76,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * masks {@link #maskFor} returns are in either form.
  *
  * <p>A column that holds lists ({@link #ofLists}) delegates its lookup to a {@link ListColumn}, which
- * classifies each element with an index of the kinds above; to the static analysis it is a single
- * class, "any list". The masks it returns are dense.
+ * classifies each element with an index of the kinds above; the static analysis reads its lists as sets
+ * of those element classes ({@link ListAnalysis}). The masks it returns are dense.
  */
 final class ColumnIndex {
 
@@ -175,8 +175,9 @@ final class ColumnIndex {
     /**
      * A column whose values are lists of {@code type} (see {@link ListColumn}); {@code allowedValues}
      * apply to the elements. Its cells test elements, so the classes of single values say nothing about
-     * which lists a rule matches: to the static analysis the column has one class, "any list", accepted
-     * by every rule, and the engine leaves the rules that constrain it out of the analysis.
+     * which lists a rule matches: its own classes are "any list", accepted by every rule, and a missing
+     * list, and the static analysis reads the lists from the classes of the elements instead
+     * ({@link ListAnalysis}).
      *
      * @param cells the column's cells; the class masks of single elements are stored in their form, the list masks are dense
      */
@@ -193,7 +194,7 @@ final class ColumnIndex {
         this.lists = lists;
         isString = false;
         temporal = false;
-        hasAllowedValues = false;
+        hasAllowedValues = lists.elements().hasAllowedValues; // they apply to the elements
         stringMasks = null;
         otherMask = null;
         disallowedStrings = null;
@@ -224,6 +225,11 @@ final class ColumnIndex {
     /** A column that holds lists: the rules whose cell is {@code -}, which accept every list. */
     long[] rulesAcceptingAnyList() {
         return lists.anyRules();
+    }
+
+    /** A column that holds lists: how its lists match, for the static analysis ({@link ListAnalysis}). */
+    ListColumn lists() {
+        return lists;
     }
 
     /**
@@ -670,10 +676,11 @@ final class ColumnIndex {
 
     /**
      * Whether one class stands for every value the rules do not mention: a STRING column whose cells
-     * do not compare. Every such value is then a gap unless the column declares its input values.
+     * do not compare. Every such value is then a gap unless the column declares its input values. For a
+     * column that holds lists, whether its elements' index has such a class.
      */
     boolean groupsOtherValues() {
-        return otherMask != null;
+        return lists != null ? lists.elements().groupsOtherValues() : otherMask != null;
     }
 
     /** Whether a valid input can fall in the class: it holds some value and the declared input values allow it. */

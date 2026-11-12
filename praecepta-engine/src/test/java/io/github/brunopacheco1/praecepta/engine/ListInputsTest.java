@@ -248,15 +248,16 @@ class ListInputsTest {
     }
 
     @Test
-    void the_analysis_leaves_out_rules_that_test_lists() {
-        // rules 1 and 2 overlap on ["PT", "BR"], which the column's classes of single values cannot show
+    void rules_that_test_different_values_of_a_list_overlap() {
+        // rules 1 and 2 overlap on ["PT", "BR"], though no single value matches both
         var engine = PraeceptaEngine.<Customer, String>builder()
                 .hitPolicy(HitPolicy.UNIQUE)
                 .listInput("nationalities", Customer::nationalities)
                 .output(output -> output.values().get("id"))
                 .rules(List.of(rule(1, Map.of("nationalities", "PT"), "pt"), rule(2, Map.of("nationalities", "BR"), "br")))
                 .build();
-        Assertions.assertThat(engine.validationReport().issues(Kind.OVERLAPPING_RULES)).isEmpty();
+        Assertions.assertThat(engine.validationReport().issues(Kind.OVERLAPPING_RULES))
+                .extracting(ValidationReport.Issue::ruleIds).containsExactly(List.of(1, 2));
         Assertions.assertThat(engine.evaluate(customer("PT"))).containsExactly("pt");
     }
 

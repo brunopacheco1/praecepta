@@ -230,10 +230,7 @@ public final class PraeceptaEngine<I, O> {
         variableCellsByBit = variableCellsByBit(variableCells, bitToRule, evaluationOrder);
         variableRules = variableRules(variableCellsByBit, words);
         hasVariableCells = !BitsetIndex.isEmpty(variableRules);
-        // rules that test a list column match lists the index's classes cannot describe: the analysis leaves them out too
-        var unseenRules = listRules(index);
-        BitsetIndex.or(unseenRules, variableRules);
-        report = validate(index, rules, hitPolicy, unseenRules, numericOutputs, builder.defaultOutput != null, builder.failOn,
+        report = validate(index, rules, hitPolicy, variableRules, numericOutputs, builder.defaultOutput != null, builder.failOn,
                 builder.logValidationReport);
     }
 
@@ -1025,8 +1022,10 @@ public final class PraeceptaEngine<I, O> {
                 TableAnalysis.analyse(index, rules, hitPolicy, variableRules, output -> comparable(output, numericOutputs)));
         if (hasDefaultOutput) {
             // DMN 1.5, 10.3.2.10: "A complete decision table SHALL NOT specify a default output value"
+            // the completeness search sees single-value classes only: rules that test a list column are left out
             var seen = index.allRules();
             BitsetIndex.andNot(seen, variableRules);
+            BitsetIndex.andNot(seen, listRules(index));
             if (Completeness.isComplete(index, seen)) {
                 analysed.add(new Issue(ValidationReport.Kind.UNREACHABLE_DEFAULT_OUTPUT, List.of()));
             }

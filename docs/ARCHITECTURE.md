@@ -120,9 +120,15 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
    it is complete (`Completeness`): whether every input, a missing value in any column and a string no rule
    mentions included, matches a rule, so that the default can never be given (an ERROR,
    `UNREACHABLE_DEFAULT_OUTPUT`). The analysis is exact, because it searches
-   the same column classes the index uses. The classes of single values cannot say which lists a rule
-   matches (rules `"PT"` and `"BR"` overlap on `["PT","BR"]`), so a list column shows the analysis
-   one class, and the rules that constrain it are left out like rules that compare with other inputs.
+   the same column classes the index uses. A list column is searched as the sets of its element
+   classes (`ListAnalysis`): rules `"PT"` and `"BR"` overlap on `["PT","BR"]`. Which rules a list
+   matches depends only on which element classes it holds, and adding an element only adds positive
+   rules and removes `not(...)` ones, so overlaps are decided pairwise and the last list column of a
+   search directly: a list matches none of some rules exactly when it holds no element that passes
+   their positive cells and, for each of their `not(...)` cells, one that rules it out. That is also
+   how a gap there is described (`nationalities has no element in "PT", nationalities has an element
+   in "ES"`). The searches fix list columns after the others; any list column before the last
+   branches on the minimal sets of rules its lists leave, at most `ListAnalysis.MAX_OUTCOMES` of them.
 
 An engine is **immutable** once built: any number of threads may share it without locks.
 
@@ -304,10 +310,20 @@ a case open, what Praecepta does is recorded in [DMN-CONFORMANCE.md](DMN-CONFORM
 - **DMN keeps strict semantics.** A plain `"PT"` against a list column would compare the whole list
   in other engines, so list entries are written with `list contains` and `some ... satisfies`, and
   only those forms are read back for a list column.
-- **The analysis leaves out rules that test lists**, as it does for cells that compare with another
-  input: the classes of single values cannot describe sets of values, and an analysis over sets of
-  classes would grow exponentially. Findings stay sound (nothing false is reported); some overlaps
-  and gaps go unreported.
+- **The analysis reads lists as sets of element classes** (#78; 0.4 and 0.5 left out the rules that
+  test lists). The sets are exponentially many, so none of the questions lists them: two rules
+  overlap when one element (or two, or none) makes a list both match; a list escapes some rules when
+  every element avoids their positive cells and their `not(...)` cells are each ruled out by one
+  element, which is a test per rule and element class. The gap search therefore needs neither a
+  bound on the length of lists nor one on the number of classes, and describes a gap symbolically
+  ("no element in ..., an element in ...") with an example list, rather than listing lists. Only a
+  table with several list columns needs more: every list column but the last branches on the
+  minimal sets of rules its lists leave (minimal, since fewer rules left only makes a gap or a
+  witness easier), found by adding one element class at a time and dropping the sets that hold
+  another. Their number is bounded (`ListAnalysis.MAX_OUTCOMES`, 1024); beyond it the rule in
+  question, or the table's gaps, go unreported, so findings stay sound. Gaps are looked for among
+  lists of values, as missing values are not searched for single values either; overlaps and
+  unreachable rules count missing lists and missing elements too.
 
 ### Output expressions (#71)
 - **A small subset, not a FEEL interpreter**: string and number literals, input names, `+ - * / **`,

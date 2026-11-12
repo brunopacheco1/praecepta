@@ -281,9 +281,16 @@ The elements of a list of times or date-times may have a time zone or not; each 
 single value is (by instant when the element and the cell both have a zone, else by local time).
 With map-based inputs, declare the column with `.listColumnType("nationalities", ColumnType.STRING)`
 and give a FEEL list as text: `["PT", "BR"]` (or `PT, BR`), `[]` for an empty list, `["PT", null]` for
-a list holding a missing element. Rules that test a
-list column are left out of the static analysis (overlaps, unreachable rules, gaps), since a list
-can match rules whose values never meet in a single value.
+a list holding a missing element.
+
+The static analysis treats a list as the set of its elements' kinds, so it sees what a list can match
+that a single value cannot: rules `"PT"` and `"BR"` overlap (on `["PT", "BR"]`), `[20..30]` after
+`>= 18` can never be selected under FIRST, and two rules `"PT"` and `"BR"` with declared values
+`"PT","BR"` leave a gap, `nationalities = []`. Overlaps and unreachable rules count every list,
+missing ones and ones holding missing elements included; gaps are looked for among lists of declared
+values and described by the elements such lists hold, as in
+`nationalities has no element in "PT", nationalities has an element in "ES"` (lists without `"PT"`
+that hold `"ES"`), with an example list.
 
 ### DMN
 `DmnReader` loads a decision table from a DMN file (DMN 1.1 to 1.5), including its hit policy,
