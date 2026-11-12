@@ -73,9 +73,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  *                       {@code list contains} and {@code some x in ? satisfies}: a positive cell holds
  *                       when some element passes one of its tests, or the list is missing and the cell
  *                       has {@code null}; {@code not(...)} holds when the list is there and every element
- *                       fails every test. A name of such a column in another
- *                       column's cell asks whether the value is in the list. A list may hold no missing
- *                       element.
+ *                       fails every test. A list may hold missing elements, for which a literal is false
+ *                       and a comparison unknown. A name of such a column in another column's cell asks
+ *                       whether the value is in the list.
  * @param bothKinds      whether the inputs of a time or date-time column may have a time zone or not, as
  *                       map-based inputs read them from text; the static analysis then visits both kinds
  *                       of values, whatever {@code zonedColumns} says
@@ -147,14 +147,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     /**
      * The first column whose (non-missing) value is outside its declared input values, or, for a list,
-     * that holds a missing element or one outside them; null if there is none.
+     * that holds a (non-missing) element outside them; null if there is none.
      */
     public String invalidColumn(Map<String, ?> input) {
-        for (var list : lists) {
-            if (value(input, list) instanceof List<?> elements && elements.stream().anyMatch(Objects::isNull)) {
-                return list;
-            }
-        }
         for (var declared : allowedValues.entrySet()) {
             var allowed = CellParser.parse(declared.getValue(), type(declared.getKey()));
             var value = value(input, declared.getKey());
@@ -724,7 +719,10 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     /**
      * A list column's cell, as FEEL evaluates {@code list contains(?, v) or some x in ? satisfies x < v or ? = null}
      * and its {@code not(...)}: on a missing list every element test is unknown, so only {@code null}
-     * holds and a negated cell is unknown.
+     * holds and a negated cell is unknown. On a list that is there, {@code ? = null} is false, and each
+     * element test is applied to every element, a missing one included: {@code list contains(?, v)} is
+     * {@code null = v} for it, false unless {@code v} is null, and {@code some x in ? satisfies x < v} is
+     * unknown for it (DMN 1.5, Tables 49, 50 and 75).
      */
     private static boolean acceptsList(UnaryTests cell, List<?> list) {
         if (cell instanceof UnaryTests.Any) {
@@ -741,13 +739,14 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     /**
      * Whether some element of a list passes one of the tests, with FEEL's three-valued {@code or}: true if
-     * one passes; else unknown (null) if one is unknown; else false.
+     * one passes; else unknown (null) if one is unknown; else false. {@code null} ({@code ? = null}) tests
+     * the list, which is there, so it is false.
      */
     private static Boolean some(List<Test> tests, List<?> list) {
         Boolean some = Boolean.FALSE;
         for (var test : tests) {
             for (var element : list) {
-                var outcome = test(test, element);
+                var outcome = test instanceof NullTest ? Boolean.FALSE : test(test, element);
                 if (outcome == Boolean.TRUE) {
                     return Boolean.TRUE;
                 }
@@ -808,12 +807,13 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     }
 
     /**
-     * Whether a value is in a list, as FEEL's {@code ? in list}: whether some element equals it, unknown
-     * (null) if none does but one is missing. A missing value is in no list.
+     * Whether a value is in a list, as FEEL's {@code ? in list}, which is {@code list contains(list, ?)}
+     * (DMN 1.5, Table 55): whether some element equals it. A missing value is in a list that holds a missing
+     * element, and in no other.
      */
     private static Boolean in(Object value, List<?> list) {
         if (value == null) {
-            return Boolean.FALSE;
+            return list.stream().anyMatch(Objects::isNull);
         }
         return some(list.stream().<Test>map(element -> new Equals((Comparable<?>) element)).toList(), List.of(value));
     }
@@ -822,6 +822,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     private static Test resolve(Test test, Function<String, Object> inputs) {
         return switch (test) {
             case NullTest n -> n;
+            case UnaryTests.NullElement n -> n;
             case Equals e -> new Equals(resolve(e.value(), inputs));
             case Compare c -> new Compare(c.operator(), resolve(c.value(), inputs));
             case Range r -> new Range(resolve(r.low(), inputs), r.lowClosed(), resolve(r.high(), inputs), r.highClosed());
@@ -837,6 +838,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         if (value == null) {
             return switch (test) {
                 case NullTest n -> true;
+                case UnaryTests.NullElement n -> true;
                 case Equals e -> e.value() == null;
                 case Compare c -> null;
                 case Range r -> null;
@@ -850,6 +852,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         }
         return switch (test) {
             case NullTest n -> false;
+            case UnaryTests.NullElement n -> false;
             case Equals e -> compare(value, e.value()) == 0;
             case Compare c -> switch (c.operator()) {
                 case LT -> compare(value, c.value()) < 0;
@@ -884,6 +887,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                     values.add(r.high());
                 }
                 case NullTest n -> {
+                    // no value
+                }
+                case UnaryTests.NullElement n -> {
                     // no value
                 }
             }

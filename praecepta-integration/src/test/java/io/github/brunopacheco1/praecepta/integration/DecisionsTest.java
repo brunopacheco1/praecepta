@@ -165,6 +165,27 @@ class DecisionsTest {
         Assertions.assertThat(engine.evaluate(Map.of("zone", "mainland"))).containsExactly(Map.of("fee", "9.90"));
     }
 
+    /** A list column whose cells test the elements; FEEL's answers for a missing element (#84). */
+    private static final String NATIONALITIES = """
+            <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+              <itemDefinition name="tCountries" isCollection="true"><typeRef>string</typeRef></itemDefinition>
+              <decision id="offer" name="Offer"><decisionTable hitPolicy="%s">
+                <input><inputExpression typeRef="tCountries"><text>nationalities</text></inputExpression></input>
+                <output name="offer" typeRef="string"/>
+                <rule><inputEntry><text>list contains(?, "PT")</text></inputEntry><outputEntry><text>"pt"</text></outputEntry></rule>
+                <rule><inputEntry><text>%s</text></inputEntry><outputEntry><text>"other"</text></outputEntry></rule>
+              </decisionTable></decision>
+            </definitions>""";
+
+    @Test
+    void a_list_input_may_hold_missing_elements() {
+        var table = DmnReader.readAll(stream(NATIONALITIES.formatted("COLLECT", "list contains(?, null)"))).getFirst();
+        var engine = Decision.of("offer", table).engine();
+        Assertions.assertThat(engine.evaluate(Map.of("nationalities", "[\"PT\", null]")))
+                .containsExactly(Map.of("offer", "pt"), Map.of("offer", "other"));
+        Assertions.assertThat(engine.evaluate(Map.of("nationalities", "[\"BR\"]"))).isEmpty();
+    }
+
     @Test
     void outputs_that_are_missing_map_to_null() {
         var table = DmnReader.readAll(stream("""

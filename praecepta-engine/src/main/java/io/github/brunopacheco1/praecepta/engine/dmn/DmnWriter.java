@@ -83,7 +83,12 @@ public final class DmnWriter {
         return xml.toString();
     }
 
-    /** Standard FEEL text for parsed unary tests. */
+    /**
+     * Standard FEEL text for parsed unary tests.
+     *
+     * @throws IllegalArgumentException if a test is a {@link UnaryTests.NullElement}, which only a list column's
+     *                                  cell holds ({@link #renderList})
+     */
     public static String render(UnaryTests tests) {
         return switch (tests) {
             case UnaryTests.Any() -> "-";
@@ -96,7 +101,7 @@ public final class DmnWriter {
      * Standard FEEL text for the cell of a column that holds lists, which tests the list's elements:
      * {@code "PT", >= 18, null} becomes
      * {@code list contains(?, "PT") or some x in ? satisfies x >= 18 or ? = null}, read back by
-     * {@code CellParser#parseFeelList}.
+     * {@code CellParser#parseFeelList}; a {@link UnaryTests.NullElement} is written {@code list contains(?, null)}.
      */
     public static String renderList(UnaryTests tests) {
         return switch (tests) {
@@ -312,6 +317,7 @@ public final class DmnWriter {
     private static String listTest(Test test) {
         return switch (test) {
             case NullTest() -> "? = null";
+            case UnaryTests.NullElement() -> "list contains(?, null)";
             case Equals(var value) -> "list contains(?, " + literal(value) + ")";
             case Compare c -> "some x in ? satisfies x " + test(c);
             case Range r -> "some x in ? satisfies x in " + test(r);
@@ -321,6 +327,8 @@ public final class DmnWriter {
     private static String test(Test test) {
         return switch (test) {
             case NullTest() -> "null";
+            // only CellParser.parseFeelList reads it, for a list column, whose cells renderList writes
+            case UnaryTests.NullElement() -> throw new IllegalArgumentException("list contains(?, null) only tests a list's elements");
             case Equals(var value) -> literal(value);
             case Compare(var operator, var value) -> operator.symbol() + " " + literal(value);
             case Range(var low, var lowClosed, var high, var highClosed) -> (lowClosed ? "[" : "(") + literal(low) + ".."

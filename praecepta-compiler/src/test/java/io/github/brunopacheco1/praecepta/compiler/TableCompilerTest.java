@@ -25,6 +25,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -398,6 +399,13 @@ class TableCompilerTest {
             Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(List.of("BR"), List.of(new BigDecimal(70)))))
                     .get().hasToString("OfferOutput[offer=senior]");
             Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(null, null)))
+                    .get().hasToString("OfferOutput[offer=standard]");
+            // a missing element: null = "PT" is false, and null >= 65 unknown, as FEEL has them (#84)
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null,
+                            constructor.newInstance(Arrays.asList("BR", null), Arrays.asList(new BigDecimal(70), null))))
+                    .get().hasToString("OfferOutput[offer=senior]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null,
+                            constructor.newInstance(Arrays.asList((String) null), Arrays.asList((BigDecimal) null))))
                     .get().hasToString("OfferOutput[offer=standard]");
             // the value list applies to the elements
             var unknown = constructor.newInstance(List.of("FR"), null);

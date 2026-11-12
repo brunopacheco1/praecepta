@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
@@ -60,6 +61,7 @@ final class VariableCells {
     private static Boolean test(Test test, Object value, Function<String, Object> inputs) {
         return switch (test) {
             case NullTest n -> value == null;
+            case UnaryTests.NullElement n -> value == null; // only list columns' cells hold it, and they name no input
             case Equals(var literal) -> {
                 var other = resolve(literal, inputs);
                 if (other instanceof List<?> list) {
@@ -97,15 +99,16 @@ final class VariableCells {
     }
 
     /**
-     * Membership in a named list, as FEEL's {@code ? in list} tests it: true if an element equals the
-     * value, else false. A list holds no missing value, so a missing value is in none.
+     * Membership in a named list, as FEEL's {@code ? in list} tests it, which is {@code list contains(list, ?)}
+     * (DMN 1.5, Table 55): true if an element equals the value, else false. A missing value equals only a
+     * missing element, and a missing element only a missing value ({@code null = x} is false).
      */
     private static Boolean in(Object value, List<?> list) {
         if (value == null) {
-            return Boolean.FALSE;
+            return list.stream().anyMatch(Objects::isNull); // List.of(...) would throw on contains(null)
         }
         for (var element : list) {
-            if (FeelTemporals.compare(value, element) == 0) {
+            if (element != null && FeelTemporals.compare(value, element) == 0) {
                 return Boolean.TRUE;
             }
         }

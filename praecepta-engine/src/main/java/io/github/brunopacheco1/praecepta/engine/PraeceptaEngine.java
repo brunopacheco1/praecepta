@@ -255,7 +255,7 @@ public final class PraeceptaEngine<I, O> {
      *                                     with different outputs under ANY
      * @throws InvalidInputException       if a value is outside its column's declared input values, or
      *                                     not a valid value of the column's type (for a list, if an
-     *                                     element is missing or of another type)
+     *                                     element is of another type)
      */
     public List<O> evaluate(I input) {
         return inputStrategy == null
@@ -1293,8 +1293,11 @@ public final class PraeceptaEngine<I, O> {
          * cell holds when some element passes one of its tests: {@code "PT","ES"} matches a list holding
          * {@code "PT"} or {@code "ES"}, and {@code not("PT")} a list without {@code "PT"}. A missing (null)
          * list matches only {@code -} and {@code null}; an empty one matches no test, so every
-         * {@code not(...)}. Elements may not be null or blank. Input values, if declared, apply to the
-         * elements. A cell of another column that names this input ({@code Flu Symptoms}, in a DMN table)
+         * {@code not(...)}. An element may be missing (null or blank), as in FEEL: a literal is false for it
+         * ({@code not("PT")} matches {@code ["BR", null]}) and a comparison unknown, so {@code >= 18} matches
+         * {@code [20, null]} but {@code not(>= 18)} does not match {@code [10, null]}; in a DMN table,
+         * {@code list contains(?, null)} asks for one. Input values, if declared, apply to the elements that are
+         * there. A cell of another column that names this input ({@code Flu Symptoms}, in a DMN table)
          * holds when that column's value is in the list.
          */
         public Builder<I, O> listInput(String column, Function<? super I, ? extends Collection<String>> extractor) {
@@ -1333,7 +1336,8 @@ public final class PraeceptaEngine<I, O> {
          * With {@link #inputs(InputStrategy)}: the column (or an input the cells compare with) holds lists
          * of {@code elementType}, matched as {@link #listInput(String, Function)} describes. Its text is a
          * FEEL list such as {@code ["PT", "BR"]} or {@code [1, 2.5]}, whose brackets may be left out
-         * ({@code PT, BR}); {@code []} is an empty list, and null or blank text a missing one.
+         * ({@code PT, BR}); {@code []} is an empty list, null or blank text a missing one, and {@code null} in
+         * a list a missing element ({@code ["PT", null]}).
          */
         public Builder<I, O> listColumnType(String column, ColumnType elementType) {
             columnType(column, elementType);

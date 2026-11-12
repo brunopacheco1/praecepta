@@ -40,8 +40,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  *                    them. A list column's cell holds when some element passes one of its tests
  *                    ({@code "PT","ES"}: the list holds {@code "PT"} or {@code "ES"}), and its
  *                    {@code not(...)} when no element does; a missing list passes only {@code -} and
- *                    {@code null}, and an empty one fails every test. In strict FEEL such a cell
- *                    is written with {@code list contains(?, "PT")} (see {@code CellParser#parseFeelList}).
+ *                    {@code null}, and an empty one fails every test. An element may be missing, for
+ *                    which a literal is false and a comparison unknown, as in FEEL. In strict FEEL such a
+ *                    cell is written with {@code list contains(?, "PT")} (see {@code CellParser#parseFeelList}),
+ *                    and {@code list contains(?, null)} asks for a missing element.
  *                    A cell that names a list input, as {@code Flu Symptoms} in a string column, holds
  *                    when the column's value is in that list, as in DMN.
  */

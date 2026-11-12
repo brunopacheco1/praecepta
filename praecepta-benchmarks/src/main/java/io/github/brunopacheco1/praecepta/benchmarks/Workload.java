@@ -181,6 +181,7 @@ public final class Workload {
                 var test = positive.tests().get(random.nextInt(positive.tests().size()));
                 yield switch (test) {
                     case NullTest n -> null;
+                    case UnaryTests.NullElement n -> null;
                     case Equals e -> e.value();
                     default -> sample(domain, random, value -> accepts(test, value));
                 };
@@ -206,6 +207,7 @@ public final class Workload {
     private static boolean accepts(Test test, Comparable<?> value) {
         return switch (test) {
             case NullTest n -> false;
+            case UnaryTests.NullElement n -> false;
             case Equals equals -> compare(value, equals.value()) == 0;
             case Compare comparison -> {
                 int cmp = compare(value, comparison.value());
@@ -242,6 +244,7 @@ public final class Workload {
                     addWithNeighbours(values, range.high());
                 }
                 case NullTest nullTest -> { }
+                case UnaryTests.NullElement nullElement -> { }
             }
         }
     }

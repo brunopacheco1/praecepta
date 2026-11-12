@@ -260,12 +260,28 @@ var engine = PraeceptaEngine.<Customer, String>builder()
 | `-` | yes | yes | yes | yes |
 
 These are the semantics of FEEL's `list contains`: a missing list makes every test unknown, while an
-empty one passes none. Elements may not be missing, must be values of the element type (as its
-single-value getter returns them, or text), and declared input values apply to each element.
+empty one passes none. Elements must be values of the element type (as its single-value getter
+returns them, or text), and declared input values apply to each element. An element may also be
+missing (null or blank), with FEEL's answers for it (DMN 1.5, Tables 49, 50 and 75): a literal is
+false, a comparison or an interval unknown, and a cell's tests are joined over the elements with FEEL's
+three-valued `or`. So a cell holds when some element passes, whatever the others, and its `not(...)`
+only when every element fails every test:
+
+| Cell (DMN form) | List | Matches |
+|---|---|---|
+| `list contains(?, "PT")` | `["PT", null]` | yes |
+| `not(list contains(?, "PT"))` | `["BR", null]` | yes (`null = "PT"` is false) |
+| `some x in ? satisfies x >= 18` | `[20, null]` | yes (`true or null`) |
+| `not(some x in ? satisfies x >= 18)` | `[10, null]` | no (`false or null` is null) |
+| `list contains(?, null)` | `["PT", null]` | yes |
+
+`list contains(?, null)` (DMN files only: in Praecepta's syntax `null` asks whether the list itself is
+missing, as `? = null` does) holds when the list holds a missing element.
 The elements of a list of times or date-times may have a time zone or not; each is compared as a
 single value is (by instant when the element and the cell both have a zone, else by local time).
 With map-based inputs, declare the column with `.listColumnType("nationalities", ColumnType.STRING)`
-and give a FEEL list as text: `["PT", "BR"]` (or `PT, BR`), `[]` for an empty list. Rules that test a
+and give a FEEL list as text: `["PT", "BR"]` (or `PT, BR`), `[]` for an empty list, `["PT", null]` for
+a list holding a missing element. Rules that test a
 list column are left out of the static analysis (overlaps, unreachable rules, gaps), since a list
 can match rules whose values never meet in a single value.
 
@@ -301,8 +317,10 @@ Supported:
   the column that names it).
 - **List columns**, typed by a collection (`isCollection="true"`, with allowed values on the item type),
   whose entries test the elements with FEEL's list functions (`list contains(?, "PT")`,
-  `some x in ? satisfies x >= 18`, `? = null`, joined with `or`, and `not(...)`); and entries that name a
-  list input (`Flu Symptoms`, typed by its `inputData`), which hold when the value is in the list.
+  `list contains(?, null)`, `some x in ? satisfies x >= 18`, `? = null`, joined with `or`, and `not(...)`);
+  and entries that name a list input (`Flu Symptoms`, typed by its `inputData`), which hold when the value
+  is in the list (`list contains(Flu Symptoms, Symptom)`: a missing value is in a list that holds a missing
+  element).
 - **Output entries** that are literals, name one of the table's inputs (`a` returns the input `a`), or
   compute their value from literals and inputs with `+`, `-`, `*`, `/`, `**` and parentheses
   (`Symptom + " is listed"`, `(price - discount) * 1.2`, `amount * (1 + rate) ** years`): `+` joins

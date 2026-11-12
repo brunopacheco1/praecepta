@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -153,6 +154,24 @@ class ReferenceMatcherTest {
         Assertions.assertThat(ids(reference.matches(nullValued("nat")))).containsExactly("3");
     }
 
+    /** The table of #84, from DMN 1.5, Tables 49, 50 and 75. */
+    @Test
+    void a_missing_element_is_false_for_a_literal_and_unknown_for_a_comparison() {
+        var rules = List.of(cell(1, "nat", "list contains(?, \"PT\")"), cell(2, "nat", "not(list contains(?, \"PT\"))"),
+                cell(3, "nat", "list contains(?, null)"), cell(4, "nat", "? = null"));
+        var reference = new ReferenceMatcher(rules, HitPolicy.COLLECT, Map.of(), Map.of("nat", ColumnType.STRING), Map.of(), true,
+                Set.of(), Set.of("nat"));
+        Assertions.assertThat(ids(reference.matches(Map.of("nat", Arrays.asList("PT", null))))).containsExactly("1", "3");
+        Assertions.assertThat(ids(reference.matches(Map.of("nat", Arrays.asList("BR", null))))).containsExactly("2", "3");
+        Assertions.assertThat(reference.invalidColumn(Map.of("nat", Arrays.asList("BR", null)))).isNull();
+
+        var ages = List.of(cell(1, "ages", "some x in ? satisfies x >= 18"), cell(2, "ages", "not(some x in ? satisfies x >= 18)"));
+        var byAge = new ReferenceMatcher(ages, HitPolicy.COLLECT, Map.of(), Map.of("ages", ColumnType.NUMBER), Map.of(), true,
+                Set.of(), Set.of("ages"));
+        Assertions.assertThat(ids(byAge.matches(Map.of("ages", Arrays.asList(new BigDecimal(20), null))))).containsExactly("1");
+        Assertions.assertThat(ids(byAge.matches(Map.of("ages", Arrays.asList(BigDecimal.TEN, null))))).isEmpty();
+    }
+
     @Test
     void an_element_with_an_offset_is_compared_with_a_literal_without_one_by_local_time() {
         // DMN 1.5, Table 54: the literal takes the element's offset, so 08:00 equals 08:00 at any offset
@@ -225,6 +244,11 @@ class ReferenceMatcherTest {
         var missing = new HashMap<String, Object>(Map.of("slots", List.of(eight)));
         missing.put("at", null);
         Assertions.assertThat(ids(reference.matches(missing))).containsExactly("2");
+        // ? in slots is list contains(slots, ?): a missing value is in a list that holds a missing element
+        missing.put("slots", Arrays.asList(eight, null));
+        Assertions.assertThat(ids(reference.matches(missing))).containsExactly("1");
+        Assertions.assertThat(ids(reference.matches(Map.of("at", LocalTime.of(9, 0), "slots", Arrays.asList(eight, null)))))
+                .containsExactly("2");
     }
 
     @Test

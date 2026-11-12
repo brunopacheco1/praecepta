@@ -181,7 +181,8 @@ final class ColumnIndex {
      * @param cells the column's cells; the class masks of single elements are stored in their form, the list masks are dense
      */
     static ColumnIndex ofLists(String name, ColumnType type, Cells cells, UnaryTests allowedValues, Zoning zoning) {
-        var elements = new ColumnIndex(name, type, cells, allowedValues, zoning, null);
+        var elementCells = new Cells(ListColumn.elementCells(cells.byBit()), cells.words(), cells.form());
+        var elements = new ColumnIndex(name, type, elementCells, allowedValues, zoning, null);
         var lists = new ListColumn(name, type, elements, cells.byBit(), cells.words());
         return new ColumnIndex(name, type, lists, cells.byBit().size(), cells.words());
     }
@@ -918,6 +919,7 @@ final class ColumnIndex {
         if (valueClass instanceof ValueClass.Missing) {
             return switch (test) {
                 case NullTest n -> true;
+                case UnaryTests.NullElement n -> true; // an element index's cell: the element is missing
                 case Equals e -> false;       // null = x is false
                 case Compare c -> null;       // null < x is unknown
                 case Range r -> null;
@@ -925,6 +927,7 @@ final class ColumnIndex {
         }
         return switch (test) {
             case NullTest n -> false;
+            case UnaryTests.NullElement n -> false;
             // literals are boundaries / written values, never inside other classes
             case Equals(var literal) -> coordinate(valueClass, literal) instanceof ValueClass.Point(var value) && compare(value, literal) == 0;
             case Compare(var operator, var literal) -> switch (operator) {

@@ -63,8 +63,20 @@ public sealed interface UnaryTests {
     sealed interface Test {
     }
 
-    /** {@code null}: true only when the value is missing. */
+    /**
+     * {@code null}: true only when the value is missing. In a list column's cell it tests the list, not its
+     * elements: {@code ? = null} as a DMN file writes it.
+     */
     record NullTest() implements Test {
+    }
+
+    /**
+     * In a list column's cell, {@code list contains(?, null)}: true for an element that is missing, so the
+     * cell holds when the list holds a missing (null) element. Only {@link CellParser#parseFeelList} reads it,
+     * as Praecepta's syntax has no form for it ({@code null} there asks whether the list itself is missing,
+     * as {@link NullTest} does). Applied to a single value, it is true when the value is missing.
+     */
+    record NullElement() implements Test {
     }
 
     /** A literal such as {@code "PT"}, {@code 18} or {@code date("2025-01-31")}: true when the value equals it. */
@@ -118,6 +130,7 @@ public sealed interface UnaryTests {
     static List<Comparable<?>> values(Test test) {
         return switch (test) {
             case NullTest n -> List.of();
+            case NullElement n -> List.of();
             case Equals(var value) -> List.of(value);
             case Compare(var operator, var value) -> List.of(value);
             case Range(var low, var lowClosed, var high, var highClosed) -> List.of(low, high);
@@ -132,6 +145,7 @@ public sealed interface UnaryTests {
         for (var test : tests()) {
             boolean names = switch (test) {
                 case NullTest n -> false;
+                case NullElement n -> false;
                 case Equals(var value) -> value instanceof Name;
                 case Compare(var operator, var value) -> value instanceof Name;
                 case Range(var low, var lowClosed, var high, var highClosed) -> low instanceof Name || high instanceof Name;

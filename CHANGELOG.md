@@ -44,6 +44,21 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   values and whether a missing input counts towards a complete table. COUNT with no match is marked settled
   (0.5.0). It also says how Praecepta returns DMN's null result: no output, or an output whose value is null.
   The README no longer calls those choices FEEL's.
+- **Missing elements in list inputs** ([#84](https://github.com/brunopacheco1/praecepta/issues/84)): a list
+  may hold missing (null) elements, as FEEL lists may, where 0.4 and 0.5 threw `InvalidInputException`
+  ("holds a missing value"). They get FEEL's three-valued answers (DMN 1.5, Tables 49, 50 and 75): a literal
+  is false for a missing element and a comparison or an interval unknown, and a cell's tests are joined over
+  the elements with FEEL's `or`, so `list contains(?, "PT")` matches `["PT", null]`,
+  `not(list contains(?, "PT"))` matches `["BR", null]`, `some x in ? satisfies x >= 18` matches `[20, null]`,
+  and `not(some x in ? satisfies x >= 18)` does not match `[10, null]` (`false or null` is null). A DMN cell
+  may ask for a missing element with `list contains(?, null)`, read by `CellParser.parseFeelList` as the new
+  test `UnaryTests.NullElement` and written back by `DmnWriter`; Praecepta's syntax has no form for it, as
+  `null` there asks whether the list itself is missing (`? = null`), which it still does. A null or blank
+  element of a `Collection`, and `null` in a list's text (`["PT", null]`, `BR, null`), is a missing element;
+  the text `null` alone is still no list. Declared input values apply to the elements that are there. A
+  cell naming a list input (`Flu Symptoms`) is `list contains(Flu Symptoms, Symptom)` (Table 55), so a
+  missing value is in a list that holds a missing element. The engine, the classes the Maven and Gradle
+  plugins generate and the framework integrations' map engines all evaluate them alike.
 
 ### Changed
 - **`DmnReader` uses the JDK's own XML parser** ([#96](https://github.com/brunopacheco1/praecepta/issues/96)):
@@ -75,6 +90,13 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   which tells a default of `null` from none. The constructor with four arguments remains and sets it when the
   default value is not null; the canonical one rejects a default value without `hasDefault`. A record pattern
   that deconstructs `OutputColumn` needs the new component.
+- `UnaryTests.Test` permits a fifth record, `NullElement`
+  ([#84](https://github.com/brunopacheco1/praecepta/issues/84)): an exhaustive `switch` over a cell's tests
+  needs a case for it. `DmnWriter.render` (of a single-value cell) rejects it with an
+  `IllegalArgumentException`; `renderList` writes it.
+- **Upgrade note:** a list input holding a missing element is evaluated rather than rejected
+  ([#84](https://github.com/brunopacheco1/praecepta/issues/84)); code that relied on the
+  `InvalidInputException` to catch such lists must check them itself.
 
 ### Fixed
 - **Validation issues were logged twice in the integrations**

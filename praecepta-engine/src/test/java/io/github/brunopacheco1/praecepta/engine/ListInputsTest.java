@@ -79,14 +79,116 @@ class ListInputsTest {
         Assertions.assertThatThrownBy(() -> engine.evaluate(french))
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("nationalities=FR");
-        var withNull = new Customer(Arrays.asList("PT", null), null);
-        Assertions.assertThatThrownBy(() -> engine.evaluate(withNull))
+        // a missing element is no value, so the declared values allow it
+        Assertions.assertThat(engine.evaluate(new Customer(Arrays.asList("BR", null), null))).containsExactly("not-pt", "any");
+    }
+
+    // ---- missing elements (#84) --------------------------------------------------------------
+
+    //   nationalities                                       → id
+    // 1 list contains(?, "PT")                                 pt
+    // 2 not(list contains(?, "PT"))                            not-pt
+    // 3 list contains(?, null)                                 has-null
+    // 4 not(list contains(?, null))                            no-null
+    // 5 ? = null                                               no-list
+    private static final DecisionTable NATIONALITIES_FEEL = new DecisionTable("nationalities", HitPolicy.COLLECT, null,
+            List.of(new DecisionTable.InputColumn("nationalities", ColumnType.STRING)),
+            List.of(new DecisionTable.OutputColumn("id", ColumnType.STRING)),
+            List.of(rule(1, Map.of("nationalities", "list contains(?, \"PT\")"), "pt"),
+                    rule(2, Map.of("nationalities", "not(list contains(?, \"PT\"))"), "not-pt"),
+                    rule(3, Map.of("nationalities", "list contains(?, null)"), "has-null"),
+                    rule(4, Map.of("nationalities", "not(list contains(?, null))"), "no-null"),
+                    rule(5, Map.of("nationalities", "? = null"), "no-list")),
+            true, Set.of("nationalities"));
+
+    //   ages                                              → id
+    // 1 some x in ? satisfies x >= 18                        adult
+    // 2 not(some x in ? satisfies x >= 18)                   no-adult
+    private static final DecisionTable AGES_FEEL = new DecisionTable("ages", HitPolicy.COLLECT, null,
+            List.of(new DecisionTable.InputColumn("ages", ColumnType.NUMBER)),
+            List.of(new DecisionTable.OutputColumn("id", ColumnType.STRING)),
+            List.of(rule(1, Map.of("ages", "some x in ? satisfies x >= 18"), "adult"),
+                    rule(2, Map.of("ages", "not(some x in ? satisfies x >= 18)"), "no-adult")),
+            true, Set.of("ages"));
+
+    /** The table of #84: FEEL's three-valued answers for a list that holds a missing element (DMN 1.5, Tables 49, 50 and 75). */
+    @Test
+    void a_missing_element_is_false_for_a_literal_and_unknown_for_a_comparison() {
+        var nationalities = PraeceptaEngine.<Customer, String>builder()
+                .table(NATIONALITIES_FEEL)
+                .listInput("nationalities", Customer::nationalities)
+                .output(output -> output.values().get("id"))
+                .build();
+        // list contains(["PT", null], "PT") is true; null = "PT" is false, so ["BR", null] holds no "PT"
+        Assertions.assertThat(nationalities.evaluate(new Customer(Arrays.asList("PT", null), null))).containsExactly("pt", "has-null");
+        Assertions.assertThat(nationalities.evaluate(new Customer(Arrays.asList("BR", null), null))).containsExactly("not-pt", "has-null");
+        Assertions.assertThat(nationalities.evaluate(customer("BR"))).containsExactly("not-pt", "no-null");
+        // ? = null asks about the list, which is there even when it holds only a missing element
+        Assertions.assertThat(nationalities.evaluate(new Customer(Arrays.asList((String) null), null))).containsExactly("not-pt", "has-null");
+        // a missing list: list contains(null, x) is unknown, so only ? = null holds
+        Assertions.assertThat(nationalities.evaluate(new Customer(null, null))).containsExactly("no-list");
+
+        var ages = PraeceptaEngine.<Customer, String>builder()
+                .table(AGES_FEEL)
+                .listInput("ages", ColumnType.NUMBER, Customer::ages)
+                .output(output -> output.values().get("id"))
+                .build();
+        // some x in [20, null] satisfies x >= 18: true or null, which is true
+        Assertions.assertThat(ages.evaluate(new Customer(null, Arrays.asList(20, null)))).containsExactly("adult");
+        // some x in [10, null] satisfies x >= 18: false or null, which is null, and so is its not(...)
+        Assertions.assertThat(ages.evaluate(new Customer(null, Arrays.asList(10, null)))).isEmpty();
+        Assertions.assertThat(ages.evaluate(new Customer(null, List.of(10)))).containsExactly("no-adult");
+    }
+
+    @Test
+    void a_blank_element_is_a_missing_one() {
+        var engine = byNationalities(HitPolicy.COLLECT);
+        Assertions.assertThat(engine.evaluate(customer("BR", " "))).containsExactly("not-pt", "any");
+        // Praecepta's null asks whether the list is missing, not whether an element is
+        Assertions.assertThat(engine.evaluate(new Customer(Arrays.asList((String) null), null))).containsExactly("not-pt", "any");
+    }
+
+    @Test
+    void map_based_inputs_read_null_in_a_list_as_a_missing_element() {
+        var engine = PraeceptaEngine.<Map<String, String>, String>builder()
+                .table(NATIONALITIES_FEEL)
+                .inputs(PraeceptaInput::new)
+                .output(output -> output.values().get("id"))
+                .build();
+        Assertions.assertThat(engine.evaluate(Map.of("nationalities", "[\"PT\", null]"))).containsExactly("pt", "has-null");
+        Assertions.assertThat(engine.evaluate(Map.of("nationalities", "[null]"))).containsExactly("not-pt", "has-null");
+        Assertions.assertThat(engine.evaluate(Map.of("nationalities", "BR, null"))).containsExactly("not-pt", "has-null");
+        // the text null alone is no list: a missing list is null or blank
+        var bare = Map.of("nationalities", "null");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(bare))
                 .isInstanceOf(InvalidInputException.class)
-                .hasMessageContaining("holds a missing value");
-        var withBlank = customer("PT", " ");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(withBlank))
-                .isInstanceOf(InvalidInputException.class)
-                .hasMessageContaining("holds a missing value");
+                .hasMessageContaining("is not a list of string values");
+    }
+
+    @Test
+    void list_contains_null_survives_a_dmn_round_trip() {
+        var xml = DmnWriter.write(NATIONALITIES_FEEL);
+        Assertions.assertThat(xml).contains("<text>list contains(?, null)</text>", "<text>not(list contains(?, null))</text>");
+        var read = DmnReader.read(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+        Assertions.assertThat(read.rules()).extracting(rule -> read.cell(rule, read.inputs().getFirst()))
+                .containsExactlyElementsOf(NATIONALITIES_FEEL.rules().stream()
+                        .map(rule -> NATIONALITIES_FEEL.cell(rule, NATIONALITIES_FEEL.inputs().getFirst())).toList());
+        Assertions.assertThat(DmnWriter.write(read)).isEqualTo(xml);
+    }
+
+    @Test
+    void a_missing_value_is_in_a_named_list_that_holds_a_missing_element() {
+        var engine = PraeceptaEngine.<Patient, String>builder()
+                .table(SYMPTOMS)
+                .input("Symptom", Patient::symptom)
+                .listInput("Flu Symptoms", Patient::fluSymptoms)
+                .output(output -> output.values().get("id"))
+                .build();
+        var withMissing = Arrays.asList("fever", null);
+        // ? in list is list contains(list, ?) (DMN 1.5, Table 55): null = null is true, null = "fever" false
+        Assertions.assertThat(engine.evaluate(new Patient(null, withMissing))).containsExactly("flu");
+        Assertions.assertThat(engine.evaluate(new Patient("fever", withMissing))).containsExactly("flu");
+        Assertions.assertThat(engine.evaluate(new Patient("rash", withMissing))).containsExactly("not-flu");
     }
 
     @Test
@@ -138,10 +240,7 @@ class ListInputsTest {
         Assertions.assertThat(engine.evaluate(Map.of("nationalities", "[]"))).containsExactly("not-pt", "any");
         Assertions.assertThat(engine.evaluate(Map.of("nationalities", " "))).containsExactly("none", "any");
         Assertions.assertThat(engine.evaluate(Map.of())).containsExactly("none", "any");
-        var withNull = Map.of("nationalities", "[\"PT\", null]");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(withNull))
-                .isInstanceOf(InvalidInputException.class)
-                .hasMessageContaining("is not a list of string values");
+        Assertions.assertThat(engine.evaluate(Map.of("nationalities", "[\"PT\", null]"))).containsExactly("iberian", "any");
         var withComparison = Map.of("nationalities", "[< 5]");
         Assertions.assertThatThrownBy(() -> engine.evaluate(withComparison))
                 .isInstanceOf(InvalidInputException.class)

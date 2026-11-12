@@ -82,11 +82,14 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
      only the classes its input can reach (`Zoning`): `timeInput` and `dateTimeInput` give values
      without a zone, `offsetTimeInput` and `zonedDateTimeInput` with one, and map-based inputs,
      read from text, either; so the analysis looks for gaps among the values that can really occur.
-   - **Lists** (`ListColumn`): an ordinary column index over the same cells classifies one element.
-     For each element, its class mask gives the positive cells it passes and the `not(...)` cells it
-     breaks; ORing those over the elements gives "some element passes", and the list's mask is the
-     `-` rules, the positive rules some element passes, and the negated rules none passes. A missing
-     and an empty list have fixed masks. Two nationalities cost one more OR per mask word. The
+   - **Lists** (`ListColumn`): an ordinary column index over the same cells, without their `null`
+     tests (`? = null` tests the list, not an element), classifies one element; a missing element
+     falls in its class for a missing value, where `list contains(?, null)` is true, a literal false
+     and a comparison unknown. For each element, its class mask gives the positive cells it passes
+     and the `not(...)` cells whose inside it does not make false (true, or unknown); ORing those over
+     the elements, and the list's mask is the `-` rules, the positive rules some element passes, and
+     the negated rules no element leaves true or unknown, which is FEEL's three-valued `or` over the
+     elements (DMN 1.5, Table 49). A missing and an empty list have fixed masks. Two nationalities cost one more OR per mask word. The
      element index stores its masks in either form (see below), and the list masks it gives are
      dense. Elements of a time or date-time list may have a zone or not: the element index takes
      both kinds, and classifies each element as it does a single value.
@@ -290,8 +293,14 @@ a case open, what Praecepta does is recorded in [DMN-CONFORMANCE.md](DMN-CONFORM
   nearly every list. "Every element passes" is not offered: no DMN form needs it yet.
 - **Missing and empty lists follow FEEL**, not the "an empty list is a missing value" first
   sketched in the issue: `list contains(null, x)` is null, so a missing list matches only `-` and
-  `null`; `list contains([], x)` is false, so an empty list matches every `not(...)`. Elements may
-  not be missing, since `list contains` and `some` would make a null element unknown.
+  `null`; `list contains([], x)` is false, so an empty list matches every `not(...)`.
+- **Missing elements follow FEEL too** (#84; 0.4 rejected them): `list contains` takes "any element of
+  the semantic domain including null" (DMN 1.5, Table 75) and `some` is a three-valued `or` over the
+  elements (Table 49), so a null element is false for a literal (`null = "PT"`) and unknown for a
+  comparison. One accumulator per list suffices: a positive rule needs one element that passes, and a
+  `not(...)` rule needs every element to make its inside false, so "unknown" and "true" may share the
+  bits that rule a negated cell out. `? = null` stays a test of the list, and
+  `list contains(?, null)` (`UnaryTests.NullElement`) is the test of an element.
 - **DMN keeps strict semantics.** A plain `"PT"` against a list column would compare the whole list
   in other engines, so list entries are written with `list contains` and `some ... satisfies`, and
   only those forms are read back for a list column.

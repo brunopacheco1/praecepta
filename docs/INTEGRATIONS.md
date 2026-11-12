@@ -63,7 +63,8 @@ integrations find their tables at runtime, so their engines take maps instead:
   same name, in one file or two.
 - **Inputs** map column names to values as text, read with the column types the DMN declares, as
   `PraeceptaEngine.Builder.inputs(...)` reads them: `"42"`, `"2025-01-31"`, `"08:30Z"`, `["PT", "BR"]` for
-  a list column. A missing or blank value is a missing input.
+  a list column (`["PT", null]` for one holding a missing element). A missing or blank value is a missing
+  input.
 - **Outputs** are one map per matching rule, in the hit policy's order (an output that is missing, such as
   an expression with a missing operand, maps to null). Under a COLLECT aggregation, the one map holds the
   aggregate, as DMN 1.5 defines it over a single output (`AggregationOperator.check`): SUM adds numbers with

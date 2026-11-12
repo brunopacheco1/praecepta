@@ -141,6 +141,7 @@ public final class CellParser {
      *
      * <pre>
      *   list contains(?, "PT")                  some element is "PT"
+     *   list contains(?, null)                  some element is missing
      *   some x in ? satisfies x &gt;= 18          some element compares that way
      *   some x in ? satisfies x in [18..65)     some element lies in the interval
      *   ? = null                                the list is missing
@@ -150,8 +151,9 @@ public final class CellParser {
      *
      * The result holds the tests that Praecepta's syntax writes {@code "PT", >= 18, [18..65), null},
      * which a list column reads the same way: some element passes one of the tests (see
-     * {@code DecisionTable#listInputs}). A list column's cells test its elements against literals, never
-     * against another input.
+     * {@code DecisionTable#listInputs}), and {@code null} asks whether the list is missing.
+     * {@code list contains(?, null)} becomes a {@link UnaryTests.NullElement}, for which Praecepta's syntax has
+     * no form. A list column's cells test its elements against literals, never against another input.
      *
      * @param type the type of the list's elements
      * @throws CellSyntaxException if a part of the cell is none of these forms, or a value is not valid for the type
@@ -223,17 +225,24 @@ public final class CellParser {
                 return some;
             }
             throw new CellSyntaxException(cell, "'" + text + "' does not test a list's elements; write list contains(?, value), "
-                    + "some x in ? satisfies x < value, some x in ? satisfies x in [low..high] or ? = null");
+                    + "list contains(?, null), some x in ? satisfies x < value, some x in ? satisfies x in [low..high] or ? = null");
         }
 
-        /** {@code list contains(?, value)}: an element equals the value; null if the text is not that. */
+        /**
+         * {@code list contains(?, value)}: an element equals the value, or with {@code null}, an element is
+         * missing (DMN 1.5, Table 75: the element is "any element of the semantic domain including null");
+         * null if the text is not that.
+         */
         private Test containsTest(String text) {
             var contains = after(text, "list contains(");
             if (contains == null || !contains.endsWith(")")) {
                 return null;
             }
             var argument = after(after(contains.substring(0, contains.length() - 1), "?"), ",");
-            return argument == null || argument.isEmpty() ? null : new Equals(literal(argument));
+            if (argument == null || argument.isEmpty()) {
+                return null;
+            }
+            return "null".equals(argument) ? new UnaryTests.NullElement() : new Equals(literal(argument));
         }
 
         /**

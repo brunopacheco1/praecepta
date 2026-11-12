@@ -68,7 +68,8 @@ import net.jqwik.api.Tuple;
  * values, and inputs include values outside them. One column
  * in five holds lists ({@link #lists}): its inputs are lists of zero to three of the values a single
  * input could take (a list of times or date-times now and then mixes values with and without a zone),
- * missing lists, and now and then a list holding a missing element, which is invalid.
+ * missing lists, and now and then a list holding a missing element. In strict FEEL, one list cell in three also
+ * asks for a missing element ({@code list contains(?, null)}).
  *
  * <p>Every rule has outputs {@code id} (its 1-based position, unique), {@code out} (one of x/y/z,
  * often shared), {@code n} (a small number, for aggregation, which one time in four is an output
@@ -176,7 +177,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
      * {@code list contains(?, ...)}), and one cell in three (by rule and column) of a column of single
      * values compares with a column of the same type instead, itself included ({@code > c1},
      * {@code c0}, {@code not(c2)}); a column that holds lists is only named whole ({@code c1},
-     * {@code not(c1)}), which asks whether the value is in that list.
+     * {@code not(c1)}), which asks whether the value is in that list. One cell in three of a column that holds
+     * lists also asks for a missing element ({@code list contains(?, null)}; a {@code -} becomes that alone).
      */
     public DecisionTableScenario withVariableCells() {
         var rewritten = new ArrayList<Praeceptum>();
@@ -189,7 +191,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 var text = rule.input().values().get(column);
                 var cell = CellParser.parse(text, type);
                 if (lists.contains(column)) {
-                    cells.put(column, DmnWriter.renderList(cell));
+                    cells.put(column, (r + c) % 3 == 1 ? withNullElement(cell) : DmnWriter.renderList(cell));
                 } else {
                     cells.put(column, (r + c) % 3 == 0 ? variableCell(type, r, c) : feelCell(text, cell, type));
                 }
@@ -198,6 +200,13 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         }
         return new DecisionTableScenario(columns, types, allowedValues, List.copyOf(rewritten), inputs, true, zonedColumns, lists,
                 maskForm, defaults);
+    }
+
+    /** A list column's cell that also asks for a missing element: {@code ... or list contains(?, null)}, inside its {@code not(...)}. */
+    private static String withNullElement(UnaryTests cell) {
+        var tests = new ArrayList<>(cell.tests());
+        tests.add(new UnaryTests.NullElement());
+        return DmnWriter.renderList(cell instanceof UnaryTests.Negated ? new UnaryTests.Negated(tests) : new UnaryTests.Positive(tests));
     }
 
     /**
@@ -591,7 +600,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         var values = new ArrayList<Arbitrary<Object>>();
         for (var column : columns) {
             if (column.list()) {
-                // zero to three values; now and then a list holding a missing element, which is invalid
+                // zero to three values; now and then a list holding a missing element
                 var element = element(column);
                 var withMissing = element.list().ofMinSize(1).ofMaxSize(2).map(elements -> {
                     var list = new ArrayList<Object>(elements);
@@ -600,7 +609,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 });
                 values.add(Arbitraries.<Object>frequencyOf(
                         Tuple.of(12, element.list().ofMaxSize(3)),
-                        Tuple.of(1, withMissing)).injectNull(0.15));
+                        Tuple.of(2, withMissing)).injectNull(0.15));
             } else {
                 values.add(value(column, true).injectNull(0.15));
             }
