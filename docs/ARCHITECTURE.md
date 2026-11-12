@@ -19,7 +19,7 @@ builds an engine once and calls it.
 | `praecepta-integration` | engine | The runtime core of the framework integrations: finds DMN files by location pattern and builds a map-based engine per decision, with its validation report (`Decisions`). Independent of any framework. |
 | `praecepta-maven-plugin` | compiler, Maven API | The `generate` goal: runs the compiler on the configured tables and adds the results to the Maven build. |
 | `praecepta-gradle-plugin` | compiler, Gradle API | The plugin `io.github.brunopacheco1.praecepta`: the `generatePraecepta` task runs the compiler on the tables of the `praecepta` extension and adds the results to the `main` source set. Built by Maven against the Gradle API. |
-| `praecepta-gradle-plugin-marker` | gradle plugin | The Gradle plugin marker (a POM), so that Gradle resolves the plugin by id from Maven Central. |
+| `praecepta-gradle-plugin-marker` | gradle plugin | The Gradle plugin marker (a POM), so that Gradle resolves the plugin by id from Maven Central. On the Gradle Plugin Portal the Portal writes its own. |
 | `praecepta-spring-boot-starter` | integration, Spring Boot (`provided`) | Spring Boot auto-configuration: loads the tables at `praecepta.locations` at startup, registers a `Decisions` bean and an engine bean per decision, and reports them through the Actuator endpoint `praecepta`. |
 | `praecepta-micronaut` | integration, Micronaut 4 (`provided`) | The Micronaut module: loads the DMN files at startup into a `Decisions` bean and one engine bean per decision, named after it, and reports through the `praecepta` management endpoint. |
 | `praecepta-quarkus` | integration, Quarkus ArC | Quarkus extension, runtime: builds the `Decisions` bean and one engine bean per decision (`@Identifier("Discount")`) from the DMN the build step validated (`PraeceptaRecorder`). |
@@ -167,6 +167,10 @@ two generated directories as outputs, so Gradle's build cache can reuse it acros
 are managed properties and nested beans with no reference to the project, so it works with the
 configuration cache. Its unit tests run the plugin in an in-process project (`ProjectBuilder`); its
 functional tests (Gradle TestKit) build real projects on several Gradle versions in their own workflow.
+Releases also go to the Gradle Plugin Portal, through `praecepta-gradle-plugin/portal`: a Gradle build
+that compiles nothing and publishes the jars and POM that Maven built (fetched from Maven Central), so
+both repositories serve the same files. The same workflow checks on every change that this build
+publishes Maven's files byte for byte.
 
 ## Framework integrations
 `praecepta-integration` turns DMN files into named engines for the Spring Boot, Micronaut and Quarkus

@@ -19,6 +19,12 @@ updates:
       # one PR per week for build and test tooling; runtime dependencies stay separate
       build-and-test:
         patterns: ['org.apache.maven.plugins:*', 'org.junit*', 'org.assertj:*', 'net.jqwik:*', 'org.jacoco:*', 'com.mycila:*', 'org.cyclonedx:*']
+  - package-ecosystem: gradle
+    # the Plugin Portal build: the plugin-publish plugin. Its jars are pinned by checksum, so an update
+    # also needs gradle/verification-metadata.xml regenerated (see the build file's header)
+    directory: /praecepta-gradle-plugin/portal
+    schedule:
+      interval: weekly
   - package-ecosystem: github-actions
     directory: /
     schedule:

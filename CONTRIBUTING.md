@@ -49,8 +49,8 @@ framework (Quarkus with `QuarkusExtensionTest` and `QuarkusDevModeTest`, dev mod
 The code targets **Java 21** (`--release 21`): newer language features or APIs fail to compile.
 CI builds and tests on Java 21, 25 and 27, runs the Maven plugin's integration tests on Maven 3.9,
 3.10 and 4.0 (on pull requests only when the plugin, the engine or a POM changes), and the Gradle
-plugin's functional tests on Gradle 8.5, 8.14 and 9 (on pull requests only when that plugin, the
-compiler, loader or engine changes), and the native-image test project with GraalVM for JDK 21 and 25
+plugin's functional tests on Gradle 8.5, 8.14 and 9 and a check that the Plugin Portal build publishes
+Maven's files unchanged (on pull requests only when that plugin, the compiler, loader or engine changes), and the native-image test project with GraalVM for JDK 21 and 25
 (on pull requests only when what goes into the executable changes). A newer push to a pull request
 cancels the checks still running for the previous one.
 

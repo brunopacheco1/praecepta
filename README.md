@@ -406,8 +406,9 @@ Generated code belongs to your project, so it carries no Praecepta licence heade
 ## Praecepta Gradle Plugin
 Does for Gradle what the Maven plugin does, with the same settings and the same generated files.
 Runs on Gradle 8.5 and later (CI tests 8.5, the last 8.x and the current 9.x) on Java 21+. It is
-published to Maven Central only, with its plugin marker, so Gradle finds it there (the Gradle Plugin
-Portal is [#93](https://github.com/brunopacheco1/praecepta/issues/93)):
+published to Maven Central with its plugin marker, so Gradle finds it there. From 0.6.0 it is on the Gradle
+Plugin Portal too ([#93](https://github.com/brunopacheco1/praecepta/issues/93)), where Gradle looks by default, and `pluginManagement` needs no change;
+for 0.5.0 add Maven Central:
 
 ```kotlin
 // settings.gradle.kts

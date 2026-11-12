@@ -7,3 +7,8 @@ target
 .idea
 .jqwik-database
 .cifuzz-corpus
+
+# the Plugin Portal build (praecepta-gradle-plugin/portal)
+.gradle
+.kotlin
+praecepta-gradle-plugin/portal/build

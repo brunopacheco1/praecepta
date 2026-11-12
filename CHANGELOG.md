@@ -11,6 +11,12 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+### Added
+- **The Gradle plugin on the Gradle Plugin Portal** ([#93](https://github.com/brunopacheco1/praecepta/issues/93)), where Gradle looks for plugins by
+  default, so `plugins { id("io.github.brunopacheco1.praecepta") version "..." }` needs no
+  `pluginManagement` repository. The Portal serves the same jars and POM as Maven Central: the release
+  uploads the files Maven built, fetched from Maven Central, and does not rebuild them with Gradle.
+
 ## [0.5.0] - 2026-11-12
 
 Integrations: Praecepta now fits the build and the framework an application already uses. A Spring

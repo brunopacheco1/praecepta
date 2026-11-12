@@ -26,6 +26,8 @@ path = [
     "site/brand/social.png",
     # last known badge values for the website (JSON has no comments)
     "site/badges.json",
+    # Gradle's dependency verification checksums, which Gradle rewrites
+    "praecepta-gradle-plugin/portal/gradle/verification-metadata.xml",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "Bruno Pacheco"

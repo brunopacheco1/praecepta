@@ -30,7 +30,8 @@ Their internals are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Every module needs Java 21 or later and is published to Maven Central with the groupId
 `io.github.brunopacheco1` and the same version (the Gradle plugin's marker, which Gradle finds by the
-plugin id, has the groupId `io.github.brunopacheco1.praecepta`). Micronaut 5 needs Java 25, so the module
+plugin id, has the groupId `io.github.brunopacheco1.praecepta`). From 0.6.0 the Gradle plugin is on the
+Gradle Plugin Portal too, with the same files. Micronaut 5 needs Java 25, so the module
 targets Micronaut 4. GraalVM native images need no module: the jars carry their own metadata.
 
 ## What they share

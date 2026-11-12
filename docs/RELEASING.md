@@ -23,7 +23,11 @@ which:
    `praecepta-quarkus-deployment`;
 5. records build provenance for the jars (GitHub artifact attestations);
 6. creates a GitHub release with the changelog section, jars, signatures, SBOMs, the provenance
-   bundle (`praecepta-X.Y.Z.intoto.jsonl`) and `THIRD-PARTY-NOTICES.txt`.
+   bundle (`praecepta-X.Y.Z.intoto.jsonl`) and `THIRD-PARTY-NOTICES.txt`;
+7. in a job of its own, publishes the Gradle plugin to the Gradle Plugin Portal (since 0.6.0): it fetches
+   the plugin's jars and POM from Maven Central and uploads them unchanged with
+   `praecepta-gradle-plugin/portal`, a Gradle build that compiles nothing, so the Portal serves the files
+   Reproducible Central rebuilds. The Portal writes the plugin marker itself.
 
 ## One-time setup (owner)
 
@@ -68,11 +72,19 @@ Its groupId is a sub-namespace of `io.github.brunopacheco1`, which Maven Central
 verified namespace; check that **Namespaces** lists it as covered before the first release that
 publishes it (0.5.0).
 
-The Gradle Plugin Portal is not used: Gradle builds find the plugin on Maven Central through the
-marker (`pluginManagement { repositories { mavenCentral() } }`), so a release needs no Portal account,
-key or step.
+### 3. Gradle Plugin Portal
+Sign in at <https://plugins.gradle.org> with the GitHub account, so the Portal accepts plugin ids under
+`io.github.brunopacheco1`, then create an API key and secret under **API Keys**. The Portal reviews a
+plugin's first version by hand, which takes a few days; later versions are published at once, unless the
+plugin id or group changes. To check a publication without publishing, run, with the jars and POM in
+place (as the release job fetches them) and the key and secret in `GRADLE_PUBLISH_KEY` and
+`GRADLE_PUBLISH_SECRET`:
 
-### 3. GitHub environment and secrets
+```bash
+gradle -p praecepta-gradle-plugin/portal publishPlugins --validate-only -Ppraecepta.version=X.Y.Z
+```
+
+### 4. GitHub environment and secrets
 **Settings → Environments → New environment** `release`. Restrict it to tags matching `v*`
 (**Deployment branches and tags → Selected → Add rule → Tag `v*`**). Add these environment secrets:
 
@@ -82,6 +94,8 @@ key or step.
 | `MAVEN_CENTRAL_PASSWORD` | user token password (step 1) |
 | `RELEASE_GPG_KEY` | contents of `release-key.asc` (step 2) |
 | `RELEASE_GPG_PASSPHRASE` | the release key's passphrase |
+| `GRADLE_PUBLISH_KEY` | Plugin Portal API key (step 3) |
+| `GRADLE_PUBLISH_SECRET` | Plugin Portal API secret (step 3) |
 
 Then delete `release-key.asc`. Optionally require yourself as a reviewer on the environment, so
 every release waits for a click.
@@ -96,7 +110,10 @@ every release waits for a click.
    git push origin vX.Y.Z
    ```
 3. Watch **Actions → Release**. When it is green, the artifacts are on Maven Central (search can
-   take a few hours to show them) and the GitHub release is published.
+   take a few hours to show them), the GitHub release is published and the Gradle plugin is on the
+   Plugin Portal. If only the **Publish to the Gradle Plugin Portal** job fails, fix the cause and
+   re-run that job alone (**Re-run failed jobs**): it needs nothing from the other job but Maven
+   Central's files.
 4. Set the development version for the next release (`mvn versions:set -DnewVersion=X.Y.(Z+1)-SNAPSHOT
    -DgenerateBackupPoms=false -DprocessAllModules`) in a pull request. This also refreshes
    `project.build.outputTimestamp`, which the next release keeps (see *Rebuilding a release*).
