@@ -142,6 +142,16 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   checks, Praecepta reads 489 and gives the kit's result for all but one, a power that is not whole, which the kit
   gives to 13 digits where FEEL's numbers have 34; the other 612 use functions, lists, contexts, booleans, `null`
   operands or hour 24. The decision-table results in `RESULTS.md` are unchanged.
+- **The framework integrations built as native executables in CI**
+  ([#99](https://github.com/brunopacheco1/praecepta/issues/99)): `praecepta-native-tests` (not published;
+  in the reactor only with the `native-frameworks` profile) holds a small Spring Boot, Micronaut and Quarkus
+  application. Each is built as a GraalVM native executable with its framework's own native build (Spring
+  Boot's `native` profile, with Spring AOT; Micronaut's `-Dpackaging=native-image`; Quarkus' `-Dnative`,
+  with a DMN file under `src/main/resources/rules/` and a CSV table declared in `application.properties`),
+  started, and made to evaluate decisions through the engines and the `Decisions` bean it injects, whose
+  answers it checks. The `Native frameworks` workflow runs them weekly and on pull requests that change a
+  framework module, the integration core or the applications, with GraalVM for JDK 25, and the Micronaut
+  one with JDK 21 too (Spring Boot 4 and Quarkus 3.40 need GraalVM for JDK 25).
 
 ### Changed
 - **`DmnReader` uses the JDK's own XML parser** ([#96](https://github.com/brunopacheco1/praecepta/issues/96)):
@@ -235,6 +245,11 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   outputs, which DMN does not aggregate, still leave a missing output to their strategy. The generated
   aggregation strategy no longer checks for null, and its `evaluate` says `(null if one of them is null)`, so the
   generated class of a COLLECT table with SUM, MIN or MAX changes in those lines.
+- **Spring Boot starter: `@Named` engines under Spring AOT** (found by the native build, #99): an
+  application processed ahead of time (every Spring native image, and the JVM's AOT mode) did not start when
+  a bean injected an engine with `@Named("<decision name>")`; `@Qualifier` worked. Spring writes a bean
+  definition's qualifiers from a set in which two qualifiers with the same value are one, so only the
+  `@Qualifier` one reached the generated code. The starter's AOT processor now writes both.
 
 ## [0.5.0] - 2026-11-12
 
