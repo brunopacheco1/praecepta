@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    SPDX-FileCopyrightText: Bruno Pacheco
+
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>it.praecepta</groupId>
+    <artifactId>native-app</artifactId>
+    <version>1.0</version>
+    <description>
+        Integration test: an application using the engine, the loader (CSV), the integration core and classes the
+        plugin generates. Every build runs it on the JVM; with -Dpraecepta.native it is also built as a GraalVM
+        native executable, which is then run (the native-image workflow, native.yml).
+    </description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>21</maven.compiler.release>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.brunopacheco1</groupId>
+            <artifactId>praecepta-engine</artifactId>
+            <version>@project.version@</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.brunopacheco1</groupId>
+            <artifactId>praecepta-loader</artifactId>
+            <version>@project.version@</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.brunopacheco1</groupId>
+            <artifactId>praecepta-integration</artifactId>
+            <version>@project.version@</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>@junit.version@</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>@maven-compiler-plugin.version@</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>@maven-surefire-plugin.version@</version>
+            </plugin>
+            <plugin>
+                <groupId>io.github.brunopacheco1</groupId>
+                <artifactId>praecepta-maven-plugin</artifactId>
+                <version>@project.version@</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <packageName>it.nativeapp.generated</packageName>
+                    <tables>
+                        <table>
+                            <source>rules/fees.csv</source>
+                            <name>Fees</name>
+                            <hitPolicy>COLLECT</hitPolicy>
+                            <aggregation>SUM</aggregation>
+                            <inputs>
+                                <input><name>zone</name><allowedValues>"mainland","islands"</allowedValues></input>
+                            </inputs>
+                            <outputs>
+                                <output><name>fee</name><type>NUMBER</type></output>
+                            </outputs>
+                        </table>
+                        <table>
+                            <source>rules/shipping.dmn</source>
+                        </table>
+                    </tables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <!-- the native executable, built with GraalVM's native-image and run as the last check -->
+            <id>native</id>
+            <activation>
+                <property>
+                    <name>praecepta.native</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>@native-maven-plugin.version@</version>
+                        <extensions>true</extensions>
+                        <executions>
+                            <execution>
+                                <id>build-native</id>
+                                <goals>
+                                    <goal>compile-no-fork</goal>
+                                </goals>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <imageName>native-app</imageName>
+                            <mainClass>it.nativeapp.NativeApp</mainClass>
+                            <!-- only the metadata the jars ship: nothing from GraalVM's shared repository -->
+                            <metadataRepository>
+                                <enabled>false</enabled>
+                            </metadataRepository>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>@exec-maven-plugin.version@</version>
+                        <executions>
+                            <execution>
+                                <id>run-native</id>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <phase>integration-test</phase>
+                                <configuration>
+                                    <executable>${project.build.directory}/native-app</executable>
+                                    <environmentVariables>
+                                        <!-- a fixed locale (C, read as en_US): its java.util.logging names are what the app registers -->
+                                        <LC_ALL>C</LC_ALL>
+                                    </environmentVariables>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!--
+                GraalVM for JDK 24 and later: a resource or reflective access that no metadata registers fails
+                loudly, instead of reading as absent, so the metadata the jars ship is checked too.
+            -->
+            <id>native-exact</id>
+            <activation>
+                <property>
+                    <name>praecepta.native</name>
+                </property>
+                <jdk>[24,)</jdk>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <configuration>
+                            <buildArgs>
+                                <buildArg>--exact-reachability-metadata</buildArg>
+                            </buildArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

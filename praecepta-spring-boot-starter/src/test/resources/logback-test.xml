@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-FileCopyrightText: Bruno Pacheco
+
+SPDX-License-Identifier: Apache-2.0
+-->
+<!-- Keeps Spring's start-up logging out of the build log; the starter's own lines stay, for the tests that read them. -->
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%-5level %logger{0} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    <logger name="io.github.brunopacheco1.praecepta" level="INFO"/>
+    <root level="WARN">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

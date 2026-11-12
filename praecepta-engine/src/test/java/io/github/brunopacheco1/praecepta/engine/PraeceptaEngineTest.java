@@ -116,11 +116,18 @@ class PraeceptaEngineTest {
         }
 
         @Test
-        void collect_can_count_the_matching_rules_even_when_none_match() {
+        void collect_can_count_the_matching_rules() {
             var engine = engine(HitPolicy.COLLECT).aggregation(AggregationOperator.COUNT).build();
             Assertions.assertThat(engine.evaluate(PT_SMB)).containsExactly(new Discount("#", 3));
             Assertions.assertThat(engine.evaluate(ES_SMB)).containsExactly(new Discount("#", 2));
-            Assertions.assertThat(engine.evaluate(FR_CORP)).containsExactly(new Discount("#", 0));
+        }
+
+        /** DMN 1.5, 10.3.2.10, step 2: with no match and no default output the result is null, before any aggregation. */
+        @ParameterizedTest
+        @EnumSource(AggregationOperator.class)
+        void every_aggregation_gives_no_output_when_no_rule_matches(AggregationOperator aggregation) {
+            var engine = engine(HitPolicy.COLLECT).aggregation(aggregation).build();
+            Assertions.assertThat(engine.evaluate(FR_CORP)).as("%s", aggregation).isEmpty();
         }
 
         @ParameterizedTest

@@ -24,6 +24,8 @@
     <properties>
         <maven.install.skip>true</maven.install.skip>
         <maven.deploy.skip>true</maven.deploy.skip>
+        <!-- left out of the Maven Central bundle (central-publishing-maven-plugin) -->
+        <skipPublishing>true</skipPublishing>
         <maven.jar.skipIfEmpty>true</maven.jar.skipIfEmpty>
         <jacoco.skip>true</jacoco.skip>
         <!-- not published: no SBOM -->
@@ -34,6 +36,13 @@
         <dependency>
             <groupId>io.github.brunopacheco1</groupId>
             <artifactId>praecepta-engine</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- the framework integrations' core, which must load the kit's models as they are -->
+        <dependency>
+            <groupId>io.github.brunopacheco1</groupId>
+            <artifactId>praecepta-integration</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>

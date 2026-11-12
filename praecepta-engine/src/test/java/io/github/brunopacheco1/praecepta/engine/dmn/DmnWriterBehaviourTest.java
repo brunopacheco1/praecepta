@@ -5,6 +5,8 @@
  */
 package io.github.brunopacheco1.praecepta.engine.dmn;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -128,6 +130,32 @@ class DmnWriterBehaviourTest {
         var table = new DecisionTable("t", HitPolicy.COLLECT, AggregationOperator.SUM, List.of(),
                 List.of(new OutputColumn("o", ColumnType.NUMBER)), List.of());
         Assertions.assertThat(DmnWriter.write(table)).contains("<decisionTable id=\"table\" hitPolicy=\"COLLECT\" aggregation=\"SUM\">");
+    }
+
+    /**
+     * A string literal may not hold vertical space (DMN 1.5, grammar rules 33 and 62), so a line feed, a carriage
+     * return and a tab are written as escape sequences, which DmnReader reads back as those characters.
+     */
+    @Test
+    void line_breaks_and_tabs_in_strings_are_written_as_escape_sequences_and_read_back() {
+        var table = new DecisionTable("t", HitPolicy.UNIQUE, null, List.of(new InputColumn("a", ColumnType.STRING, "\"x\\ty\", \"z\"")),
+                List.of(new OutputColumn("o", ColumnType.STRING, List.of("1\n2", "3"))),
+                List.of(new Praeceptum(1, new PraeceptaInput(Map.of("a", "\"x\\ty\"")), new PraeceptaOutput(Map.of("o", "1\n2"))),
+                        new Praeceptum(2, new PraeceptaInput(Map.of("a", "\"z\"")), new PraeceptaOutput(Map.of("o", "line\r\nbreak")))));
+        var xml = DmnWriter.write(table);
+        Assertions.assertThat(xml)
+                .contains("<inputValues id=\"input_values_0\"><text>\"x\\ty\", \"z\"</text></inputValues>")
+                .contains("<outputValues id=\"output_values_0\"><text>\"1\\n2\", \"3\"</text></outputValues>")
+                .contains("<inputEntry id=\"input_entry_0_0\"><text>\"x\\ty\"</text></inputEntry>")
+                .contains("<outputEntry id=\"output_entry_0_0\"><text>\"1\\n2\"</text></outputEntry>")
+                .contains("<outputEntry id=\"output_entry_1_0\"><text>\"line\\r\\nbreak\"</text></outputEntry>")
+                .doesNotContain("\t", "\r");
+
+        var read = DmnReader.read(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+        Assertions.assertThat(read.inputs().getFirst().allowedValues()).isEqualTo("\"x\\ty\", \"z\"");
+        Assertions.assertThat(read.outputs().getFirst().values()).containsExactly("1\n2", "3");
+        Assertions.assertThat(read.rules()).extracting(rule -> rule.output().values().get("o")).containsExactly("1\n2", "line\r\nbreak");
+        Assertions.assertThat(DmnWriter.write(read)).isEqualTo(xml);
     }
 
     @Test

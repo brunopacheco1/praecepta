@@ -1,0 +1,158 @@
+<!--
+
+    SPDX-FileCopyrightText: Bruno Pacheco
+
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.brunopacheco1</groupId>
+        <artifactId>praecepta</artifactId>
+        <version>0.5.0-SNAPSHOT</version>
+    </parent>
+    <artifactId>praecepta-gradle-plugin</artifactId>
+    <packaging>jar</packaging>
+    <name>praecepta-gradle-plugin</name>
+    <description>
+        Gradle plugin (id io.github.brunopacheco1.praecepta) that compiles Excel, CSV and DMN decision tables at
+        build time: validates them, converts them to DMN resources and generates typed input/output records and a
+        decision class, as the Maven plugin does.
+    </description>
+    <properties>
+        <!-- JaCoCo adds its agent here; empty when it is skipped (see the surefire argLine) -->
+        <argLine/>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>io.github.brunopacheco1</groupId>
+            <artifactId>praecepta-compiler</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <!-- Gradle provides its API to the plugins it runs -->
+            <groupId>dev.gradleplugins</groupId>
+            <artifactId>gradle-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>dev.gradleplugins</groupId>
+            <artifactId>gradle-test-kit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- ProjectBuilder (an in-process Gradle project) needs the Groovy modules a Gradle distribution bundles -->
+        <dependency>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-json</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-ant</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <Automatic-Module-Name>io.github.brunopacheco1.praecepta.gradle</Automatic-Module-Name>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <!-- the functional tests run real Gradle builds; only the gradle-functional profile runs them -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>**/*FunctionalTest.java</exclude>
+                    </excludes>
+                    <!-- ProjectBuilder defines classes in java.lang's packages, as Gradle's own launcher allows;
+                         @{argLine} keeps JaCoCo's agent -->
+                    <argLine>@{argLine} --add-opens java.base/java.lang=ALL-UNNAMED</argLine>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+    <profiles>
+        <!--
+            Functional tests: Gradle TestKit builds small projects that apply the plugin by id and version, as users
+            do, resolving it (through its marker), the compiler and the engine from a repository the invoker fills
+            with this build's artifacts, and anything else (the BOMs third-party POMs import) from Maven Central.
+            TestKit downloads the Gradle distribution (-Dpraecepta.gradle.version, default
+            ${gradle-functional.version}). They need a Java that Gradle version runs on. gradle-versions.yml runs
+            them:
+
+              mvn -pl praecepta-gradle-plugin -am verify -P gradle-functional -Dpraecepta.gradle.version=8.5
+        -->
+        <profile>
+            <id>gradle-functional</id>
+            <properties>
+                <praecepta.gradle.version>${gradle-functional.version}</praecepta.gradle.version>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-invoker-plugin</artifactId>
+                        <version>${maven-invoker-plugin.version}</version>
+                        <configuration>
+                            <localRepositoryPath>${project.build.directory}/it-repo</localRepositoryPath>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>functional-test-repository</id>
+                                <goals>
+                                    <goal>install</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <version>${maven-surefire-plugin.version}</version>
+                        <configuration>
+                            <includes>
+                                <include>**/*FunctionalTest.java</include>
+                            </includes>
+                            <systemPropertyVariables>
+                                <praecepta.gradle.version>${praecepta.gradle.version}</praecepta.gradle.version>
+                                <praecepta.version>${project.version}</praecepta.version>
+                                <praecepta.repository>${project.build.directory}/it-repo</praecepta.repository>
+                                <praecepta.marker>${project.basedir}/../praecepta-gradle-plugin-marker/pom.xml</praecepta.marker>
+                                <praecepta.golden>${project.basedir}/../praecepta-compiler/src/test/resources/golden</praecepta.golden>
+                            </systemPropertyVariables>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>integration-test</goal>
+                                    <goal>verify</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

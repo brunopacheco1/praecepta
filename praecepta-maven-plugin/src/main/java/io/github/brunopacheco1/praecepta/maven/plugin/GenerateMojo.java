@@ -7,13 +7,9 @@ package io.github.brunopacheco1.praecepta.maven.plugin;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 
 import org.apache.maven.model.Resource;
 import org.apache.maven.plugin.AbstractMojo;
@@ -23,6 +19,9 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 
+import io.github.brunopacheco1.praecepta.compiler.CompiledTable;
+import io.github.brunopacheco1.praecepta.compiler.CompilerOptions;
+import io.github.brunopacheco1.praecepta.compiler.TableCompiler;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 
 /**
@@ -66,6 +65,9 @@ import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 @Mojo(name = "generate", defaultPhase = LifecyclePhase.GENERATE_SOURCES, threadSafe = true)
 public class GenerateMojo extends AbstractMojo {
 
+    /** The tool the generated sources name. */
+    private static final String GENERATOR = "praecepta-maven-plugin";
+
     @Parameter(defaultValue = "${project}", readonly = true, required = true)
     private MavenProject project;
 
@@ -107,18 +109,17 @@ public class GenerateMojo extends AbstractMojo {
         if (tables.isEmpty()) {
             throw new MojoFailureException("Configure at least one <table>");
         }
-        var severity = severity(failOn);
-        var packagePath = packageName.replace('.', File.separatorChar);
+        var options = new CompilerOptions(packageName, severity(failOn), fileHeader, GENERATOR, CompilerOptions.XML_ELEMENTS);
         var classNames = new HashSet<String>();
         try {
             for (var table : tables) {
                 resolveSource(table);
-                var result = compile(table, severity);
+                var result = compile(table, options);
                 if (!classNames.add(result.className())) {
                     throw new MojoFailureException("Two tables generate the class " + result.className() + "; set <name> on one");
                 }
                 result.report().issues().forEach(issue -> getLog().warn(result.className() + ": " + issue));
-                writeFiles(result, packagePath);
+                result.write(outputDirectory.toPath(), resourceDirectory.toPath());
                 getLog().info("Compiled table %s (%d rules, %s) into %s.%s".formatted(table.source.getName(),
                         result.table().rules().size(), result.table().hitPolicy(), packageName, result.className()));
             }
@@ -139,35 +140,20 @@ public class GenerateMojo extends AbstractMojo {
     }
 
     /** Compiles one table; a configuration or table mistake fails the build with its message. */
-    private TableCompiler.Result compile(TableConfig table, Severity severity) throws MojoFailureException {
+    private static CompiledTable compile(TableConfig table, CompilerOptions options) throws MojoFailureException {
         try {
-            return TableCompiler.compile(table, packageName, severity, fileHeader);
+            return TableCompiler.compile(table.definition(), options);
         } catch (IllegalArgumentException e) {
             throw new MojoFailureException(e.getMessage(), e);
         }
     }
 
+    /** The severity {@code failOn} names, as every integration reads it ({@link Severity#failOn}); null for NONE. */
     private static Severity severity(String value) throws MojoFailureException {
-        if (value == null || value.equalsIgnoreCase("NONE")) {
-            return null;
-        }
         try {
-            return Severity.valueOf(value.toUpperCase(Locale.ROOT));
+            return Severity.failOn(value);
         } catch (IllegalArgumentException e) {
-            throw new MojoFailureException("<failOn> must be ERROR, WARNING or NONE, not " + value);
+            throw new MojoFailureException("<failOn> " + e.getMessage(), e);
         }
-    }
-
-    /** Writes the table's DMN resource and Java sources into the package's directory under each root. */
-    private void writeFiles(TableCompiler.Result result, String packagePath) throws IOException {
-        writeFile(resourceDirectory.toPath().resolve(packagePath).resolve(result.className() + ".dmn"), result.dmn());
-        for (var source : result.sources().entrySet()) {
-            writeFile(outputDirectory.toPath().resolve(packagePath).resolve(source.getKey() + ".java"), source.getValue());
-        }
-    }
-
-    private static void writeFile(Path file, String content) throws IOException {
-        Files.createDirectories(file.getParent());
-        Files.writeString(file, content, StandardCharsets.UTF_8);
     }
 }

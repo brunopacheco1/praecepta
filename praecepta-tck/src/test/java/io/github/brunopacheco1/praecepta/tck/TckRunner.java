@@ -274,6 +274,7 @@ final class TckRunner {
             Map.entry("constrains a collection as a whole", "allowed values of a whole list"),
             Map.entry("is a collection", "list outputs"),
             Map.entry("is a time with a zone id", "times with a zone id, which have no fixed offset"),
+            Map.entry("a default output must be a literal", "default outputs that are not literals"),
             Map.entry("output entries must be literals", "output expressions beyond +, -, *, / and ** of literals and inputs"));
 
     /**

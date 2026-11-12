@@ -45,22 +45,28 @@ jobs:
         # also checks SPDX headers (license-maven-plugin), runs the plugin's integration tests and
         # writes SBOMs (target/bom.json)
         run: mvn -B verify
+      - name: Test the workflow scripts
+        if: ${{ env.PRIMARY == 'true' }}
+        # their release-only paths (published_modules.py jars) would otherwise first run on a release tag
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
       - name: Check dependency licences
         if: ${{ env.PRIMARY == 'true' }}
-        run: >
-          python3 .github/scripts/check_sbom_licenses.py
-          praecepta-engine/target/bom.json
-          praecepta-loader/target/bom.json
-          praecepta-maven-plugin/target/bom.json
+        # every published module writes an SBOM; modules that are never published skip theirs
+        # (published_modules.py), so new modules are checked without being listed here
+        run: |
+          mapfile -t sboms < <(python3 .github/scripts/published_modules.py sboms)
+          python3 .github/scripts/check_sbom_licenses.py "${sboms[@]}"
+          python3 .github/scripts/published_modules.py merge-sboms target/published-sbom/bom.json
       - name: Upload SBOMs
         if: ${{ env.PRIMARY == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom
+          # each published module's SBOM, and all of them merged for the vulnerability scan
           path: |
-            praecepta-engine/target/bom.json
-            praecepta-loader/target/bom.json
-            praecepta-maven-plugin/target/bom.json
+            **/target/bom.json
+            !**/target/it/**
+            target/published-sbom/bom.json
       - name: SonarCloud analysis and quality gate
         # Mandatory: the scanner waits for the quality gate and fails this job if the gate fails,
         # the token is missing or expired, or the analysis errors.
@@ -94,9 +100,9 @@ jobs:
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
     with:
       download-artifact: sbom
-      # the engine has no dependencies; the loader and plugin carry Apache POI's tree
+      # the components of every published module, merged into one SBOM by the build job
+      # (the engine has none; the loader, compiler and build plugins carry Apache POI's tree)
       scan-args: |-
-        -L praecepta-loader/target/bom.json
-        -L praecepta-maven-plugin/target/bom.json
+        -L target/published-sbom/bom.json
       # advisory for now: findings go to Security > Code scanning without blocking merges
       fail-on-vuln: false

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- read with DmnReader and bound to maps: a date-time with a zone id (Europe/Paris changes to summer time on 2025-03-30) -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="pricing" name="pricing" namespace="https://example.com/pricing">
+  <decision id="pricing" name="Pricing">
+    <decisionTable id="table" hitPolicy="UNIQUE">
+      <input id="at" label="at"><inputExpression typeRef="dateTime"><text>at</text></inputExpression></input>
+      <input id="amount" label="amount"><inputExpression typeRef="number"><text>amount</text></inputExpression></input>
+      <output id="season" name="season" typeRef="string"/>
+      <output id="total" name="total" typeRef="number"/>
+      <rule id="winter">
+        <inputEntry><text>&lt; date and time("2025-03-30T03:00:00@Europe/Paris")</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"winter"</text></outputEntry>
+        <outputEntry><text>amount * 1.1</text></outputEntry>
+      </rule>
+      <rule id="summer">
+        <inputEntry><text>&gt;= date and time("2025-03-30T03:00:00@Europe/Paris")</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"summer"</text></outputEntry>
+        <outputEntry><text>amount * 1.2</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

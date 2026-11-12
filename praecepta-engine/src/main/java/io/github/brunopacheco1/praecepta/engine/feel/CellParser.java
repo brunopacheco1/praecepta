@@ -31,6 +31,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   (blank) or -             any value
  *   "PT", "ES"               string literals (STRING columns)
  *   PT, ES                   unquoted words are string literals too (Praecepta's original syntax)
+ *   "a\tb", "\U01F40E"       escape sequences in quoted strings: \" \\ \' \n \r \t and code points (FEEL rule 64)
  *   18, 2.5                  number literals (NUMBER columns)
  *   date("2025-01-31")       date literal (DATE columns; a bare 2025-01-31 is accepted as well)
  *   time("08:30:00")         time literal (TIME columns; a bare 08:30:00 is accepted as well)
@@ -42,7 +43,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   duration("P1DT2H")       days and time duration (DAY_TIME_DURATION columns; a bare P1DT2H too)
  *   duration("P1Y2M")        years and months duration (YEAR_MONTH_DURATION columns; a bare P1Y2M too)
  *   true, false              boolean literals (BOOLEAN columns)
- *   &lt; 18, &gt;= 2.5, &lt; "N"      comparisons (all but BOOLEAN columns; strings compare lexicographically)
+ *   &lt; 18, &gt;= 2.5, &lt; "N"      comparisons (all but BOOLEAN columns; strings compare by code point, {@link FeelStrings#compare})
  *   [18..65), (0..1], ]a..b[  intervals; [ and ] include their end, ( ) and outward-facing brackets exclude it
  *   null                     only a missing value
  *   not(t1, t2)              anything but these tests
@@ -434,7 +435,13 @@ public final class CellParser {
             return text; // Praecepta's original unquoted syntax
         }
 
-        /** The contents of a quoted string, in which a backslash escapes the character after it. */
+        /**
+         * The contents of a quoted string, with FEEL's escape sequences ({@link FeelStrings#escape}):
+         * {@code \"}, {@code \\}, {@code \'}, {@code \n}, {@code \r}, {@code \t}, and a code point
+         * ({@code \U01F40E}). A backslash before any other character is rejected, and so, in strict FEEL, is a
+         * line break: a string literal may not hold vertical space (U+000A to U+000D, grammar rules 33 and 62),
+         * which is written {@code \n} or {@code \r}.
+         */
         private String quoted(String text) {
             if (text.length() < 2 || !text.endsWith("\"")) {
                 throw new CellSyntaxException(cell, "unterminated string " + text);
@@ -447,12 +454,16 @@ public final class CellParser {
                 if (c == '"') {
                     throw new CellSyntaxException(cell, "unexpected quote in " + text);
                 }
-                if (c == '\\' && i + 1 < end) {
-                    value.append(text.charAt(i + 1));
-                    i += 2;
-                } else {
+                if (strictFeel && FeelStrings.isVerticalSpace(c)) {
+                    throw new CellSyntaxException(cell, FeelStrings.VERTICAL_SPACE + " in " + text);
+                }
+                if (c != '\\') {
                     value.append(c);
                     i++;
+                } else if (i + 1 < end) {
+                    i = FeelStrings.escape(text, i + 1, value, problem -> new CellSyntaxException(cell, problem + " in " + text));
+                } else {
+                    throw new CellSyntaxException(cell, "unterminated string " + text); // the backslash escapes the closing quote
                 }
             }
             return value.toString();

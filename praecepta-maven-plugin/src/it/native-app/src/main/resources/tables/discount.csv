@@ -1,0 +1,3 @@
+country;segment;grade
+"PT","ES";"SMB";A
+not("FR");;B

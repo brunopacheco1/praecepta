@@ -534,7 +534,7 @@ class ColumnIndexBehaviourTest {
                 9 null missing rules=[4, 5] example=-
                 """);
         Assertions.assertThat(column.describe(List.of(0, 1, 2, 3, 4, 8))).containsExactly("(-inf..\"C\")", "(\"D\"..+inf)");
-        // strings compare by UTF-16 code unit: lower case sorts after upper case, a space before both
+        // strings compare by code point: lower case sorts after upper case, a space before both
         Assertions.assertThat(lookups(column, null, "A", "Aardvark", "B", "Ba", "C", "Cz", "D", "Zed", "a", " B", "", "  ")).isEqualTo("""
                 null -> [4, 5]
                 'A' (String) -> [0]
@@ -550,6 +550,39 @@ class ColumnIndexBehaviourTest {
                 '' (String) -> [4, 5]
                 '  ' (String) -> [4, 5]
                 """);
+    }
+
+    /**
+     * FEEL orders strings by character, a code point (DMN 1.5, Table 54 and 10.3.2.3.2): U+1F40E comes after
+     * U+FF5E, although UTF-16 writes it with a first unit, U+D83D, that comes before.
+     */
+    @Test
+    void comparing_string_classes_order_strings_by_code_point() {
+        var tilde = "～"; // U+FF5E
+        var horse = "🐎"; // U+1F40E
+        var privateUse = String.valueOf((char) 0xE000);
+        var column = column(ColumnType.STRING, null, "< \"" + tilde + "\"", "[\"" + tilde + "\"..\"" + horse + "\"]", "> \"" + horse + "\"");
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf.."～") rules=[0] example=a (String)
+                1 "～" rules=[1] example=～ (String)
+                2 ("～".."🐎") rules=[1] example=～a (String)
+                3 "🐎" rules=[1] example=🐎 (String)
+                4 ("🐎"..+inf) rules=[2] example=🐎a (String)
+                5 null missing rules=[] example=-
+                """);
+        var grin = new String(Character.toChars(0x1F600)); // after U+1F40E
+        Assertions.assertThat(lookups(column, "z", tilde, tilde + "z", horse, grin, horse + "a")).isEqualTo("""
+                'z' (String) -> [0]
+                '～' (String) -> [1]
+                '～z' (String) -> [1]
+                '🐎' (String) -> [1]
+                '😀' (String) -> [2]
+                '🐎a' (String) -> [2]
+                """);
+        // U+E000 and U+FFFF lie between U+D83D and U+1F40E: UTF-16 would put them after the horse
+        Assertions.assertThat(lookups(column, privateUse)).isEqualTo("'" + privateUse + "' (String) -> [0]\n");
+        var last = String.valueOf((char) 0xFFFF);
+        Assertions.assertThat(lookups(column, last)).isEqualTo("'" + last + "' (String) -> [1]\n");
     }
 
     @Test

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="approvals" name="approvals" namespace="https://example.com/approvals">
+  <decision id="approvals" name="approvals">
+    <decisionTable id="table" hitPolicy="RULE ORDER">
+      <input id="score" label="score"><inputExpression typeRef="number"><text>score</text></inputExpression></input>
+      <output id="status" name="status" typeRef="string">
+        <outputValues><text>"approved", "declined"</text></outputValues>
+        <defaultOutputEntry><text>"declined"</text></defaultOutputEntry>
+      </output>
+      <output id="rate" name="rate" typeRef="string"/>
+      <output id="until" name="until" typeRef="time">
+        <defaultOutputEntry><text>time("17:00:00Z")</text></defaultOutputEntry>
+      </output>
+      <rule id="r1">
+        <inputEntry><text>&gt;= 700</text></inputEntry>
+        <outputEntry><text>"approved"</text></outputEntry>
+        <outputEntry><text>"best"</text></outputEntry>
+        <outputEntry><text>time("18:00:00+01:00")</text></outputEntry>
+      </rule>
+      <rule id="r2">
+        <inputEntry><text>&gt;= 600</text></inputEntry>
+        <outputEntry><text>"approved"</text></outputEntry>
+        <outputEntry><text>"standard"</text></outputEntry>
+        <outputEntry><text>null</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

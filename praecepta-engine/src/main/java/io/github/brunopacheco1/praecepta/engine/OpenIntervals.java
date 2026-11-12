@@ -19,6 +19,7 @@ import java.time.ZonedDateTime;
 import java.util.List;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelStrings;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 
 /**
@@ -28,7 +29,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  */
 final class OpenIntervals {
 
-    /** The smallest string after another is that string followed by this character. */
+    /** The smallest string after another, in FEEL's order by code point, is that string followed by this character. */
     private static final String LOWEST_CHARACTER = String.valueOf(Character.MIN_VALUE);
     /** Suffixes tried for a readable string inside an interval, before falling back to {@link #LOWEST_CHARACTER}. */
     private static final List<String> READABLE_SUFFIXES = List.of("a", "A", "0", "!");
@@ -367,7 +368,7 @@ final class OpenIntervals {
         var prefix = low == null ? "" : low;
         for (var suffix : READABLE_SUFFIXES) {
             var candidate = prefix + suffix;
-            if (high == null || candidate.compareTo(high) < 0) {
+            if (high == null || FeelStrings.compare(candidate, high) < 0) {
                 return candidate;
             }
         }

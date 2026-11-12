@@ -108,7 +108,8 @@ public final class FeelTemporals {
      * Orders two values of one column type as FEEL does: times and date-times that both have a zone by
      * instant (so equal instants compare as 0, whatever their zones); when only one has a zone, the
      * other takes its offset, so the two are ordered by their {@linkplain #local local} time; every
-     * other value by its natural order. Across values with and without a zone this order is not
+     * string by character ({@link FeelStrings#compare}), and every other value by its natural order. Across
+     * values with and without a zone this order is not
      * transitive ({@code 08:00Z} is before {@code 08:30}, which is before {@code 09:00+02:00}, the
      * instant before {@code 08:00Z}), so sort only values of one kind with it.
      */
@@ -126,6 +127,7 @@ public final class FeelTemporals {
                 var other = (ZonedDateTime) b;
                 yield order(dateTime.isBefore(other), dateTime.isAfter(other));
             }
+            case String text -> FeelStrings.compare(text, (String) b);
             default -> ((Comparable) a).compareTo(b);
         };
     }

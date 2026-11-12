@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A FIRST table whose second rule can never be selected: a validation WARNING. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="unreachable" name="Unreachable" namespace="http://example.com/tables">
+  <decision id="grade" name="Grade">
+    <decisionTable id="gradeTable" hitPolicy="FIRST">
+      <input id="scoreInput" label="Score">
+        <inputExpression id="scoreExpression" typeRef="number">
+          <text>score</text>
+        </inputExpression>
+      </input>
+      <output id="gradeOutput" name="grade" typeRef="string" />
+      <rule id="any">
+        <inputEntry id="anyScore"><text>-</text></inputEntry>
+        <outputEntry id="anyGrade"><text>"A"</text></outputEntry>
+      </rule>
+      <rule id="high">
+        <inputEntry id="highScore"><text>&gt; 5</text></inputEntry>
+        <outputEntry id="highGrade"><text>"B"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

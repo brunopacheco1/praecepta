@@ -87,6 +87,23 @@ class DmnReaderTest {
     }
 
     @Test
+    void read_all_reads_every_decision_table_in_document_order() {
+        var tables = DmnReader.readAll(resource("dmn11-two-decisions.dmn"));
+        Assertions.assertThat(tables).extracting(DecisionTable::name).containsExactly("Carrier", "Fee");
+        Assertions.assertThat(tables.getLast()).isEqualTo(DmnReader.read(resource("dmn11-two-decisions.dmn"), "Fee"));
+        Assertions.assertThat(DmnReader.readAll(resource("camunda-modeler-discount.dmn"))).singleElement()
+                .isEqualTo(DmnReader.read(resource("camunda-modeler-discount.dmn")));
+
+        var noTables = new ByteArrayInputStream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <inputData id="x" name="x"/>
+                </definitions>""".getBytes(StandardCharsets.UTF_8));
+        Assertions.assertThat(DmnReader.readAll(noTables)).isEmpty();
+        var notDmn = new ByteArrayInputStream("<html/>".getBytes(StandardCharsets.UTF_8));
+        Assertions.assertThatThrownBy(() -> DmnReader.readAll(notDmn)).isInstanceOf(InvalidDecisionTableException.class);
+    }
+
+    @Test
     void reads_dmn_1_1_and_picks_a_decision_by_name() {
         var carrier = DmnReader.read(resource("dmn11-two-decisions.dmn"), "Carrier");
         Assertions.assertThat(carrier.inputs()).containsExactly(new InputColumn("weight", ColumnType.NUMBER));
@@ -431,6 +448,63 @@ class DmnReaderTest {
         var written = DmnWriter.write(discount);
         Assertions.assertThat(written).contains("hitPolicy=\"RULE ORDER\"", "<outputValues", "<inputValues");
         Assertions.assertThat(DmnReader.read(stream(written)).outputs()).isEqualTo(discount.outputs());
+    }
+
+    /**
+     * DMN 1.5, Table 34: "The OutputClause of a single output decision table SHALL NOT specify a typeRef"; the
+     * type is then the decision's result's: the table's typeRef, else the decision variable's, the item type of a
+     * list for a multi-hit table, and nothing for COUNT, whose result is the number of outputs.
+     */
+    @ParameterizedTest(name = "{0} {1}, table ''{2}'', variable ''{3}'': {4}")
+    @CsvSource(delimiter = '|', value = {
+            "FIRST     |       | number   |          | NUMBER",
+            "FIRST     |       |          | date     | DATE",
+            "FIRST     |       | string   | number   | STRING",
+            "FIRST     |       |          | tAmount  | NUMBER",
+            "COLLECT   | SUM   | number   |          | NUMBER",
+            "COLLECT   | MAX   |          | tAmount  | NUMBER",
+            "COLLECT   | COUNT | number   | number   | STRING",
+            "COLLECT   |       |          | tAmounts | NUMBER",
+            "RULE ORDER|       |          | tAmounts | NUMBER",
+            // a type that says nothing of one output leaves it untyped
+            "COLLECT   |       |          | number   | STRING",
+            "FIRST     |       |          | tAmounts | STRING",
+            "FIRST     |       |          | tPerson  | STRING",
+            "FIRST     |       |          |          | STRING",
+    })
+    void a_single_outputs_type_is_its_decisions(String hitPolicy, String aggregation, String tableType, String variableType,
+            ColumnType expected) {
+        var xml = model("""
+                <itemDefinition name="tAmount"><typeRef>number</typeRef></itemDefinition>
+                <itemDefinition name="tAmounts" isCollection="true"><typeRef>tAmount</typeRef></itemDefinition>
+                <itemDefinition name="tPerson"><itemComponent name="age"><typeRef>number</typeRef></itemComponent></itemDefinition>
+                <decision id="d1" name="Amount">%s
+                  <decisionTable hitPolicy="%s"%s%s>
+                    <input><inputExpression typeRef="number"><text>x</text></inputExpression></input>
+                    <output/>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>null</text></outputEntry></rule>
+                  </decisionTable>
+                </decision>""".formatted(variableType == null ? "" : "<variable name=\"Amount\" typeRef=\"" + variableType + "\"/>",
+                hitPolicy, aggregation == null ? "" : " aggregation=\"" + aggregation + "\"",
+                tableType == null ? "" : " typeRef=\"" + tableType + "\""));
+        Assertions.assertThat(DmnReader.read(stream(xml)).outputs()).singleElement().extracting(OutputColumn::type).isEqualTo(expected);
+    }
+
+    /** An output entry is read with that type: a string where the decision says number is rejected. */
+    @Test
+    void a_single_output_typed_by_its_decision_checks_its_entries() {
+        var xml = model("""
+                <decision id="d1" name="Amount"><variable name="Amount" typeRef="number"/>
+                  <decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="number"><text>x</text></inputExpression></input>
+                    <output/>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"one"</text></outputEntry></rule>
+                  </decisionTable>
+                </decision>""");
+        var dmn = stream(xml);
+        Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessageContaining("Decision 'Amount', rule 1, output 'Amount'");
     }
 
     /** A DMN 1.3 model holding these elements: item definitions and decisions. */

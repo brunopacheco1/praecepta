@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A DMN model with a decision but no decision table. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="literal" name="Literal" namespace="http://example.com/tables">
+  <decision id="answer" name="Answer">
+    <literalExpression id="answerExpression">
+      <text>42</text>
+    </literalExpression>
+  </decision>
+</definitions>

@@ -1,0 +1,4 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+org.springframework.boot.diagnostics.FailureAnalyzer=io.github.brunopacheco1.praecepta.spring.PraeceptaFailureAnalyzer

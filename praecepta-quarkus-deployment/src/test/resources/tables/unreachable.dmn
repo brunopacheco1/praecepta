@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- a FIRST table whose second rule can never be selected: a WARNING of the validation report -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="unreachable" name="Unreachable" namespace="https://example.org/praecepta">
+  <decision id="grade" name="Grade">
+    <decisionTable hitPolicy="FIRST">
+      <input><inputExpression typeRef="number"><text>score</text></inputExpression></input>
+      <output name="grade" typeRef="string"/>
+      <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"A"</text></outputEntry></rule>
+      <rule><inputEntry><text>&gt; 5</text></inputEntry><outputEntry><text>"B"</text></outputEntry></rule>
+    </decisionTable>
+  </decision>
+</definitions>

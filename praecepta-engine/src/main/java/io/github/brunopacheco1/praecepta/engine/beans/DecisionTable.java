@@ -5,10 +5,12 @@
  */
 package io.github.brunopacheco1.praecepta.engine.beans;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -24,7 +26,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * @param hitPolicy   the hit policy
  * @param aggregation COLLECT aggregation, or null
  * @param inputs      input columns, in table order
- * @param outputs     output columns, in table order
+ * @param outputs     output columns, in table order, with their value lists and default values ({@link #defaultOutput})
  * @param rules       rules in rule order; input cells are unary tests of their column's type, outputs
  *                    are plain values as text (a string, or a number, boolean, date or time such as
  *                    {@code 2025-01-31}), null when empty, unless they name an input or are expressions
@@ -135,17 +137,41 @@ public record DecisionTable(
     }
 
     /**
-     * @param name   the column name
-     * @param type   the type of its values
-     * @param values DMN output value list, highest priority first (used by PRIORITY and OUTPUT_ORDER); may be empty
+     * The output when no rule matches, built from the columns' {@linkplain OutputColumn#defaultValue default
+     * values} (DMN's {@code defaultOutputEntry}): DMN 1.5, 10.3.2.10, "if no rules match, if a default output
+     * value d is specified, DTI=FEEL(d)". It holds every output column, null for a column without a default;
+     * a table with no default at all has none, and then gives no output when no rule matches.
      */
-    public record OutputColumn(String name, ColumnType type, List<String> values) {
+    public Optional<PraeceptaOutput> defaultOutput() {
+        if (outputs.stream().allMatch(output -> output.defaultValue() == null)) {
+            return Optional.empty();
+        }
+        var values = new LinkedHashMap<String, String>();
+        outputs.forEach(output -> values.put(output.name(), output.defaultValue()));
+        return Optional.of(new PraeceptaOutput(Collections.unmodifiableMap(values)));
+    }
+
+    /**
+     * @param name         the column name
+     * @param type         the type of its values
+     * @param values       DMN output value list, highest priority first (used by PRIORITY and OUTPUT_ORDER); may be empty
+     * @param defaultValue the value when no rule matches (DMN's {@code defaultOutputEntry}), as plain text like the
+     *                     rules' outputs ({@code Declined}, {@code 0}); null if the column has none (see
+     *                     {@link DecisionTable#defaultOutput})
+     */
+    public record OutputColumn(String name, ColumnType type, List<String> values, String defaultValue) {
         public OutputColumn {
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(type, "type");
             values = List.copyOf(values);
         }
 
+        /** A column without a default value. */
+        public OutputColumn(String name, ColumnType type, List<String> values) {
+            this(name, type, values, null);
+        }
+
+        /** A column without an output value list or a default value. */
         public OutputColumn(String name, ColumnType type) {
             this(name, type, List.of());
         }

@@ -86,12 +86,43 @@
         <central-publishing-maven-plugin.version>0.12.0</central-publishing-maven-plugin.version>
         <versions-maven-plugin.version>2.24.0</versions-maven-plugin.version>
         <maven-invoker-plugin.version>3.10.1</maven-invoker-plugin.version>
+        <!-- native images (#19): only the native-image test project uses them (praecepta-maven-plugin/src/it/native-app) -->
+        <native-maven-plugin.version>1.1.18</native-maven-plugin.version>
+        <exec-maven-plugin.version>3.6.4</exec-maven-plugin.version>
+
+        <!-- Spring Boot starter (#20): its BOM is imported by praecepta-spring-boot-starter only -->
+        <spring-boot.version>4.1.2</spring-boot.version>
+
+        <!-- Micronaut module (#77): the Micronaut 4 platform BOM, imported by praecepta-micronaut alone
+             (Micronaut 5 needs Java 25, above the project's Java 21 baseline) -->
+        <micronaut-platform.version>4.10.24</micronaut-platform.version>
+
+        <!-- Quarkus extension (#76): the BOM, imported by praecepta-quarkus and praecepta-quarkus-deployment
+             only, and the extension's build plugin and annotation processor, released with it -->
+        <quarkus.version>3.40.1.2</quarkus.version>
+
+        <!-- Gradle plugin (#18) -->
+        <!-- the Gradle API the plugin compiles against, redistributed on Maven Central by gradleplugins.dev
+             (its last release); the plugin uses only API that Gradle 8.5 to 9 share -->
+        <gradle-api.version>8.11.1</gradle-api.version>
+        <!-- the Groovy that Gradle ${gradle-api.version} bundles; its in-process tests need more of it than the API -->
+        <groovy.version>3.0.22</groovy.version>
+        <!-- the Gradle version the functional tests run (-P gradle-functional); gradle-versions.yml sets others -->
+        <gradle-functional.version>9.8.2</gradle-functional.version>
     </properties>
 
     <modules>
         <module>praecepta-engine</module>
         <module>praecepta-loader</module>
+        <module>praecepta-compiler</module>
+        <module>praecepta-integration</module>
         <module>praecepta-maven-plugin</module>
+        <module>praecepta-gradle-plugin</module>
+        <module>praecepta-gradle-plugin-marker</module>
+        <module>praecepta-spring-boot-starter</module>
+        <module>praecepta-micronaut</module>
+        <module>praecepta-quarkus</module>
+        <module>praecepta-quarkus-deployment</module>
         <module>praecepta-benchmarks</module>
         <module>praecepta-tck</module>
     </modules>
@@ -117,6 +148,13 @@
                 <version>1.23.0</version>
             </dependency>
             <dependency>
+                <!-- POI's own version, which an imported BOM (Quarkus') would otherwise lower to 2.26.0
+                     (GHSA-qv9r-c865-cp47) -->
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-api</artifactId>
+                <version>2.26.1</version>
+            </dependency>
+            <dependency>
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
                 <version>${assertj-core.version}</version>
@@ -131,6 +169,61 @@
                 <groupId>com.code-intelligence</groupId>
                 <artifactId>jazzer-junit</artifactId>
                 <version>${jazzer.version}</version>
+            </dependency>
+            <!-- Gradle plugin (#18): the Gradle API (provided) and TestKit (test). Their POMs also ask for
+                 groovy-all and kotlin-stdlib at runtime, which Gradle itself provides: the plugin compiles
+                 against the API and Groovy (which its signatures mention), and its in-process tests
+                 (ProjectBuilder) run with kotlin-stdlib too. -->
+            <dependency>
+                <groupId>dev.gradleplugins</groupId>
+                <artifactId>gradle-api</artifactId>
+                <version>${gradle-api.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.codehaus.groovy</groupId>
+                        <artifactId>groovy-all</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.jetbrains.kotlin</groupId>
+                        <artifactId>kotlin-stdlib</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>dev.gradleplugins</groupId>
+                <artifactId>gradle-test-kit</artifactId>
+                <version>${gradle-api.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.codehaus.groovy</groupId>
+                        <artifactId>groovy-all</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.codehaus.groovy</groupId>
+                <artifactId>groovy-json</artifactId>
+                <version>${groovy.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.codehaus.groovy</groupId>
+                <artifactId>groovy-ant</artifactId>
+                <version>${groovy.version}</version>
+                <exclusions>
+                    <!-- Ant's JUnit and ANTLR tasks and Groovydoc; a Gradle project needs only Ant itself -->
+                    <exclusion>
+                        <groupId>org.apache.ant</groupId>
+                        <artifactId>ant-junit</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.ant</groupId>
+                        <artifactId>ant-antlr</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.codehaus.groovy</groupId>
+                        <artifactId>groovy-groovydoc</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
         </dependencies>
     </dependencyManagement>

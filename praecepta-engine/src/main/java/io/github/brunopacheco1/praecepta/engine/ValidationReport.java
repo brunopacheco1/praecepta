@@ -8,6 +8,7 @@ package io.github.brunopacheco1.praecepta.engine;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -26,7 +27,26 @@ public record ValidationReport(List<Issue> issues) {
 
     public enum Severity {
         WARNING,
-        ERROR,
+        ERROR;
+
+        /**
+         * Reads a {@code failOn} setting, as every build-tool and framework integration does: {@code ERROR},
+         * {@code WARNING} or {@code NONE}, in any case and with surrounding whitespace ignored.
+         *
+         * @return the severity, or null for {@code NONE}, which fails on no validation issue
+         * @throws IllegalArgumentException for any other value, null and blank included; its message,
+         *                                  {@code must be ERROR, WARNING or NONE, not <value>}, follows the
+         *                                  setting's name as the tool spells it
+         */
+        public static Severity failOn(String value) {
+            var text = value == null ? "" : value.strip().toUpperCase(Locale.ROOT);
+            return switch (text) {
+                case "NONE" -> null;
+                case "ERROR" -> ERROR;
+                case "WARNING" -> WARNING;
+                default -> throw new IllegalArgumentException("must be ERROR, WARNING or NONE, not " + value);
+            };
+        }
     }
 
     public enum Kind {

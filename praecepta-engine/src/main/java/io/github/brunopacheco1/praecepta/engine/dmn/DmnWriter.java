@@ -42,7 +42,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * compare with, also gets an {@code inputData} element, which Drools needs to bind input values. An
  * input that holds lists is typed by a collection item definition (of an item type with its input
  * values, if it declares any), and a list column's cells are written with FEEL's list functions
- * ({@link #renderList}).
+ * ({@link #renderList}). An output's default value is written as its {@code defaultOutputEntry}.
  *
  * <p>The result is read back unchanged by {@link DmnReader}, and is evaluated identically by
  * Camunda 8 and Drools (checked by the benchmark module).
@@ -197,17 +197,24 @@ public final class DmnWriter {
         xml.append("      </input>\n");
     }
 
+    /** An output, with its value list and its default value ({@code defaultOutputEntry}), if it has them, in that order. */
     private static void output(StringBuilder xml, int c, OutputColumn output) {
         xml.append("      <output").append(idAndName("output_" + c, output.name())).append(typed(output.type()));
-        if (output.values().isEmpty()) {
+        if (output.values().isEmpty() && output.defaultValue() == null) {
             xml.append("/>\n");
             return;
         }
-        var values = output.values().stream()
-                .map(value -> outputLiteral(value, output.type(), "output values of '" + output.name() + "'"))
-                .collect(Collectors.joining(", "));
         xml.append(">\n");
-        expression(xml, "outputValues", id("output_values_" + c), values);
+        if (!output.values().isEmpty()) {
+            var values = output.values().stream()
+                    .map(value -> outputLiteral(value, output.type(), "output values of '" + output.name() + "'"))
+                    .collect(Collectors.joining(", "));
+            expression(xml, "outputValues", id("output_values_" + c), values);
+        }
+        if (output.defaultValue() != null) {
+            var value = outputLiteral(output.defaultValue(), output.type(), "default output of '" + output.name() + "'");
+            expression(xml, "defaultOutputEntry", id("output_default_" + c), value);
+        }
         xml.append("      </output>\n");
     }
 

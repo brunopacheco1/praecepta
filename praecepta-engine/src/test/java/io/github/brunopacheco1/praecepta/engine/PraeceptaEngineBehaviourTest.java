@@ -363,6 +363,47 @@ class PraeceptaEngineBehaviourTest {
                     .hasMessage("Input country=PT is not one of the column's allowed input values");
         }
 
+        /** DMN 1.5, grammar rule 64: in a quoted string, \t is a tab and \U01F40E one character, not the letters after the backslash. */
+        @Test
+        void escape_sequences_in_quoted_cells_stand_for_the_characters_they_name() {
+            var engine = byColumn(HitPolicy.FIRST, rule(1, Map.of("country", "\"a\\tb\""), "TAB"),
+                    rule(2, Map.of("country", "\"\\U01F40E\", \"caf\\u00e9\""), "CODE POINT"),
+                    rule(3, Map.of("country", "\"a\\\\tb\""), "BACKSLASH")).build();
+            Assertions.assertThat(engine.evaluate(Map.of("country", "a\tb"))).containsExactly("TAB");
+            Assertions.assertThat(engine.evaluate(Map.of("country", "atb"))).isEmpty();
+            Assertions.assertThat(engine.evaluate(Map.of("country", "🐎"))).containsExactly("CODE POINT");
+            Assertions.assertThat(engine.evaluate(Map.of("country", "café"))).containsExactly("CODE POINT");
+            Assertions.assertThat(engine.evaluate(Map.of("country", "U01F40E"))).isEmpty();
+            Assertions.assertThat(engine.evaluate(Map.of("country", "a\\tb"))).containsExactly("BACKSLASH");
+        }
+
+        /** DMN 1.5, Table 54: strings are ordered by character, a code point, so U+1F40E comes after U+FF5E (#83). */
+        @Test
+        void comparisons_order_strings_by_code_point() {
+            var engine = byColumn(HitPolicy.FIRST, rule(1, Map.of("country", "< \"～\""), "BEFORE"),
+                    rule(2, Map.of("country", "> \"～\""), "AFTER")).build();
+            Assertions.assertThat(engine.evaluate(Map.of("country", "🐎"))).containsExactly("AFTER");
+            Assertions.assertThat(engine.evaluate(Map.of("country", "z"))).containsExactly("BEFORE");
+            // an interval from U+FF5E to U+1F40E is in order, and holds U+FFFF
+            var interval = byColumn(HitPolicy.FIRST, rule(1, Map.of("country", "[\"～\"..\"🐎\"]"), "IN")).build();
+            Assertions.assertThat(interval.evaluate(Map.of("country", String.valueOf((char) 0xFFFF)))).containsExactly("IN");
+            Assertions.assertThat(interval.evaluate(Map.of("country", "🐎"))).containsExactly("IN");
+            Assertions.assertThat(interval.evaluate(Map.of("country", "😀"))).isEmpty();
+            var backwards = byColumn(HitPolicy.FIRST, rule(2, Map.of("country", "[\"🐎\"..\"～\"]"), "IN"));
+            Assertions.assertThatThrownBy(backwards::build)
+                    .isExactlyInstanceOf(InvalidDecisionTableException.class)
+                    .hasMessageContaining("interval starts after it ends");
+        }
+
+        @Test
+        void a_quoted_cell_with_a_backslash_before_another_character_is_rejected() {
+            var builder = byColumn(HitPolicy.FIRST, rule(4, Map.of("country", "\"P\\T\""), "A"));
+            Assertions.assertThatThrownBy(builder::build)
+                    .isExactlyInstanceOf(InvalidDecisionTableException.class)
+                    .hasMessage("Rule 4, column 'country': Invalid cell '\"P\\T\"': \\T is not an escape sequence; "
+                            + "write \\\\ for a backslash in \"P\\T\"");
+        }
+
         @Test
         void bound_numbers_must_be_finite() {
             var engine = PraeceptaEngine.<Double, String>builder()

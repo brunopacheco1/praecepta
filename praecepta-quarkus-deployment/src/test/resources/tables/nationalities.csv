@@ -1,0 +1,4 @@
+nationalities;ages;offer
+"PT","ES";;iberian
+not("PT");>= 65;senior
+;;standard

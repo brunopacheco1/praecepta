@@ -135,11 +135,12 @@ class EngineMatchesReferencePropertiesTest {
                     Assertions.assertThatThrownBy(() -> engine.evaluate(input)).isInstanceOf(InvalidInputException.class);
                     continue;
                 }
-                var expected = reference.aggregate(input, DecisionTableScenario.NUMBER, Aggregator.valueOf(aggregation.name()));
-                // no match gives no output, except for COUNT; matches whose outputs are all missing give a missing total
-                var noMatch = aggregation != AggregationOperator.COUNT && reference.matches(input).isEmpty();
-                Assertions.assertThat(engine.evaluate(input)).as("%s of input %s", aggregation, input)
-                        .isEqualTo(noMatch ? List.of() : List.of(Optional.ofNullable(expected)));
+                // no match gives the default output if there is one, else no output, whatever the aggregation; matches
+                // whose outputs are all missing give a missing total
+                var expected = reference.aggregate(input, DecisionTableScenario.NUMBER, Aggregator.valueOf(aggregation.name()))
+                        .map(total -> List.of(Optional.ofNullable(total.value())))
+                        .orElse(List.of());
+                Assertions.assertThat(engine.evaluate(input)).as("%s of input %s", aggregation, input).isEqualTo(expected);
             }
         }
     }
@@ -262,7 +263,9 @@ class EngineMatchesReferencePropertiesTest {
             // the example's columns are fixed; every other column may take any valid value
             for (var input : completions(gap.example(), s, reference)) {
                 Assertions.assertThat(reference.matches(input)).as("gap %s, input %s", gap.detail(), input).isEmpty();
-                Assertions.assertThat(engine.evaluate(input)).as("gap %s, input %s", gap.detail(), input).isEmpty();
+                // no rule matches: no output, or the default output, which does not hide the gap from the report
+                var noMatch = reference.defaultOutput() == null ? List.<PraeceptaOutput>of() : List.of(reference.defaultOutput());
+                Assertions.assertThat(engine.evaluate(input)).as("gap %s, input %s", gap.detail(), input).isEqualTo(noMatch);
             }
         }
     }

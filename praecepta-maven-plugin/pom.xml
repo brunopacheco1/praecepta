@@ -28,7 +28,7 @@
     <dependencies>
         <dependency>
             <groupId>io.github.brunopacheco1</groupId>
-            <artifactId>praecepta-loader</artifactId>
+            <artifactId>praecepta-compiler</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -54,6 +54,13 @@
             <artifactId>maven-plugin-annotations</artifactId>
             <version>${maven-plugin-tools.version}</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <!-- not used by the plugin: built first so the invoker can give it to src/it/native-app (extraArtifacts) -->
+            <groupId>io.github.brunopacheco1</groupId>
+            <artifactId>praecepta-integration</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -92,6 +99,9 @@
                     <localRepositoryPath>${project.build.directory}/it-repo</localRepositoryPath>
                     <settingsFile>src/it/settings.xml</settingsFile>
                     <streamLogsOnFailures>true</streamLogsOnFailures>
+                    <extraArtifacts>
+                        <extraArtifact>io.github.brunopacheco1:praecepta-integration:${project.version}:jar</extraArtifact>
+                    </extraArtifacts>
                 </configuration>
                 <executions>
                     <execution>
@@ -113,4 +123,27 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <!--
+                GraalVM native image (#19): -Pnative builds src/it/native-app as a native executable too, and runs
+                it. Needs GraalVM's native-image on the path; the native-image workflow (native.yml) runs it.
+            -->
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-invoker-plugin</artifactId>
+                        <configuration>
+                            <invokerTest>native-app</invokerTest>
+                            <properties>
+                                <praecepta.native>true</praecepta.native>
+                            </properties>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

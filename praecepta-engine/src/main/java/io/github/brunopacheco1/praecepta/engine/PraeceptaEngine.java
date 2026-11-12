@@ -140,7 +140,7 @@ public final class PraeceptaEngine<I, O> {
     private final BinaryOperator<O> reduce;
     /** COUNT only: the output for each number of matching rules; null otherwise. */
     private final IntFunction<O> count;
-    /** The result when no rule matches: empty, or the COUNT output for zero. */
+    /** The result when no rule matches: the default output if there is one, else empty, whatever the aggregation. */
     private final List<O> noMatch;
     private final ValidationReport report;
 
@@ -209,7 +209,11 @@ public final class PraeceptaEngine<I, O> {
                 : null;
         reduce = reducer(builder.aggregation, builder.outputStrategy);
         count = builder.aggregation == AggregationOperator.COUNT ? builder.outputStrategy::count : null;
-        noMatch = count == null ? List.of() : List.of(count.apply(0));
+        if (count != null) {
+            count.apply(1); // so that a strategy without count fails here, not when a rule first matches
+        }
+        // DMN 1.5, 10.3.2.10, step 2: no match gives the default output, else null, before any aggregation
+        noMatch = builder.defaultOutput == null ? List.of() : List.of(outputStrategy.transform(builder.defaultOutput));
         variableCellsByBit = variableCellsByBit(variableCells, bitToRule, evaluationOrder);
         variableRules = variableRules(variableCellsByBit, words);
         hasVariableCells = !BitsetIndex.isEmpty(variableRules);
@@ -228,8 +232,9 @@ public final class PraeceptaEngine<I, O> {
      * Evaluates the decision table.
      *
      * @return the outputs selected by the hit policy: at most one for single-hit policies (and for
-     *         aggregations), several for multi-hit ones; empty if no rule matches, except for COUNT,
-     *         which always returns one output
+     *         aggregations), several for multi-hit ones. If no rule matches: the default output alone, if
+     *         there is one ({@link Builder#defaultOutput}), else empty, whatever the hit policy and
+     *         aggregation (COUNT included: DMN 1.5, 10.3.2.10, gives null, not zero)
      * @throws HitPolicyViolationException if the input matches several rules under UNIQUE, or rules
      *                                     with different outputs under ANY
      * @throws InvalidInputException       if a value is outside its column's declared input values, or
@@ -984,6 +989,8 @@ public final class PraeceptaEngine<I, O> {
         private List<Praeceptum> rules;
         private Severity failOn;
         private Masks.Form maskForm = Masks.Form.AUTO;
+        /** The output when no rule matches, or null. */
+        private PraeceptaOutput defaultOutput;
 
         private final Map<String, Binding<I>> bindings = new LinkedHashMap<>();
         private InputStrategy<I> inputStrategy;
@@ -1014,8 +1021,9 @@ public final class PraeceptaEngine<I, O> {
         }
 
         /**
-         * Takes the hit policy, aggregation, rules, input value lists and (for PRIORITY and
-         * OUTPUT_ORDER) output value lists from a decision table, e.g. one read by {@code DmnReader}.
+         * Takes the hit policy, aggregation, rules, input value lists, (for PRIORITY and OUTPUT_ORDER) output
+         * value lists and default output ({@link #defaultOutput}) from a decision table, e.g. one read by
+         * {@code DmnReader}.
          * Inputs are still bound with {@code input(...)} and its typed variants, which must cover every
          * column of the table with its type ({@code listInput(...)} for the table's list inputs), or with
          * {@link #inputs(InputStrategy)}, in which case the table's column types and list inputs apply.
@@ -1043,6 +1051,7 @@ public final class PraeceptaEngine<I, O> {
             tableOutputTypes = outputTypes;
             listColumns.addAll(table.listInputs());
             feelCells = table.feelCells();
+            table.defaultOutput().ifPresent(this::defaultOutput);
             if (usesOutputPriority(table.hitPolicy())) {
                 for (var output : table.outputs()) {
                     if (!output.values().isEmpty()) {
@@ -1085,7 +1094,31 @@ public final class PraeceptaEngine<I, O> {
             return this;
         }
 
-        /** Aggregates COLLECT results into a single output, using the output strategy's sum/min/max/count. */
+        /**
+         * The output when no rule matches: DMN's default output values (DMN 1.5, 10.3.2.10: "if no rules match,
+         * if a default output value d is specified, DTI=FEEL(d)"). Evaluation then gives this output instead of
+         * none, whatever the hit policy: alone under a single-hit policy, as a list of one under a multi-hit
+         * policy, and as the result of a COLLECT aggregation (COUNT included), not aggregated. It is converted
+         * once, when the engine is built, like a rule's output. Its values are plain text, as a rule's are, and
+         * null for an output without a default. {@link #table} takes it from the table's output columns
+         * ({@link DecisionTable#defaultOutput}).
+         *
+         * @throws IllegalArgumentException if the output names an input or is an expression: a default is a value
+         */
+        public Builder<I, O> defaultOutput(PraeceptaOutput output) {
+            Objects.requireNonNull(output, "output");
+            if (output.readsInputs()) {
+                throw new IllegalArgumentException("A default output is a value; it cannot name an input or be an expression: " + output);
+            }
+            this.defaultOutput = output;
+            return this;
+        }
+
+        /**
+         * Aggregates COLLECT results into a single output, using the output strategy's sum/min/max/count. When
+         * no rule matches, there is nothing to aggregate: the result is the default output ({@link #defaultOutput}),
+         * or none, COUNT included (DMN 1.5, 10.3.2.10, step 2).
+         */
         public Builder<I, O> aggregation(AggregationOperator aggregation) {
             this.aggregation = Objects.requireNonNull(aggregation, "aggregation");
             return this;

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- found by praecepta-integration's default location (classpath*:rules/**/*.dmn): two decisions in one model -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="eligibility" name="eligibility" namespace="https://example.com/eligibility">
+  <decision id="eligibility" name="Eligibility">
+    <decisionTable id="eligibilityTable" hitPolicy="UNIQUE">
+      <input id="age" label="age">
+        <inputExpression typeRef="number"><text>age</text></inputExpression>
+        <inputValues><text>[0..120]</text></inputValues>
+      </input>
+      <output id="group" name="group" typeRef="string"/>
+      <rule id="minor">
+        <inputEntry><text>&lt; 18</text></inputEntry>
+        <outputEntry><text>"minor"</text></outputEntry>
+      </rule>
+      <rule id="adult">
+        <inputEntry><text>[18..65)</text></inputEntry>
+        <outputEntry><text>"adult"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="risk" name="Risk Points">
+    <decisionTable id="riskTable" hitPolicy="COLLECT" aggregation="SUM">
+      <input id="score" label="score"><inputExpression typeRef="number"><text>score</text></inputExpression></input>
+      <output id="points" name="points" typeRef="number"/>
+      <rule id="high">
+        <inputEntry><text>&gt; 500</text></inputEntry>
+        <outputEntry><text>10.5</text></outputEntry>
+      </rule>
+      <rule id="base">
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>1</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>
