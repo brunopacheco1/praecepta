@@ -11,34 +11,33 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-11
+
+Integrations: Praecepta now fits the build and the framework an application already uses. A Spring
+Boot starter, a Quarkus extension and a Micronaut module load DMN decision tables as engine beans and
+refuse to start (Quarkus: to build) when a table is invalid; a Gradle plugin generates the same classes
+as the Maven plugin; and applications build as GraalVM native images with no configuration for
+Praecepta. What the integrations share is in two new modules, `praecepta-compiler` (the Maven plugin's
+build-time core, now independent of Maven) and `praecepta-integration` (DMN files to named engines);
+the engine still has no dependencies. Three fixes bring tables closer to DMN 1.5: an output's default
+value is the result when no rule matches, quoted strings read FEEL's escape sequences, and strings are
+ordered by character. The DMN conformance kit (TCK) still passes 83 of its 86 decision-table checks;
+the other three need decision requirement graphs
+([#14](https://github.com/brunopacheco1/praecepta/issues/14)). Read *Fixed* before upgrading if your
+DMN tables declare default output values (they now give that output instead of none) or your quoted
+strings hold a backslash (the path `C:\temp` is now written `"C:\\temp"`), and *Changed* if you
+deconstruct `DecisionTable.OutputColumn` with a record pattern.
+
 ### Added
-- **Gradle plugin** ([#18](https://github.com/brunopacheco1/praecepta/issues/18)), id
-  `io.github.brunopacheco1.praecepta`: does for Gradle builds what the Maven plugin does, through
-  `praecepta-compiler`, so the generated classes and DMN resources are the Maven plugin's byte for byte
-  (but for the tool they name). The `praecepta` extension takes the Maven plugin's settings
-  (`tables { register("discount") { source = file(...); hitPolicy = "FIRST"; inputs { column("age")
-  { type = "NUMBER" } } } }`), except that a table's generated class is named by `className`, since
-  `name` is the name it is registered under. The `generatePraecepta` task feeds the `main` source set, is
-  cacheable (across machines: tables count by name and content) and works with the configuration cache.
-  It runs on Gradle 8.5 and later with Java 21+, and is published to Maven Central with its plugin marker
-  (`io.github.brunopacheco1.praecepta:io.github.brunopacheco1.praecepta.gradle.plugin`), not to the Gradle
-  Plugin Portal.
 - **`praecepta-spring-boot-starter`** ([#20](https://github.com/brunopacheco1/praecepta/issues/20)):
   Spring Boot 4 auto-configuration. At startup it loads the DMN files at `praecepta.locations`
   (`classpath*:rules/**/*.dmn` by default), registers a `Decisions` bean (`praeceptaDecisions`) and one
-  engine bean per decision table, `PraeceptaEngine<Map<String, String>, Map<String, String>>` injected with
-  `@Qualifier("<decision name>")` (or `@Named`, as in Micronaut and Quarkus), and stops the application,
-  listing every problem, when a table cannot be loaded or has validation issues at `praecepta.fail-on`
-  (`ERROR` by default); other issues are logged as warnings. With Actuator, the endpoint `praecepta` reports each decision's columns and validation
-  issues. `praecepta.enabled=false` turns it off. Configuration metadata gives IDEs the keys.
-- **`praecepta-micronaut`** ([#77](https://github.com/brunopacheco1/praecepta/issues/77)): Micronaut 4
-  applications get their DMN decision tables as beans. At startup the module loads the files
-  `praecepta.locations` finds (`classpath*:rules/**/*.dmn` by default) into a `Decisions` bean and
-  registers one engine per decision, injected with `@Named("Discount")`. Unreadable or invalid tables,
-  and validation issues at `praecepta.fail-on` (`ERROR` by default), stop startup with every problem
-  listed; other issues are logged as warnings. With `micronaut-management`, the `praecepta` endpoint
-  reports every decision and its validation issues (`/praecepta`, `/praecepta/{name}`). Micronaut is
-  `provided`, and the module needs no reflection. `praecepta.enabled=false` turns it off.
+  engine bean per decision table, `PraeceptaEngine<Map<String, String>, Map<String, String>>` injected
+  with `@Qualifier("<decision name>")` (or `@Named`, as in Micronaut and Quarkus), and stops the
+  application, listing every problem, when a table cannot be loaded or has validation issues at
+  `praecepta.fail-on` (`ERROR` by default); other issues are logged as warnings. With Actuator, the
+  endpoint `praecepta` reports each decision's columns and validation issues. `praecepta.enabled=false`
+  turns it off. Configuration metadata gives IDEs the keys.
 - **Quarkus extension** ([#76](https://github.com/brunopacheco1/praecepta/issues/76)):
   `praecepta-quarkus` (with its build-time module, `praecepta-quarkus-deployment`), for Quarkus 3.40 and
   later. While Quarkus builds the application, it finds the DMN files under `rules/` on the class path
@@ -49,21 +48,41 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `@Identifier("Discount")` (or `@Named`), with the validation reports at runtime. In dev mode a changed
   table restarts the application. Apache POI stays in the build; the extension uses no reflection, but
   the native-image workflow does not build a Quarkus application yet.
+- **`praecepta-micronaut`** ([#77](https://github.com/brunopacheco1/praecepta/issues/77)): Micronaut 4
+  applications get their DMN decision tables as beans. At startup the module loads the files
+  `praecepta.locations` finds (`classpath*:rules/**/*.dmn` by default) into a `Decisions` bean and
+  registers one engine per decision, injected with `@Named("Discount")`. Unreadable or invalid tables,
+  and validation issues at `praecepta.fail-on` (`ERROR` by default), stop startup with every problem
+  listed; other issues are logged as warnings. With `micronaut-management`, the `praecepta` endpoint
+  reports every decision and its validation issues (`/praecepta`, `/praecepta/{name}`). Micronaut is
+  `provided`, and the module needs no reflection. `praecepta.enabled=false` turns it off.
+- **Gradle plugin** ([#18](https://github.com/brunopacheco1/praecepta/issues/18)), id
+  `io.github.brunopacheco1.praecepta`: does for Gradle builds what the Maven plugin does, through
+  `praecepta-compiler`, so the generated classes and DMN resources are the Maven plugin's byte for byte
+  (but for the tool they name). The `praecepta` extension takes the Maven plugin's settings (`tables {
+  register("discount") { source = file(...); hitPolicy = "FIRST"; inputs { column("age") { type =
+  "NUMBER" } } } }`), except that a table's generated class is named by `className`, since `name` is the
+  name it is registered under. The `generatePraecepta` task feeds the `main` source set, is cacheable
+  (across machines: tables count by name and content) and works with the configuration cache. It runs on
+  Gradle 8.5 and later with Java 21+, and is published to Maven Central with its plugin marker
+  (`io.github.brunopacheco1.praecepta:io.github.brunopacheco1.praecepta.gradle.plugin`), not to the
+  Gradle Plugin Portal.
 - **GraalVM native images** ([#19](https://github.com/brunopacheco1/praecepta/issues/19)): applications
   using the engine, `praecepta-integration`, `CsvLoader` and the classes the Maven and Gradle plugins
-  generate build as native executables with no configuration for Praecepta. The jars carry their reachability metadata
-  (`META-INF/native-image/io.github.brunopacheco1/<artifactId>/resource-config.json`): the engine keeps the
-  JDK XML parser's messages, without which a malformed DMN file failed natively with a
+  generate build as native executables with no configuration for Praecepta. The jars carry their
+  reachability metadata
+  (`META-INF/native-image/io.github.brunopacheco1/<artifactId>/resource-config.json`): the engine keeps
+  the JDK XML parser's messages, without which a malformed DMN file failed natively with a
   `MissingResourceException`, and the integration core registers the default location's files
   (`rules/**/*.dmn`). `ExcelLoader` does not work in native images (Apache POI); compile Excel tables at
-  build time instead. A `Native image` workflow builds and runs a test application with GraalVM for JDK 21
-  and 25. See [Native images](README.md#native-images).
+  build time instead. A `Native image` workflow builds and runs a test application with GraalVM for JDK
+  21 and 25. See [Native images](README.md#native-images).
 - **`praecepta-compiler`**: the build-time core of the Maven plugin (`TableCompiler`, and the source
   generation it drives) as a module of its own, independent of Maven, so the Gradle plugin
   ([#18](https://github.com/brunopacheco1/praecepta/issues/18)) and the Quarkus extension
   ([#76](https://github.com/brunopacheco1/praecepta/issues/76)) generate exactly what the Maven plugin
-  does. `TableCompiler.compile(TableDefinition, CompilerOptions)` returns a `CompiledTable` with the table,
-  its validation report, its DMN and the generated sources, and `CompiledTable.write(sourceRoot,
+  does. `TableCompiler.compile(TableDefinition, CompilerOptions)` returns a `CompiledTable` with the
+  table, its validation report, its DMN and the generated sources, and `CompiledTable.write(sourceRoot,
   resourceRoot)` writes them; `CompilerOptions` names the tool in the generated files and how messages
   name its settings. The Maven plugin's goal, configuration, messages and generated files are unchanged.
 - **`praecepta-integration`**: what the Spring Boot, Micronaut and Quarkus integrations share, with no
@@ -83,50 +102,53 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   [#79](https://github.com/brunopacheco1/praecepta/issues/79)).
 
 ### Changed
-- The release publishes every module but the benchmarks and the TCK runner, found by the build rather
-  than listed, so new modules need no change to the release, the SBOM checks or the website. Rebuilding a
-  release from 0.5.0 on uses `-pl '!praecepta-benchmarks,!praecepta-tck'` (see
-  [docs/RELEASING.md](docs/RELEASING.md)).
 - `DecisionTable.OutputColumn` has a fourth component, `defaultValue`
   ([#79](https://github.com/brunopacheco1/praecepta/issues/79)). Its constructors with two and three
   arguments remain; a record pattern that deconstructs it needs the new component.
+- The release publishes every module but the benchmarks and the TCK runner, found by the build rather
+  than listed, so new modules need no change to the release, the SBOM checks or the website. Rebuilding
+  a release from 0.5.0 on uses `-pl '!praecepta-benchmarks,!praecepta-tck'` (see
+  [docs/RELEASING.md](docs/RELEASING.md)).
 
 ### Fixed
-- **String literals in cells read FEEL's escape sequences** ([#80](https://github.com/brunopacheco1/praecepta/issues/80)):
-  in a quoted string of a cell, an input or output value list or a DMN output entry, a backslash used to
-  mean "the next character as it is", so `"a\tb"` was `atb` and `"caf\u00e9"` was `cafu00e9`. They now
-  read as DMN 1.5 has them (grammar rule 64, 10.3.1.1), in Praecepta's syntax and in strict FEEL alike, and
-  as output expressions have read them since 0.4.0: `\n`, `\r`, `\t`, `\"`, `\\`, `\'`, and a character by
-  its code point (`\u00e9`, `\U01F40E`, or a surrogate pair `\uD83D\uDC0E`). A backslash before any other
-  character is rejected (`\q is not an escape sequence; write \\ for a backslash`), so a quoted Windows path
-  needs its backslashes doubled (`"C:\\temp"`); unquoted words keep their backslashes. `FeelLiterals.literal`,
-  and so `DmnWriter`, writes a line feed, a carriage return and a tab as `\n`, `\r` and `\t` (and the other
-  vertical space, U+000B and U+000C, as code points), since a FEEL string literal may not hold a line break.
+- **Default output values** ([#79](https://github.com/brunopacheco1/praecepta/issues/79)): `DmnReader`
+  read an output's value list but skipped its `defaultOutputEntry`, so a table that declares a default
+  gave no output when no rule matched, with no warning. DMN 1.5 says the default is then the result
+  (8.2.12; Table 34; 10.3.2.10, step 2: "if a default output value d is specified, DTI=FEEL(d)"), which
+  applies before the hit policy and any aggregation. The engine now returns that default output,
+  converted once when it is built: alone under every hit policy, as the one element of a multi-hit
+  result, and as the result of a COLLECT aggregation, COUNT included (`[Status=Declined, Rate=Standard]`
+  for the TCK's `0108-first-hitpolicy`, rather than `[]`). An output without a default is null in it.
+  Tables without defaults behave as before. `DecisionTable.OutputColumn` gains `defaultValue` (plain
+  text, like a rule's output; the three-argument constructor keeps none), so a record pattern over it
+  needs the new component; `DecisionTable.defaultOutput()` builds the output, and
+  `PraeceptaEngine.Builder.defaultOutput(PraeceptaOutput)` sets one for a table built in code
+  (`table(...)` takes the table's). `DmnReader` reads defaults that are literals of the output's type
+  (`null` is no default) and rejects any other default naming the decision and output, and `DmnWriter`
+  writes them back. The Maven plugin generates the same classes; a DMN table's default reaches its
+  `evaluate`, whose Javadoc then says so, and a time or date-time default counts when deciding whether
+  the output's component has a time zone. Gaps are still reported for a table with a default, since no
+  rule covers them.
+- **String literals in cells read FEEL's escape sequences**
+  ([#80](https://github.com/brunopacheco1/praecepta/issues/80)): in a quoted string of a cell, an input
+  or output value list or a DMN output entry, a backslash used to mean "the next character as it is", so
+  `"a\tb"` was `atb` and `"caf\u00e9"` was `cafu00e9`. They now read as DMN 1.5 has them (grammar rule
+  64, 10.3.1.1), in Praecepta's syntax and in strict FEEL alike, and as output expressions have read
+  them since 0.4.0: `\n`, `\r`, `\t`, `\"`, `\\`, `\'`, and a character by its code point (`\u00e9`,
+  `\U01F40E`, or a surrogate pair `\uD83D\uDC0E`). A backslash before any other character is rejected
+  (`\q is not an escape sequence; write \\ for a backslash`), so a quoted Windows path needs its
+  backslashes doubled (`"C:\\temp"`); unquoted words keep their backslashes. `FeelLiterals.literal`, and
+  so `DmnWriter`, writes a line feed, a carriage return and a tab as `\n`, `\r` and `\t` (and the other
+  vertical space, U+000B and U+000C, as code points), since a FEEL string literal may not hold a line
+  break.
 - **Strings are ordered by character** ([#83](https://github.com/brunopacheco1/praecepta/issues/83)):
   comparisons and intervals of strings (`< "N"`, `["A".."M"]`) used Java's `String.compareTo`, which
   compares UTF-16 code units, while FEEL orders strings lexicographically by character, a Unicode code
-  point (DMN 1.5, Table 54 and 10.3.2.3.2). The two differ when a character beyond U+FFFF (an emoji, many
-  CJK ideographs), which UTF-16 writes as two surrogates, meets one from U+E000 to U+FFFF: the cell
+  point (DMN 1.5, Table 54 and 10.3.2.3.2). The two differ when a character beyond U+FFFF (an emoji,
+  many CJK ideographs), which UTF-16 writes as two surrogates, meets one from U+E000 to U+FFFF: the cell
   `< "～"` (U+FF5E) matched `"🐎"` (U+1F40E), and `["～".."🐎"]` was rejected as starting after it ended.
   The new `feel.FeelStrings.compare` orders strings by code point; the index, the validation report's
   examples and `FeelTemporals.compare` use it. Other strings compare as before.
-- **Default output values** ([#79](https://github.com/brunopacheco1/praecepta/issues/79)): `DmnReader`
-  read an output's value list but skipped its `defaultOutputEntry`, so a table that declares a default gave
-  no output when no rule matched, with no warning. DMN 1.5 says the default is then the result (8.2.12;
-  Table 34; 10.3.2.10, step 2: "if a default output value d is specified, DTI=FEEL(d)"), which applies
-  before the hit policy and any aggregation. The engine now returns that default output, converted once
-  when it is built: alone under every hit policy, as the one element of a multi-hit result, and as the
-  result of a COLLECT aggregation, COUNT included (`[Status=Declined, Rate=Standard]` for the TCK's
-  `0108-first-hitpolicy`, rather than `[]`). An output without a default is null in it. Tables without
-  defaults behave as before. `DecisionTable.OutputColumn` gains `defaultValue` (plain text, like a rule's
-  output; the three-argument constructor keeps none), so a record pattern over it needs the new component;
-  `DecisionTable.defaultOutput()` builds the output, and `PraeceptaEngine.Builder.defaultOutput(PraeceptaOutput)`
-  sets one for a table built in code (`table(...)` takes the table's). `DmnReader` reads defaults that are
-  literals of the output's type (`null` is no default) and rejects any other default naming the decision and
-  output, and `DmnWriter` writes them back. The Maven plugin generates the same classes; a DMN table's
-  default reaches its `evaluate`, whose Javadoc then says so, and a time or date-time default counts when
-  deciding whether the output's component has a time zone. Gaps are still reported for a table with a
-  default, since no rule covers them.
 
 ## [0.4.0] - 2026-11-11
 
@@ -489,7 +511,8 @@ Code written against the prototype needs the changes listed under *Changed*.
 - **`MissingOutputException`** (no match now yields an empty result), **`InvalidPraeceptaException`**
   and the trie visitor API.
 
-[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/brunopacheco1/praecepta/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/brunopacheco1/praecepta/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/brunopacheco1/praecepta/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/brunopacheco1/praecepta/compare/v0.1.0...v0.2.0

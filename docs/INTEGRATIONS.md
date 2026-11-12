@@ -4,380 +4,199 @@ SPDX-FileCopyrightText: Bruno Pacheco
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# Framework and build-tool integrations
+# Integrations
 
-The design shared by the integrations of 0.5: the Gradle plugin
-([#18](https://github.com/brunopacheco1/praecepta/issues/18)), GraalVM native images
-([#19](https://github.com/brunopacheco1/praecepta/issues/19)), the Spring Boot starter
-([#20](https://github.com/brunopacheco1/praecepta/issues/20)), the Quarkus extension
-([#76](https://github.com/brunopacheco1/praecepta/issues/76)) and the Micronaut module
-([#77](https://github.com/brunopacheco1/praecepta/issues/77)). It fixes module names, what each module
-depends on, configuration keys, bean naming, how validation is reported and what a failing table does,
-so that the integrations behave alike and can be built independently. Sections marked *planned*
-describe modules that do not exist yet; their authors update them as they land.
-
-## Principles
-1. **The engine stays dependency-free.** Every framework or build tool lives in its own module; nothing
-   is added to `praecepta-engine` but what any Java application could use (such as
-   `DmnReader.readAll`).
-2. **Two shared cores, no framework in either.** Build tools share `praecepta-compiler` (tables to
-   DMN resources and typed records, as the Maven plugin has always done); frameworks share
-   `praecepta-integration` (DMN files to named engines with their reports, at startup).
-3. **DMN at runtime, spreadsheets at build time.** Excel and CSV need Apache POI and a declaration of
-   their hit policy and columns; DMN carries both. Runtime integrations read DMN only and never depend on
-   `praecepta-loader`. Excel and CSV tables reach them through a build plugin (Maven or Gradle), which
-   converts them to DMN resources that a location pattern then finds, or through the Quarkus build step.
-4. **Strict and early.** A table that cannot be read, cannot be built, or has validation issues at the
-   configured severity stops the build (build tools, Quarkus) or the application's startup (Spring,
-   Micronaut), with every problem listed at once. Semantics are those of the engine; no integration
-   adds its own.
-5. **One meaning per setting.** The same keys, defaults and values in every framework (below).
+Praecepta fits the build and the framework an application already uses: a Maven and a Gradle plugin,
+a Spring Boot starter, a Micronaut module, a Quarkus extension, and GraalVM native images. They are
+built to behave alike, so moving a table from one to another changes nothing about what it means or
+how a bad one fails. This document is what they have in common and where they differ; how to set up
+each one is in the README:
+[Maven](../README.md#praecepta-maven-plugin), [Gradle](../README.md#praecepta-gradle-plugin),
+[Spring Boot](../README.md#praecepta-spring-boot-starter), [Micronaut](../README.md#praecepta-micronaut),
+[Quarkus](../README.md#praecepta-quarkus-extension) and [native images](../README.md#native-images).
+Their internals are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Modules
 
-| Module (artifactId) | Directory | Depends on | Status |
+| Module (artifactId) | For | Depends on | Tables are checked |
 |---|---|---|---|
-| `praecepta-engine` | `praecepta-engine` | the JDK | released |
-| `praecepta-loader` | `praecepta-loader` | engine, Apache POI | released |
-| `praecepta-compiler` | `praecepta-compiler` | engine, loader | 0.5 (moved out of the Maven plugin) |
-| `praecepta-integration` | `praecepta-integration` | engine | 0.5 |
-| `praecepta-maven-plugin` | `praecepta-maven-plugin` | compiler; Maven API (`provided`) | released |
-| `praecepta-gradle-plugin` | `praecepta-gradle-plugin` | compiler; Gradle API (`provided`) | 0.5 (#18) |
-| `io.github.brunopacheco1.praecepta.gradle.plugin` (groupId `io.github.brunopacheco1.praecepta`) | `praecepta-gradle-plugin-marker` | gradle plugin (pom only) | 0.5 (#18) |
-| `praecepta-spring-boot-starter` | `praecepta-spring-boot-starter` | integration; Spring Boot (`provided`) | 0.5 (#20) |
-| `praecepta-micronaut` | `praecepta-micronaut` | integration; Micronaut 4 (`provided`) | 0.5 (#77) |
-| `praecepta-quarkus` | `praecepta-quarkus` | integration; `quarkus-arc` (`provided`) | 0.5 (#76) |
-| `praecepta-quarkus-deployment` | `praecepta-quarkus-deployment` | runtime, compiler; `quarkus-arc-deployment` (`provided`) | 0.5 (#76) |
+| `praecepta-maven-plugin` | Maven 3.9+ | `praecepta-compiler`; the Maven API (`provided`) | when the project builds |
+| Gradle plugin `io.github.brunopacheco1.praecepta` (`praecepta-gradle-plugin`) | Gradle 8.5+ | `praecepta-compiler`; the Gradle API (`provided`) | when the project builds |
+| `praecepta-spring-boot-starter` | Spring Boot 4 | `praecepta-integration`; Spring Boot (`provided`) | when the application starts |
+| `praecepta-micronaut` | Micronaut 4 | `praecepta-integration`; Micronaut (`provided`) | when the application starts |
+| `praecepta-quarkus` (and `praecepta-quarkus-deployment`, which Quarkus adds to its build) | Quarkus 3.40+ | `praecepta-integration`; `quarkus-arc` (`provided`) | when Quarkus builds the application |
+| `praecepta-compiler` | writing a build-tool integration | `praecepta-engine`, `praecepta-loader` | when you call it |
+| `praecepta-integration` | using the runtime core without a framework | `praecepta-engine` | when you call it |
 
-All share the groupId `io.github.brunopacheco1` (except the Gradle plugin marker, whose coordinates
-Gradle dictates), the version of the reactor, and the parent POM. Every module is a directory directly
-under the repository root, with the reactor's parent POM as its parent: no nested modules, so the release
-command, Reproducible Central's version rewrite (`pom.xml */pom.xml`) and the website's Javadoc copy
-cover new modules as they are. Java packages are
-`io.github.brunopacheco1.praecepta.<module>` (`compiler`, `integration`, `gradle`, `spring`,
-`micronaut`, `quarkus`, `quarkus.deployment`); no package is split across modules, and each jar has an
-`Automatic-Module-Name` equal to its package. GraalVM support (#19) adds no published module (see
-[Native images](#native-images-19)).
+Every module needs Java 21 or later and is published to Maven Central with the groupId
+`io.github.brunopacheco1` and the same version (the Gradle plugin's marker, which Gradle finds by the
+plugin id, has the groupId `io.github.brunopacheco1.praecepta`). Micronaut 5 needs Java 25, so the module
+targets Micronaut 4. GraalVM native images need no module: the jars carry their own metadata.
 
-## praecepta-compiler: the build-time core
-`praecepta-compiler` is what the Maven plugin's `generate` goal always did, without Maven:
-`TableCompiler.compile(TableDefinition, CompilerOptions)` loads one table (Excel, CSV or DMN),
-validates it as the generated code will bind it, renders it as DMN and generates the
-`<Name>Input` / `<Name>Output` records and the `<Name>` decision class. Build tools only translate
-their configuration and write the result.
+## What they share
+1. **The engine stays dependency-free.** Every build tool and framework has a module of its own;
+   `praecepta-engine` gains nothing a plain Java application could not use.
+2. **Two cores, no framework in either.** The build tools share `praecepta-compiler`: tables to DMN
+   resources and typed records, as the Maven plugin has always done, so the Maven and Gradle plugins
+   generate the same classes byte for byte (but for the tool named in their comments). The frameworks share
+   `praecepta-integration`: DMN files to named engines with their validation reports.
+3. **DMN at runtime, spreadsheets at build time.** Excel and CSV need Apache POI and a declaration of
+   their hit policy and columns; DMN carries both. The framework integrations read DMN only, and never
+   bring Apache POI into an application. Excel and CSV tables reach them through a build plugin, which
+   writes them as DMN resources a location pattern then finds, or through the Quarkus extension, which
+   compiles the tables declared in `application.properties` while it builds the application.
+4. **Strict and early.** A table that cannot be read or built, or that has validation issues at the
+   configured severity, stops the build (Maven, Gradle, Quarkus) or the application's startup (Spring Boot,
+   Micronaut), with every problem listed at once. The engine decides what a table means; no integration
+   adds a meaning of its own.
+5. **The same settings everywhere,** with the same defaults and values (below).
 
-| Type | Role |
-|---|---|
-| `TableDefinition(source, name, decision, hitPolicy, aggregation, inputs, outputs)` | One table, as configured. `TableDefinition.dmn(path)` for a DMN file. A DMN source takes only `source`, `name` and `decision`. |
-| `ColumnDefinition(name, type, allowedValues, priority, list)` | A column of an Excel or CSV table. `ColumnDefinition.of(name, type)`, `ColumnDefinition.listInput(name, type, allowedValues)`. |
-| `CompilerOptions(packageName, failOn, fileHeader, generator, settingNames)` | `CompilerOptions.of(packageName, generator)` fails on ERROR, adds no header and names settings `'quoted'`; `withFailOn`, `withFileHeader`, `withSettingNames`. `generator` is the tool named in the generated files ("Generated by praecepta-gradle-plugin from discount.csv"). `settingNames` maps a setting's canonical name (`table`, `source`, `name`, `decision`, `hitPolicy`, `aggregation`, `inputs`, `outputs`, `list`, `fileHeader`) to the tool's spelling in messages: `CompilerOptions.XML_ELEMENTS` (`<hitPolicy>`) for Maven, `QUOTED` (`'hitPolicy'`) by default, kebab-case for Quarkus properties. |
-| `CompiledTable(table, packageName, className, report, dmn, sources)` | The result. `write(sourceRoot, resourceRoot)` writes the DMN at `resourcePath()` (`com/acme/Discount.dmn`) and each source into the package's directory, and returns the files written. |
-
-Rules for every build tool:
-- `TableCompiler.compile` throws `IllegalArgumentException` with a readable message for any configuration
-  or table mistake, and for validation issues at `failOn`; the tool turns it into its build failure,
-  unchanged.
-- The tool logs every issue of `report()` as a warning, prefixed with the class name, as the Maven plugin
-  does (`Fees: WARNING rule 3 can never be selected`).
-- The tool rejects two tables that generate the same class: `Two tables generate the class <X>; set
-  <name> on one` (with the tool's spelling of `name`).
-- Relative sources are resolved against the project directory. Generated sources and resources go to the
-  tool's generated-sources and generated-resources directories, registered with the build so they are
-  compiled and packaged. Files are written only through `CompiledTable.write`, so anything the compiler
-  later adds (such as native-image metadata, #19) reaches every tool.
-- Same tables, same options: same bytes. The compiler's golden files
-  (`praecepta-compiler/src/test/resources/golden`) pin the Maven plugin's output; the Gradle plugin's
-  tests compare against them with `generator` set to `praecepta-maven-plugin`, or against their own
-  golden files that differ only in that name.
-- Configuration names follow the Maven plugin's: `packageName`, `failOn` (`ERROR`, `WARNING`, `NONE`),
-  `fileHeader`, `skip`, and per table `source`, `name`, `decision`, `hitPolicy`, `aggregation`,
-  `inputs`/`outputs` with `name`, `type`, `allowedValues`, `priority`, `list`. Where a tool's own
-  conventions take one of these words, it says so (the Gradle plugin's `className`, below).
-
-## praecepta-integration: the runtime core
-`praecepta-integration` (engine only, no framework) turns DMN files into engines the way every framework
-integration does:
-
-| Type | Role |
-|---|---|
-| `TableSource(location, opener)` | A DMN file: where it is (for messages and reports) and how to open it. `TableSource.of(Path)`, `of(URL)`, `of(location, bytes)`. Frameworks turn their own resources into these. |
-| `TableLocations` | Finds DMN files by pattern on the class path (directories and jars, and a native image's `resource:` file system) or the file system: `find(patterns, classLoader)`, `split("a,b")`, `Location.parse(pattern).matches(path)`. `TableLocations.DEFAULT` is the default pattern. |
-| `Decision(name, location, table, engine, report)` | One decision with its map-based engine; `Decision.of(location, table)` builds it; `describe()` gives it as plain maps for an endpoint. |
-| `Decisions` | The application's decisions by name: `Decisions.load(sources, failOn)`, `get(name)`, `find(name)`, `engine(name)`, `evaluate(name, input)`, `names()`, `all()`, `describe()`, `Decisions.failOn("ERROR")`. Immutable and thread-safe. |
-| `DecisionsException` | Everything that went wrong while loading, as `problems()` (`<location>: <what>`), all at once. |
-
-### From a file to engines
-- Every decision table of every DMN file found becomes one `Decision`, read with `DmnReader.readAll`.
-  A file with no decision table, or one the engine cannot read (including decisions that need other
-  decisions, #14), is an error; so are two decisions with the same name, in one file or two.
-- **Inputs are bound as a map.** An engine has the type
-  `PraeceptaEngine<Map<String, String>, Map<String, String>>`: the input maps column names to values as
-  text (`"42"`, `"2025-01-31"`, `"08:30Z"`, `["PT", "BR"]` for a list column), read with the column types
-  the DMN declares, exactly as `PraeceptaEngine.Builder.inputs(...)` reads them; a missing or blank value
-  is a missing input. Each output map holds one matching rule's outputs (a missing computed output maps to
-  null), in the hit policy's order. Under a COLLECT aggregation (one NUMBER output, as the build plugins
-  require), the one map holds the aggregate: SUM adds with FEEL's 34 digits, MIN and MAX return the
-  rule's output as written, missing values are skipped, COUNT is the number of matches. When no rule
-  matches, a table whose outputs declare default values (`defaultOutputEntry`) gives one map of them, null
-  for an output without one, whatever its hit policy or aggregation (DMN 1.5, 10.3.2.10).
-- **Typed records stay a build-time feature.** The classes the Maven and Gradle plugins generate are
-  static (`Discount.evaluate(...)`, `Discount.engine()`) and need no container; an application that wants
-  one injected declares it as a bean itself. Integrations do not scan for generated classes. The DMN
-  resources those plugins write are ordinary DMN files, so a location pattern that covers their package
-  (`classpath*:com/acme/pricing/*.dmn`) also gives them map-based engines.
-- **Validation** runs when an engine is built; its report is that of the map-based engine (times and
-  date-times may have a time zone or not, so gaps are looked for among both kinds). Issues at
-  `fail-on` or above fail `Decisions.load`; the others are logged as warnings by the framework, one line
-  per issue, prefixed with the decision's name.
+## Inputs and outputs
+The build plugins generate typed records (`DiscountInput`, `DiscountOutput`) and a static class
+(`Discount.evaluate(...)`); see the [Maven plugin](../README.md#praecepta-maven-plugin). The framework
+integrations find their tables at runtime, so their engines take maps instead:
+- **Every decision table of every DMN file found becomes one decision**, and one engine of type
+  `PraeceptaEngine<Map<String, String>, Map<String, String>>`. A file with no decision table, or with one the
+  engine cannot read (including decisions that need other decisions,
+  [#14](https://github.com/brunopacheco1/praecepta/issues/14)), is an error; so are two decisions with the
+  same name, in one file or two.
+- **Inputs** map column names to values as text, read with the column types the DMN declares, as
+  `PraeceptaEngine.Builder.inputs(...)` reads them: `"42"`, `"2025-01-31"`, `"08:30Z"`, `["PT", "BR"]` for
+  a list column. A missing or blank value is a missing input.
+- **Outputs** are one map per matching rule, in the hit policy's order (an output that is missing, such as
+  an expression with a missing operand, maps to null). Under a COLLECT aggregation, the one map holds the
+  aggregate: SUM adds with FEEL's 34 digits, MIN and MAX return the rule's output as written, missing values
+  are skipped, and COUNT is the number of matches. When no rule matches, a table whose outputs declare
+  default values (`defaultOutputEntry`) gives one map of them, null for an output without one, whatever its
+  hit policy or aggregation (DMN 1.5, 10.3.2.10).
+- **Validation** is that of the map-based engine. Times and date-times read from text may have a time zone
+  or not, so gaps are looked for among both kinds.
+- **Generated classes are not beans.** They are static and need no container; declare one as a bean
+  yourself if you want it injected. The DMN resources the build plugins write are ordinary DMN files, so a
+  location pattern that covers their package (`classpath*:com/acme/pricing/*.dmn`) gives them map-based
+  engines too.
 
 ## Configuration
-The same keys everywhere: Spring Boot and Micronaut read them under `praecepta`, Quarkus under
-`quarkus.praecepta` (its convention for extensions), where both are fixed at build time.
+Spring Boot and Micronaut read these keys under `praecepta`; Quarkus reads them under `quarkus.praecepta`,
+its prefix for extensions, and fixes them when it builds the application.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `praecepta.enabled` | `true` | Spring Boot and Micronaut only: `false` turns the integration off (no beans, no endpoint). Quarkus has none: remove the extension. |
-| `praecepta.locations` | `classpath*:rules/**/*.dmn` (`TableLocations.DEFAULT`) | The DMN files to load: a comma-separated list (or a YAML list) of patterns. `classpath:` and `classpath*:` both search every class path root (Spring Boot rewrites `classpath:` to `classpath*:` before using its own resolver), `file:` the file system; `*` matches within a path segment, `**` across segments. |
-| `praecepta.fail-on` | `ERROR` | The validation severity that stops startup (Spring Boot, Micronaut) or the build (Quarkus): `ERROR`, `WARNING` or `NONE`, in any case; parse it with `Decisions.failOn`, which rejects anything else. Unreadable or invalid tables fail whatever it says. |
+| `praecepta.enabled` | `true` | Spring Boot and Micronaut: `false` turns the integration off (no beans, no endpoint). Quarkus has no such key: remove the extension instead. |
+| `praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load: a comma-separated list (or a YAML list) of patterns. `classpath:` and `classpath*:` both search every class path root, directories and jars; `file:` searches the file system. `*` matches within a path segment, `**` across segments. |
+| `praecepta.fail-on` | `ERROR` | The validation severity that stops startup (Spring Boot, Micronaut) or the build (Quarkus): `ERROR`, `WARNING` or `NONE`, in any case. Tables that cannot be read or built fail whatever it says. |
 
-A pattern that matches nothing is an error when `praecepta.locations` was set explicitly (the message
-names the pattern); with the default, finding nothing gives an empty `Decisions` and an INFO log line.
-The three frameworks word these problems alike and list them in the one `DecisionsException`, together
-with the tables' problems:
-- `<pattern>: no DMN file matches this location` for an explicit pattern that finds nothing;
+With the default location, finding no file gives no decisions and the INFO line
+`No decision tables found at <patterns>`. A location you set yourself must find something. The three
+frameworks word their problems alike, and list them together with the tables' own problems:
+- `<pattern>: no DMN file matches this location`, for a location you set that finds nothing;
 - `praecepta.locations is set but names no location` (Spring Boot and Micronaut; Quarkus reads an empty
   value as unset);
-- `Location '<pattern>': expected classpath:, classpath*: or file:` for a malformed pattern;
+- `Location '<pattern>': expected classpath:, classpath*: or file:`, for a malformed pattern;
 - `praecepta.fail-on must be ERROR, WARNING or NONE, not <value>` (`quarkus.praecepta.fail-on` in
   Quarkus); the tables are then still loaded and checked at `ERROR`, so their problems are listed too.
 
-The INFO line is `No decision tables found at <patterns>`.
-Integrations add no other key without updating this table. The Quarkus extension adds one: build-time
-declarations of Excel and CSV tables under `quarkus.praecepta.tables."<key>"`, mirroring
-`TableDefinition` in kebab-case (`source`, `decision`, `hit-policy`, `aggregation`, and
-`inputs[n]`/`outputs[n]` with `name`, `type`, `allowed-values`, `priority`, `list`). The key only groups
-a table's settings: the decision is named after the file, as a build plugin names it, and `name` and
-`file-header` have no meaning without generated classes. A relative `source` is resolved against the
-project's directory.
+The Quarkus extension has one more setting: Excel and CSV tables to compile while it builds the
+application, under `quarkus.praecepta.tables."<key>"`, with the Maven plugin's settings in kebab-case
+(`source`, `decision`, `hit-policy`, `aggregation`, and `inputs[n]`/`outputs[n]` with `name`, `type`,
+`allowed-values`, `priority`, `list`). The key only groups a table's settings: the decision is named after
+the file, as a build plugin names it. A relative `source` is resolved against the project's directory.
 
-## Beans and names
+The build plugins' settings are the Maven plugin's in every tool: `packageName`, `failOn` (`ERROR`,
+`WARNING`, `NONE`), `fileHeader`, `skip`, and per table `source`, `name`, `decision`, `hitPolicy`,
+`aggregation`, and the columns' `name`, `type`, `allowedValues`, `priority` and `list`. In Gradle, `name`
+is the name a table is registered under, so the generated class is named by `className`.
+
+## Names and beans
 - **A decision's name** is the DMN decision's `name` attribute (its `id` when it has none), exactly as
-  written: `Discount`, `Credit Score`. A table compiled by a build plugin keeps its table name (the CSV
-  file name without extension, or the DMN decision's name), not its generated class name.
-- **Every framework registers one `Decisions` bean** (Spring bean name `praeceptaDecisions`), created at
-  startup, never lazily: Micronaut makes it `@Context`, Spring a non-lazy singleton, Quarkus a
-  `@Startup`-initialised `@Singleton` bean. This is the portable way in:
-  `decisions.evaluate("Discount", Map.of("country", "PT"))`.
-- **Each decision is also an engine bean** of type
-  `PraeceptaEngine<Map<String, String>, Map<String, String>>`, qualified by the decision's name:
-  - Spring Boot: injected with `@Qualifier("Discount")`; the bean is named `praecepta.Discount` (so a
-    table cannot clash with another bean) and carries the qualifier `Discount`, with its generic type set
-    (`ResolvableType`). It carries `jakarta.inject.Named` with the same value too, so `@Named("Discount")`
-    works when the application has `jakarta.inject-api`.
-  - Micronaut: `@Named("Discount")` (`Qualifiers.byName`), registered before the application's beans are
-    created; if Micronaut cannot do that for files found at runtime, the module offers only `Decisions`
-    and says so in its README section.
-  - Quarkus: `@Identifier("Discount")` on `@Singleton` synthetic beans produced at build time (`@Named`
-    works too). `PraeceptaEngine` is a final class, so it cannot have the client proxy a normal scope such
-    as `@ApplicationScoped` needs; engines are immutable, so a singleton behaves the same.
-- So `@Named("Discount")` injects an engine in all three frameworks.
-- Nothing is registered for typed records or generated classes (see above).
+  written: `Discount`, `Credit Score`. A table the Quarkus extension compiles from a spreadsheet is named
+  after the file, without its extension.
+- **Every framework registers one `Decisions` bean**, created at startup, never lazily (in Spring Boot,
+  named `praeceptaDecisions`). It works the same everywhere:
+  `decisions.evaluate("Discount", Map.of("country", "PT"))`, `decisions.names()`,
+  `decisions.get("Discount").report()`.
+- **Each decision is also an engine bean**, qualified by the decision's name:
+
+  | | Inject with | Notes |
+  |---|---|---|
+  | Spring Boot | `@Qualifier("Discount")` | The bean is named `praecepta.Discount`, so a table cannot clash with another bean. `@Named("Discount")` works too when the application has `jakarta.inject-api`. |
+  | Micronaut | `@Named("Discount")` | Registered before the application's own beans are created, so context-scoped beans can inject it too. |
+  | Quarkus | `@Identifier("Discount")` or `@Named("Discount")` | A `@Singleton`: an engine is immutable, and `PraeceptaEngine`, a final class, cannot have the client proxy of a normal scope. |
+
+  So `@Named("Discount")` injects an engine in all three.
 
 ## Reports and failures
 
 | | Spring Boot | Micronaut | Quarkus |
 |---|---|---|---|
-| Where validation runs | startup | startup | build (`quarkus:build`, dev mode, tests) |
-| A failing table | context fails to start with the `DecisionsException` (a `FailureAnalyzer` may format it) | context fails to start | the build fails with the `DecisionsException` message |
-| Warnings | logged at startup | logged at startup | logged by the build step |
-| Report endpoint | Actuator endpoint `praecepta` (`/actuator/praecepta`, and `/actuator/praecepta/{name}` for one decision), when Actuator is present; exposed under Actuator's usual rules | management endpoint `praecepta` (`/praecepta`, `/praecepta/{name}`), when `micronaut-management` is present | `Decisions` at runtime (`describe()`, `get(name).report()`); no Dev UI card or `/q/praecepta` route yet, since a route would make the extension depend on `quarkus-vertx-http` |
+| Validation runs | at startup | at startup | while Quarkus builds the application (`quarkus:build`, dev mode, tests) |
+| A failing table | the application does not start; Spring Boot's failure report lists every problem | the application does not start, with every problem in one `DecisionsException` | the build fails, listing every problem |
+| Other issues | logged as warnings at startup | logged as warnings at startup | logged as warnings by the build |
+| Report endpoint | Actuator endpoint `praecepta` (`/actuator/praecepta`, `/actuator/praecepta/{name}`), exposed under Actuator's usual rules | management endpoint `praecepta` (`/praecepta`, `/praecepta/{name}`) with `micronaut-management`, sensitive by default | none yet; `decisions.describe()` gives the same at runtime |
 
-The endpoints return `Decisions.describe()` (`{"decisions": {"Discount": {...}}}`) and
-`Decision.describe()` for one decision (404 for an unknown name): `name`, `location`, `hitPolicy`,
-`aggregation`, `rules`, `inputs` and `outputs` (`name`, `type`, and `list` for inputs) and `issues`
-(`severity`, `kind`, `rules`, `detail`, `example`, `message`). They only read; nothing evaluates through
-them. In Quarkus the runtime builds engines from the DMN the build step validated (written into the
-application as generated resources, `META-INF/praecepta/tables/<n>.dmn`, registered for native images),
-with `fail-on` already enforced, so it cannot fail differently at runtime.
+Warnings are one line per issue, prefixed with the decision's name:
+`Discount: WARNING rule 3 can never be selected`. The endpoints return `Decisions.describe()`,
+`{"decisions": {"Discount": {...}}}`, or one decision's description (404 for an unknown name): `name`,
+`location`, `hitPolicy`, `aggregation`, `rules` (the number of rules), `inputs` and `outputs` (`name`,
+`type`, and `list` for inputs), and `issues` (`severity`, `kind`, `rules`, `detail`, `example`,
+`message`). They only read; nothing is evaluated through them. The descriptions show the rules'
+conditions, so expose the endpoints as you would any other that shows configuration.
 
-## Per integration
-### Gradle plugin (#18)
-- Plugin id `io.github.brunopacheco1.praecepta`, class `io.github.brunopacheco1.praecepta.gradle.PraeceptaPlugin`,
-  extension `praecepta { packageName; failOn; fileHeader; skip; tables { register("discount") { source;
-  className; decision; hitPolicy; aggregation; inputs { column("country") { type; allowedValues; list } };
-  outputs { column("tier") { type; priority } } } } }`, task `generatePraecepta` (type `GeneratePraecepta`,
-  cacheable, inputs: the table files by name and content and the settings; outputs:
-  `build/generated/sources/praecepta/java/main` and `build/generated/resources/praecepta/main`, added to
-  the `main` source set so `compileJava` and `processResources` depend on it). Works with the
-  configuration cache.
-- **`className` instead of `name`.** In a Gradle container, `name` is the name an element is registered
-  under (`register("discount")`), read-only, so a table's generated class is named by `className`, which
-  is what the Maven plugin's `<name>` sets (and defaults the same way). Messages name it `'className'`
-  (`Two tables generate the class Fees; set 'className' on one`); the registered name appears only in
-  Gradle's own messages. A column's name is the argument of `column(...)`, since the columns are a list
-  in declaration order, not a container. Values are the Maven plugin's text (`hitPolicy = "FIRST"`,
-  `type = "NUMBER"`), in any case.
-- `skip` defaults to the Gradle property `praecepta.skip` (`-Ppraecepta.skip=true`), as the Maven plugin's
-  does to the user property. Each run empties both output directories first, so a removed table leaves no
-  class behind; a skipped run leaves them empty.
-- Built by the Maven reactor like every other module: compiled against the Gradle API from Maven Central
-  (`dev.gradleplugins:gradle-api` 8.11.1, the last that gradleplugins.dev published, `provided`), with
-  `META-INF/gradle-plugins/io.github.brunopacheco1.praecepta.properties`. The plugin uses only API that
-  Gradle 8.5 to 9 share; 8.5 is the oldest it supports, the first Gradle that runs on Java 21.
-- Unit tests run in the default `mvn verify` with an in-process project (`ProjectBuilder`, which needs
-  `--add-opens java.base/java.lang` and a few Groovy modules on the test class path). Functional tests
-  (Gradle TestKit, which downloads a Gradle distribution) run with `-P gradle-functional`: the invoker
-  installs this build's artifacts into `target/it-repo`, the tests add the marker POM to it, and small
-  projects apply the plugin by id and version from there (and Maven Central, for the BOMs third-party POMs
-  import), compile and run the generated classes, compare them with the compiler's golden files, and
-  check the build cache (from another directory), the configuration cache, failures and `skip`, with
-  `--warning-mode=fail`. They run in `gradle-versions.yml` (Gradle 8.5 and 8.14.7 on Java 21, 9.9.1 on
-  Java 25: pull requests touching the Gradle plugin, its marker, the compiler, loader or engine sources
-  or their POMs, main, weekly), not in the default `mvn verify`.
-- Published to Maven Central only, with the plugin marker artifact so that `plugins { id(...) version
-  "..." }` resolves from `mavenCentral()` in `pluginManagement`; the Gradle Plugin Portal is not used.
+In Quarkus, the application builds its engines from the DMN the build validated, so it cannot fail
+differently at runtime.
 
-### Native images (#19)
-- **No new module.** The test project is `praecepta-maven-plugin/src/it/native-app`, an invoker project:
-  an application that uses the engine (`DmnReader`, `DmnWriter`, map-based engines), the loader (CSV), the
-  integration core (`TableLocations.DEFAULT`, `Decisions`) and two classes the plugin generates (from a CSV
-  and a DMN table), and checks every answer. The default `mvn verify` runs those checks on the JVM in a few
-  seconds; the plugin's `native` profile (`-Pnative`) also builds the project with GraalVM's
-  `native-maven-plugin` and runs the executable.
-- **Workflow `native.yml`** runs `mvn -pl praecepta-maven-plugin -am verify -Pnative` with GraalVM for JDK
-  21 and 25, set up by `graalvm/setup-graalvm` (the task that built it asked for that action rather than the
-  container image this section first named; locally the same build runs in
-  `ghcr.io/graalvm/native-image-community`). It runs on pull requests touching the engine, loader,
-  compiler, integration or Maven plugin sources, the test project, a POM or the workflow; on main; and
-  weekly; superseded runs are cancelled. On GraalVM for JDK 24 and later the test project builds with
-  `--exact-reachability-metadata`, so a resource that no metadata registers fails the run instead of
-  reading as absent.
-- **Metadata** lives in the jars, as `META-INF/native-image/io.github.brunopacheco1/<artifactId>/resource-config.json`
-  (the format GraalVM for JDK 21 reads too), and reaches every native build that has the jar on its class
-  path, whatever runs `native-image`:
-  - `praecepta-engine`: the JDK XML parser's message bundle (without it a malformed DMN file fails with a
-    `MissingResourceException`), and JAXP's `DocumentBuilderFactory` service file (needed under
-    `--exact-reachability-metadata` only).
-  - `praecepta-integration`: `rules` and `rules/**/*.dmn`, the files of `TableLocations.DEFAULT`. A framework
-    module whose `praecepta.locations` names other files registers those through its own native support
-    (Spring's `RuntimeHints`, Micronaut's resource configuration, Quarkus's
-    `NativeImageResourceBuildItem`); with the default it needs nothing.
-  - `praecepta-compiler` writes none, and the golden files are unchanged: the generated classes read their
-    DMN through `getResourceAsStream` with a constant name, which `native-image` registers by itself
-    (verified on GraalVM for JDK 21 and, under `--exact-reachability-metadata`, 25). `CompiledTable.write`
-    stays the place to add some if a GraalVM release stops doing that.
-- **Excel is not supported natively.** `ExcelLoader` fails on the first workbook (Apache POI needs the
-  `CP1252` charset, XMLBeans' message bundles and its schema type system), and GraalVM's shared metadata
-  repository has no entry for Apache POI. Spreadsheets reach a native executable as DMN, compiled at build
-  time, as principle 3 already has it.
-- **No reflection:** the engine needs none. Framework modules keep to that.
-- **Framework modules are not built natively yet.** `native.yml` covers what goes into every native
-  executable (the engine, the CSV loader, the integration core and generated classes); the Spring Boot,
-  Micronaut and Quarkus modules use no reflection and rely on the integration core's metadata for the
-  default location, but no CI job builds an application with them. The next step for each is a small
-  application built by its own tooling in `native.yml`, kept out of the default `mvn verify`: Spring
-  Boot's AOT processing (`process-aot`, which runs `DecisionsRegistrar` at build time and must be able to
-  write its instance suppliers as code), Micronaut's `native-image` packaging, and Quarkus' `-Dnative`
-  with `quarkus.native.container-build=false` on the runner's GraalVM, running a
-  `@QuarkusIntegrationTest` or the executable to check that an injected engine evaluates (the extension
-  reads the tables during static init, so the engines live in the image heap).
+## Without a framework
+`praecepta-integration` is what the framework integrations use, and works on its own:
 
-### Spring Boot starter (#20)
-- One module, `praecepta-spring-boot-starter` (auto-configuration and starter together), package
-  `io.github.brunopacheco1.praecepta.spring`: `PraeceptaAutoConfiguration` (listed in
-  `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`,
-  `@ConditionalOnProperty(praecepta.enabled, matchIfMissing)`), `PraeceptaProperties`
-  (`@ConfigurationProperties("praecepta")`, with configuration metadata), and the Actuator endpoint in a
-  nested configuration conditional on Actuator. Resources are found with Spring's
-  `ResourcePatternResolver`, so nested jars of executable jars work.
-- Built against Spring Boot 4 (the BOM imported in the module, version `spring-boot.version` in the
-  parent), every Spring dependency `provided`.
-- **Tables are loaded while bean definitions are registered** (an `ImportBeanDefinitionRegistrar`), since
-  each decision becomes a bean of its own: the registrar binds `praecepta.*` with Spring's `Binder`, finds
-  the files, runs `Decisions.load`, and registers `praeceptaDecisions` and the `praecepta.<name>` engines
-  (qualifier and generic type set) as non-lazy beans that return what it loaded. A failure therefore stops
-  the context's refresh before any application bean is created; `PraeceptaFailureAnalyzer` lists the
-  problems in Spring Boot's "APPLICATION FAILED TO START" report.
-- The endpoint's `@Selector` parameter is found by name, so the module compiles with `-parameters`.
+```java
+var sources = TableLocations.find(List.of("classpath*:rules/**/*.dmn"), getClass().getClassLoader());
+var decisions = Decisions.load(sources, Severity.ERROR);       // throws DecisionsException
+List<Map<String, String>> discount = decisions.evaluate("Discount", Map.of("country", "PT", "age", "42"));
+```
 
-### Micronaut module (#77)
-- `praecepta-micronaut`, package `io.github.brunopacheco1.praecepta.micronaut`: a `@Factory`
-  (`PraeceptaFactory`), `@ConfigurationProperties("praecepta")` configuration (`PraeceptaConfiguration`),
-  and a management endpoint (`PraeceptaEndpoint`) when `micronaut-management` is present. Files are found
-  with `TableLocations` and the application's class loader. Micronaut's annotation processors must not make
-  the compiler warn (the build uses `-Werror`); they write bytecode, not sources, so they do not.
-- Built against Micronaut 4 (the platform BOM `io.micronaut.platform:micronaut-platform`, imported in the
-  module only). Micronaut 5 needs Java 25, above the project's baseline.
-- **Engine beans.** The `Decisions` bean is `@Context` with `@Order(Ordered.HIGHEST_PRECEDENCE)`, so it is
-  the first context-scoped bean created. While it is created, it registers a singleton
-  `RuntimeBeanDefinition` per decision, typed with the engine's generic type and qualified with
-  `Qualifiers.byName(<name>)`. Every application bean, context-scoped ones included, can therefore inject
-  the engines with `@Named`, so the fallback above (`Decisions` only) is not needed.
-- **The endpoint** keeps Micronaut's default for endpoints, `sensitive`, since the reports show the
-  rules' conditions: `endpoints.praecepta.sensitive: false` opens it, or Micronaut Security guards it.
-  An unknown name answers 404 (the read method returns null).
+| Type | Role |
+|---|---|
+| `TableLocations` | Finds DMN files by pattern on the class path (directories, jars, and a native image's resources) or the file system: `find(patterns, classLoader)`, `split("a,b")`, `Location.parse(pattern).matches(path)`. `TableLocations.DEFAULT` is the default pattern. |
+| `TableSource` | A DMN file: where it is (for messages and reports) and how to open it. `TableSource.of(Path)`, `of(URL)`, `of(location, bytes)`. |
+| `Decisions` | The decisions by name: `Decisions.load(sources, failOn)`, `get(name)`, `find(name)`, `engine(name)`, `evaluate(name, input)`, `names()`, `all()`, `describe()`; `Decisions.failOn("ERROR")` reads a severity as the settings above do. Immutable and thread-safe. |
+| `Decision` | One decision: its `name`, `location`, `table`, `engine` and validation `report`; `describe()` as plain maps. |
+| `DecisionsException` | Everything that went wrong while loading, as `problems()` (`<location>: <what>`), all at once. |
 
-### Quarkus extension (#76)
-- `praecepta-quarkus` (runtime: `PraeceptaRecorder`) and `praecepta-quarkus-deployment` (build steps:
-  `PraeceptaProcessor`; configuration: `PraeceptaBuildTimeConfig`), built with
-  `quarkus-extension-maven-plugin`, side by side under the repository root (the Quarkus BOM imported in
-  each module's own `<dependencyManagement>`).
-- The deployment module finds DMN files with `Location.matches` in the application's own archive, the
-  other application archives and every runtime dependency (the class path the application will have,
-  not the build's), and `file:` patterns with `TableLocations`. It compiles the declared Excel and CSV
-  tables with `praecepta-compiler` (so Apache POI stays in the deployment module), validates everything
-  with `Decisions.load` at build time, logs the remaining issues, writes the validated DMN into the
-  application as generated resources (registered for native images), and produces the `Decisions` and
-  engine beans from a `STATIC_INIT` recorder.
-- Dev mode restarts the application when a file a class path pattern matches changes or appears, or
-  when a `file:` table or a declared spreadsheet changes; a table that fails shows on the error page.
-- `quarkus-arc` and `quarkus-arc-deployment` are `provided`: every Quarkus application has them, and
-  their tree (Jakarta APIs under EPL-2.0, GraalVM's SDK under UPL-1.0) is outside the licence allowlist.
-- Tested with `QuarkusExtensionTest` (Quarkus 3.35 deprecated `QuarkusUnitTest` for removal, which
-  `-Werror` rejects) and `QuarkusDevModeTest`, in the default `mvn verify` (about 20 seconds); no
-  production-mode or native test yet (see Native images).
+## Writing a build-tool integration
+`praecepta-compiler` is what the Maven plugin's `generate` goal does, without Maven: it loads a table
+(Excel, CSV or DMN), validates it as the generated code will bind it, renders it as DMN, and generates
+the `<Name>Input` and `<Name>Output` records and the `<Name>` class. A build tool translates its own
+configuration and writes the result.
 
-## Registering a module
-New modules need these and nothing else:
-1. **Reactor:** a `<module>` line in the parent POM, after `praecepta-maven-plugin` and before
-   `praecepta-benchmarks` (several integrations land at once, so expect, and simply resolve, conflicts in
-   that list). The module is a directory under the repository root and its parent is the reactor's
-   parent POM (`../pom.xml`).
-2. **Versions:** every dependency and plugin version is a property in the parent POM, in a block
-   commented with the issue (`<!-- Spring Boot starter (#20) -->`), and only exact, current, stable
-   releases from Maven Central. A framework BOM is imported in the module's own `<dependencyManagement>`
-   (importing it in the parent would change the versions every other module resolves), with its version
-   property in the parent. The enforcer's `dependencyConvergence` applies to every module.
-3. **Publishing:** nothing to list. The release builds every module but the benchmarks and the TCK runner
-   (`-pl '!praecepta-benchmarks,!praecepta-tck'`) and publishes every one that does not opt out; the
-   GitHub release, provenance and third-party notices find the published jars themselves
-   (`.github/scripts/published_modules.py`). A module that must never be published (test projects,
-   samples) sets `skipPublishing`, `maven.deploy.skip`, `maven.install.skip` and `cyclonedx.skip` to
-   `true`, as `praecepta-tck` does; it is still built and tested in the release.
-4. **SBOM and licences:** every published module writes `target/bom.json`, and CI checks all of them
-   against the allowlist in `.github/scripts/check_sbom_licenses.py` and scans them for known
-   vulnerabilities, without being told about new modules. Framework dependencies the application always
-   has (Spring Boot, Micronaut, Quarkus' ArC, the Gradle and Maven APIs) are `provided` (or optional), so they are not
-   part of what Praecepta ships. Do not widen the allowlist in an integration's change: report a
-   dependency it rejects to the maintainer.
-5. **API documentation:** the website publishes every published module's Javadoc at
-   `api/<directory without "praecepta-", "/" as "-">` (`api/spring-boot-starter`, `api/quarkus`)
-   with no change to `pages.yml`; linking it from the website is part of release preparation.
-6. **CI load:** the default `mvn verify` (every pull request, on Java 21, 25 and 27) runs a module's fast
-   tests only, seconds not minutes. Slow checks (other Gradle or framework versions, native images,
-   Quarkus production-mode integration tests) get their own workflow that runs on pull requests only when
-   the module's paths (or what it is built from) change, always on main and weekly, and cancels
-   superseded runs, as `maven-versions.yml` does. The required checks (Build & test (Java 25),
-   SonarCloud, REUSE compliance, CodeQL, Dependency review) need no change.
-7. **Files:** SPDX headers on every new file (`mvn license:format` for Java and POMs; data files are
-   covered by `REUSE.toml` patterns such as `**/*.dmn`), `reuse lint` clean; Checkstyle and `-Werror`
-   as for every module.
-8. **Documentation:** a section in the README after the Maven plugin's, a row in the modules table of
-   `docs/ARCHITECTURE.md`, a line under `## [Unreleased]` in `CHANGELOG.md`, Javadoc on public types, and
-   the module's status in this document.
+| Type | Role |
+|---|---|
+| `TableDefinition(source, name, decision, hitPolicy, aggregation, inputs, outputs)` | One table, as configured; `TableDefinition.dmn(path)` for a DMN file, which takes only `source`, `name` and `decision`. |
+| `ColumnDefinition(name, type, allowedValues, priority, list)` | A column of an Excel or CSV table; `ColumnDefinition.of(name, type)`, `ColumnDefinition.listInput(name, type, allowedValues)`. |
+| `CompilerOptions(packageName, failOn, fileHeader, generator, settingNames)` | `CompilerOptions.of(packageName, generator)` fails on ERROR and adds no header; `withFailOn`, `withFileHeader`, `withSettingNames`. `generator` is the tool named in the generated files ("Generated by praecepta-gradle-plugin from discount.csv"); `settingNames` spells the settings in messages as the tool does: `CompilerOptions.XML_ELEMENTS` (`<hitPolicy>`) for Maven, `QUOTED` (`'hitPolicy'`) by default. |
+| `CompiledTable(table, packageName, className, report, dmn, sources)` | The result. `write(sourceRoot, resourceRoot)` writes the DMN at `resourcePath()` (`com/acme/Discount.dmn`) and each source in its package's directory, and returns the files written. |
 
-## Reproducible Central
-The release command changed in 0.5 from a list of modules (`-pl praecepta-engine,praecepta-loader,praecepta-maven-plugin -am`)
-to everything but the benchmarks and the TCK runner (`-pl '!praecepta-benchmarks,!praecepta-tck'`), so
-Reproducible Central's `.buildspec` needs that change once, for 0.5.0; after that, new modules need no
-change there either. See [RELEASING.md](RELEASING.md).
+What the Maven and Gradle plugins do, and another tool should too:
+- `TableCompiler.compile` throws `IllegalArgumentException` with a readable message for any mistake in
+  the configuration or the table, and for validation issues at `failOn`; the tool reports it as its build
+  failure, unchanged.
+- Every other issue of `report()` is logged as a warning, prefixed with the class name
+  (`Fees: WARNING rule 3 can never be selected`).
+- Two tables that generate the same class are rejected: `Two tables generate the class <X>; set <name> on
+  one`, with the tool's spelling of `name`.
+- Relative sources are resolved against the project directory, and the results go to the tool's
+  generated-sources and generated-resources directories, registered with the build so that they are
+  compiled and packaged. Files are written only through `CompiledTable.write`.
+
+## Native images
+The jars carry the reachability metadata they need, under
+`META-INF/native-image/io.github.brunopacheco1/<artifactId>/resource-config.json`: the engine registers
+the XML parser's messages, and `praecepta-integration` the files of the default location,
+`rules/**/*.dmn`. So an application with its tables there needs no configuration for Praecepta. The
+framework integrations use no reflection; register tables at other locations yourself, through the
+framework's own native support (Spring's `RuntimeHints`, Micronaut's resource configuration) or a
+`resource-config.json` of the application's. The Quarkus extension registers the tables it validated
+itself. CI builds and runs a native application that uses the
+engine, the CSV loader, `praecepta-integration` and generated classes, with GraalVM for JDK 21 and 25; it
+does not build a Spring Boot, Micronaut or Quarkus application natively yet. `ExcelLoader` does not work
+in a native image: compile Excel tables at build time. Details are in the
+[README](../README.md#native-images).

@@ -27,9 +27,13 @@ builds an engine once and calls it.
 | `praecepta-benchmarks` | engine, Camunda 8, Drools, JMH | Compares Praecepta with other engines; not published. |
 | `praecepta-tck` | engine | Runs the DMN TCK's decision-table cases; not published. |
 
-The framework and build-tool integrations of 0.5 (Gradle, Spring Boot, Micronaut, Quarkus, native
-images) build on `praecepta-compiler` and `praecepta-integration`; their shared design (module names,
-configuration keys, bean names, reports, failures) is in [INTEGRATIONS.md](INTEGRATIONS.md).
+The build-tool and framework integrations build on `praecepta-compiler` and `praecepta-integration`, so
+that they behave alike; what they share (settings, bean names, reports, failures) is in
+[INTEGRATIONS.md](INTEGRATIONS.md). Every module is a directory directly under the repository root, with
+the reactor's POM as its parent, and its Java package is `io.github.brunopacheco1.praecepta.<module>`
+(`engine`, `loader`, `compiler`, `integration`, `maven.plugin`, `gradle`, `spring`, `micronaut`,
+`quarkus`, `quarkus.deployment`); no package is split across modules, and each jar has an
+`Automatic-Module-Name` equal to its package.
 
 ## From a table to an answer
 
@@ -183,6 +187,20 @@ decision (`RuntimeBeanDefinition`, qualified by the decision's name), so every b
 can inject an engine with `@Named`. Micronaut's annotation processors generate the bean definitions and
 the configuration binding at compile time, so nothing is reflective.
 
+The Quarkus extension does its work while Quarkus builds the application. Its deployment module
+(`PraeceptaProcessor`, with the settings of `PraeceptaBuildTimeConfig`) finds the DMN files with
+`Location.matches` in the application's archives and every runtime dependency (the class path the
+application will have, not the build's), and `file:` patterns with `TableLocations`; compiles the declared
+Excel and CSV tables with `praecepta-compiler`, so Apache POI stays in the build; validates everything with
+`Decisions.load`; and writes the validated DMN into the application as generated resources
+(`META-INF/praecepta/tables/<n>.dmn`, registered for native images). The runtime module's recorder
+(`PraeceptaRecorder`) rebuilds the engines from those resources during static initialisation, so in a
+native executable they live in the image heap, and produces the `Decisions` bean and one `@Singleton`
+synthetic bean per decision. Dev mode restarts the application when a file a class path pattern matches
+changes or appears, or when a `file:` table or a declared spreadsheet changes. `quarkus-arc` and
+`quarkus-arc-deployment` are `provided`, since every Quarkus application has them. The tests use
+`QuarkusExtensionTest` and `QuarkusDevModeTest` and run in the default build.
+
 ## Native images
 Praecepta needs no reflection, so GraalVM's `native-image` builds applications that use it without a
 `Feature` or reflection metadata. What it does need is in each jar, under
@@ -207,7 +225,10 @@ reads from every jar on its class path, whichever build tool or framework runs i
 The metadata uses the `resource-config.json` format, which GraalVM for JDK 21 reads as well as later
 releases. `praecepta-maven-plugin/src/it/native-app` is an application that uses all of this; every build
 runs its checks on the JVM, and the `Native image` workflow (`-Pnative`) builds it with GraalVM for JDK 21
-and 25 and runs the executable.
+and 25 and runs the executable, with `--exact-reachability-metadata` on 25, so a resource no metadata
+registers fails the run instead of reading as absent. The framework modules use no reflection and rely
+on the integration core's metadata for the default location (the Quarkus extension registers the tables
+it validated), but no CI job builds a Spring Boot, Micronaut or Quarkus application natively yet.
 
 ## Design decisions
 The main decisions and their reasons (strict DMN semantics, bitsets instead of a trie or generated

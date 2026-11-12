@@ -6,7 +6,7 @@
 
 A module is published unless its POM says otherwise: modules that are never published (the benchmarks,
 the TCK runner, test projects) set cyclonedx.skip, skipPublishing, maven.deploy.skip and
-maven.install.skip (docs/INTEGRATIONS.md, "Registering a module"). So after `mvn verify`, every
+maven.install.skip (CONTRIBUTING.md, "Adding a module"). So after `mvn verify`, every
 module directory with a target/bom.json is a published module, and after the release build, every one
 whose signed main jar is in target/ is a published jar module. Test projects copied under a target/
 directory (maven-invoker-plugin's target/it) are never counted.
