@@ -55,7 +55,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
 /**
- * A decision table evaluated with strict DMN 1.3 hit-policy semantics.
+ * A decision table evaluated with strict DMN 1.5 hit-policy semantics.
  *
  * <pre>{@code
  * var engine = PraeceptaEngine.<Order, Discount>builder()
@@ -66,14 +66,14 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  *         .rules(loader.getPraecepta())
  *         .build();
  *
- * List<Discount> discounts = engine.evaluate(order); // empty if no rule matches
+ * List<Discount> discounts = engine.evaluate(order); // empty if no rule matches and there is no default output
  * }</pre>
  *
  * <p>Cells are DMN FEEL unary tests, parsed per column type: {@code "PT","ES"} (or unquoted
- * {@code PT,ES}), {@code not("FR")}, {@code >= 18}, {@code [18..65)}, {@code < date("2025-01-01")},
- * {@code null}, and {@code -} or blank for any value. See {@code CellParser}. A column bound with
- * {@link Builder#listInput(String, Function)} holds lists, and its cells hold when some element passes
- * them.
+ * {@code PT,ES}), {@code not("FR")}, {@code != "FR"}, {@code >= 18}, {@code [18..65)},
+ * {@code < date("2025-01-01")}, {@code < @"2025-01-01"}, {@code null}, and {@code -} or blank for any value.
+ * See {@code CellParser}. A column bound with {@link Builder#listInput(String, Function)} holds lists, and its
+ * cells hold when some element passes them.
  *
  * <p>A whole DMN decision table (hit policy, column types, value lists and rules) can be loaded with
  * {@code DmnReader} and passed to {@link Builder#table}; inputs are then bound as usual:

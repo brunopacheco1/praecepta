@@ -53,17 +53,19 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * {@code string}, {@code number} (or {@code integer}, {@code long}, {@code double}), {@code date},
  * {@code boolean}, {@code time}, {@code dateTime} (or {@code date and time}), {@code dayTimeDuration} and
  * {@code yearMonthDuration} (or their FEEL names) columns, times and date-times with or without a time zone
- * (but no time with a zone id, which has no fixed offset); columns typed by an item definition of one of
+ * (an offset, or a zone id, with which a time is a {@code ZonedTime}); columns typed by an item definition of one of
  * those types, whose allowed values become the input value list unless the input declares its own;
  * columns typed by a collection of those ({@code isCollection="true"}), which hold lists and whose
  * entries test the elements ({@code list contains(?, "PT")}, see {@link CellParser#parseFeelList}), and
  * named inputs whose {@code inputData} is such a collection (see {@link DecisionTable#listInputs}); input
- * entries in Praecepta's FEEL subset (lists, {@code not(...)}, {@code null}, comparisons, intervals, {@code -}); input and output value
+ * entries in Praecepta's FEEL subset (lists, {@code not(...)}, {@code null}, comparisons, {@code =} and {@code !=},
+ * intervals, {@code -}), with FEEL's literals (numbers such as {@code 1.2e3}, at-literals, every form of the date and
+ * time functions) and comments, as {@link CellParser} reads them; input and output value
  * lists; outputs' default values ({@code defaultOutputEntry}, see {@link DecisionTable#defaultOutput}) that are
  * literals, {@code null} included ({@link DecisionTable.OutputColumn#hasDefault}); output entries that are
  * literals or name one of the table's inputs (of the output's type, or
  * any input for a string output; an input is a column or an input the cells compare with, and holds single
- * values), or that join string and number literals and the table's inputs with
+ * values), or that combine literals (strings, numbers, dates, times and durations) and the table's inputs with
  * {@code +}, {@code -}, {@code *}, {@code /} and {@code **} ({@link OutputExpression}, kept as written in
  * {@link PraeceptaOutput#expressions()}); every hit policy; SUM, MIN, MAX and COUNT aggregation. Anything else is rejected with an
  * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered

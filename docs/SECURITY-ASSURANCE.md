@@ -20,7 +20,9 @@ tables to load and how strictly to check them.
 
 **Users can expect:**
 - **Reading untrusted DMN does not reach outside the document:** `DmnReader` resolves no DTDs and no
-  external entities, so a DMN file cannot read local files or make network requests (XXE).
+  external entities, so a DMN file cannot read local files or make network requests (XXE). It always
+  parses with the JDK's own XML parser, for which these settings are written, whatever other parser is on
+  the class path.
 - **Bad input fails cleanly:** any malformed table, cell or DMN document is rejected with a
   documented exception (`InvalidDecisionTableException`, `CellSyntaxException`) naming where the
   problem is, never with an unexpected exception or a half-built engine.
@@ -36,7 +38,8 @@ tables to load and how strictly to check them.
   issues at the configured severity, listing every problem.
 - **Releases are authentic:** signed, with SLSA Build Level 2 provenance and an SBOM, and reproducible:
   [Reproducible Central](https://github.com/jvm-repo-rebuild/reproducible-central/blob/master/content/io/github/brunopacheco1/praecepta/README.md) rebuilds each release independently and checks it is bit-for-bit
-  identical to Maven Central.
+  identical to Maven Central. The Gradle Plugin Portal serves the same files as Maven Central: the
+  release uploads the jars Maven built, fetched from Maven Central, rather than building them again.
 
 **Users cannot expect (out of scope):**
 - **Protection from a malicious table's logic.** A table decides what the application does with
@@ -59,8 +62,8 @@ tables to load and how strictly to check them.
 ## Threat model
 | Asset | Threat | Countered by |
 |---|---|---|
-| The host application's files and network | A crafted DMN document using XXE or a DTD to read files or make requests | DTDs disallowed, external entities off, secure processing on (`DmnReader`) |
-| The host application's availability | Documents or cells crafted to crash the parser or exhaust memory | Fuzzing of the cell parser and DMN reader; JDK XML limits; a cell grammar without nesting (`not(...)` only wraps a whole cell), and output expressions of at most 1,000 operators and parentheses, so parsing and evaluation depth is bounded |
+| The host application's files and network | A crafted DMN document using XXE or a DTD to read files or make requests | DTDs disallowed, external entities off, secure processing on, always with the JDK's own parser (`DmnReader`) |
+| The host application's availability | Documents or cells crafted to crash the parser or exhaust memory | Fuzzing of the cell parser and DMN reader; JDK XML limits; a cell grammar without nesting (`not(...)` only wraps a whole cell) but for date and time literals, nested at most 8 deep (`date and time(date(...), time(...))`), and output expressions of at most 1,000 operators and parentheses, so parsing and evaluation depth is bounded |
 | Correct decisions | Ambiguous or overlapping rules giving different answers than intended | Strict DMN hit policies; validation of overlaps, unreachable rules and gaps; the engine is tested against a reference implementation with property-based tests |
 | A build using the Maven or Gradle plugin | Table content injected into generated Java code | `JavaNames` sanitises identifiers (reserved words included); string literals are escaped; comments escape unicode escapes and comment terminators |
 | Users' supply chain | A tampered release or dependency | Signed releases with provenance; pinned CI actions; Dependabot, dependency review and OSV scans; a signed-commit, pull-request-only `main` |

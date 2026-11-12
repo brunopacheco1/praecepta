@@ -15,7 +15,10 @@ import java.util.stream.Collectors;
 /**
  * Static analysis of a decision table, computed when the engine is built. It is exact: every issue
  * corresponds to inputs that actually occur, and every input region is examined (gaps are capped at
- * 100 entries).
+ * 100 entries), except where the analysis cannot decide, which it leaves unreported rather than report
+ * wrongly: rules whose cells compare with another input are judged only as rules that may be unreachable,
+ * and in a table with several list columns a rule, or the table's gaps, go unreported when a list column
+ * can leave more than 1024 different sets of rules.
  *
  * @param issues findings, most severe first
  */
@@ -57,7 +60,7 @@ public record ValidationReport(List<Issue> issues) {
         /** Two rules with different outputs that some inputs match together (ANY): a violation. */
         CONFLICTING_OUTPUTS(Severity.ERROR),
         /**
-         * Declared input values that no rule matches (evaluation returns an empty result). Only reported
+         * Declared input values that no rule matches (evaluation returns the default output, or none). Only reported
          * when every string column the rules constrain declares its input values; at most 100 gaps are
          * listed.
          */
@@ -65,9 +68,10 @@ public record ValidationReport(List<Issue> issues) {
         /**
          * A default output that no input can reach: the table is complete, as every input, with a missing value in
          * any column too, matches some rule, so the default is never given. DMN 1.5, 10.3.2.10: "A complete decision
-         * table SHALL NOT specify a default output value." Rules that compare with another input or test a column
-         * holding lists are left out of the search, as from the other analyses, so a table that is complete only
-         * through them is not reported.
+         * table SHALL NOT specify a default output value." A column holding lists is searched as every list it
+         * takes, a missing one and ones holding missing elements included. Rules that compare with another input are
+         * left out of the search, as from the other analyses, so a table that is complete only through them is not
+         * reported.
          */
         UNREACHABLE_DEFAULT_OUTPUT(Severity.ERROR);
 

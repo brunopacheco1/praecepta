@@ -31,19 +31,22 @@ Quarkus or Micronaut.
 - All DMN hit policies: UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER and COLLECT
   (with SUM / MIN / MAX / COUNT aggregation)
 - DMN FEEL cells on STRING, NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION and
-  YEAR_MONTH_DURATION columns: lists, `not(...)`, comparisons, `=` and `!=`, intervals, `null`; unquoted `PT,ES`
-  cells from earlier versions keep working
-- Times and date-times with or without a time zone; two with one compare by instant, and one with
-  a zone compares with one without by local time (DMN 1.5, Table 54; see
-  [DMN conformance](docs/DMN-CONFORMANCE.md) for the cases it leaves open)
-- List inputs, such as a customer's nationalities: a cell holds when some element passes it
+  YEAR_MONTH_DURATION columns: lists, `not(...)`, comparisons, `=` and `!=`, intervals, `null`, every
+  FEEL literal form (`1.2e3`, `@"2025-01-31"`, `date(2025, 1, 31)`) and comments; unquoted `PT,ES` cells
+  from earlier versions keep working
+- Times and date-times with or without a time zone (an offset, or a zone id such as `@Europe/Paris`):
+  two with a zone compare by instant, and one with a zone and one without by local time (DMN 1.5,
+  Table 54); a time with a zone id compares only with times in its zone (see
+  [DMN conformance](docs/DMN-CONFORMANCE.md) for the cases DMN 1.5 leaves open)
+- List inputs, such as a customer's nationalities, whose elements may be missing: a cell holds when
+  some element passes it
 - DMN output entries that name an input or compute with `+`, `-`, `*`, `/` and `**` on strings,
   numbers, dates, times and durations (`(price - discount) * 1.2`, `Symptom + " is listed"`,
   `due + duration("P14D")`, `returned - sent`), evaluated only for the rules that match
 - Optional DMN input value lists: values outside them are rejected
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
   rules that can never be selected (FIRST, PRIORITY), gaps (declared inputs no rule matches), and
-  default outputs no input can reach (a complete table)
+  default outputs no input can reach (a complete table), list columns included
 - Bitset matching: memory grows linearly with the table (10,000 rules take 1.5 to 5 MB of heap,
   against about 90 to 130 MB for Camunda and Drools) and most engines build in milliseconds; the
   mask of a value only a few rules accept, such as a product code, is stored compactly, so even a
@@ -68,14 +71,14 @@ Java 21 or later (tested on 21, 25 and 27). Pick the modules you need:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-engine</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 
 <!-- optional: load rules from Excel or CSV at runtime (brings Apache POI) -->
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-loader</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 ```
 
@@ -84,15 +87,16 @@ Or let your build or framework do it:
 | You use | Add | What it does |
 |---|---|---|
 | Maven | [`praecepta-maven-plugin`](#praecepta-maven-plugin) | Validates tables at build time and generates typed classes; only `praecepta-engine` is needed at runtime. |
-| Gradle | [plugin `io.github.brunopacheco1.praecepta`](#praecepta-gradle-plugin) | The same, for Gradle 8.5 and later. |
+| Gradle | [plugin `io.github.brunopacheco1.praecepta`](#praecepta-gradle-plugin) | The same, for Gradle 8.5 and later, from the Gradle Plugin Portal. |
 | Spring Boot 4 | [`praecepta-spring-boot-starter`](#praecepta-spring-boot-starter) | Loads the DMN files under `rules/` at startup and injects one engine per decision. |
 | Micronaut 4 | [`praecepta-micronaut`](#praecepta-micronaut) | The same, for Micronaut. |
 | Quarkus 3.40+ | [`praecepta-quarkus`](#praecepta-quarkus-extension) | Validates the tables while Quarkus builds the application, and injects one engine per decision. |
 | Another framework, or none | [`praecepta-integration`](#praecepta-integration) | Loads DMN files into named engines, as the framework integrations do. |
 | GraalVM | nothing | [Native images](#native-images) need no configuration for Praecepta. |
 
-Every module is published to Maven Central under the same version. How the integrations fit together,
-and what they share, is in [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+Every module is published to Maven Central under the same version, and the Gradle plugin to the Gradle
+Plugin Portal too. How the integrations fit together, and what they share, is in
+[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 Every release is signed and has an SBOM, SLSA Build Level 2 provenance (`gh attestation verify`) and
 third-party notices on its [GitHub release](https://github.com/brunopacheco1/praecepta/releases), and
@@ -106,7 +110,7 @@ Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drool
   input (`> limit`) or test a list's elements, but not compute. Output entries may compute with `+`,
   `-`, `*`, `/` and `**` on strings, numbers, dates, times and durations, but call no functions
   (other than the date and time literals `date(...)`, `time(...)`, `date and time(...)` and
-  `duration(...)`) and hold no comparison or `if`; see the [roadmap](docs/ROADMAP.md).
+  `duration(...)`) and hold no comparison or `if`.
 - **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
   boxed expressions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)).
 - **A process engine, a modeller or a decision service** around the tables.
@@ -336,11 +340,13 @@ Supported:
   `customer.age`, `Credit Score`), of type `string`, `number` (`integer`, `long`, `double`), `date`,
   `boolean`, `time`, `dateTime`, `dayTimeDuration` or `yearMonthDuration`, or an item definition of one
   of them (such as a `string` with allowed values, which become the input value list); times and
-  date-times with or without a time zone.
+  date-times with or without a time zone, which may be an offset or a zone id
+  (`time("10:30:00@Europe/Paris")`).
 - **Input entries** in the cell syntax above, as strict FEEL: strings quoted (an unquoted word is a
-  reference to another variable), with FEEL's escape sequences, and dates, times and durations written
-  with `date(...)`, `time(...)`, `date and time(...)` and `duration(...)`, in any of their forms, or as
-  at-literals (`@"2025-01-31"`).
+  reference to another variable), with FEEL's escape sequences, numbers as FEEL writes them (`.5`,
+  `1.2e3`), `=` and `!=` tests, comments, and dates, times and durations written with `date(...)`,
+  `time(...)`, `date and time(...)` and `duration(...)`, in any of their forms, or as at-literals
+  (`@"2025-01-31"`).
 - **Entries that compare with another input** (`> limit`, `[floor..limit]`, `not(home)`), which then
   becomes an input of the engine, bound like a column (with map-based inputs it is read with the type of
   the column that names it).
@@ -434,7 +440,7 @@ needs only `praecepta-engine`; Apache POI stays a build-time dependency.
 <plugin>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-maven-plugin</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
   <executions><execution><goals><goal>generate</goal></goals></execution></executions>
   <configuration>
     <packageName>com.acme.pricing</packageName>
@@ -473,30 +479,21 @@ Generated code belongs to your project, so it carries no Praecepta licence heade
 
 ## Praecepta Gradle Plugin
 Does for Gradle what the Maven plugin does, with the same settings and the same generated files.
-Runs on Gradle 8.5 and later (CI tests 8.5, the last 8.x and the current 9.x) on Java 21+. It is
-published to Maven Central with its plugin marker, so Gradle finds it there. From 0.6.0 it is on the Gradle
-Plugin Portal too ([#93](https://github.com/brunopacheco1/praecepta/issues/93)), where Gradle looks by default, and `pluginManagement` needs no change;
-for 0.5.0 add Maven Central:
-
-```kotlin
-// settings.gradle.kts
-pluginManagement {
-    repositories {
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-```
+Runs on Gradle 8.5 and later (CI tests 8.5, the last 8.x and the current 9.x) on Java 21+. It is on the
+[Gradle Plugin Portal](https://plugins.gradle.org/plugin/io.github.brunopacheco1.praecepta), where Gradle
+looks for plugins by default, so applying it needs no `pluginManagement` repository (it is on Maven Central
+too, with its plugin marker). Version 0.5.0 is on Maven Central only: for it, add `mavenCentral()` to
+`pluginManagement { repositories { ... } }` in `settings.gradle.kts`, next to `gradlePluginPortal()`.
 
 ```kotlin
 // build.gradle.kts
 plugins {
     java
-    id("io.github.brunopacheco1.praecepta") version "0.5.0"
+    id("io.github.brunopacheco1.praecepta") version "0.6.0"
 }
 
 dependencies {
-    implementation("io.github.brunopacheco1:praecepta-engine:0.5.0")
+    implementation("io.github.brunopacheco1:praecepta-engine:0.6.0")
 }
 
 praecepta {
@@ -542,7 +539,7 @@ registers them as beans:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-spring-boot-starter</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 ```
 
@@ -609,7 +606,7 @@ For Micronaut 4 applications on Java 21+. At startup, the module:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-micronaut</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 ```
 
@@ -670,7 +667,7 @@ Runs on Quarkus 3.40 and later with Java 21+. Add the extension to a Quarkus app
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-quarkus</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 ```
 
@@ -745,7 +742,7 @@ DMN files, builds one engine per decision table, and evaluates them by name. It 
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-integration</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 ```
 
@@ -862,7 +859,9 @@ engine against a naive reference implementation of DMN decision-table semantics 
 table Praecepta can read passes (83 of 86); the other three need inputs computed by other decisions
 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)), which Praecepta does not have yet.
 The pass rate, the results per test case and what each unsupported check needs are in
-[praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md). Semantics are judged by DMN 1.5 and the TCK alone;
+[praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md). The literal expressions of the TCK's arithmetic test
+cases run as output expressions too: of their 1,101 checks, Praecepta reads 489 and gives the kit's result
+for all but one (see [praecepta-tck/README.md](praecepta-tck/README.md#output-expressions)). Semantics are judged by DMN 1.5 and the TCK alone;
 where both leave a case open, what Praecepta does is recorded in
 [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md), to be settled when a later DMN version or the TCK
 decides.
