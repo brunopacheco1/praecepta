@@ -178,13 +178,14 @@ class OutputExpressionTest {
                 .hasMessage("* combines a string and a number, which gives null in FEEL");
         var stringMinusString = OutputExpression.parse("s - s");
         Assertions.assertThatThrownBy(() -> stringMinusString.type(types::get))
-                .hasMessage("- applies to numbers, not strings");
+                .hasMessage("- combines a string and a string, which gives null in FEEL");
         var negatedString = OutputExpression.parse("-s");
         Assertions.assertThatThrownBy(() -> negatedString.type(types::get))
-                .hasMessage("- applies to numbers, not strings");
+                .hasMessage("- applies to numbers and durations, not to a string");
+        // DMN 1.5, Table 57: a date takes durations, not numbers
         var datePlusNumber = OutputExpression.parse("d + 1");
         Assertions.assertThatThrownBy(() -> datePlusNumber.type(types::get))
-                .hasMessage("'d' is a date; output expressions combine strings and numbers");
+                .hasMessage("+ combines a date and a number, which gives null in FEEL");
     }
 
     @Test

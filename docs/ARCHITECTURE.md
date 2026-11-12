@@ -156,7 +156,7 @@ An engine is **immutable** once built: any number of threads may share it withou
   on the class path) with DTDs and external entities disabled. Anything it does not
   support (function calls, inputs computed by other decisions) is rejected
   with an error naming the decision, rule and column. Output entries may be expressions of
-  literals and inputs with `+ - * / **` (`OutputExpression`): they are kept as written, parsed and
+  literals (dates, times and durations included) and inputs with `+ - * / **` (`OutputExpression`): they are kept as written, parsed and
   type-checked when the engine is built, and evaluated only for matching rules, like outputs that
   name an input; `DmnWriter` writes them back unchanged. Strict FEEL compares a list with a unary test
   as a whole, so a list column's entries are written with FEEL's list functions
@@ -336,8 +336,8 @@ a case open, what Praecepta does is recorded in [DMN-CONFORMANCE.md](DMN-CONFORM
   unreachable rules count missing lists and missing elements too.
 
 ### Output expressions (#71)
-- **A small subset, not a FEEL interpreter**: string and number literals, input names, `+ - * / **`,
-  unary minus and parentheses (FEEL's arithmetic expressions, DMN 1.5 grammar rule 4, on numbers). That covers string building and arithmetic (and the TCK's case) while
+- **A small subset, not a FEEL interpreter**: string, number and date time literals, input names, `+ - * / **`,
+  unary minus and parentheses (FEEL's arithmetic expressions, DMN 1.5 grammar rule 4). That covers string building and arithmetic (and the TCK's case) while
   keeping the engine dependency-free; anything else is rejected by name, so a table never evaluates
   differently from other engines in silence.
 - **Parsed and type-checked when the engine is built**, so a table that adds a string to a number
@@ -352,6 +352,16 @@ a case open, what Praecepta does is recorded in [DMN-CONFORMANCE.md](DMN-CONFORM
   numbers are written without trailing zeros, since a FEEL
   number is a value, not a scale. Literal outputs and outputs that name an input keep the text they
   were given (`1.50`), so the output strategy sees what the table says.
+- **Dates, times and durations (#85)** combine as Tables 57, 59 and 62 list them (`FeelArithmetic`): `type`
+  checks the pair of operand types against those tables, so a table that adds two dates fails when it is
+  built, and `evaluate` gives null where FEEL defines no value for the values themselves (a date-time with a
+  zone minus one without, a month without the date's day, a result out of range). Their literals are read
+  by `TemporalLiterals`, the reader cells use, so a cell and an output entry take the same forms. Two
+  readings come from the DMN TCK's `0100-arithmetic`, which `praecepta-tck` evaluates in full
+  (`OutputExpressionsTckTest`): a years and months duration scaled by a number keeps whole months, toward
+  zero, and a date counts as UTC midnight with a zone when it meets a date-time. Times subtract as they
+  compare: by instant with offsets, by local time when one has none, by local time in one zone id, and not
+  at all otherwise, the cases DMN 1.5 leaves open (#86).
 - **ANY compares evaluated outputs**, and compares number outputs by value, as FEEL's `=` does
   (those a table declares as numbers, or that a rule computes as one), so `1.50`, `1.5` and
   `price * 1` agree, at build time as at evaluation; output priority lists find number outputs by

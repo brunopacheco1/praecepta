@@ -119,6 +119,30 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   local times and the other zone ids one class; a map-based column whose cells name no zone id takes such a time
   too, matching only the cells that accept any value, and keeps the validation report it had.
   `FeelTemporals.comparable(a, b)` says whether two values compare.
+- **Output expressions over dates, times and durations** ([#85](https://github.com/brunopacheco1/praecepta/issues/85)):
+  output entries combine dates, times, date-times and durations as DMN 1.5 defines it (Tables 57, 59 and 62),
+  where they took strings and numbers only and rejected the table when the engine was built (`'due' is a date;
+  output expressions combine strings and numbers`). `due + duration("P14D")` is a date, `returned - sent` a
+  days and time duration (as are two times or two dates subtracted), `start + @"P1Y"` keeps the type of
+  `start`, durations of a kind add, subtract and divide to a number, a duration scales by a number, and
+  `-elapsed` is `elapsed * -1`. Their literals are those cells read, at-literals and the date and time
+  functions in every form, through one reader. The output is null where FEEL defines no value: a date and time
+  with a zone minus one without (Table 57), a date plus a month that does not have its day
+  (`date("2025-01-31") + duration("P1M")`, as `date(2025, 2, 31)` is null), a division by zero, a result out of
+  range. A years and months duration scaled by a number keeps whole months, toward zero, and a date meeting a
+  date and time counts as UTC midnight (10.3.2.3.5), as the DMN TCK's `0100-arithmetic` expects. Times subtract
+  as they compare: by instant when both have an offset, by local time when one has none or both have a zone id
+  in one zone, and not at all for a time with a zone id and any other; DMN 1.5 leaves those cases open, so they
+  belong with [#86](https://github.com/brunopacheco1/praecepta/issues/86). Types FEEL does not combine
+  (`due + 1`, `elapsed + tenure`) are still rejected when the engine is built, now naming both types
+  (`+ combines a date and a number, which gives null in FEEL`). The engine, the classes the build plugins
+  generate (which evaluate through it), `praecepta-integration`'s map engines and `DmnWriter`, which writes the
+  entries back as read, agree. `praecepta-tck` now also evaluates the TCK's `0099-arithmetic-negation` and
+  `0100-arithmetic` literal expressions as output expressions (`OutputExpressionsTckTest`): of their 1,101
+  checks, Praecepta reads 489 and gives the kit's result for all but one, a power that is not whole, which the kit
+  gives to 13 digits where FEEL's numbers have 34; the other 612 use functions, lists, contexts, booleans, `null`
+  operands or hour 24. The
+  decision-table results in `RESULTS.md` are unchanged.
 
 ### Changed
 - **`DmnReader` uses the JDK's own XML parser** ([#96](https://github.com/brunopacheco1/praecepta/issues/96)):

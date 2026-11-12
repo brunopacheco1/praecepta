@@ -264,7 +264,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             values.put(output, switch (value) {
                 case null -> null;
                 case BigDecimal number -> number.compareTo(BigDecimal.ZERO) == 0 ? "0" : number.stripTrailingZeros().toPlainString();
-                default -> value.toString();
+                case String text -> text;
+                default -> FeelLiterals.text(value);
             });
         });
         return new PraeceptaOutput(values);
@@ -288,15 +289,17 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     /**
      * An output expression on concrete values, as FEEL defines it: a missing operand gives null, {@code +}
      * joins strings or adds numbers, a division by zero gives null and every result has 34 digits
-     * (DMN 1.5, Tables 57, 59 and 60). Exponents are whole numbers here.
+     * (DMN 1.5, Tables 57, 59 and 60). Exponents are whole numbers here. Dates, times and durations follow
+     * {@link #temporal}; unary minus is {@code e * -1} (Table 62).
      */
     private static Object evaluate(OutputExpression expression, Function<String, Object> inputs) {
         return switch (expression) {
             case OutputExpression.Literal literal -> literal.value();
             case OutputExpression.Name name -> inputs.apply(name.name());
             case OutputExpression.Negation negation -> {
-                var operand = (BigDecimal) evaluate(negation.operand(), inputs);
-                yield operand == null ? null : BigDecimal.ZERO.subtract(operand);
+                var operand = evaluate(negation.operand(), inputs);
+                yield operand == null ? null : evaluate(new OutputExpression.Arithmetic(OutputExpression.Operator.MULTIPLY,
+                        new OutputExpression.Literal(operand), new OutputExpression.Literal(BigDecimal.ONE.negate())), inputs);
             }
             case OutputExpression.Arithmetic arithmetic -> {
                 var a = evaluate(arithmetic.left(), inputs);
@@ -306,6 +309,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                 }
                 if (a instanceof String text) {
                     yield text.concat((String) b);
+                }
+                if (!(a instanceof BigDecimal) || !(b instanceof BigDecimal)) {
+                    yield temporal(arithmetic.operator(), a, b);
                 }
                 var x = (BigDecimal) a;
                 var y = (BigDecimal) b;
@@ -318,6 +324,125 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                 };
             }
         };
+    }
+
+    /**
+     * Arithmetic with dates, times and durations, as DMN 1.5 has it (Tables 57 and 59), on the values themselves:
+     * a date moved by months keeps its day, and is null if the month does not have it; a date moved by days and
+     * time is a date and time at UTC midnight moved, then its date; two date-times subtract by instant, or by
+     * their fields when neither has a zone, and not at all when only one has one; a date counts as UTC midnight
+     * there; times subtract by instant with offsets, by local time when one has none, by local time in one zone
+     * id, and not at all otherwise; a years and months duration scales to the whole month toward zero, a days and
+     * time one to the nanosecond.
+     */
+    private static Object temporal(OutputExpression.Operator operator, Object a, Object b) {
+        try {
+            return switch (operator) {
+                case ADD -> a instanceof Duration || a instanceof YearsAndMonths && !(b instanceof YearsAndMonths) && !(b instanceof Duration)
+                        ? moved(b, a, false) : plus(a, b);
+                case SUBTRACT -> b instanceof Duration || b instanceof YearsAndMonths ? moved(a, b, true) : difference(a, b);
+                case MULTIPLY -> a instanceof BigDecimal number ? scaled(b, number, false) : scaled(a, (BigDecimal) b, false);
+                case DIVIDE -> b instanceof BigDecimal number ? scaled(a, number, true) : ratio(a, b);
+                case POWER -> throw new IllegalStateException("** of " + a);
+            };
+        } catch (java.time.DateTimeException | ArithmeticException e) {
+            return null;
+        }
+    }
+
+    /** {@code a + b} where {@code a} keeps its type: two durations of a kind, or a value moved by a duration. */
+    private static Object plus(Object a, Object b) {
+        if (a instanceof Duration x && b instanceof Duration y) {
+            return x.plus(y);
+        }
+        if (a instanceof YearsAndMonths x && b instanceof YearsAndMonths y) {
+            return new YearsAndMonths(x.months() + y.months());
+        }
+        return moved(a, b, false);
+    }
+
+    private static Object moved(Object value, Object duration, boolean back) {
+        if (value instanceof Duration x) {
+            return back ? x.minus((Duration) duration) : x.plus((Duration) duration);
+        }
+        if (value instanceof YearsAndMonths x) {
+            var months = ((YearsAndMonths) duration).months();
+            return new YearsAndMonths(back ? x.months() - months : x.months() + months);
+        }
+        if (duration instanceof YearsAndMonths months) {
+            long by = back ? -months.months() : months.months();
+            var date = switch (value) {
+                case LocalDate day -> sameDay(day, by);
+                case LocalDateTime moment -> sameDay(moment.toLocalDate(), by);
+                case ZonedDateTime moment -> sameDay(moment.toLocalDate(), by);
+                default -> throw new IllegalStateException("not a date: " + value);
+            };
+            return switch (value) {
+                case LocalDateTime moment when date != null -> LocalDateTime.of(date, moment.toLocalTime());
+                case ZonedDateTime moment when date != null -> ZonedDateTime.of(date, moment.toLocalTime(), moment.getZone());
+                case LocalDate day -> date;
+                default -> null;
+            };
+        }
+        var by = back ? ((Duration) duration).negated() : (Duration) duration;
+        return switch (value) {
+            case LocalDate date -> LocalDateTime.of(date, LocalTime.MIDNIGHT).plus(by).toLocalDate();
+            case LocalDateTime moment -> moment.plus(by);
+            case ZonedDateTime moment -> ZonedDateTime.ofInstant(moment.toInstant().plus(by), moment.getZone());
+            case LocalTime time -> LocalTime.ofNanoOfDay(Math.floorMod(time.toNanoOfDay() + by.toNanos(), 86_400_000_000_000L));
+            case OffsetTime time -> OffsetTime.of(LocalTime.ofNanoOfDay(Math.floorMod(time.toLocalTime().toNanoOfDay() + by.toNanos(),
+                    86_400_000_000_000L)), time.getOffset());
+            case ZonedTime time -> new ZonedTime(LocalTime.ofNanoOfDay(Math.floorMod(time.time().toNanoOfDay() + by.toNanos(),
+                    86_400_000_000_000L)), time.zone());
+            default -> throw new IllegalStateException("not a date or time: " + value);
+        };
+    }
+
+    /** The date {@code months} later, on the same day: null if that month does not have it. */
+    private static LocalDate sameDay(LocalDate date, long months) {
+        var moved = date.withDayOfMonth(1).plusMonths(months);
+        return date.getDayOfMonth() > moved.lengthOfMonth() ? null : moved.withDayOfMonth(date.getDayOfMonth());
+    }
+
+    /** {@code a - b} of two dates, date-times or times, as a days and time duration; null where it is not defined. */
+    private static Duration difference(Object a, Object b) {
+        var x = a instanceof LocalDate date ? date.atStartOfDay(ZoneOffset.UTC) : a;
+        var y = b instanceof LocalDate date ? date.atStartOfDay(ZoneOffset.UTC) : b;
+        return switch (x) {
+            case LocalDateTime from when y instanceof LocalDateTime to -> Duration.between(to, from);
+            case ZonedDateTime from when y instanceof ZonedDateTime to -> Duration.between(to.toInstant(), from.toInstant());
+            case OffsetTime from when y instanceof OffsetTime to -> Duration.ofNanos(nanosAtUtc(from) - nanosAtUtc(to));
+            case OffsetTime from when y instanceof LocalTime to -> Duration.ofNanos(from.toLocalTime().toNanoOfDay() - to.toNanoOfDay());
+            case LocalTime from when y instanceof OffsetTime to -> Duration.ofNanos(from.toNanoOfDay() - to.toLocalTime().toNanoOfDay());
+            case LocalTime from when y instanceof LocalTime to -> Duration.ofNanos(from.toNanoOfDay() - to.toNanoOfDay());
+            case ZonedTime from when y instanceof ZonedTime to && from.zone().equals(to.zone()) ->
+                    Duration.ofNanos(from.time().toNanoOfDay() - to.time().toNanoOfDay());
+            default -> null;
+        };
+    }
+
+    private static long nanosAtUtc(OffsetTime time) {
+        return time.toLocalTime().toNanoOfDay() - time.getOffset().getTotalSeconds() * 1_000_000_000L;
+    }
+
+    private static Object scaled(Object duration, BigDecimal by, boolean divide) {
+        if (divide && by.signum() == 0) {
+            return null;
+        }
+        if (duration instanceof YearsAndMonths months) {
+            var value = new BigDecimal(months.months());
+            var result = divide ? value.divide(by, MathContext.DECIMAL128) : value.multiply(by);
+            return new YearsAndMonths(result.setScale(0, java.math.RoundingMode.DOWN).longValueExact());
+        }
+        var nanos = new BigDecimal(((Duration) duration).toNanos());
+        var result = divide ? nanos.divide(by, MathContext.DECIMAL128) : nanos.multiply(by);
+        return Duration.ofNanos(result.setScale(0, java.math.RoundingMode.HALF_EVEN).longValueExact());
+    }
+
+    private static BigDecimal ratio(Object a, Object b) {
+        var x = a instanceof Duration d ? new BigDecimal(d.toNanos()) : new BigDecimal(((YearsAndMonths) a).months());
+        var y = b instanceof Duration d ? new BigDecimal(d.toNanos()) : new BigDecimal(((YearsAndMonths) b).months());
+        return y.signum() == 0 ? null : x.divide(y, MathContext.DECIMAL128);
     }
 
     /**

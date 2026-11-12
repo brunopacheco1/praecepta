@@ -440,6 +440,13 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
      * sequences in strings.
      */
     private static String expression(List<String> names, Map<String, ColumnType> types, Set<String> lists, int form) {
+        // half the time, arithmetic on a column of dates, times or durations (DMN 1.5, Tables 57, 59 and 62)
+        var temporal = names.stream().filter(name -> TEMPORAL_FORMS.containsKey(types.get(name)) && !lists.contains(name)).toList();
+        if (!temporal.isEmpty() && form >= 3) {
+            var name = temporal.get(form % temporal.size());
+            var forms = TEMPORAL_FORMS.get(types.get(name));
+            return forms.get((form + names.indexOf(name)) % forms.size()).replace("$", name);
+        }
         var string = names.stream().filter(name -> types.get(name) == ColumnType.STRING && !lists.contains(name)).findFirst();
         var number = names.stream().filter(name -> types.get(name) == ColumnType.NUMBER && !lists.contains(name)).findFirst();
         if (number.isPresent() && (string.isEmpty() || form % 2 == 0)) {
@@ -452,6 +459,20 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         }
         return List.of("\"x\" + \"y\"", "1 + 2 * 3", "(10 - 4) / 4", "-2.50 * 2", "2 ** 3 ** 0", "(1 / 3) * 3 - 1e0").get(form);
     }
+
+    /**
+     * Expressions over a column ({@code $}) of each temporal type: moved by durations written in every form, the
+     * difference with a literal of each kind (with a zone, without one, a date), durations scaled and divided.
+     */
+    private static final Map<ColumnType, List<String>> TEMPORAL_FORMS = Map.of(
+            ColumnType.DATE, List.of("$ + @\"P1M\"", "$ - duration(\"P1D\")", "$ - date(\"2025-01-03\")", "@\"P1Y\" + $",
+                    "$ + @\"PT36H\"", "$ - date and time(\"2025-01-01T12:00:00Z\")"),
+            ColumnType.TIME, List.of("$ + @\"PT45M\"", "$ - time(\"08:30:00\")", "$ - @\"PT12H\"", "$ - time(\"08:30:00+01:00\")",
+                    "$ - time(\"08:30:00@Europe/Paris\")", "@\"P1D\" + $"),
+            ColumnType.DATE_TIME, List.of("$ + @\"P1DT6H\"", "$ - date and time(\"2025-01-02T06:00:00\")", "$ - @\"P1M\"",
+                    "$ - date(\"2025-01-01\")", "$ - date and time(\"2025-01-02T06:00:00@Europe/Paris\")", "@\"P1Y\" + $"),
+            ColumnType.DAY_TIME_DURATION, List.of("$ * 1.5", "-$ / 4", "$ + @\"PT90M\"", "$ / @\"PT6H\"", "2 * $ - $", "$ / 0"),
+            ColumnType.YEAR_MONTH_DURATION, List.of("$ * 2.5", "$ - @\"P1Y\"", "$ / @\"P3M\"", "-$", "$ / -1.5", "$ / @\"P0M\""));
 
     @SuppressWarnings("unchecked")
     private static Arbitrary<String> cell(Column column) {

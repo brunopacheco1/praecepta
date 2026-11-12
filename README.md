@@ -37,8 +37,9 @@ Quarkus or Micronaut.
   a zone compares with one without by local time (DMN 1.5, Table 54; see
   [DMN conformance](docs/DMN-CONFORMANCE.md) for the cases it leaves open)
 - List inputs, such as a customer's nationalities: a cell holds when some element passes it
-- DMN output entries that name an input or compute with `+`, `-`, `*`, `/` and `**`
-  (`(price - discount) * 1.2`, `Symptom + " is listed"`), evaluated only for the rules that match
+- DMN output entries that name an input or compute with `+`, `-`, `*`, `/` and `**` on strings,
+  numbers, dates, times and durations (`(price - discount) * 1.2`, `Symptom + " is listed"`,
+  `due + duration("P14D")`, `returned - sent`), evaluated only for the rules that match
 - Optional DMN input value lists: values outside them are rejected
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
   rules that can never be selected (FIRST, PRIORITY), gaps (declared inputs no rule matches), and
@@ -103,9 +104,9 @@ Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drool
 - **Full FEEL**: functions, contexts, `if`, and tests that compute (e.g. `income > 2 * rent`).
   Praecepta's input entries are FEEL *simple unary tests*: in DMN they may compare with another
   input (`> limit`) or test a list's elements, but not compute. Output entries may compute with `+`,
-  `-`, `*`, `/` and `**` on strings and numbers, but call no functions. Some FEEL that fits a single
-  table is not read yet either: arithmetic on dates, times and durations
-  ([#85](https://github.com/brunopacheco1/praecepta/issues/85)); see the [roadmap](docs/ROADMAP.md).
+  `-`, `*`, `/` and `**` on strings, numbers, dates, times and durations, but call no functions
+  (other than the date and time literals `date(...)`, `time(...)`, `date and time(...)` and
+  `duration(...)`) and hold no comparison or `if`; see the [roadmap](docs/ROADMAP.md).
 - **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
   boxed expressions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)).
 - **A process engine, a modeller or a decision service** around the tables.
@@ -183,8 +184,9 @@ character by Unicode code point and case-sensitively (`"Zed" < "apple"`), so a c
 such as an emoji, comes after every other (`"🐎" > "～"`), where Java's `String.compareTo` would put it
 before U+E000 to U+FFFF. Where DMN 1.5 and its TCK leave a
 case open (`-` against a missing value, `=` between a time with a zone and one without, two times at
-different offsets, a time with a zone id against a time in another zone, at an offset or without a zone),
-Praecepta's choice is recorded in [DMN conformance](docs/DMN-CONFORMANCE.md).
+different offsets, a time with a zone id against a time in another zone, at an offset or without a zone, and
+the difference of two times that are not both without a zone), Praecepta's choice is recorded in
+[DMN conformance](docs/DMN-CONFORMANCE.md).
 
 Times may have an offset (`Z`, `+01:00`) and date-times an offset or a zone id (`@Europe/Paris`).
 Two values with a time zone compare by the instant they denote, as XML Schema compares them
@@ -352,6 +354,14 @@ Supported:
   compute their value from literals and inputs with `+`, `-`, `*`, `/`, `**` and parentheses
   (`Symptom + " is listed"`, `(price - discount) * 1.2`, `amount * (1 + rate) ** years`): `+` joins
   strings or adds numbers, results have FEEL's 34 digits, and a missing operand gives a missing output.
+  Dates, times, date-times and durations combine as DMN 1.5 has it (Tables 57, 59 and 62):
+  `due + duration("P14D")` is a date, `returned - sent` (two date-times, or two times, or two dates) a days
+  and time duration, `start + @"P1Y"` keeps the type of `start`, `duration("PT8H") * days` and
+  `-elapsed` are durations, and `elapsed / duration("PT1H")` is a number. Where FEEL gives null, so does
+  the output: a date-time with a zone minus one without, a date plus a month that has not its day
+  (`date("2025-01-31") + duration("P1M")`), a division by zero; a years and months duration scaled by a
+  number keeps whole months (`duration("P1Y11M") * -2.5` is `-P4Y9M`, as the DMN TCK has it). Types FEEL
+  does not combine (`due + 1`, `elapsed + tenure`) are rejected when the engine is built.
   The inputs they name are columns, or inputs the cells compare with, that hold single values.
 - **Default output values** (`defaultOutputEntry`, literals of the output's type, and one of its output
   values when it lists them), which are the result when no rule matches, whatever the hit policy or
@@ -375,8 +385,7 @@ Supported:
   output (`[{fee=null}]`), and COUNT counts the rule.
 
 Anything else is rejected with a message naming the decision, rule and column: function calls such as
-`upper case(a)`, `if`, output entries that compute with dates,
-times or durations ([#85](https://github.com/brunopacheco1/praecepta/issues/85)), and inputs computed by
+`upper case(a)`, `if`, comparisons in output entries, and inputs computed by
 other decisions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)). `DmnReader.readAll(dmn)`
 reads every decision table of a file. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
 evaluate identically, which is how the benchmarks feed them.

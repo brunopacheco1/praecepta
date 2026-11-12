@@ -186,7 +186,7 @@ class OutputExpressionsTest {
                 .hasMessage("Rule 1, output 'x': + combines a string and a number, which gives null in FEEL");
         var date = List.of(rule(1, Map.of(), Map.of(), Map.of("x", "day + 1")));
         Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, date))
-                .hasMessage("Rule 1, output 'x': 'day' is a date; output expressions combine strings and numbers");
+                .hasMessage("Rule 1, output 'x': + combines a date and a number, which gives null in FEEL");
         var unknown = List.of(rule(1, Map.of(), Map.of(), Map.of("x", "tax * 2")));
         Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, unknown))
                 .hasMessageStartingWith("Rule 1: output 'x' names 'tax', which is not an input column");

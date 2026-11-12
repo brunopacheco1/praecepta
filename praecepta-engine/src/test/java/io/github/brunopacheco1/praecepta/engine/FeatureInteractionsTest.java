@@ -160,7 +160,7 @@ class FeatureInteractionsTest {
     }
 
     @Test
-    void output_expressions_cannot_read_a_list_or_a_time() {
+    void output_expressions_cannot_read_a_list_or_add_a_number_to_a_time() {
         var list = PraeceptaEngine.<Booking, String>builder()
                 .hitPolicy(HitPolicy.FIRST)
                 .listInput("nationalities", Booking::nationalities)
@@ -176,7 +176,7 @@ class FeatureInteractionsTest {
                 .rules(List.of(expressionRule(1, Map.of(), "at + 1")));
         Assertions.assertThatThrownBy(time::build)
                 .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessage("Rule 1, output 'total': 'at' is a time; output expressions combine strings and numbers");
+                .hasMessage("Rule 1, output 'total': + combines a time and a number, which gives null in FEEL");
     }
 
     // ---- helpers -------------------------------------------------------------------------------

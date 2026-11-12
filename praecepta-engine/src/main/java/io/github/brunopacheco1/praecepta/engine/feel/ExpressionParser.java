@@ -23,14 +23,17 @@ import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression.Operator;
  *   product = power { ("*" | "/") power }
  *   power   = unary { "**" unary }
  *   unary   = "-" unary | primary
- *   primary = string | number | name | "(" sum ")"
+ *   primary = string | number | date time literal | name | "(" sum ")"
  * </pre>
  *
  * So unary minus binds tighter than {@code **}, and {@code **} associates to the left: {@code -4 ** 2} is
  * 16 and {@code 3 ** 4 ** 5} is {@code (3 ** 4) ** 5} (DMN 1.5, 10.3.1.2). A number is FEEL's numeric
  * literal (grammar rule 35), with an optional exponent as in {@code 1.2e3}; a string takes FEEL's escape
  * sequences (rule 64): {@code \n}, {@code \r}, {@code \t}, {@code \'}, {@code \"}, {@code \\}, and a
- * code point as a backslash, {@code u} and four hexadecimal digits or {@code U} and six.
+ * code point as a backslash, {@code u} and four hexadecimal digits or {@code U} and six. A date time literal is an
+ * at-literal or an invocation of {@code date}, {@code time}, {@code date and time} or {@code duration}, read as cells
+ * read it ({@link TemporalLiterals}): {@code @"2025-01-31"}, {@code duration("P14D")}, {@code date(2025, 1, 31)}.
+ * Comments ({@code //} to the end of the line, {@code /* ... *&#47;}) are ignored.
  *
  * <p>A name is a FEEL name ({@link CellParser#isName}): words of letters, digits, {@code _} and {@code ?},
  * separated by single spaces or dots, as in {@code Credit Score} or {@code Applicant.age}. A name
@@ -156,6 +159,9 @@ final class ExpressionParser {
         if (c == '"') {
             return new Literal(string());
         }
+        if (TemporalLiterals.startsAt(text, position)) {
+            return dateTimeLiteral();
+        }
         if (Character.isDigit(c) || c == '.' && position + 1 < text.length() && Character.isDigit(text.charAt(position + 1))) {
             return new Literal(number());
         }
@@ -163,6 +169,17 @@ final class ExpressionParser {
             return name();
         }
         throw unsupported("unexpected '" + c + "'");
+    }
+
+    /** A date time literal: an at-literal, or an invocation of the date and time functions. */
+    private OutputExpression dateTimeLiteral() {
+        try {
+            var read = TemporalLiterals.read(text, position, null);
+            position = read.end();
+            return new Literal(read.value());
+        } catch (IllegalArgumentException e) {
+            throw unsupported(e.getMessage());
+        }
     }
 
     /**

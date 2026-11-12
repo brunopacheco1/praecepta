@@ -5,7 +5,6 @@
  */
 package io.github.brunopacheco1.praecepta.engine.feel;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -14,23 +13,33 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 
 /**
  * An output entry that computes its value, as DMN allows any FEEL expression there: the subset
- * Praecepta supports joins string and number literals and the names of inputs with {@code +},
- * {@code -}, {@code *}, {@code /}, {@code **}, unary minus and parentheses, as in
- * {@code Symptom + " is in the list of Flu symptoms"}, {@code (price - discount) * 1.2} or
- * {@code amount * (1 + rate) ** years}.
+ * Praecepta supports joins literals (strings, numbers, and dates, times, date-times and durations written as
+ * {@code TemporalLiterals} reads them) and the names of inputs with {@code +}, {@code -}, {@code *}, {@code /},
+ * {@code **}, unary minus and parentheses, as in {@code Symptom + " is in the list of Flu symptoms"},
+ * {@code (price - discount) * 1.2}, {@code amount * (1 + rate) ** years}, {@code due + duration("P14D")} or
+ * {@code returned - sent}.
  *
- * <p>FEEL's semantics (DMN 1.5, Tables 57, 59 and 60): {@code +} concatenates two strings or adds two
- * numbers; the other operators take numbers. Numbers are decimals, and every result is rounded to 34
+ * <p>FEEL's semantics (DMN 1.5, Tables 57, 59, 60 and 62): {@code +} concatenates two strings or adds two
+ * numbers; the other operators take numbers; dates, times, date-times and durations combine as
+ * {@code FeelArithmetic} lists (a date plus a duration is a date, two date-times subtract to a days and time
+ * duration, a duration scales by a number, two durations of a kind divide to a number). Numbers are decimals, and every result is rounded to 34
  * digits (FEEL's decimal128), ties to the even neighbour. An operand that is missing (null) makes the
  * result missing, and so does a result FEEL does not define: a division by zero, zero to a negative
  * power, a negative number to a power that is not whole, an exponent beyond 999,999,999 either way, or a
  * number too large or too small for a decimal128. As FEEL has it, unary minus binds tighter than
  * {@code **}, so {@code -4 ** 2} is 16, and {@code **} associates to the left like the other operators.
- * A string and a number never combine (FEEL gives null); {@link #type} rejects them before any evaluation.
+ * A string and a number never combine (FEEL gives null); {@link #type} rejects them, and any other pair of types
+ * FEEL does not combine, before any evaluation. Where the types combine but a value does not, the result is null as
+ * well: a date and time with a zone minus one without, a date plus a month that it does not have
+ * ({@code date("2025-01-31") + duration("P1M")}), a result beyond the type's range.
  */
 public sealed interface OutputExpression {
 
-    /** A string ({@code String}) or number ({@code BigDecimal}) literal. */
+    /**
+     * A literal: a {@code String}, a {@code BigDecimal}, or a date, time, date and time or duration ({@code LocalDate},
+     * {@code LocalTime}, {@code OffsetTime}, {@link ZonedTime}, {@code LocalDateTime}, {@code ZonedDateTime},
+     * {@code Duration}, {@link YearsAndMonths}).
+     */
     record Literal(Object value) implements OutputExpression {
     }
 
@@ -94,77 +103,69 @@ public sealed interface OutputExpression {
     }
 
     /**
-     * The type of the expression's value, {@code STRING} or {@code NUMBER}, given the type of each input
-     * it names.
+     * The type of the expression's value, given the type of each input it names: a string, a number, or a date,
+     * time, date and time or duration, as FEEL's arithmetic gives it ({@code FeelArithmetic}).
      *
      * @param inputs the type of each input the expression names; null for a name that is not an input
-     * @throws ExpressionTypeException if a name is not an input, an input is of another type, or an operator
-     *                                 gets a string and a number, or a string where only numbers go
+     * @throws ExpressionTypeException if a name is not an input, an input is a boolean, or an operator gets two
+     *                                 types FEEL does not combine (a string and a number, a date and a time, two
+     *                                 dates added...), for which FEEL gives null
      */
     default ColumnType type(Function<String, ColumnType> inputs) {
         return switch (this) {
-            case Literal(var value) -> value instanceof String ? ColumnType.STRING : ColumnType.NUMBER;
+            case Literal(var value) -> TemporalLiterals.typeOf(value);
             case Name(var name) -> {
                 var type = inputs.apply(name);
                 if (type == null) {
                     throw new ExpressionTypeException("'%s' is not an input".formatted(name));
                 }
-                if (type != ColumnType.STRING && type != ColumnType.NUMBER) {
-                    throw new ExpressionTypeException("'%s' is a %s; output expressions combine strings and numbers"
-                            .formatted(name, type.feelName()));
+                if (type == ColumnType.BOOLEAN) {
+                    throw new ExpressionTypeException(("'%s' is a %s; output expressions combine strings, numbers, dates, times "
+                            + "and durations").formatted(name, type.feelName()));
                 }
                 yield type;
             }
             case Negation(var operand) -> {
-                if (operand.type(inputs) != ColumnType.NUMBER) {
-                    throw new ExpressionTypeException("- applies to numbers, not strings");
+                var operandType = operand.type(inputs);
+                var type = FeelArithmetic.negationType(operandType);
+                if (type == null) {
+                    throw new ExpressionTypeException("- applies to numbers and durations, not to a " + operandType.feelName());
                 }
-                yield ColumnType.NUMBER;
+                yield type;
             }
             case Arithmetic(var operator, var left, var right) -> {
                 var leftType = left.type(inputs);
                 var rightType = right.type(inputs);
-                if (leftType != rightType) {
+                var type = FeelArithmetic.type(operator, leftType, rightType);
+                if (type == null) {
                     throw new ExpressionTypeException("%s combines a %s and a %s, which gives null in FEEL"
                             .formatted(operator.symbol(), leftType.feelName(), rightType.feelName()));
                 }
-                if (leftType == ColumnType.STRING && operator != Operator.ADD) {
-                    throw new ExpressionTypeException(operator.symbol() + " applies to numbers, not strings");
-                }
-                yield leftType;
+                yield type;
             }
         };
     }
 
     /**
-     * The expression's value: a {@code String}, a {@code BigDecimal}, or null if an operand is missing
-     * or FEEL defines no result (a division by zero, say). The expression must have passed {@link #type}.
+     * The expression's value: a value of the type {@link #type} gives, or null if an operand is missing or FEEL
+     * defines no result (a division by zero, a day the month does not have, say). The expression must have passed
+     * {@link #type}.
      *
-     * @param inputs the value of each input it names: a {@code String} or {@code BigDecimal}, or null if missing
+     * @param inputs the value of each input it names, of its type (a years and months duration as a
+     *               {@link YearsAndMonths}), or null if missing
      */
     default Object evaluate(Function<String, Object> inputs) {
         return switch (this) {
             case Literal(var value) -> value;
             case Name(var name) -> inputs.apply(name);
-            case Negation(var operand) -> operand.evaluate(inputs) instanceof BigDecimal number ? FeelNumbers.negate(number) : null;
+            case Negation(var operand) -> {
+                var value = operand.evaluate(inputs);
+                yield value == null ? null : FeelArithmetic.negate(value);
+            }
             case Arithmetic(var operator, var left, var right) -> {
                 var a = left.evaluate(inputs);
                 var b = right.evaluate(inputs);
-                if (a == null || b == null) {
-                    yield null;
-                }
-                if (a instanceof String first) {
-                    yield first + b;
-                }
-                var x = (BigDecimal) a;
-                var y = (BigDecimal) b;
-                yield switch (operator) {
-                    case ADD -> FeelNumbers.add(x, y);
-                    case SUBTRACT -> FeelNumbers.subtract(x, y);
-                    case MULTIPLY -> FeelNumbers.multiply(x, y);
-                    case DIVIDE -> FeelNumbers.divide(x, y);
-                    case POWER -> FeelNumbers.power(x, y);
-                };
+                yield a == null || b == null ? null : FeelArithmetic.apply(operator, a, b);
             }
         };
     }
