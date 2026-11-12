@@ -82,6 +82,10 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   it holds when some element differs. `UnaryTests.NotEqual` holds it; `DmnWriter` writes it back as `!= x` (on a
   list column, `some x in ? satisfies x != "PT"`, which `DmnReader` reads), and the index, the validation report
   and every integration treat it as the engine does.
+- **Numbers that start with their fraction or have an exponent** ([#81](https://github.com/brunopacheco1/praecepta/issues/81)):
+  a number in a cell, a value list or a DMN entry may be written `.5` or `1.2e3` (`1E-2`, `2.5E+1`), as FEEL's
+  numeric literal allows (grammar rule 35; 10.3.2.3.1: "FEEL supports literal scientific notation, e.g., 1.2e3"),
+  as output expressions already read them. `DmnWriter` writes such a number as plain digits (`1200`).
 
 ### Changed
 - **`DmnReader` uses the JDK's own XML parser** ([#96](https://github.com/brunopacheco1/praecepta/issues/96)):

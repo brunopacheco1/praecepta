@@ -117,6 +117,19 @@ class FeelLiteralFormsTest {
                 .contains("<text>some x in ? satisfies x != \"PT\" or some x in ? satisfies x != null</text>");
     }
 
+    // ---- numbers -------------------------------------------------------------------------------
+
+    @Test
+    void numbers_with_a_leading_fraction_or_an_exponent_are_values() {
+        var engine = engine(ColumnType.NUMBER, "< 1E-2, [.5..1.2e3]");
+        Assertions.assertThat(engine.evaluate(input("0.009"))).containsExactly("1");
+        Assertions.assertThat(engine.evaluate(input("0.01"))).isEmpty();
+        Assertions.assertThat(engine.evaluate(input("0.5"))).containsExactly("1");
+        Assertions.assertThat(engine.evaluate(input("1200"))).containsExactly("1");
+        Assertions.assertThat(engine.evaluate(input("1200.5"))).isEmpty();
+        Assertions.assertThat(DmnWriter.write(table(ColumnType.NUMBER, false, "1.2e3"))).contains("<text>1200</text>");
+    }
+
     // ---- fixtures ------------------------------------------------------------------------------
 
     private static PraeceptaEngine<Map<String, String>, String> engine(ColumnType type, String cell) {

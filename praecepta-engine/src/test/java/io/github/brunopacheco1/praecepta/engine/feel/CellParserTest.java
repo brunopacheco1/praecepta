@@ -56,6 +56,32 @@ class CellParserTest {
                 .isEqualTo(positive(new NotEqual(new Equals(LocalDate.of(2025, 1, 31)))));
     }
 
+    @ParameterizedTest
+    @CsvSource(delimiter = ';', value = {
+            ".5;        0.5",
+            "-.5;       -0.5",
+            "1.2e3;     1200",
+            "1E-2;      0.01",
+            "2.50E+1;   25",
+            "0e0;       0",
+    })
+    void numbers_may_start_with_their_fraction_and_have_an_exponent(String literal, BigDecimal value) {
+        // DMN 1.5, 10.3.2.3.1: "FEEL supports literal scientific notation, e.g., 1.2e3"
+        var cell = CellParser.parseFeel(literal, ColumnType.NUMBER);
+        Assertions.assertThat(cell.values().orElseThrow()).singleElement()
+                .satisfies(number -> Assertions.assertThat((BigDecimal) number).isEqualByComparingTo(value));
+        Assertions.assertThat(CellParser.parse("< " + literal + ", [" + literal + ".." + literal + "]", ColumnType.NUMBER).tests())
+                .hasSize(2);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1.", ".", "1e", "1.2.3", "--1", "1e1.5", "1e9999999999", "+1"})
+    void numbers_follow_feels_numeric_literal(String literal) {
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel(literal, ColumnType.NUMBER))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining("is not a number");
+    }
+
     @Test
     void a_list_column_reads_not_equal_on_its_elements() {
         Assertions.assertThat(CellParser.parseFeelList("some x in ? satisfies x != \"PT\" or some x in ? satisfies x != null",

@@ -467,7 +467,9 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     private static Arbitrary<String> literal(Column column) {
         return switch (column.type()) {
             case STRING -> stringLiteral(column.domain());
-            case NUMBER -> Arbitraries.integers().between(0, 5).map(String::valueOf);
+            // in each of FEEL's forms: digits, a fraction alone, an exponent (grammar rule 35)
+            case NUMBER -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(String.valueOf(i), i + ".0", i + "0E-1",
+                    "." + i + "e1", i + "e+0"));
             case DATE -> Arbitraries.integers().between(0, 5).flatMap(d -> Arbitraries.of(
                     "date(\"" + DAY0.plusDays(d) + "\")", DAY0.plusDays(d).toString()));
             case BOOLEAN -> Arbitraries.of("true", "false");

@@ -148,7 +148,7 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 |---|---|---|
 | blank or `-` | any value, including a missing one | all |
 | `"PT","ES"` or `PT,ES` | one of the values (unquoted words are string literals) | STRING |
-| `18`, `2.5` | that number (`1.0` equals `1`) | NUMBER |
+| `18`, `2.5`, `.5`, `1.2e3` | that number (`1.0` equals `1`) | NUMBER |
 | `date("2025-01-31")` or `2025-01-31` | that date | DATE |
 | `true`, `false` | that boolean | BOOLEAN |
 | `time("08:30:00")` or `08:30:00` | that time of day | TIME |

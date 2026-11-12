@@ -33,7 +33,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   "PT", "ES"               string literals (STRING columns)
  *   PT, ES                   unquoted words are string literals too (Praecepta's original syntax)
  *   "a\tb", "\U01F40E"       escape sequences in quoted strings: \" \\ \' \n \r \t and code points (FEEL rule 64)
- *   18, 2.5                  number literals (NUMBER columns)
+ *   18, 2.5, .5, 1.2e3       number literals, with an optional exponent (NUMBER columns)
  *   date("2025-01-31")       date literal (DATE columns; a bare 2025-01-31 is accepted as well)
  *   time("08:30:00")         time literal (TIME columns; a bare 08:30:00 is accepted as well)
  *   time("08:30:00+01:00")   time with an offset (Z, +01:00), compared by instant with other such times
@@ -67,7 +67,11 @@ public final class CellParser {
 
     /** Two-character operators come first, so that {@code <= 5} is not read as {@code <} and {@code = 5}. */
     private static final List<Operator> OPERATORS = List.of(Operator.LE, Operator.GE, Operator.LT, Operator.GT);
-    private static final Pattern NUMBER = Pattern.compile("-?\\d+(\\.\\d+)?");
+    /**
+     * FEEL's numeric literal (DMN 1.5, grammar rule 35, and 10.3.2.3.1: "an optional decimal point, and an optional
+     * exponent"): digits with an optional fraction, or a fraction alone, then an optional exponent.
+     */
+    private static final Pattern NUMBER = Pattern.compile("-?(\\d+(\\.\\d+)?|\\.\\d+)([eE][+-]?\\d+)?");
     private static final Pattern DATE_CALL = Pattern.compile("date\\(\\s*\"([^\"]*)\"\\s*\\)");
     private static final Pattern BARE_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
     private static final Pattern TIME_CALL = Pattern.compile("time\\(\\s*\"([^\"]*)\"\\s*\\)");
@@ -512,10 +516,14 @@ public final class CellParser {
         }
 
         private BigDecimal number(String text) {
-            if (!NUMBER.matcher(text).matches()) {
-                throw new CellSyntaxException(cell, "'" + text + "' is not a number");
+            if (NUMBER.matcher(text).matches()) {
+                try {
+                    return new BigDecimal(text);
+                } catch (NumberFormatException e) {
+                    // an exponent beyond what a BigDecimal holds
+                }
             }
-            return new BigDecimal(text);
+            throw new CellSyntaxException(cell, "'" + text + "' is not a number");
         }
 
         private Boolean bool(String text) {
