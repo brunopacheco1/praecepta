@@ -93,8 +93,11 @@ A new integration or other module needs these, and nothing else:
    commented with the issue (`<!-- Spring Boot starter (#20) -->`), and only exact, current, stable
    releases from Maven Central. A framework's BOM is imported in the module's own
    `<dependencyManagement>` (importing it in the parent would change the versions every other module
-   resolves), with its version property in the parent. The enforcer's `dependencyConvergence` applies to
-   every module.
+   resolves), with its version property in the parent. The parent's JUnit artifacts are declared one by
+   one rather than imported from `junit-bom`, since a module's `<dependencyManagement>` is published with
+   it and no consumer needs JUnit's; being declared, they also win over the JUnit a framework's BOM
+   manages. A test that needs another JUnit artifact adds it there. The enforcer's `dependencyConvergence`
+   applies to every module.
 3. **Publishing:** nothing to list. The release builds every module but the benchmarks and the TCK runner
    and publishes every one that does not opt out; the GitHub release, provenance and third-party notices
    find the published jars themselves (`.github/scripts/published_modules.py`). A module that must never

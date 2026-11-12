@@ -30,10 +30,17 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   with `newDefaultInstance()`, the JDK's built-in parser, which its security settings (no DTDs, no external
   entities) are written for. **Upgrade note:** an application with another DOM parser on the class path,
   such as Xerces, or with that system property set, used to read DMN files with that parser and now reads
-  them with the JDK's; valid DMN files read the same, but the messages of a malformed file are the JDK
-  parser's. The engine's native-image metadata no longer registers JAXP's service file
+  them with the JDK's, with its security settings applied as intended; a malformed file's message is the
+  JDK parser's. The engine's native-image metadata no longer registers JAXP's service file
   (`META-INF/services/javax.xml.parsers.DocumentBuilderFactory`), which only that lookup needed; it still
   keeps the parser's messages.
+- **The published POMs no longer import the JUnit BOM** ([#98](https://github.com/brunopacheco1/praecepta/issues/98)):
+  the parent POM, which every published module inherits, imported `org.junit:junit-bom` in its
+  `dependencyManagement`, as did the Spring Boot starter and the Micronaut module, so every build that read a
+  Praecepta POM (Maven and Gradle alike, the Gradle plugin's marker included) resolved the JUnit BOM, although
+  no published module depends on JUnit. The parent now declares the JUnit artifacts the build uses
+  (`junit-jupiter`, its `-api`, `-engine` and `-params`, and `junit-platform-commons`, `-engine` and
+  `-launcher`) each at `junit.version`. Every module resolves the same JUnit as before.
 
 ### Fixed
 - **Validation issues were logged twice in the integrations**
