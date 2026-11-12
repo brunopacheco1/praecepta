@@ -136,7 +136,7 @@ class OutputExpressionsTest {
 
     @Test
     void an_aggregation_gets_a_computed_output_that_is_missing_as_null() {
-        // the strategy skips missing values, as a sum over FEEL's nulls would leave them out
+        // FEEL's sum is null for a list that holds null (DMN 1.5, 10.3.4.4): the engine gives the missing output itself
         var engine = PraeceptaEngine.<Order, Optional<BigDecimal>>builder()
                 .hitPolicy(HitPolicy.COLLECT)
                 .aggregation(AggregationOperator.SUM)
@@ -150,7 +150,7 @@ class OutputExpressionsTest {
 
                     @Override
                     public Optional<BigDecimal> sum(Optional<BigDecimal> a, Optional<BigDecimal> b) {
-                        return a.isEmpty() ? b : b.isEmpty() ? a : Optional.of(a.get().add(b.get()));
+                        return Optional.of(a.orElseThrow().add(b.orElseThrow()));
                     }
                 })
                 .rules(List.of(rule(1, Map.of(), Map.of("fee", "5"), Map.of()), rule(2, Map.of(), Map.of(), Map.of("fee", "price * 0.1")),
@@ -158,10 +158,10 @@ class OutputExpressionsTest {
                 .build();
         Assertions.assertThat(engine.evaluate(new Order("PT", new BigDecimal(30), new BigDecimal(2), null)))
                 .containsExactly(Optional.of(new BigDecimal("23")));
-        // no discount: price / discount is missing
-        Assertions.assertThat(engine.evaluate(new Order("PT", new BigDecimal(30), null, null))).containsExactly(Optional.of(new BigDecimal("8")));
-        // no price: only the literal fee is left
-        Assertions.assertThat(engine.evaluate(new Order("PT", null, null, null))).containsExactly(Optional.of(new BigDecimal("5")));
+        // no discount: price / discount is missing, and so is the sum
+        Assertions.assertThat(engine.evaluate(new Order("PT", new BigDecimal(30), null, null))).containsExactly(Optional.empty());
+        // no price: two outputs are missing
+        Assertions.assertThat(engine.evaluate(new Order("PT", null, null, null))).containsExactly(Optional.empty());
     }
 
     @Test

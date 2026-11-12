@@ -168,10 +168,12 @@ final class SourceGenerator {
             """;
 
     /**
-     * The output strategy of an aggregating table, whose one NUMBER output is checked when compiling;
-     * missing values are skipped, and sums keep FEEL's 34 significant digits (DMN 1.5, 10.3.2.3.1), as the
-     * framework integrations' map-based engines do. It is pasted mid-line after {@code .output(} in the decision
-     * class, so its first line has no indentation and the others carry the generated file's own.
+     * The output strategy of an aggregating table, whose one NUMBER output is checked when compiling; sums
+     * keep FEEL's 34 significant digits (DMN 1.5, 10.3.2.3.1), as the framework integrations' map-based engines
+     * do. The engine never passes it a missing value: a matching rule whose output is missing is the result
+     * (FEEL's {@code sum}, {@code min} and {@code max} are null for a list that holds null, 10.3.4.4). It is
+     * pasted mid-line after {@code .output(} in the decision class, so its first line has no indentation and the
+     * others carry the generated file's own.
      */
     private static final String AGGREGATING_OUTPUT = """
             new io.github.brunopacheco1.praecepta.engine.OutputStrategy<${Output}>() {
@@ -182,18 +184,17 @@ final class SourceGenerator {
 
                                     @Override
                                     public ${Output} sum(${Output} a, ${Output} b) {
-                                        return a.${field}() == null ? b : b.${field}() == null ? a
-                                                : new ${Output}(a.${field}().add(b.${field}(), java.math.MathContext.DECIMAL128));
+                                        return new ${Output}(a.${field}().add(b.${field}(), java.math.MathContext.DECIMAL128));
                                     }
 
                                     @Override
                                     public ${Output} min(${Output} a, ${Output} b) {
-                                        return a.${field}() == null ? b : b.${field}() == null || a.${field}().compareTo(b.${field}()) <= 0 ? a : b;
+                                        return a.${field}().compareTo(b.${field}()) <= 0 ? a : b;
                                     }
 
                                     @Override
                                     public ${Output} max(${Output} a, ${Output} b) {
-                                        return a.${field}() == null ? b : b.${field}() == null || a.${field}().compareTo(b.${field}()) >= 0 ? a : b;
+                                        return a.${field}().compareTo(b.${field}()) >= 0 ? a : b;
                                     }
 
                                     @Override
@@ -354,9 +355,9 @@ final class SourceGenerator {
             return "the selected output";
         }
         return switch (table.aggregation()) {
-            case SUM -> "the sum of the matching rules' outputs";
-            case MIN -> "the smallest of the matching rules' outputs";
-            case MAX -> "the largest of the matching rules' outputs";
+            case SUM -> "the sum of the matching rules' outputs (null if one of them is null)";
+            case MIN -> "the smallest of the matching rules' outputs (null if one of them is null)";
+            case MAX -> "the largest of the matching rules' outputs (null if one of them is null)";
             case COUNT -> "the number of matching rules";
         };
     }

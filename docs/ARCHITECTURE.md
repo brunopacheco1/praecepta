@@ -107,7 +107,10 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
    only those, so a lookup by code touches a word or two instead of the whole table. The hit policy
    then reads the result: FIRST and PRIORITY take the lowest set bit (bits are numbered in rule or
    priority order), UNIQUE and ANY check their constraint, RULE ORDER, OUTPUT ORDER and COLLECT walk
-   the set bits, and COLLECT aggregates with SUM, MIN, MAX or COUNT (`OutputStrategy`).
+   the set bits, and COLLECT aggregates with SUM, MIN, MAX or COUNT (`OutputStrategy`). The engine, not the
+   strategy, applies FEEL's null semantics to SUM, MIN and MAX over a table's one output: a matching rule whose
+   output is missing is the result, and the strategy combines only outputs that are present, so the generated
+   classes, the framework integrations' map-based engine and any other strategy agree.
 4. **Validation** (`TableAnalysis`, `ValidationReport`), when the engine is built: overlapping rules
    (UNIQUE), conflicting outputs (ANY), rules that can never fire (FIRST, PRIORITY), and gaps
    (declared inputs that no rule covers, with an example). The analysis is exact, because it searches

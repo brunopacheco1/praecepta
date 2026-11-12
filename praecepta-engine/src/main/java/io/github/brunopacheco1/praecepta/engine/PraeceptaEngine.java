@@ -138,6 +138,13 @@ public final class PraeceptaEngine<I, O> {
 
     /** The COLLECT aggregation combining outputs (SUM, MIN, MAX), or null. */
     private final BinaryOperator<O> reduce;
+    /**
+     * SUM, MIN and MAX of a table with one output: that output, whose being missing in a matching rule makes
+     * the aggregate missing (see {@link #aggregate}); null otherwise.
+     */
+    private final String aggregatedOutput;
+    /** By bit, for a rule whose output reads no input: whether its {@link #aggregatedOutput} is missing. */
+    private final boolean[] missingAggregateByBit;
     /** COUNT only: the output for each number of matching rules; null otherwise. */
     private final IntFunction<O> count;
     /** The result when no rule matches: the default output if there is one, else empty, whatever the aggregation. */
@@ -208,6 +215,12 @@ public final class PraeceptaEngine<I, O> {
                 ? sameOutputMasks(rules, bitToRule, index.words(), builder.maskForm, numericOutputs)
                 : null;
         reduce = reducer(builder.aggregation, builder.outputStrategy);
+        aggregatedOutput = reduce == null ? null : onlyOutput(builder.tableOutputTypes, rules);
+        missingAggregateByBit = new boolean[ruleCount];
+        for (int bit = 0; bit < ruleCount; bit++) {
+            missingAggregateByBit[bit] = aggregatedOutput != null && computedByBit[bit] == null
+                    && rules.get(bitToRule[bit]).output().values().get(aggregatedOutput) == null;
+        }
         count = builder.aggregation == AggregationOperator.COUNT ? builder.outputStrategy::count : null;
         if (count != null) {
             count.apply(1); // so that a strategy without count fails here, not when a rule first matches
@@ -234,7 +247,9 @@ public final class PraeceptaEngine<I, O> {
      * @return the outputs selected by the hit policy: at most one for single-hit policies (and for
      *         aggregations), several for multi-hit ones. If no rule matches: the default output alone, if
      *         there is one ({@link Builder#defaultOutput}), else empty, whatever the hit policy and
-     *         aggregation (COUNT included: DMN 1.5, 10.3.2.10, gives null, not zero)
+     *         aggregation (COUNT included: DMN 1.5, 10.3.2.10, gives null, not zero). A SUM, MIN or MAX
+     *         of a table with one output is missing when that output is missing in a matching rule: the
+     *         result is then that rule's output (see {@link OutputStrategy#transform})
      * @throws HitPolicyViolationException if the input matches several rules under UNIQUE, or rules
      *                                     with different outputs under ANY
      * @throws InvalidInputException       if a value is outside its column's declared input values, or
@@ -275,21 +290,45 @@ public final class PraeceptaEngine<I, O> {
                 if (count != null) {
                     yield List.of(count.apply(BitsetIndex.count(matches)));
                 }
+                if (reduce != null) {
+                    yield aggregate(matches, input, reader);
+                }
                 var selected = new Object[BitsetIndex.count(matches)];
                 int i = 0;
                 for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
                     selected[i++] = computedByBit[bit] == null ? outputByBit[bit] : outputStrategy.transform(output(bit, input, reader));
                 }
-                if (reduce != null) {
-                    var total = (O) selected[0];
-                    for (int k = 1; k < selected.length; k++) {
-                        total = reduce.apply(total, (O) selected[k]);
-                    }
-                    yield List.of(total);
-                }
                 yield (List<O>) List.of(selected);
             }
         };
+    }
+
+    /**
+     * SUM, MIN or MAX of the matching rules' outputs (one at least). FEEL's {@code sum}, {@code min} and
+     * {@code max} give null for a list that holds null (DMN 1.5, 10.3.4.4 and 10.3.2.16), so where the table's
+     * one output is missing in a matching rule, the aggregate is missing: the result is that rule's output, as
+     * converted, and the strategy combines nothing.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> List<O> aggregate(long[] matches, T input, BitsetIndex.ColumnReader<T> reader) {
+        O total = null;
+        for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
+            O output;
+            if (computedByBit[bit] == null) {
+                if (missingAggregateByBit[bit]) {
+                    return singleByBit[bit];
+                }
+                output = (O) outputByBit[bit];
+            } else {
+                var computed = output(bit, input, reader);
+                output = outputStrategy.transform(computed);
+                if (aggregatedOutput != null && computed.values().get(aggregatedOutput) == null) {
+                    return List.of(output);
+                }
+            }
+            total = total == null ? output : reduce.apply(total, output);
+        }
+        return List.of(total);
     }
 
     /** The hit policy. */
@@ -739,6 +778,23 @@ public final class PraeceptaEngine<I, O> {
         return masks;
     }
 
+    /**
+     * The table's output, if it has exactly one: DMN aggregates a single output (8.2.11, "decision tables with
+     * compound outputs do not support aggregation"). The outputs are those a {@linkplain Builder#table table}
+     * declares, or else those the rules give; null if there are several, whose aggregation the strategy defines.
+     */
+    private static String onlyOutput(Map<String, ColumnType> declared, List<Praeceptum> rules) {
+        var outputs = new HashSet<>(declared.keySet());
+        if (outputs.isEmpty()) {
+            for (var rule : rules) {
+                outputs.addAll(rule.output().values().keySet());
+                outputs.addAll(rule.output().references().keySet());
+                outputs.addAll(rule.output().expressions().keySet());
+            }
+        }
+        return outputs.size() == 1 ? outputs.iterator().next() : null;
+    }
+
     private static <O> BinaryOperator<O> reducer(AggregationOperator aggregation, OutputStrategy<O> strategy) {
         if (aggregation == null) {
             return null;
@@ -1121,7 +1177,9 @@ public final class PraeceptaEngine<I, O> {
         /**
          * Aggregates COLLECT results into a single output, using the output strategy's sum/min/max/count. When
          * no rule matches, there is nothing to aggregate: the result is the default output ({@link #defaultOutput}),
-         * or none, COUNT included (DMN 1.5, 10.3.2.10, step 2).
+         * or none, COUNT included (DMN 1.5, 10.3.2.10, step 2). SUM, MIN and MAX of a table with one output are
+         * missing when that output is missing in a matching rule, as FEEL's {@code sum}, {@code min} and {@code max}
+         * are null for a list that holds null (10.3.4.4); COUNT counts every matching rule.
          */
         public Builder<I, O> aggregation(AggregationOperator aggregation) {
             this.aggregation = Objects.requireNonNull(aggregation, "aggregation");

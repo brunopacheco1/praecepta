@@ -188,7 +188,10 @@ final class TckRunner {
         };
     }
 
-    /** One output per matching rule; aggregations sum, min, max or count the single NUMBER output. */
+    /**
+     * One output per matching rule; aggregations sum, min, max or count the single NUMBER output. The engine
+     * passes no missing output to sum, min and max: a matching rule whose output is missing is the result.
+     */
     private static OutputStrategy<PraeceptaOutput> outputs(DecisionTable table) {
         var column = table.outputs().getFirst().name();
         return new OutputStrategy<>() {
@@ -218,12 +221,9 @@ final class TckRunner {
             }
 
             private PraeceptaOutput combine(PraeceptaOutput a, PraeceptaOutput b, BinaryOperator<BigDecimal> operator) {
-                var x = a.values().get(column);
-                var y = b.values().get(column);
-                if (x == null || y == null) {
-                    return x == null ? b : a;
-                }
-                return new PraeceptaOutput(Map.of(column, operator.apply(new BigDecimal(x), new BigDecimal(y)).toPlainString()));
+                var x = new BigDecimal(a.values().get(column));
+                var y = new BigDecimal(b.values().get(column));
+                return new PraeceptaOutput(Map.of(column, operator.apply(x, y).toPlainString()));
             }
         };
     }

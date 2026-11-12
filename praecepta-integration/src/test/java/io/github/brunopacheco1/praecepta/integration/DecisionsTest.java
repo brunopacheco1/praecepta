@@ -95,7 +95,7 @@ class DecisionsTest {
     }
 
     @Test
-    void sums_keep_feel_precision_and_skip_missing_values() {
+    void sums_keep_feel_precision_and_are_missing_where_an_output_is() {
         var table = DmnReader.readAll(stream("""
                 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
                   <decision id="total" name="Total"><decisionTable hitPolicy="COLLECT" aggregation="SUM">
@@ -112,9 +112,40 @@ class DecisionsTest {
                 </definitions>""")).getFirst();
         var engine = Decision.of("total", table).engine();
         // 1234567890123456789012345678901234.1 has 35 digits: rounded to 34, ties to even
-        Assertions.assertThat(engine.evaluate(Map.of("zone", "x"))).containsExactly(Map.of("total", "1234567890123456789012345678901234"));
+        Assertions.assertThat(engine.evaluate(Map.of("zone", "x", "extra", "0")))
+                .containsExactly(Map.of("total", "1234567890123456789012345678901234"));
         Assertions.assertThat(engine.evaluate(Map.of("zone", "x", "extra", "0.9")))
                 .containsExactly(Map.of("total", "1234567890123456789012345678901235"));
+        // without extra, the second rule's output is missing, and so is the sum (FEEL: sum([0.1, null, ...]) is null, #90)
+        var missing = new HashMap<String, String>();
+        missing.put("total", null);
+        Assertions.assertThat(engine.evaluate(Map.of("zone", "x"))).containsExactly(missing);
+    }
+
+    /** FEEL's min and max are null for a list that holds null, as sum is; count counts every item (#90). */
+    @ParameterizedTest
+    @CsvSource(nullValues = "null", value = {
+            "SUM,   null",
+            "MIN,   null",
+            "MAX,   null",
+            "COUNT, 2",
+    })
+    void a_literal_null_output_makes_sum_min_and_max_missing_but_is_counted(String aggregation, String expected) {
+        var table = DmnReader.readAll(stream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="fee" name="Fee"><decisionTable hitPolicy="COLLECT" aggregation="%s">
+                    <input><inputExpression typeRef="string"><text>zone</text></inputExpression></input>
+                    <output name="fee" typeRef="number"/>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>10</text></outputEntry></rule>
+                    <rule><inputEntry><text>"islands"</text></inputEntry><outputEntry><text>null</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""".formatted(aggregation))).getFirst();
+        var engine = Decision.of("fee", table).engine();
+        var result = new HashMap<String, String>();
+        result.put("fee", expected);
+        Assertions.assertThat(engine.evaluate(Map.of("zone", "islands"))).containsExactly(result);
+        Assertions.assertThat(engine.evaluate(Map.of("zone", "mainland")))
+                .containsExactly(Map.of("fee", aggregation.equals("COUNT") ? "1" : "10"));
     }
 
     /** DMN 1.5, 10.3.2.10: a table's default output values are its result when no rule matches (#79). */

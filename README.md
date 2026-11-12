@@ -316,9 +316,10 @@ Supported:
   output strategy; `AggregationOperator.check(outputs)` says where DMN defines them: on a single output,
   SUM over numbers, MIN and MAX over any ordered type, COUNT over any. They apply only when a rule
   matches: when none does, the result is the default output, or none (`[]`), whatever the aggregation,
-  so COUNT gives no output rather than 0 (DMN 1.5, 10.3.2.10, step 2). As in Praecepta's generated classes
-  and framework integrations, an aggregation skips missing outputs, where FEEL's `sum`, `min` and `max`
-  would give null (10.3.4): a known deviation.
+  so COUNT gives no output rather than 0 (DMN 1.5, 10.3.2.10, step 2). When a matching rule's output is
+  missing (a `null` entry, or an expression with a missing operand), SUM, MIN and MAX are missing too, as
+  FEEL's `sum`, `min` and `max` are null for a list that holds null (10.3.4.4): the engine gives that rule's
+  output (`[{fee=null}]`), and COUNT counts the rule.
 
 Anything else is rejected with a message naming the decision, rule and column: function calls such as
 `upper case(a)`, `if`, `=` and `!=` tests and other FEEL literal forms
@@ -402,7 +403,8 @@ Optional<DiscountOutput> discount = Discount.evaluate(new DiscountInput(Discount
 
 Single-hit tables (and aggregations) return an `Optional`; multi-hit tables return a `List`. When no
 rule matches, these are empty (a COUNT too, rather than 0), unless the DMN table declares default output
-values: then they hold the default output.
+values: then they hold the default output. A SUM, MIN or MAX over a matching rule whose output is missing
+is an output whose value is null (`TotalOutput[total=null]`), as in FEEL.
 Generated code belongs to your project, so it carries no Praecepta licence header. Set
 `<fileHeader>` to prepend your own, such as your project's SPDX lines.
 `Discount.validationReport()` gives the build-time findings, and `Discount.engine()` the engine.

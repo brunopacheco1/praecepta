@@ -21,7 +21,7 @@ public final class Fees {
     }
 
     /**
-     * @return the sum of the matching rules' outputs, or empty if no rule matches
+     * @return the sum of the matching rules' outputs (null if one of them is null), or empty if no rule matches
      * @throws io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException if the hit policy is violated
      * @throws io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException if a value is outside its column's value list
      */
@@ -56,18 +56,17 @@ public final class Fees {
 
                         @Override
                         public FeesOutput sum(FeesOutput a, FeesOutput b) {
-                            return a.fee() == null ? b : b.fee() == null ? a
-                                    : new FeesOutput(a.fee().add(b.fee(), java.math.MathContext.DECIMAL128));
+                            return new FeesOutput(a.fee().add(b.fee(), java.math.MathContext.DECIMAL128));
                         }
 
                         @Override
                         public FeesOutput min(FeesOutput a, FeesOutput b) {
-                            return a.fee() == null ? b : b.fee() == null || a.fee().compareTo(b.fee()) <= 0 ? a : b;
+                            return a.fee().compareTo(b.fee()) <= 0 ? a : b;
                         }
 
                         @Override
                         public FeesOutput max(FeesOutput a, FeesOutput b) {
-                            return a.fee() == null ? b : b.fee() == null || a.fee().compareTo(b.fee()) >= 0 ? a : b;
+                            return a.fee().compareTo(b.fee()) >= 0 ? a : b;
                         }
 
                         @Override

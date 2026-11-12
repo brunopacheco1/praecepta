@@ -25,6 +25,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -255,6 +256,52 @@ class TableCompilerTest {
             Assertions.assertThat(decision.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("total", generated.toPlainString()));
             Assertions.assertThat(generated).isEqualByComparingTo("1234567890123456789012345678901235");
         }
+    }
+
+    /**
+     * FEEL's {@code sum}, {@code min} and {@code max} are null for a list that holds null (DMN 1.5, 10.3.4.4), so a
+     * generated SUM, MIN or MAX is missing where a matching rule's output is, as the map-based engine of the framework
+     * integrations is; COUNT counts that rule (#90).
+     */
+    @ParameterizedTest
+    @CsvSource(nullValues = "null", value = {
+            // aggregation, islands without extra, islands with extra 1
+            "SUM,   null, 12",
+            "MIN,   null, 2",
+            "MAX,   null, 10",
+            "COUNT, 2,    2",
+    })
+    void a_generated_aggregation_is_missing_where_an_output_is_as_the_map_based_one(String aggregation, String withoutExtra,
+            String withExtra) throws Exception {
+        var dmn = out.resolve("extras-" + aggregation + ".dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="total" name="total"><decisionTable hitPolicy="COLLECT" aggregation="%s">
+                    <input><inputExpression typeRef="string"><text>zone</text></inputExpression></input>
+                    <input><inputExpression typeRef="number"><text>extra</text></inputExpression></input>
+                    <output name="total" typeRef="number"/>
+                    <rule><inputEntry><text>-</text></inputEntry><inputEntry><text>-</text></inputEntry>
+                      <outputEntry><text>10</text></outputEntry></rule>
+                    <rule><inputEntry><text>"islands"</text></inputEntry><inputEntry><text>-</text></inputEntry>
+                      <outputEntry><text>extra * 2</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""".formatted(aggregation));
+        var result = compile(new TableDefinition(dmn, "Total", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        var decision = Decision.of("total", DmnReader.read(Files.newInputStream(dmn)));
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".TotalInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Total").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("islands", null)))
+                    .get().hasToString("TotalOutput[total=" + withoutExtra + "]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("islands", BigDecimal.ONE)))
+                    .get().hasToString("TotalOutput[total=" + withExtra + "]");
+        }
+        var missing = new HashMap<String, String>();
+        missing.put("total", withoutExtra);
+        Assertions.assertThat(decision.evaluate(Map.of("zone", "islands"))).containsExactly(missing);
+        Assertions.assertThat(decision.evaluate(Map.of("zone", "islands", "extra", "1"))).containsExactly(Map.of("total", withExtra));
     }
 
     /** A COLLECT table aggregating one number output whose default is 9.90; on the islands, two rules sum to 35 digits. */

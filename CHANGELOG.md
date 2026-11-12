@@ -54,6 +54,23 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   Quarkus, for the tables it compiles) log `CompiledTable.report()` themselves; another build tool using
   `TableCompiler` logs the report as [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) describes. The classes the
   build plugins generate are unchanged: their engines still log the report when the application loads them.
+- **SUM, MIN and MAX of a missing output are missing**
+  ([#90](https://github.com/brunopacheco1/praecepta/issues/90)): a COLLECT aggregation skipped the matching
+  rules whose output was missing (a `null` output entry, an output that names a missing input, an expression
+  with a missing operand or a division by zero), so outputs of `10` and null summed to `10`. DMN 1.5
+  aggregates with FEEL's `sum`, `min` and `max` (8.2.11; 10.3.2.10, step 3b), which give null for a list that
+  holds null, as null is outside their parameters' domain (10.3.4.4, 10.3.2.16). The engine now applies this
+  itself, before the output strategy: under SUM, MIN or MAX, a table with one output whose output is missing in
+  a matching rule gives that rule's output, converted by the strategy, and `sum`, `min` and `max` of an
+  `OutputStrategy` only ever see outputs that are present. COUNT counts every matching rule, as before, and no
+  rule matching still gives the default output or none. **This changes results silently**: where some matching
+  rules have an output and others have none, a framework integration's engine now gives `[{fee=null}]` where it
+  gave the sum, minimum or maximum of the others, a generated class an output whose component is null
+  (`Optional[FeesOutput[fee=null]]`), and the engine the missing rule's output; a table that wants the old
+  behaviour can give such rules an output of `0` (for SUM) or split them out. Engines built in code with several
+  outputs, which DMN does not aggregate, still leave a missing output to their strategy. The generated
+  aggregation strategy no longer checks for null, and its `evaluate` says `(null if one of them is null)`, so the
+  generated class of a COLLECT table with SUM, MIN or MAX changes in those lines.
 
 ## [0.5.0] - 2026-11-12
 

@@ -196,10 +196,10 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * DMN COLLECT with an aggregator over a single numeric output column, as DMN 1.5, 10.3.2.10 evaluates it.
      * No match is step 2, before any aggregation: the default output's value, if the table has a default
      * output (null if that output has no default), else null, which is no result at all (empty), whatever the
-     * aggregator, COUNT included. Otherwise (step 3b) the aggregate of the matching rules' outputs, skipping
-     * missing ones (a computed output that names a missing input or divides by zero), as Praecepta does where
-     * FEEL would give null: SUM, MIN and MAX of no output that is not missing are null. COUNT counts the
-     * matching rules.
+     * aggregator, COUNT included. Otherwise (step 3b) FEEL's {@code sum}, {@code min}, {@code max} or {@code count}
+     * of the matching rules' outputs: the first three are null when an output is missing (a literal {@code null},
+     * or a computed output that names a missing input or divides by zero), since null is outside their parameters'
+     * domain (10.3.4.4, 10.3.2.16); COUNT counts the matching rules, whatever their outputs.
      */
     public Optional<Aggregate> aggregate(Map<String, ?> input, String output, Aggregator aggregator) {
         if (hitPolicy != HitPolicy.COLLECT) {
@@ -213,16 +213,19 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             var value = defaultOutput.values().get(output);
             return Optional.of(new Aggregate(value == null ? null : new BigDecimal(value)));
         }
-        var values = matched.stream()
-                .map(rule -> output(rule, input).values().get(output))
-                .filter(Objects::nonNull)
-                .map(BigDecimal::new)
-                .toList();
+        var texts = matched.stream().map(rule -> output(rule, input).values().get(output)).toList();
+        if (aggregator == Aggregator.COUNT) {
+            return Optional.of(new Aggregate(BigDecimal.valueOf(texts.size())));
+        }
+        if (texts.stream().anyMatch(Objects::isNull)) {
+            return Optional.of(new Aggregate(null));
+        }
+        var values = texts.stream().map(BigDecimal::new).toList();
         return Optional.of(new Aggregate(switch (aggregator) {
-            case COUNT -> BigDecimal.valueOf(matched.size());
-            case SUM -> values.isEmpty() ? null : values.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-            case MIN -> values.stream().min(Comparator.naturalOrder()).orElse(null);
-            case MAX -> values.stream().max(Comparator.naturalOrder()).orElse(null);
+            case SUM -> values.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+            case MIN -> values.stream().min(Comparator.naturalOrder()).orElseThrow();
+            case MAX -> values.stream().max(Comparator.naturalOrder()).orElseThrow();
+            case COUNT -> throw new IllegalStateException("counted above");
         }));
     }
 

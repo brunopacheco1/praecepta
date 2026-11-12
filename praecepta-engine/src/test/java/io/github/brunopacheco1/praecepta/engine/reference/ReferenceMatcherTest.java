@@ -241,16 +241,23 @@ class ReferenceMatcherTest {
     }
 
     @Test
-    void aggregations_skip_computed_outputs_that_are_missing() {
+    void sum_min_and_max_are_missing_when_an_output_is_but_count_counts_it() {
         var rules = List.of(
-                new Praeceptum(1, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of("n", "5"))),
-                new Praeceptum(2, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of(), Map.of(), Map.of("n", "a * 2"))),
-                new Praeceptum(3, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of(), Map.of(), Map.of("n", "a / 0"))));
-        var reference = new ReferenceMatcher(rules, HitPolicy.COLLECT, Map.of(), Map.of("a", ColumnType.NUMBER), Map.of());
+                new Praeceptum(1, new PraeceptaInput(Map.of("b", "")), new PraeceptaOutput(Map.of("n", "5"))),
+                new Praeceptum(2, new PraeceptaInput(Map.of("b", "")), new PraeceptaOutput(Map.of(), Map.of(), Map.of("n", "a * 2"))),
+                new Praeceptum(3, new PraeceptaInput(Map.of("b", "1")), new PraeceptaOutput(Map.of(), Map.of(), Map.of("n", "a / 0"))));
+        var reference = new ReferenceMatcher(rules, HitPolicy.COLLECT, Map.of(), Map.of("a", ColumnType.NUMBER, "b", ColumnType.NUMBER), Map.of());
         Assertions.assertThat(total(reference, Map.of("a", new BigDecimal("1.5")), "n", Aggregator.SUM)).isEqualByComparingTo("8");
-        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.SUM)).isEqualByComparingTo("5");
-        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.MAX)).isEqualByComparingTo("5");
-        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.COUNT)).isEqualByComparingTo("3");
+        Assertions.assertThat(total(reference, Map.of("a", new BigDecimal("1.5")), "n", Aggregator.MIN)).isEqualByComparingTo("3");
+        // a / 0 is null, and so is every aggregate but the count (FEEL: sum([5, 3, null]) = null)
+        var dividing = Map.of("a", new BigDecimal("1.5"), "b", BigDecimal.ONE);
+        Assertions.assertThat(total(reference, dividing, "n", Aggregator.SUM)).isNull();
+        Assertions.assertThat(total(reference, dividing, "n", Aggregator.MAX)).isNull();
+        Assertions.assertThat(total(reference, dividing, "n", Aggregator.COUNT)).isEqualByComparingTo("3");
+        // without a: a * 2 is null
+        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.SUM)).isNull();
+        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.MIN)).isNull();
+        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.COUNT)).isEqualByComparingTo("2");
     }
 
     /** The value of an aggregation that has a result: null when it is missing. */

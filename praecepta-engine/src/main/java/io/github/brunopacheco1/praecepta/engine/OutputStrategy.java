@@ -20,9 +20,14 @@ public interface OutputStrategy<O> {
      * whose output reads inputs (names an input or is an expression): its output is converted on every
      * evaluation that selects it, with the inputs' values. Such an output is null in
      * {@link PraeceptaOutput#values()} when the input it names is missing, or the expression gives null
-     * (a missing operand, a division by zero); under a COLLECT aggregation, the strategy decides what that
-     * adds up to, for example by converting it to a value that {@link #sum}, {@link #min} and
-     * {@link #max} skip. The result may not be null.
+     * (a missing operand, a division by zero). The result may not be null.
+     *
+     * <p>Under SUM, MIN and MAX, a table with one output (the one DMN aggregates) has a missing aggregate
+     * when that output is missing in some matching rule, as FEEL's {@code sum}, {@code min} and {@code max}
+     * give null for a list that holds null (DMN 1.5, 10.3.4.4 and 10.3.2.16): the engine then returns that
+     * rule's output, converted by this method, and calls none of {@link #sum}, {@link #min} and {@link #max},
+     * which so only ever see outputs that are not missing. With several outputs, which DMN does not aggregate,
+     * the strategy decides what a missing one adds up to.
      */
     O transform(PraeceptaOutput output);
 

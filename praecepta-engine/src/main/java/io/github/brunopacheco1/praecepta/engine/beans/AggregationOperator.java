@@ -15,7 +15,9 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn
  * and {@code max} combine the matching rules' outputs, and {@code count} builds an output from the
  * number of matching rules. They apply only when a rule matches: when none does, the result is the
  * table's default output, or none, whatever the aggregation (DMN 1.5, 10.3.2.10, step 2), so COUNT
- * gives no output rather than zero.
+ * gives no output rather than zero. SUM, MIN and MAX of a table's one output are missing when it is
+ * missing in some matching rule, as FEEL's {@code sum}, {@code min} and {@code max} are null for a list
+ * that holds null (10.3.4.4, 10.3.2.16); COUNT counts every matching rule, whatever its output.
  */
 public enum AggregationOperator {
     SUM,

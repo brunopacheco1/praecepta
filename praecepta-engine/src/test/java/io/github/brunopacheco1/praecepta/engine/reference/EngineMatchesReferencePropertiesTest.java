@@ -119,14 +119,18 @@ class EngineMatchesReferencePropertiesTest {
         assertSameHits(s, DecisionTableScenario.outOnly(s.rules()), HitPolicy.ANY, List.of(), perColumn);
     }
 
-    /** The number output {@code n} is now and then an expression, which may give a missing value: the aggregations skip it. */
+    /**
+     * The table's one output, the number {@code n}, is now and then an expression, which may give a missing value:
+     * SUM, MIN and MAX are then missing, as FEEL's {@code sum}, {@code min} and {@code max} are null for a list
+     * that holds null; COUNT counts it.
+     */
     @Property(tries = TRIES, edgeCases = EdgeCasesMode.NONE)
     void collect_aggregations_match_dmn(@ForAll("scenarios") DecisionTableScenario s, @ForAll boolean perColumn) {
-        var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of());
+        var rules = DecisionTableScenario.numberOnly(s.rules());
+        var reference = s.reference(rules, HitPolicy.COLLECT, Map.of(), true, List.of(DecisionTableScenario.NUMBER));
         for (var aggregation : AggregationOperator.values()) {
             var builder = PraeceptaEngine.<Map<String, Object>, Optional<BigDecimal>>builder()
-                    .table(s.table(s.rules(), HitPolicy.COLLECT, List.of()))
-                    .aggregation(aggregation)
+                    .table(s.numberTable(rules, aggregation))
                     .output(numericOutput());
             configure(builder, s, perColumn);
             var engine = builder.build();
@@ -135,8 +139,8 @@ class EngineMatchesReferencePropertiesTest {
                     Assertions.assertThatThrownBy(() -> engine.evaluate(input)).isInstanceOf(InvalidInputException.class);
                     continue;
                 }
-                // no match gives the default output if there is one, else no output, whatever the aggregation; matches
-                // whose outputs are all missing give a missing total
+                // no match gives the default output if there is one, else no output, whatever the aggregation; a
+                // matching rule whose output is missing makes SUM, MIN and MAX missing
                 var expected = reference.aggregate(input, DecisionTableScenario.NUMBER, Aggregator.valueOf(aggregation.name()))
                         .map(total -> List.of(Optional.ofNullable(total.value())))
                         .orElse(List.of());
@@ -338,7 +342,10 @@ class EngineMatchesReferencePropertiesTest {
                 .toList();
     }
 
-    /** The number output, empty where it is missing (a computed output may be), which the aggregations skip. */
+    /**
+     * The number output, empty where it is missing (a computed output may be). The engine combines only outputs
+     * that are not missing, so combining an empty one fails.
+     */
     private static OutputStrategy<Optional<BigDecimal>> numericOutput() {
         return new OutputStrategy<>() {
             @Override
@@ -369,6 +376,6 @@ class EngineMatchesReferencePropertiesTest {
     }
 
     private static Optional<BigDecimal> combine(Optional<BigDecimal> a, Optional<BigDecimal> b, BinaryOperator<BigDecimal> operator) {
-        return a.isEmpty() ? b : b.isEmpty() ? a : Optional.of(operator.apply(a.get(), b.get()));
+        return Optional.of(operator.apply(a.orElseThrow(), b.orElseThrow()));
     }
 }

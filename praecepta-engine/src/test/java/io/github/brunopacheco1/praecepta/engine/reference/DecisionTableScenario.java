@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.ForcedMaskForm;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
+import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
@@ -818,6 +819,31 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                             new PraeceptaOutput(Map.copyOf(values), rule.output().references(), expressions));
                 })
                 .toList();
+    }
+
+    /**
+     * The rules with {@link #NUMBER} as their only output, a literal or an expression, which may give a missing
+     * value: what a COLLECT aggregation aggregates, since DMN aggregates a single output (8.2.11).
+     */
+    public static List<Praeceptum> numberOnly(List<Praeceptum> rules) {
+        return rules.stream()
+                .map(rule -> {
+                    var values = new HashMap<String, String>();
+                    if (rule.output().values().containsKey(NUMBER)) {
+                        values.put(NUMBER, rule.output().values().get(NUMBER));
+                    }
+                    var expressions = new HashMap<>(rule.output().expressions());
+                    expressions.keySet().retainAll(Set.of(NUMBER));
+                    return new Praeceptum(rule.priority(), rule.input(), new PraeceptaOutput(values, Map.of(), expressions));
+                })
+                .toList();
+    }
+
+    /** The scenario's table with {@link #NUMBER} as its only output, with its default if it has one, aggregated. */
+    public DecisionTable numberTable(List<Praeceptum> tableRules, AggregationOperator aggregation) {
+        var table = table(tableRules, HitPolicy.COLLECT, List.of());
+        return new DecisionTable(table.name(), HitPolicy.COLLECT, aggregation, table.inputs(),
+                List.of(output(NUMBER, ColumnType.NUMBER, List.of())), tableRules, table.feelCells(), table.listInputs());
     }
 
     /**

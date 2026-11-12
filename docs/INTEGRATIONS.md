@@ -69,9 +69,11 @@ integrations find their tables at runtime, so their engines take maps instead:
   aggregate, as DMN 1.5 defines it over a single output (`AggregationOperator.check`): SUM adds numbers with
   FEEL's 34 digits and keeps their scale, as the build plugins' generated classes do; MIN and MAX return the
   smallest or largest output as written, of any ordered type (numbers, strings by character, dates, times,
-  durations); COUNT is the number of matches, of outputs of any type. Missing values are skipped, where
-  FEEL's `sum`, `min` and `max` would give null (10.3.4): a known deviation, shared with the build plugins'
-  generated classes. When no rule matches, a table whose outputs declare
+  durations); COUNT is the number of matches, of outputs of any type. When a matching rule's output is
+  missing (a `null` entry, an expression with a missing operand), SUM, MIN and MAX are missing too, as FEEL's
+  `sum`, `min` and `max` are null for a list that holds null (10.3.4.4): the one map maps the output to null
+  (`[{fee=null}]`), as the build plugins' generated classes give an output whose component is null; COUNT
+  counts that rule. When no rule matches, a table whose outputs declare
   default values (`defaultOutputEntry`) gives one map of them, null for an output without one, and any
   other table no map, whatever its hit policy or aggregation (DMN 1.5, 10.3.2.10, step 2): a COUNT then
   gives no map rather than `0`, as the generated classes give an empty `Optional`.
