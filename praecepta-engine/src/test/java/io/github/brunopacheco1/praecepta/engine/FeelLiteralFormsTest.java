@@ -130,6 +130,46 @@ class FeelLiteralFormsTest {
         Assertions.assertThat(DmnWriter.write(table(ColumnType.NUMBER, false, "1.2e3"))).contains("<text>1200</text>");
     }
 
+    // ---- date time literals ----------------------------------------------------------------------
+
+    @Test
+    void at_literals_and_the_date_and_time_functions_are_values_of_their_type() {
+        var dates = engine(ColumnType.DATE, ">= @\"2019-03-31\", date(2019, 1, 1)");
+        Assertions.assertThat(dates.evaluate(input("2019-03-31"))).containsExactly("1");
+        Assertions.assertThat(dates.evaluate(input("2019-01-01"))).containsExactly("1");
+        Assertions.assertThat(dates.evaluate(input("2019-03-30"))).isEmpty();
+        var durations = engine(ColumnType.DAY_TIME_DURATION, "<= @\"PT1H\"");
+        Assertions.assertThat(durations.evaluate(input("PT60M"))).containsExactly("1");
+        Assertions.assertThat(durations.evaluate(input("PT61M"))).isEmpty();
+        var times = engine(ColumnType.TIME, "[time(8, 30, 0)..@\"12:00:00\")");
+        Assertions.assertThat(times.evaluate(input("08:30"))).containsExactly("1");
+        Assertions.assertThat(times.evaluate(input("12:00"))).isEmpty();
+    }
+
+    @Test
+    void a_date_and_time_without_a_time_is_at_midnight() {
+        // DMN TCK, 0068-feel-equality: date and time("2018-12-08") = date and time("2018-12-08T00:00:00")
+        var engine = engine(ColumnType.DATE_TIME, "date and time(\"2018-12-08\")");
+        Assertions.assertThat(engine.evaluate(input("2018-12-08T00:00:00"))).containsExactly("1");
+        Assertions.assertThat(engine.evaluate(input("2018-12-08T00:00:01"))).isEmpty();
+    }
+
+    @Test
+    void dmn_writes_date_time_literals_as_the_date_and_time_functions_and_reads_them_back() {
+        var table = table(ColumnType.DATE_TIME, true, "[@\"2025-01-01T00:00:00\"..date and time(date(2025, 1, 31), time(8, 30, 0))]");
+        var xml = DmnWriter.write(table);
+        Assertions.assertThat(xml)
+                .contains("<text>[date and time(\"2025-01-01T00:00:00\")..date and time(\"2025-01-31T08:30:00\")]</text>");
+        var read = DmnReader.read(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+        var engine = PraeceptaEngine.<Map<String, String>, String>builder()
+                .table(read)
+                .inputs(PraeceptaInput::new)
+                .output(output -> output.values().get("id"))
+                .build();
+        Assertions.assertThat(engine.evaluate(input("2025-01-31T08:30"))).containsExactly("1");
+        Assertions.assertThat(engine.evaluate(input("2025-01-31T08:31"))).isEmpty();
+    }
+
     // ---- fixtures ------------------------------------------------------------------------------
 
     private static PraeceptaEngine<Map<String, String>, String> engine(ColumnType type, String cell) {

@@ -82,6 +82,84 @@ class CellParserTest {
                 .hasMessageContaining("is not a number");
     }
 
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            // at-literals: their string's syntax says their type (DMN 1.5, grammar rule 65, 10.3.4.1)
+            "DATE                | @\"2025-01-31\"                                         | 2025-01-31",
+            "TIME                | @\"08:30:00\"                                           | 08:30",
+            "TIME                | @\"08:30:00+01:00\"                                     | 08:30+01:00",
+            "DATE_TIME           | @\"2025-01-31T08:30:00Z\"                               | 2025-01-31T08:30Z",
+            "DATE_TIME           | @\"2025-01-31T08:30:00@Europe/Paris\"                   | 2025-01-31T08:30+01:00[Europe/Paris]",
+            "DAY_TIME_DURATION   | @\"P1DT2H\"                                             | PT26H",
+            "YEAR_MONTH_DURATION | @\"P1Y2M\"                                              | P14M",
+            // the other forms of the date and time functions (Table 72)
+            "DATE                | date(2025, 1, 31)                                       | 2025-01-31",
+            "DATE                | date(date and time(\"2025-01-31T23:59:00Z\"))            | 2025-01-31",
+            "DATE                | date( @\"2025-01-31T08:30:00\" )                         | 2025-01-31",
+            "TIME                | time(8, 30, 0)                                          | 08:30",
+            "TIME                | time(8, 30, 15.5)                                       | 08:30:15.5",
+            "TIME                | time(8, 30, 0, duration(\"PT1H\"))                       | 08:30+01:00",
+            "TIME                | time(8, 30, 0, null)                                    | 08:30",
+            "TIME                | time(date and time(\"2025-01-31T08:30:00-05:00\"))       | 08:30-05:00",
+            "TIME                | time(@\"2025-01-31T08:30:00\")                          | 08:30",
+            "DATE_TIME           | date and time(date(\"2025-01-31\"), time(\"08:30:00\"))  | 2025-01-31T08:30",
+            "DATE_TIME           | date and time(@\"2025-01-31T23:00:00\", @\"08:30:00Z\")  | 2025-01-31T08:30Z",
+            "DATE_TIME           | date  and  time ( \"2025-01-31T08:30:00\" )               | 2025-01-31T08:30",
+            // a date and time string may be a date alone (10.3.4.1), at midnight
+            "DATE_TIME           | date and time(\"2025-01-31\")                            | 2025-01-31T00:00",
+    })
+    void date_time_literals_take_every_form_of_dmn(ColumnType type, String literal, String value) {
+        var expected = switch (type) {
+            case DATE -> LocalDate.parse(value);
+            case TIME -> FeelTemporals.parseTime(value);
+            case DATE_TIME -> FeelTemporals.parseDateTime(value);
+            case DAY_TIME_DURATION -> java.time.Duration.parse(value);
+            default -> YearsAndMonths.parse(value);
+        };
+        Assertions.assertThat(CellParser.parseFeel(literal, type)).isEqualTo(positive(new Equals((Comparable<?>) expected)));
+        Assertions.assertThat(CellParser.parse("< " + literal, type)).isEqualTo(positive(new Compare(Operator.LT, (Comparable<?>) expected)));
+    }
+
+    @Test
+    void date_time_literals_mix_in_lists_and_intervals() {
+        Assertions.assertThat(CellParser.parseFeel("[@\"2025-01-01\"..date(2025, 1, 31)), date(2025,3,1), != @\"2025-02-01\"", ColumnType.DATE)
+                .tests()).hasSize(3);
+        Assertions.assertThat(CellParser.parseFeel("not([time(8, 0, 0)..@\"12:00:00\"])", ColumnType.TIME))
+                .isEqualTo(negated(new Range(LocalTime.of(8, 0), true, LocalTime.NOON, true)));
+        // the date and time functions of DMN 1.5 are not names of inputs
+        Assertions.assertThat(CellParser.parseFeel("date(2025, 1, 31)", ColumnType.DATE).namesInputs()).isFalse();
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', quoteCharacter = '~', value = {
+            "DATE                | @\"08:30:00\"                        | is a time, not a date",
+            "TIME                | @\"2025-01-31\"                      | is a date, not a time",
+            "DATE_TIME           | @\"2025-01-31\"                      | is a date, not a date and time",
+            "DAY_TIME_DURATION   | @\"P1Y\"                             | invalid days and time duration 'P1Y'",
+            "YEAR_MONTH_DURATION | @\"P1D\"                             | invalid years and months duration 'P1D'",
+            "DATE                | @2025                                 | @ must be followed by a string",
+            "DATE                | @\"2025-02-30\"                      | invalid date '2025-02-30'",
+            "DATE                | date(2025, 2, 30)                     | invalid date",
+            "DATE                | date(2025, 1.5, 3)                    | invalid date",
+            "DATE                | date(2025, 1)                         | date(...) takes",
+            "DATE                | date(\"2025-01-31\") + 1             | unexpected '+ 1' after a date",
+            "DATE                | date(\"2025-01-31\"                  | not closed",
+            "DATE                | date(x)                               | 'x' is not a string, a number or a date time literal",
+            "TIME                | time(25, 0, 0)                        | invalid time",
+            "TIME                | time(8, 0, 0, duration(\"PT0.5S\"))  | invalid time",
+            "TIME                | time(8, 0, 0, duration(\"PT19H\"))   | invalid time",
+            "TIME                | @\"10:00:00@Europe/Paris\"           | is a time with a zone id, which is not supported",
+            "DATE_TIME           | date and time(time(\"08:00:00\"))    | date and time(...) takes",
+            "DATE_TIME           | date and time(date(\"2025-01-31\"), date(\"2025-01-31\")) | date and time(...) takes",
+            "DATE_TIME           | @\"2025-10-26T02:30+01:00[Europe/Paris]\" | write a zone id as @Europe/Paris",
+            "DAY_TIME_DURATION   | duration(1)                           | duration(...) takes a duration string",
+    })
+    void invalid_date_time_literals_say_why(ColumnType type, String literal, String reason) {
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel(literal, type))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining(reason);
+    }
+
     @Test
     void a_list_column_reads_not_equal_on_its_elements() {
         Assertions.assertThat(CellParser.parseFeelList("some x in ? satisfies x != \"PT\" or some x in ? satisfies x != null",
@@ -393,7 +471,7 @@ class CellParserTest {
             "TIME;   [time(\"11:00:00\")..time(\"10:00:00+05:00\")]; starts after it ends",
             "TIME;   [time(\"10:00:00Z\")..time(\"10:00:00+01:00\")]; starts after it ends",
             "DATE_TIME; 2025-01-01;   is not a date and time",
-            "DATE_TIME; date and time(\"2025-01-31\"); invalid date and time",
+            "DATE_TIME; date and time(\"2025-01-31T\"); invalid date and time",
             "TIME;   time(\"10:00:00+0200\"); invalid time",
             "DATE_TIME; [date and time(\"2025-01-02T00:00:00\")..date and time(\"2025-01-01T00:00:00\")]; starts after it ends",
             "NUMBER; abc;             is not a number",

@@ -35,6 +35,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   "a\tb", "\U01F40E"       escape sequences in quoted strings: \" \\ \' \n \r \t and code points (FEEL rule 64)
  *   18, 2.5, .5, 1.2e3       number literals, with an optional exponent (NUMBER columns)
  *   date("2025-01-31")       date literal (DATE columns; a bare 2025-01-31 is accepted as well)
+ *   &#64;"2025-01-31", date(2025, 1, 31), time(8, 30, 0), date and time(date("2025-01-31"), time("08:30:00"))
+ *                            the other date time literals: at-literals and the forms of the date and time
+ *                            functions (DMN 1.5, grammar rules 60 and 65, Table 72), in columns of their type
  *   time("08:30:00")         time literal (TIME columns; a bare 08:30:00 is accepted as well)
  *   time("08:30:00+01:00")   time with an offset (Z, +01:00), compared by instant with other such times
  *   date and time("2025-01-31T08:30:00")
@@ -72,16 +75,12 @@ public final class CellParser {
      * exponent"): digits with an optional fraction, or a fraction alone, then an optional exponent.
      */
     private static final Pattern NUMBER = Pattern.compile("-?(\\d+(\\.\\d+)?|\\.\\d+)([eE][+-]?\\d+)?");
-    private static final Pattern DATE_CALL = Pattern.compile("date\\(\\s*\"([^\"]*)\"\\s*\\)");
     private static final Pattern BARE_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
-    private static final Pattern TIME_CALL = Pattern.compile("time\\(\\s*\"([^\"]*)\"\\s*\\)");
     /** An offset after a bare time or date-time: Z, or a sign and hh:mm. */
     private static final String OFFSET = "([Zz]|[+-]\\d{2}:\\d{2})";
     private static final Pattern BARE_TIME = Pattern.compile("\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?" + OFFSET + "?");
-    private static final Pattern DATE_TIME_CALL = Pattern.compile("date\\s+and\\s+time\\(\\s*\"([^\"]*)\"\\s*\\)");
     private static final Pattern BARE_DATE_TIME = Pattern.compile(
             "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(" + OFFSET + "|@[\\w+\\-/]+)?");
-    private static final Pattern DURATION_CALL = Pattern.compile("duration\\(\\s*\"([^\"]*)\"\\s*\\)");
     /** ISO 8601 durations: an optional sign, P, then digits, fractions and designators. */
     private static final Pattern BARE_DURATION = Pattern.compile("-?P[0-9YMWDTHS.]+");
     /** Names FEEL reserves for literals, which never name an input. */
@@ -436,12 +435,12 @@ public final class CellParser {
                 case STRING -> string(text);
                 case NUMBER -> number(text);
                 case BOOLEAN -> bool(text);
-                case DATE -> temporal(text, DATE_CALL, BARE_DATE, LocalDate::parse, "date(\"yyyy-mm-dd\")");
-                case TIME -> temporal(text, TIME_CALL, BARE_TIME, iso -> (Comparable<?>) FeelTemporals.parseTime(iso), "time(\"hh:mm:ss\")");
-                case DATE_TIME -> temporal(text, DATE_TIME_CALL, BARE_DATE_TIME, iso -> (Comparable<?>) FeelTemporals.parseDateTime(iso),
+                case DATE -> temporal(text, BARE_DATE, LocalDate::parse, "date(\"yyyy-mm-dd\")");
+                case TIME -> temporal(text, BARE_TIME, iso -> (Comparable<?>) FeelTemporals.parseTime(iso), "time(\"hh:mm:ss\")");
+                case DATE_TIME -> temporal(text, BARE_DATE_TIME, iso -> (Comparable<?>) FeelTemporals.parseDateTime(iso),
                         "date and time(\"yyyy-mm-ddThh:mm:ss\")");
-                case DAY_TIME_DURATION -> temporal(text, DURATION_CALL, BARE_DURATION, Duration::parse, "duration(\"P1DT2H\")");
-                case YEAR_MONTH_DURATION -> temporal(text, DURATION_CALL, BARE_DURATION, Parser::yearsAndMonths, "duration(\"P1Y2M\")");
+                case DAY_TIME_DURATION -> temporal(text, BARE_DURATION, Duration::parse, "duration(\"P1DT2H\")");
+                case YEAR_MONTH_DURATION -> temporal(text, BARE_DURATION, Parser::yearsAndMonths, "duration(\"P1Y2M\")");
             };
         }
 
@@ -535,32 +534,40 @@ public final class CellParser {
         }
 
         /**
-         * A date, time, date-time or duration: its FEEL function call, or, outside strict FEEL, the bare ISO text.
+         * A date, time, date-time or duration: a date time literal ({@link TemporalLiterals}: an at-literal, or an
+         * invocation of the date and time functions) of the column's type, or, outside strict FEEL, the bare ISO text.
          * Strict FEEL cannot take the bare form, as it reads {@code 2025-01-31} as {@code 2025 - 1 - 31}.
          */
-        private Comparable<?> temporal(String text, Pattern call, Pattern bare, Function<String, Comparable<?>> parse, String hint) {
-            var matcher = call.matcher(text);
-            String iso;
-            if (matcher.matches()) {
-                iso = matcher.group(1).strip();
-            } else if (!strictFeel && bare.matcher(text).matches()) {
-                iso = text;
-            } else {
+        private Comparable<?> temporal(String text, Pattern bare, Function<String, Comparable<?>> parse, String hint) {
+            if (TemporalLiterals.startsAt(text, 0)) {
+                return dateTimeLiteral(text);
+            }
+            if (strictFeel || !bare.matcher(text).matches()) {
                 throw new CellSyntaxException(cell, "'" + text + "' is not a " + type.feelName() + "; write " + hint);
             }
-            if (type == ColumnType.TIME && iso.indexOf('@') >= 0) {
-                throw new CellSyntaxException(cell, "'" + iso + "' is a time with a zone id, which is not supported; "
-                        + "write an offset such as +01:00");
-            }
-            // FEEL writes a zone id as @Europe/Paris only; Java's [Europe/Paris] could carry an offset FEEL cannot write back
-            if (iso.indexOf('[') >= 0) {
-                throw new CellSyntaxException(cell, "invalid " + type.feelName() + " '" + iso + "'; write a zone id as @Europe/Paris");
-            }
             try {
-                return parse.apply(iso);
+                return parse.apply(text);
             } catch (DateTimeParseException e) {
-                throw new CellSyntaxException(cell, "invalid " + type.feelName() + " '" + iso + "'");
+                throw new CellSyntaxException(cell, "invalid " + type.feelName() + " '" + text + "'");
             }
+        }
+
+        /** A date time literal that is the whole text, of the column's type. */
+        private Comparable<?> dateTimeLiteral(String text) {
+            TemporalLiterals.Read read;
+            try {
+                read = TemporalLiterals.read(text, 0, type);
+            } catch (IllegalArgumentException e) {
+                throw new CellSyntaxException(cell, e.getMessage());
+            }
+            if (read.end() < text.length()) {
+                throw new CellSyntaxException(cell, "unexpected '" + text.substring(read.end()).strip() + "' after a " + type.feelName());
+            }
+            var literalType = TemporalLiterals.typeOf(read.value());
+            if (literalType != type) {
+                throw new CellSyntaxException(cell, "'" + text + "' is a " + literalType.feelName() + ", not a " + type.feelName());
+            }
+            return (Comparable<?>) read.value();
         }
 
         // ---- scanners: where tests, strings and intervals end ------------------------------------

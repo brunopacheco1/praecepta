@@ -30,6 +30,7 @@ import io.github.brunopacheco1.praecepta.engine.reference.ReferenceMatcher.Findi
 import io.github.brunopacheco1.praecepta.engine.reference.ReferenceMatcher.Outcome;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
+import net.jqwik.api.Assume;
 import net.jqwik.api.EdgeCasesMode;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
@@ -52,6 +53,12 @@ class EngineMatchesReferencePropertiesTest {
     /** Tables of up to 200 rules: each try evaluates every hit policy. */
     private static final int WIDE_TRIES = 200;
     private static final int WIDE_ANALYSIS_TRIES = 50;
+    /**
+     * The most cells the reference's brute force evaluates for a wide table's analysis (its representative inputs
+     * times its rules): now and then, three columns of times and date-times with and without a zone give hundreds
+     * of thousands of inputs, which take the reference minutes, so such a try is skipped.
+     */
+    private static final long MAX_WIDE_ANALYSIS_WORK = 5_000_000L;
 
     @Provide
     Arbitrary<DecisionTableScenario> scenarios() {
@@ -202,6 +209,12 @@ class EngineMatchesReferencePropertiesTest {
     @Property(tries = WIDE_ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
     void wide_tables_validation_report_matches_the_reference(@ForAll("wideScenarios") DecisionTableScenario s,
             @ForAll("priorities") List<String> priority, @ForAll boolean perColumn) {
+        var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of(), perColumn);
+        long work = s.rules().size();
+        for (var column : s.columns()) {
+            work *= reference.representativeValues(column, true).size();
+        }
+        Assume.that(work <= MAX_WIDE_ANALYSIS_WORK);
         assertSameFindings(s, priority, perColumn);
     }
 

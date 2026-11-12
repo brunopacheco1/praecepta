@@ -51,7 +51,8 @@ import net.jqwik.api.Tuple;
 /**
  * A random decision table plus inputs to evaluate against it. Columns are STRING, NUMBER, DATE,
  * BOOLEAN, TIME or DATE_TIME, and cells use every form of the grammar: wildcards, literals (quoted
- * and legacy unquoted, with escape sequences, function and bare forms), lists, comparisons, intervals with every bracket
+ * and legacy unquoted, with escape sequences, function, at-literal and bare forms, numbers with a fraction alone or an
+ * exponent, dates, times and date-times built from their parts), lists, comparisons, intervals with every bracket
  * style, {@code = x}, {@code != x} (and {@code != null}), {@code not(...)} and {@code null}. String columns compare less often than the others, so
  * that both kinds of string column (with and without comparisons) are common, and string inputs
  * include values between and around the letters the cells mention, among them characters beyond U+FFFF and
@@ -470,15 +471,18 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             // in each of FEEL's forms: digits, a fraction alone, an exponent (grammar rule 35)
             case NUMBER -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(String.valueOf(i), i + ".0", i + "0E-1",
                     "." + i + "e1", i + "e+0"));
-            case DATE -> Arbitraries.integers().between(0, 5).flatMap(d -> Arbitraries.of(
-                    "date(\"" + DAY0.plusDays(d) + "\")", DAY0.plusDays(d).toString()));
+            case DATE -> Arbitraries.integers().between(0, 5).flatMap(d -> {
+                var date = DAY0.plusDays(d);
+                return Arbitraries.of("date(\"" + date + "\")", date.toString(), atLiteral(date),
+                        "date(%d, %d, %d)".formatted(date.getYear(), date.getMonthValue(), date.getDayOfMonth()));
+            });
             case BOOLEAN -> Arbitraries.of("true", "false");
             case TIME, DATE_TIME -> Arbitraries.frequencyOf(Tuple.of(4, temporalLiteral(column.type(), column.zoned())),
                     Tuple.of(1, temporalLiteral(column.type(), !column.zoned())));
             case DAY_TIME_DURATION -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(
-                    value(ColumnType.DAY_TIME_DURATION, i, -1), FeelLiterals.text(dayTime(i))));
+                    value(ColumnType.DAY_TIME_DURATION, i, -1), FeelLiterals.text(dayTime(i)), atLiteral(dayTime(i))));
             case YEAR_MONTH_DURATION -> Arbitraries.integers().between(0, 5).flatMap(i -> Arbitraries.of(
-                    value(ColumnType.YEAR_MONTH_DURATION, i, -1), FeelLiterals.text(yearMonth(i))));
+                    value(ColumnType.YEAR_MONTH_DURATION, i, -1), FeelLiterals.text(yearMonth(i)), atLiteral(yearMonth(i))));
         };
     }
 
@@ -522,12 +526,38 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     }
 
     /**
-     * A time or date-time, with a zone or without, written with its function or as bare text. Without a
-     * zone, the bare text has no seconds ({@code 08:30}), as people write it.
+     * A time or date-time, with a zone or without, written with its function, as an at-literal, with the function's
+     * other forms ({@link #componentLiteral}) or as bare text. Without a zone, the bare text has no seconds
+     * ({@code 08:30}), as people write it.
      */
     private static Arbitrary<String> temporalLiteral(ColumnType type, boolean zoned) {
         return Combinators.combine(Arbitraries.integers().between(0, 5), zone(type, zoned)).as((i, zone) -> temporal(type, i, zone))
-                .flatMap(value -> Arbitraries.of(FeelLiterals.literal(value), zoned ? FeelLiterals.text(value) : value.toString()));
+                .flatMap(value -> Arbitraries.of(FeelLiterals.literal(value), zoned ? FeelLiterals.text(value) : value.toString(),
+                        atLiteral(value), componentLiteral(value)));
+    }
+
+    /** A date, time, date-time or duration as an at-literal: {@code @"2025-01-01"} (DMN 1.5, grammar rule 65). */
+    static String atLiteral(Object value) {
+        var literal = FeelLiterals.literal(value);
+        return "@" + literal.substring(literal.indexOf('"'), literal.lastIndexOf('"') + 1);
+    }
+
+    /**
+     * A time or date-time with the forms of its function that build it from parts (DMN 1.5, Table 72):
+     * {@code time(8, 30, 0)}, {@code time(8, 30, 0, duration("PT1H"))}, {@code date and time(date(...), time(...))}; one
+     * in a zone id, which no time holds, as an at-literal.
+     */
+    private static String componentLiteral(Object value) {
+        return switch (value) {
+            case LocalTime time -> "time(%d, %d, %d)".formatted(time.getHour(), time.getMinute(), time.getSecond());
+            case OffsetTime time -> "time(%d, %d, %d, %s)".formatted(time.getHour(), time.getMinute(), time.getSecond(),
+                    FeelLiterals.literal(Duration.ofSeconds(time.getOffset().getTotalSeconds())));
+            case LocalDateTime moment -> "date and time(%s, %s)".formatted(FeelLiterals.literal(moment.toLocalDate()),
+                    FeelLiterals.literal(moment.toLocalTime()));
+            case ZonedDateTime moment when moment.getZone() instanceof ZoneOffset offset -> "date and time(%s, %s)".formatted(
+                    atLiteral(moment.toLocalDate()), componentLiteral(OffsetTime.of(moment.toLocalTime(), offset)));
+            default -> atLiteral(value);
+        };
     }
 
     /** Which of {@link #OFFSETS} or {@link #ZONES} to write a value in; -1, none, if not {@code zoned}. */
@@ -601,7 +631,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     private static String value(ColumnType type, int i, int zone) {
         return switch (type) {
             case NUMBER -> String.valueOf(i);
-            case DATE -> "date(\"" + DAY0.plusDays(i) + "\")";
+            case DATE -> i % 2 == 0 ? "date(\"" + DAY0.plusDays(i) + "\")" : atLiteral(DAY0.plusDays(i));
             case TIME -> zone >= 0 ? FeelLiterals.literal(temporal(type, i, zone))
                     : "time(\"" + DateTimeFormatter.ISO_LOCAL_TIME.format(TIME0.plusMinutes(30L * i)) + "\")";
             case DATE_TIME -> zone >= 0 ? FeelLiterals.literal(temporal(type, i, zone))

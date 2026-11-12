@@ -104,8 +104,7 @@ Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drool
   Praecepta's input entries are FEEL *simple unary tests*: in DMN they may compare with another
   input (`> limit`) or test a list's elements, but not compute. Output entries may compute with `+`,
   `-`, `*`, `/` and `**` on strings and numbers, but call no functions. Some FEEL that fits a single
-  table is not read yet either: at-literals such as `@"2025-01-31"`
-  ([#81](https://github.com/brunopacheco1/praecepta/issues/81)), times with a zone id
+  table is not read yet either: comments ([#81](https://github.com/brunopacheco1/praecepta/issues/81)), times with a zone id
   ([#82](https://github.com/brunopacheco1/praecepta/issues/82)) and arithmetic on dates, times and
   durations ([#85](https://github.com/brunopacheco1/praecepta/issues/85)); see the
   [roadmap](docs/ROADMAP.md).
@@ -157,6 +156,8 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 | `date and time("2025-01-31T08:30:00Z")`, `date and time("2025-01-31T08:30:00@Europe/Paris")` | that instant | DATE_TIME |
 | `duration("P1DT2H")` or `P1DT2H` | that length of time (`PT24H` equals `P1D`) | DAY_TIME_DURATION |
 | `duration("P1Y2M")` or `P1Y2M` | that number of months (`P12M` equals `P1Y`) | YEAR_MONTH_DURATION |
+| `@"2025-01-31"`, `@"08:30:00Z"`, `@"P1D"` | at-literals: a date, time, date and time or duration, as the string's form says | its type |
+| `date(2025, 1, 31)`, `time(8, 30, 0)`, `time(8, 30, 0, duration("PT1H"))`, `date and time(date("2025-01-31"), time("08:30:00"))`, `date and time("2025-01-31")` | the other forms of the date and time functions (DMN 1.5, Table 72); a date and time without a time is at midnight | its type |
 | `< 18`, `<= 18`, `> 18`, `>= 18`, `< "N"` | comparisons | all but BOOLEAN |
 | `[18..65)`, `(0..1]`, `]a..b[`, `["A".."M"]` | intervals: `[`/`]` closed, `(`/`)` or outward brackets open | all but BOOLEAN |
 | `= 18`, `= "PT"` | the same as `18`, `"PT"` | all |
@@ -321,8 +322,9 @@ Supported:
   of them (such as a `string` with allowed values, which become the input value list); times and
   date-times with or without a time zone.
 - **Input entries** in the cell syntax above, as strict FEEL: strings quoted (an unquoted word is a
-  reference to another variable), with FEEL's escape sequences, and dates and times written with
-  `date(...)`, `time(...)` and `date and time(...)`.
+  reference to another variable), with FEEL's escape sequences, and dates, times and durations written
+  with `date(...)`, `time(...)`, `date and time(...)` and `duration(...)`, in any of their forms, or as
+  at-literals (`@"2025-01-31"`).
 - **Entries that compare with another input** (`> limit`, `[floor..limit]`, `not(home)`), which then
   becomes an input of the engine, bound like a column (with map-based inputs it is read with the type of
   the column that names it).

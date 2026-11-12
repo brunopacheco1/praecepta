@@ -86,6 +86,17 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   a number in a cell, a value list or a DMN entry may be written `.5` or `1.2e3` (`1E-2`, `2.5E+1`), as FEEL's
   numeric literal allows (grammar rule 35; 10.3.2.3.1: "FEEL supports literal scientific notation, e.g., 1.2e3"),
   as output expressions already read them. `DmnWriter` writes such a number as plain digits (`1200`).
+- **Date time literals in every form DMN 1.5 has** ([#81](https://github.com/brunopacheco1/praecepta/issues/81)):
+  at-literals (grammar rule 65; `>= @"2019-03-31"`, `< @"08:30:00"`, `@"P1D"`), whose string's syntax says
+  whether they are a date, a time, a date and time or a duration, and the other forms of the date and time
+  functions (rule 60, Table 72): `date(2025, 1, 31)`, `date(date and time(...))`, `time(8, 30, 0)`,
+  `time(8, 30, 0, duration("PT1H"))`, `time(date and time(...))`, `date and time(date(...), time(...))`, and
+  `date and time("2025-01-31")`, a date and time string without a time, which is that date at midnight
+  (10.3.4.1; the TCK's `0068-feel-equality` has it equal `date and time("2025-01-31T00:00:00")`). Cells, value
+  lists and DMN entries read them in columns of their type, and reject one of another type by name
+  (`'@"08:30:00"' is a time, not a date`); `DmnWriter` writes them as `date("...")`, `time("...")`, `date and
+  time("...")` and `duration("...")`. Input values read from text are unchanged: a date-time input is still
+  written with its time.
 
 ### Changed
 - **`DmnReader` uses the JDK's own XML parser** ([#96](https://github.com/brunopacheco1/praecepta/issues/96)):

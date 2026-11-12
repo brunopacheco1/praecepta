@@ -397,7 +397,10 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         }
         for (var column : columns) {
             var cells = rules.stream().map(rule -> parse(rule.input().values().get(column), column)).toList();
-            boolean constrained = cells.stream().anyMatch(cell -> !(cell instanceof UnaryTests.Any));
+            // a cell such as "= null, != null" constrains nothing, as - does
+            var values = representativeValues(column, true);
+            boolean constrained = cells.stream()
+                    .anyMatch(cell -> values.stream().anyMatch(value -> !accepts(cell, single(value), name -> null)));
             boolean compares = cells.stream().flatMap(cell -> tests(cell).stream())
                     .anyMatch(test -> test instanceof Compare || test instanceof Range);
             if (type(column) == ColumnType.STRING && constrained && !compares && !allowedValues.containsKey(column)) {
@@ -1048,6 +1051,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     }
 
     private UnaryTests parse(String cell, String column) {
+        if (cell == null) {
+            return new UnaryTests.Any();
+        }
         var type = type(column);
         boolean list = lists.contains(column);
         return PARSED.computeIfAbsent(Arrays.asList(cell, type, feelCells, list), key -> {
