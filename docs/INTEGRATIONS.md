@@ -71,8 +71,9 @@ integrations find their tables at runtime, so their engines take maps instead:
   durations); COUNT is the number of matches, of outputs of any type. Missing values are skipped, where
   FEEL's `sum`, `min` and `max` would give null (10.3.4): a known deviation, shared with the build plugins'
   generated classes. When no rule matches, a table whose outputs declare
-  default values (`defaultOutputEntry`) gives one map of them, null for an output without one, whatever its
-  hit policy or aggregation (DMN 1.5, 10.3.2.10).
+  default values (`defaultOutputEntry`) gives one map of them, null for an output without one, and any
+  other table no map, whatever its hit policy or aggregation (DMN 1.5, 10.3.2.10, step 2): a COUNT then
+  gives no map rather than `0`, as the generated classes give an empty `Optional`.
 - **Validation** is that of the map-based engine. Times and date-times read from text may have a time zone
   or not, so gaps are looked for among both kinds.
 - **Generated classes are not beans.** They are static and need no container; declare one as a bean

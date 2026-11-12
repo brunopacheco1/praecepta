@@ -182,7 +182,7 @@ public final class TableCompiler {
                         return output;
                     }
 
-                    // a COUNT engine builds its no-match output up front; the generated strategy counts too
+                    // a COUNT engine checks when built that its strategy counts; the generated strategy does
                     @Override
                     public PraeceptaOutput count(int matches) {
                         return new PraeceptaOutput(Map.of());

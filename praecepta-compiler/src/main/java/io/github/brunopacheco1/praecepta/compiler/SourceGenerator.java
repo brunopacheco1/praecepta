@@ -146,7 +146,7 @@ final class SourceGenerator {
     /** {@code evaluate} of a table that selects one output: a single-hit policy, or an aggregation. */
     private static final String EVALUATE_ONE = """
                 /**
-                 * @return the selected output, or ${noMatch} if no rule matches
+                 * @return ${result}, or ${noMatch} if no rule matches
                  * @throws io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException if the hit policy is violated
                  * @throws io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException if a value is outside its column's value list
                  */
@@ -338,14 +338,33 @@ final class SourceGenerator {
                 "source", javadoc(sourceFile),
                 "generator", javadoc(generator),
                 "resource", stringLiteral(className + ".dmn"),
-                "evaluate", fill(singleResult ? EVALUATE_ONE : EVALUATE_ALL, Map.of("noMatch", noMatch(singleResult))),
+                "evaluate", singleResult
+                        ? fill(EVALUATE_ONE, Map.of("result", result(), "noMatch", noMatch(true)))
+                        : fill(EVALUATE_ALL, Map.of("noMatch", noMatch(false))),
                 "bindings", bindings.toString(),
                 "outputStrategy", outputStrategy()));
     }
 
     /**
+     * What {@code evaluate} of a single result gives when a rule matches: the selected output or, for an
+     * aggregation, what it aggregates; it applies only then, since no rule matching gives what {@link #noMatch} says.
+     */
+    private String result() {
+        if (table.aggregation() == null) {
+            return "the selected output";
+        }
+        return switch (table.aggregation()) {
+            case SUM -> "the sum of the matching rules' outputs";
+            case MIN -> "the smallest of the matching rules' outputs";
+            case MAX -> "the largest of the matching rules' outputs";
+            case COUNT -> "the number of matching rules";
+        };
+    }
+
+    /**
      * What {@code evaluate} gives when no rule matches: nothing, or the table's default output (DMN's default
-     * output values), which the engine gives whatever the hit policy.
+     * output values), which the engine gives whatever the hit policy and aggregation (COUNT included: DMN 1.5,
+     * 10.3.2.10, step 2).
      */
     private String noMatch(boolean singleResult) {
         if (table.defaultOutput().isEmpty()) {

@@ -38,7 +38,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
  * {@code 2025-01-31}, times and date-times with or without a time zone, durations as {@code P1DT2H}, a
  * list column's value as a FEEL list ({@code ["PT", "BR"]}); a missing or blank value is a missing input.
  * Each output map holds one matching rule's outputs (an output that is missing, such as an expression with
- * a missing operand, maps to null); under a COLLECT aggregation, the one map holds the aggregate.
+ * a missing operand, maps to null); under a COLLECT aggregation, the one map holds the aggregate. When no
+ * rule matches, the list holds the table's default output values, if it declares any, or is empty, whatever
+ * the hit policy or aggregation (DMN 1.5, 10.3.2.10, step 2): a COUNT is then empty, not zero.
  *
  * @param name     the decision's name: the DMN decision's {@code name} (or {@code id}); engines are named and
  *                 injected by it
@@ -136,7 +138,8 @@ public record Decision(String name, String location, DecisionTable table, Praece
      * scale ({@code 10.50} and {@code 1.50} give {@code 12.00}), as the generated code of the build plugins
      * does; MIN and MAX keep the smallest or the largest value as written, ordered as FEEL orders values of the
      * output's type ({@link FeelTemporals#compare}); COUNT gives the number of matches. A missing value is
-     * skipped, as the generated code skips it.
+     * skipped, as the generated code skips it. None is called when no rule matches: the engine then gives the
+     * default output, or none (10.3.2.10, step 2).
      *
      * @param aggregated the output a COLLECT aggregation aggregates, or null for none
      */

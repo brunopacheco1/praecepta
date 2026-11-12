@@ -27,6 +27,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -192,32 +193,41 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     }
 
     /**
-     * DMN COLLECT with an aggregator over a single numeric output column, skipping missing outputs (a
-     * computed output that names a missing input or divides by zero). COUNT counts the matching rules.
-     * No match: the default output's value, if the table has a default output (null if that output has no
-     * default), whatever the aggregator. Otherwise no match, or no output that is not missing → null
-     * (COUNT → 0).
+     * DMN COLLECT with an aggregator over a single numeric output column, as DMN 1.5, 10.3.2.10 evaluates it.
+     * No match is step 2, before any aggregation: the default output's value, if the table has a default
+     * output (null if that output has no default), else null, which is no result at all (empty), whatever the
+     * aggregator, COUNT included. Otherwise (step 3b) the aggregate of the matching rules' outputs, skipping
+     * missing ones (a computed output that names a missing input or divides by zero), as Praecepta does where
+     * FEEL would give null: SUM, MIN and MAX of no output that is not missing are null. COUNT counts the
+     * matching rules.
      */
-    public BigDecimal aggregate(Map<String, ?> input, String output, Aggregator aggregator) {
+    public Optional<Aggregate> aggregate(Map<String, ?> input, String output, Aggregator aggregator) {
         if (hitPolicy != HitPolicy.COLLECT) {
             throw new IllegalStateException("DMN only allows aggregation with COLLECT");
         }
         var matched = matches(input);
-        if (matched.isEmpty() && defaultOutput != null) {
+        if (matched.isEmpty()) {
+            if (defaultOutput == null) {
+                return Optional.empty();
+            }
             var value = defaultOutput.values().get(output);
-            return value == null ? null : new BigDecimal(value);
+            return Optional.of(new Aggregate(value == null ? null : new BigDecimal(value)));
         }
         var values = matched.stream()
                 .map(rule -> output(rule, input).values().get(output))
                 .filter(Objects::nonNull)
                 .map(BigDecimal::new)
                 .toList();
-        return switch (aggregator) {
+        return Optional.of(new Aggregate(switch (aggregator) {
             case COUNT -> BigDecimal.valueOf(matched.size());
             case SUM -> values.isEmpty() ? null : values.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
             case MIN -> values.stream().min(Comparator.naturalOrder()).orElse(null);
             case MAX -> values.stream().max(Comparator.naturalOrder()).orElse(null);
-        };
+        }));
+    }
+
+    /** A COLLECT aggregation's result: its value, null when it is missing. */
+    public record Aggregate(BigDecimal value) {
     }
 
     public enum Aggregator { COUNT, SUM, MIN, MAX }

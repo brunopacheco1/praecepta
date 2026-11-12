@@ -16,6 +16,8 @@ import java.util.NoSuchElementException;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
@@ -259,19 +261,29 @@ class DecisionsTest {
                         "both.dmn: Table 'Bad': MAX aggregation needs an output whose values are ordered, not a boolean"));
     }
 
-    @Test
-    void a_count_that_no_rule_matches_is_zero() {
-        var table = DmnReader.readAll(stream("""
+    /**
+     * DMN 1.5, 10.3.2.10, step 2: when no rule matches, the result is the default output value, or null without one,
+     * before any aggregation: COUNT gives no map rather than zero, as SUM, MIN and MAX give none.
+     */
+    @ParameterizedTest
+    @CsvSource({"SUM, 12.5", "MIN, 12.5", "MAX, 12.5", "COUNT, 1"})
+    void an_aggregation_that_no_rule_matches_gives_the_default_or_nothing(String aggregation, String islands) {
+        var xml = """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
-                  <decision id="fee" name="Fee"><decisionTable hitPolicy="COLLECT" aggregation="COUNT">
+                  <decision id="fee" name="Fee"><decisionTable hitPolicy="COLLECT" aggregation="%s">
                     <input><inputExpression typeRef="string"><text>zone</text></inputExpression></input>
-                    <output name="fee" typeRef="number"/>
+                    <output name="fee" typeRef="number">%s</output>
                     <rule><inputEntry><text>"islands"</text></inputEntry><outputEntry><text>12.5</text></outputEntry></rule>
                   </decisionTable></decision>
-                </definitions>""")).getFirst();
-        var count = Decision.of("count", table).engine();
-        Assertions.assertThat(count.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("fee", "1"));
-        Assertions.assertThat(count.evaluate(Map.of("zone", "nowhere"))).containsExactly(Map.of("fee", "0"));
+                </definitions>""";
+        var withoutDefault = Decision.of("fee", DmnReader.readAll(stream(xml.formatted(aggregation, ""))).getFirst()).engine();
+        Assertions.assertThat(withoutDefault.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("fee", islands));
+        Assertions.assertThat(withoutDefault.evaluate(Map.of("zone", "nowhere"))).isEmpty();
+        Assertions.assertThat(withoutDefault.evaluate(Map.of())).isEmpty();
+
+        var defaultEntry = "<defaultOutputEntry><text>0</text></defaultOutputEntry>";
+        var withDefault = Decision.of("fee", DmnReader.readAll(stream(xml.formatted(aggregation, defaultEntry))).getFirst()).engine();
+        Assertions.assertThat(withDefault.evaluate(Map.of("zone", "nowhere"))).containsExactly(Map.of("fee", "0"));
     }
 
     /**

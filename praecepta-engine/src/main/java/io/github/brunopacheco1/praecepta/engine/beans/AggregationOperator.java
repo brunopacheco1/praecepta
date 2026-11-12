@@ -13,7 +13,9 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn
  * DMN aggregation of the outputs of a {@link HitPolicy#COLLECT} table into a single value.
  * The combining functions come from the engine's {@code OutputStrategy}: {@code sum}, {@code min}
  * and {@code max} combine the matching rules' outputs, and {@code count} builds an output from the
- * number of matching rules.
+ * number of matching rules. They apply only when a rule matches: when none does, the result is the
+ * table's default output, or none, whatever the aggregation (DMN 1.5, 10.3.2.10, step 2), so COUNT
+ * gives no output rather than zero.
  */
 public enum AggregationOperator {
     SUM,

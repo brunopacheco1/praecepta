@@ -211,6 +211,29 @@ class TableCompilerTest {
     }
 
     /**
+     * Without a default output, a generated aggregation gives nothing when no rule matches, COUNT included: DMN 1.5,
+     * 10.3.2.10, step 2, "else DTI=null", before any aggregation.
+     */
+    @ParameterizedTest
+    @CsvSource({"SUM, 1234567890123456789012345678901235", "MIN, 0.6", "MAX, 1234567890123456789012345678901234", "COUNT, 2"})
+    void a_generated_aggregation_without_a_default_gives_nothing_when_no_rule_matches(String aggregation, String islands)
+            throws Exception {
+        var dmn = totals(aggregation);
+        Files.writeString(dmn, Files.readString(dmn).replace("<defaultOutputEntry><text>9.90</text></defaultOutputEntry>", ""));
+        var result = compile(new TableDefinition(dmn, "Total", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("Total")).contains("or empty if no rule matches");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".TotalInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Total").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("mainland"))).isEmpty();
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance("islands")))
+                    .get().hasToString("TotalOutput[total=" + islands + "]");
+        }
+    }
+
+    /**
      * A sum of more than 34 digits is rounded to FEEL's precision (DMN 1.5, 10.3.2.3.1) in the generated class, as
      * the framework integrations' map-based engine rounds it, so the same table gives the same sum in both.
      */

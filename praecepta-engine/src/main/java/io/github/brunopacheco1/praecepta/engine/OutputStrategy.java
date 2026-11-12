@@ -39,8 +39,10 @@ public interface OutputStrategy<O> {
     }
 
     /**
-     * The output of a COUNT aggregation: the number of matching rules, zero when none match. The
-     * engine calls it with zero once when it is built, so a strategy without it fails there.
+     * The output of a COUNT aggregation: the number of matching rules, at least one. When no rule
+     * matches, the engine gives the default output, or no output, without calling it (DMN 1.5,
+     * 10.3.2.10, step 2: the result is then the default output value, or null). The engine calls it once
+     * when it is built, so a strategy without it fails there.
      */
     default O count(int matches) {
         throw new UnsupportedOperationException("This OutputStrategy does not support aggregation");

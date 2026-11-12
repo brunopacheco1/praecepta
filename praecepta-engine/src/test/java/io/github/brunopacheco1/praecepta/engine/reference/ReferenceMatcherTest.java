@@ -97,12 +97,19 @@ class ReferenceMatcherTest {
     @Test
     void collect_aggregates_numeric_outputs() {
         var reference = new ReferenceMatcher(RULES, HitPolicy.COLLECT);
-        Assertions.assertThat(reference.aggregate(RED_SMALL, "points", Aggregator.SUM)).isEqualByComparingTo("16");
-        Assertions.assertThat(reference.aggregate(RED_SMALL, "points", Aggregator.MIN)).isEqualByComparingTo("1");
-        Assertions.assertThat(reference.aggregate(RED_SMALL, "points", Aggregator.MAX)).isEqualByComparingTo("10");
-        Assertions.assertThat(reference.aggregate(RED_SMALL, "points", Aggregator.COUNT)).isEqualByComparingTo("3");
-        Assertions.assertThat(reference.aggregate(GREEN_LARGE, "points", Aggregator.SUM)).isNull();
-        Assertions.assertThat(reference.aggregate(GREEN_LARGE, "points", Aggregator.COUNT)).isEqualTo(BigDecimal.ZERO);
+        Assertions.assertThat(total(reference, RED_SMALL, "points", Aggregator.SUM)).isEqualByComparingTo("16");
+        Assertions.assertThat(total(reference, RED_SMALL, "points", Aggregator.MIN)).isEqualByComparingTo("1");
+        Assertions.assertThat(total(reference, RED_SMALL, "points", Aggregator.MAX)).isEqualByComparingTo("10");
+        Assertions.assertThat(total(reference, RED_SMALL, "points", Aggregator.COUNT)).isEqualByComparingTo("3");
+    }
+
+    /** DMN 1.5, 10.3.2.10, step 2: with no match and no default output, the result is null, before any aggregation. */
+    @Test
+    void with_no_match_and_no_default_output_every_aggregation_gives_no_result() {
+        var reference = new ReferenceMatcher(RULES, HitPolicy.COLLECT);
+        for (var aggregator : Aggregator.values()) {
+            Assertions.assertThat(reference.aggregate(GREEN_LARGE, "points", aggregator)).as("%s", aggregator).isEmpty();
+        }
     }
 
     /** DMN 1.5, 10.3.2.10, step 2: with no match, the default output, before any hit policy or aggregation. */
@@ -125,10 +132,10 @@ class ReferenceMatcherTest {
         var collect = new ReferenceMatcher(RULES, HitPolicy.COLLECT, Map.of(), Map.of(), Map.of(), false, Set.of(), Set.of(), false,
                 defaultOutput);
         for (var aggregator : Aggregator.values()) {
-            Assertions.assertThat(collect.aggregate(GREEN_LARGE, "points", aggregator)).as("%s", aggregator).isEqualTo(BigDecimal.ZERO);
+            Assertions.assertThat(total(collect, GREEN_LARGE, "points", aggregator)).as("%s", aggregator).isEqualTo(BigDecimal.ZERO);
         }
-        Assertions.assertThat(collect.aggregate(GREEN_LARGE, "id", Aggregator.SUM)).as("an output without a default").isNull();
-        Assertions.assertThat(collect.aggregate(RED_SMALL, "points", Aggregator.COUNT)).isEqualByComparingTo("3");
+        Assertions.assertThat(total(collect, GREEN_LARGE, "id", Aggregator.SUM)).as("an output without a default").isNull();
+        Assertions.assertThat(total(collect, RED_SMALL, "points", Aggregator.COUNT)).isEqualByComparingTo("3");
     }
 
     // ---- lists, zones and output expressions, as FEEL evaluates them --------------------------------
@@ -240,10 +247,15 @@ class ReferenceMatcherTest {
                 new Praeceptum(2, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of(), Map.of(), Map.of("n", "a * 2"))),
                 new Praeceptum(3, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of(), Map.of(), Map.of("n", "a / 0"))));
         var reference = new ReferenceMatcher(rules, HitPolicy.COLLECT, Map.of(), Map.of("a", ColumnType.NUMBER), Map.of());
-        Assertions.assertThat(reference.aggregate(Map.of("a", new BigDecimal("1.5")), "n", Aggregator.SUM)).isEqualByComparingTo("8");
-        Assertions.assertThat(reference.aggregate(nullValued("a"), "n", Aggregator.SUM)).isEqualByComparingTo("5");
-        Assertions.assertThat(reference.aggregate(nullValued("a"), "n", Aggregator.MAX)).isEqualByComparingTo("5");
-        Assertions.assertThat(reference.aggregate(nullValued("a"), "n", Aggregator.COUNT)).isEqualByComparingTo("3");
+        Assertions.assertThat(total(reference, Map.of("a", new BigDecimal("1.5")), "n", Aggregator.SUM)).isEqualByComparingTo("8");
+        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.SUM)).isEqualByComparingTo("5");
+        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.MAX)).isEqualByComparingTo("5");
+        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.COUNT)).isEqualByComparingTo("3");
+    }
+
+    /** The value of an aggregation that has a result: null when it is missing. */
+    private static BigDecimal total(ReferenceMatcher reference, Map<String, ?> input, String output, Aggregator aggregator) {
+        return reference.aggregate(input, output, aggregator).orElseThrow().value();
     }
 
     private static Praeceptum cell(int id, String column, String cell) {

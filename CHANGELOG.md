@@ -26,9 +26,9 @@ the other three need decision requirement graphs
 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)). Read *Fixed* before upgrading if your
 DMN tables declare default output values (they now give that output instead of none), type a single
 output through their decision rather than its output clause (the output, and a generated record's
-component, now take that type), or hold quoted strings with a backslash (`"C:\temp"` now holds a tab,
-silently; a path is written `"C:\\temp"`), and *Changed* if you deconstruct `DecisionTable.OutputColumn`
-with a record pattern.
+component, now take that type), hold quoted strings with a backslash (`"C:\temp"` now holds a tab,
+silently; a path is written `"C:\\temp"`), or COUNT matching rules (no match now gives no output, not 0),
+and *Changed* if you deconstruct `DecisionTable.OutputColumn` with a record pattern.
 
 ### Added
 - **`praecepta-spring-boot-starter`** ([#20](https://github.com/brunopacheco1/praecepta/issues/20)):
@@ -183,6 +183,19 @@ with a record pattern.
   `0115-sum-collect-hitpolicy` and `0020-vacation-days` load in the framework integrations, and the Maven
   and Gradle plugins generate a `BigDecimal` component for such a number output where they generated a
   `String`.
+- **A COUNT that no rule matches gives no output, not 0**: DMN 1.5 deals with "no rules match" before any
+  aggregation (10.3.2.10, step 2: "if a default output value d is specified, DTI=FEEL(d)", "else
+  DTI=null"; step 3b aggregates only the rules that match), so a COLLECT table with COUNT (`C#`) gives its
+  default output when no rule matches, and null without one. Since 0.4.0 it gave 0. **This changes results
+  silently**: where no rule matches and the table declares no default, the engine now returns an empty list,
+  a generated class an empty `Optional`, and a framework integration's engine no map, where they returned 0
+  (`[{fee=0}]` in the integrations); code that reads the count must take an empty result as no match, or the
+  table can declare a default output value of `0`. SUM, MIN and MAX already gave no output there, so every
+  aggregation now agrees, in the engine, the generated classes and `praecepta-integration` alike.
+  `OutputStrategy.count` is now called only for one or more matches (and once when the engine is built, as
+  before, so a strategy without it still fails there). A generated aggregation's `evaluate` says what it
+  returns (`@return the number of matching rules, or empty if no rule matches`), so the generated classes of a
+  COLLECT table with an aggregation change in that Javadoc line.
 - **Generated aggregations** sum with FEEL's 34 significant digits (DMN 1.5, 10.3.2.3.1), as the framework
   integrations do, where they added exactly; a sum that needs more digits is rounded, half to even.
 - `failOn` ignores surrounding spaces in the Maven and Gradle plugins too (`"ERROR "`), as in the

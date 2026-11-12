@@ -309,7 +309,9 @@ Supported:
   variable's (the item type of a list for a multi-hit table; nothing for COUNT, whose result is a number).
 - **Every hit policy**, with SUM, MIN, MAX and COUNT aggregation. The engine leaves what they mean to the
   output strategy; `AggregationOperator.check(outputs)` says where DMN defines them: on a single output,
-  SUM over numbers, MIN and MAX over any ordered type, COUNT over any. As in Praecepta's generated classes
+  SUM over numbers, MIN and MAX over any ordered type, COUNT over any. They apply only when a rule
+  matches: when none does, the result is the default output, or none (`[]`), whatever the aggregation,
+  so COUNT gives no output rather than 0 (DMN 1.5, 10.3.2.10, step 2). As in Praecepta's generated classes
   and framework integrations, an aggregation skips missing outputs, where FEEL's `sum`, `min` and `max`
   would give null (10.3.4): a known deviation.
 
@@ -394,8 +396,8 @@ Optional<DiscountOutput> discount = Discount.evaluate(new DiscountInput(Discount
 ```
 
 Single-hit tables (and aggregations) return an `Optional`; multi-hit tables return a `List`. When no
-rule matches, these are empty, unless the DMN table declares default output values: then they hold the
-default output.
+rule matches, these are empty (a COUNT too, rather than 0), unless the DMN table declares default output
+values: then they hold the default output.
 Generated code belongs to your project, so it carries no Praecepta licence header. Set
 `<fileHeader>` to prepend your own, such as your project's SPDX lines.
 `Discount.validationReport()` gives the build-time findings, and `Discount.engine()` the engine.

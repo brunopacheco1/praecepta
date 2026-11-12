@@ -18,6 +18,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
@@ -103,13 +104,18 @@ class DefaultOutputsTest {
         Assertions.assertThat(engine.evaluate(Map.of("score", score))).containsExactly(new BigDecimal(expected));
     }
 
-    @Test
-    void without_a_default_no_rule_matching_still_gives_no_output_and_count_still_zero() {
-        var withoutDefault = FEES.replace("<defaultOutputEntry><text>%s</text></defaultOutputEntry>", "");
-        Assertions.assertThat(numberEngine(read(withoutDefault.formatted("SUM"))).evaluate(Map.of("score", "500"))).isEmpty();
-        Assertions.assertThat(numberEngine(read(withoutDefault.formatted("COUNT"))).evaluate(Map.of("score", "500")))
-                .containsExactly(BigDecimal.ZERO);
-        Assertions.assertThat(read(withoutDefault.formatted("SUM")).defaultOutput()).isEmpty();
+    /**
+     * DMN 1.5, 10.3.2.10, step 2: "If no rules match, [...] else DTI=null", before any aggregation, so COUNT too
+     * gives no output rather than zero.
+     */
+    @ParameterizedTest
+    @EnumSource(AggregationOperator.class)
+    void without_a_default_no_rule_matching_gives_no_output_whatever_the_aggregation(AggregationOperator aggregation) {
+        var withoutDefault = read(FEES.replace("<defaultOutputEntry><text>%s</text></defaultOutputEntry>", "").formatted(aggregation));
+        Assertions.assertThat(withoutDefault.defaultOutput()).isEmpty();
+        Assertions.assertThat(numberEngine(withoutDefault).evaluate(Map.of("score", "500"))).isEmpty();
+        Assertions.assertThat(numberEngine(withoutDefault).evaluate(Map.of())).as("a missing input matches no rule either").isEmpty();
+        Assertions.assertThat(numberEngine(withoutDefault).evaluate(Map.of("score", "650"))).as("one rule matches").hasSize(1);
     }
 
     @Test

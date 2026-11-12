@@ -140,7 +140,7 @@ public final class PraeceptaEngine<I, O> {
     private final BinaryOperator<O> reduce;
     /** COUNT only: the output for each number of matching rules; null otherwise. */
     private final IntFunction<O> count;
-    /** The result when no rule matches: the default output if there is one, else empty, or the COUNT output for zero. */
+    /** The result when no rule matches: the default output if there is one, else empty, whatever the aggregation. */
     private final List<O> noMatch;
     private final ValidationReport report;
 
@@ -209,9 +209,11 @@ public final class PraeceptaEngine<I, O> {
                 : null;
         reduce = reducer(builder.aggregation, builder.outputStrategy);
         count = builder.aggregation == AggregationOperator.COUNT ? builder.outputStrategy::count : null;
-        // COUNT's output for zero is built even when a default output replaces it, so a strategy without count fails here
-        var none = count == null ? List.<O>of() : List.of(count.apply(0));
-        noMatch = builder.defaultOutput == null ? none : List.of(outputStrategy.transform(builder.defaultOutput));
+        if (count != null) {
+            count.apply(1); // so that a strategy without count fails here, not when a rule first matches
+        }
+        // DMN 1.5, 10.3.2.10, step 2: no match gives the default output, else null, before any aggregation
+        noMatch = builder.defaultOutput == null ? List.of() : List.of(outputStrategy.transform(builder.defaultOutput));
         variableCellsByBit = variableCellsByBit(variableCells, bitToRule, evaluationOrder);
         variableRules = variableRules(variableCellsByBit, words);
         hasVariableCells = !BitsetIndex.isEmpty(variableRules);
@@ -231,8 +233,8 @@ public final class PraeceptaEngine<I, O> {
      *
      * @return the outputs selected by the hit policy: at most one for single-hit policies (and for
      *         aggregations), several for multi-hit ones. If no rule matches: the default output alone, if
-     *         there is one ({@link Builder#defaultOutput}), whatever the hit policy and aggregation; else
-     *         empty, except for COUNT, which then returns its output for zero
+     *         there is one ({@link Builder#defaultOutput}), else empty, whatever the hit policy and
+     *         aggregation (COUNT included: DMN 1.5, 10.3.2.10, gives null, not zero)
      * @throws HitPolicyViolationException if the input matches several rules under UNIQUE, or rules
      *                                     with different outputs under ANY
      * @throws InvalidInputException       if a value is outside its column's declared input values, or
@@ -1112,7 +1114,11 @@ public final class PraeceptaEngine<I, O> {
             return this;
         }
 
-        /** Aggregates COLLECT results into a single output, using the output strategy's sum/min/max/count. */
+        /**
+         * Aggregates COLLECT results into a single output, using the output strategy's sum/min/max/count. When
+         * no rule matches, there is nothing to aggregate: the result is the default output ({@link #defaultOutput}),
+         * or none, COUNT included (DMN 1.5, 10.3.2.10, step 2).
+         */
         public Builder<I, O> aggregation(AggregationOperator aggregation) {
             this.aggregation = Objects.requireNonNull(aggregation, "aggregation");
             return this;

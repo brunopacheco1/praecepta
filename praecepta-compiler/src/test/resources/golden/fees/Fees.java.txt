@@ -21,7 +21,7 @@ public final class Fees {
     }
 
     /**
-     * @return the selected output, or empty if no rule matches
+     * @return the sum of the matching rules' outputs, or empty if no rule matches
      * @throws io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException if the hit policy is violated
      * @throws io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException if a value is outside its column's value list
      */
