@@ -496,7 +496,8 @@ class DecisionsTest {
                 <input><inputExpression typeRef="date"><text>sent</text></inputExpression></input>
                 <input><inputExpression typeRef="string"><text>service</text></inputExpression></input>
                 <output name="due" typeRef="date"><defaultOutputEntry><text>null</text></defaultOutputEntry></output>
-                <rule><inputEntry><text>&gt;= @"2025-01-01" // this year</text></inputEntry><inputEntry><text>"express", "standard"</text></inputEntry>
+                <rule><inputEntry><text>&gt;= @"2025-01-01" // this year</text></inputEntry>
+                  <inputEntry><text>"express", "standard"</text></inputEntry>
                   <outputEntry><text>sent + duration("P14D")</text></outputEntry></rule>
                 <rule><inputEntry><text>-</text></inputEntry><inputEntry><text>"express"</text></inputEntry>
                   <outputEntry><text>sent + @"P1M" /* a month later, if that day exists */</text></outputEntry></rule>
@@ -533,7 +534,8 @@ class DecisionsTest {
                   <decision id="due" name="Due"><decisionTable hitPolicy="COLLECT">
                     <input><inputExpression typeRef="tDates"><text>due dates</text></inputExpression></input>
                     <output name="id" typeRef="string"/>
-                    <rule><inputEntry><text>list contains(?, @"2025-01-31")</text></inputEntry><outputEntry><text>"january"</text></outputEntry></rule>
+                    <rule><inputEntry><text>list contains(?, @"2025-01-31")</text></inputEntry>
+                      <outputEntry><text>"january"</text></outputEntry></rule>
                     <rule><inputEntry><text>some x in ? satisfies x != date(2025, 1, 31) // any other</text></inputEntry>
                       <outputEntry><text>"other"</text></outputEntry></rule>
                     <rule><inputEntry><text>list contains(?, null)</text></inputEntry><outputEntry><text>"missing"</text></outputEntry></rule>
