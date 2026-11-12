@@ -13,8 +13,6 @@ import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import io.quarkus.builder.BuildContext;
-import io.quarkus.builder.BuildStep;
 import io.quarkus.deployment.builditem.FeatureBuildItem;
 import io.quarkus.deployment.builditem.GeneratedResourceBuildItem;
 import io.quarkus.deployment.builditem.nativeimage.NativeImageResourceBuildItem;
@@ -35,12 +33,9 @@ class NativeResourcesTest {
             .withApplicationRoot(root -> root
                     .addAsResource("tables/discount.dmn", "rules/discount.dmn")
                     .addAsResource("tables/shipping.dmn", "rules/shipping/shipping.dmn"))
-            .addBuildChainCustomizer(chain -> chain.addBuildStep(new BuildStep() {
-                @Override
-                public void execute(BuildContext context) {
-                    check(context.consumeMulti(GeneratedResourceBuildItem.class), context.consumeMulti(NativeImageResourceBuildItem.class));
-                    context.produce(new FeatureBuildItem("praecepta-native-resources-test"));
-                }
+            .addBuildChainCustomizer(chain -> chain.addBuildStep(context -> {
+                check(context.consumeMulti(GeneratedResourceBuildItem.class), context.consumeMulti(NativeImageResourceBuildItem.class));
+                context.produce(new FeatureBuildItem("praecepta-native-resources-test"));
             }).consumes(GeneratedResourceBuildItem.class).consumes(NativeImageResourceBuildItem.class).produces(FeatureBuildItem.class).build());
 
     private static void check(List<GeneratedResourceBuildItem> generated, List<NativeImageResourceBuildItem> registered) {

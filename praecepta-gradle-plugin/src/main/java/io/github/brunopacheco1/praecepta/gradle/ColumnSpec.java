@@ -33,6 +33,7 @@ public abstract class ColumnSpec implements Named {
      * @param name the column's header in the sheet
      */
     @Inject
+    @SuppressWarnings("java:S5993") // Gradle creates its managed types through public constructors only
     public ColumnSpec(String name) {
         this.name = name;
     }

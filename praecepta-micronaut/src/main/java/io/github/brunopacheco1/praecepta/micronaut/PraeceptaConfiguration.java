@@ -36,18 +36,18 @@ public class PraeceptaConfiguration implements Toggleable {
     /** The setting that turns the integration off when {@code false}. */
     public static final String ENABLED = PREFIX + ".enabled";
 
-    private boolean enabled = true;
+    private boolean active = true;
     private List<String> locations;
     private String failOn = "ERROR";
 
     /** Whether the integration is on ({@code praecepta.enabled}, default {@code true}). */
     @Override
     public boolean isEnabled() {
-        return enabled;
+        return active;
     }
 
     public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+        this.active = enabled;
     }
 
     /**

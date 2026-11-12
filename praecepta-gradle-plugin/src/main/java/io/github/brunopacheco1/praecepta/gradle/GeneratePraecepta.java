@@ -71,6 +71,7 @@ public abstract class GeneratePraecepta extends DefaultTask {
     };
 
     /** Creates the task; Gradle does when the plugin registers it. */
+    @SuppressWarnings("java:S5993") // Gradle creates its managed types through public constructors only
     public GeneratePraecepta() {
         // Gradle implements the properties
     }
@@ -146,7 +147,7 @@ public abstract class GeneratePraecepta extends DefaultTask {
         var sourceRoot = getSourceDirectory().get().getAsFile().toPath();
         var resourceRoot = getResourceDirectory().get().getAsFile().toPath();
         getFileSystemOperations().delete(spec -> spec.delete(sourceRoot.toFile(), resourceRoot.toFile()));
-        if (getSkip().get()) {
+        if (getSkip().get().booleanValue()) {
             getLogger().lifecycle("Skipping Praecepta table generation");
             return;
         }

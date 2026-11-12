@@ -119,19 +119,8 @@ public final class DecisionsLoader {
         }
         var sources = new TreeMap<String, TableSource>();
         for (var pattern : patterns) {
-            try {
-                var found = finder.find(Location.parse(pattern));
-                if (found.isEmpty() && explicit) {
-                    problems.add(pattern + ": no DMN file matches this location");
-                }
-                found.forEach(source -> sources.putIfAbsent(source.location(), source));
-            } catch (IllegalArgumentException e) {
-                problems.add(e.getMessage());
-            } catch (IOException e) {
-                problems.add("%s: cannot be searched (%s)".formatted(pattern, e.getMessage()));
-            } catch (UncheckedIOException e) {
-                problems.add("%s: cannot be searched (%s)".formatted(pattern, e.getMessage()));
-            }
+            find(finder, pattern, explicit, problems)
+                    .forEach(source -> sources.putIfAbsent(source.location(), source));
         }
         declared.forEach(source -> sources.putIfAbsent(source.location(), source));
         problems.addAll(declaredProblems);
@@ -155,5 +144,21 @@ public final class DecisionsLoader {
             decision.report().issues().forEach(issue -> log.warn(decision.name() + ": " + issue));
         }
         return decisions;
+    }
+
+    /** The files one location finds, or none, adding to problems what goes wrong. */
+    private static List<TableSource> find(Finder finder, String pattern, boolean explicit, List<String> problems) {
+        try {
+            var found = finder.find(Location.parse(pattern));
+            if (found.isEmpty() && explicit) {
+                problems.add(pattern + ": no DMN file matches this location");
+            }
+            return found;
+        } catch (IllegalArgumentException e) {
+            problems.add(e.getMessage());
+        } catch (IOException | UncheckedIOException e) {
+            problems.add("%s: cannot be searched (%s)".formatted(pattern, e.getMessage()));
+        }
+        return List.of();
     }
 }

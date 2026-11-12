@@ -46,6 +46,7 @@ import org.gradle.api.tasks.PathSensitivity;
 public abstract class TableSpec implements Named {
 
     /** Creates a table; Gradle does when one is registered. */
+    @SuppressWarnings("java:S5993") // Gradle creates its managed types through public constructors only
     public TableSpec() {
         // Gradle implements the properties
     }

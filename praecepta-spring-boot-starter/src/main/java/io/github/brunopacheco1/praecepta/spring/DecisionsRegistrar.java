@@ -49,6 +49,8 @@ import io.github.brunopacheco1.praecepta.integration.TableSource;
  */
 final class DecisionsRegistrar implements ImportBeanDefinitionRegistrar {
 
+    // logs as the public auto-configuration, whose name users set log levels by; this class is internal
+    @SuppressWarnings("java:S3416")
     private static final Log LOG = LogFactory.getLog(PraeceptaAutoConfiguration.class);
 
     private static final ResolvableType MAP_OF_TEXT = ResolvableType.forClassWithGenerics(Map.class, String.class, String.class);

@@ -68,7 +68,7 @@ public class PraeceptaProcessor {
     static final Type ENGINE_TYPE = ParameterizedType.create(ENGINE, new Type[] {TEXT_MAP, TEXT_MAP}, null);
 
     @BuildStep
-    FeatureBuildItem feature() {
+    FeatureBuildItem registerFeature() {
         return new FeatureBuildItem(FEATURE);
     }
 

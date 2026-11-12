@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
@@ -83,11 +84,7 @@ public final class Decisions {
             }
             var decisions = new ArrayList<Decision>();
             for (var table : tables) {
-                try {
-                    decisions.add(Decision.of(source.location(), table));
-                } catch (IllegalArgumentException e) {
-                    problems.add(source.location() + ": " + e.getMessage());
-                }
+                decision(source, table, problems).ifPresent(decisions::add);
             }
             return decisions;
         } catch (IOException e) {
@@ -96,6 +93,15 @@ public final class Decisions {
             problems.add(source.location() + ": " + e.getMessage());
         }
         return List.of();
+    }
+
+    private static Optional<Decision> decision(TableSource source, DecisionTable table, List<String> problems) {
+        try {
+            return Optional.of(Decision.of(source.location(), table));
+        } catch (IllegalArgumentException e) {
+            problems.add(source.location() + ": " + e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /** The decision with this name, if loaded. */

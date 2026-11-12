@@ -28,11 +28,11 @@ class FailOnNoneTest {
     static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
             .withApplicationRoot(root -> root.addAsResource("tables/overlapping.dmn", "rules/overlapping.dmn"))
             .overrideConfigKey("quarkus.praecepta.fail-on", "NONE")
-            .setLogRecordPredicate(record -> record.getLoggerName().equals(PraeceptaProcessor.class.getName()))
+            .setLogRecordPredicate(logRecord -> logRecord.getLoggerName().equals(PraeceptaProcessor.class.getName()))
             .assertLogRecords(records -> Assertions.assertThat(records)
-                    .anySatisfy(record -> {
-                        Assertions.assertThat(record.getLevel()).isEqualTo(Level.WARNING);
-                        Assertions.assertThat(record.getMessage()).startsWith("Tier: ERROR ");
+                    .anySatisfy(logRecord -> {
+                        Assertions.assertThat(logRecord.getLevel()).isEqualTo(Level.WARNING);
+                        Assertions.assertThat(logRecord.getMessage()).startsWith("Tier: ERROR ");
                     }));
 
     @Inject

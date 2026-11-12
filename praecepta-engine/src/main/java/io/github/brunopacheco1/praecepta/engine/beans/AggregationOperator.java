@@ -40,21 +40,13 @@ public enum AggregationOperator {
                     .formatted(this, outputs.size()));
         }
         var type = outputs.getFirst().type();
-        switch (this) {
-            case SUM -> {
-                if (type != ColumnType.NUMBER) {
-                    throw new IllegalArgumentException("SUM aggregation needs a number output, not a " + type.feelName());
-                }
-            }
-            case MIN, MAX -> {
-                if (!type.supportsComparisons()) {
-                    throw new IllegalArgumentException("%s aggregation needs an output whose values are ordered, not a %s"
-                            .formatted(this, type.feelName()));
-                }
-            }
-            case COUNT -> {
-                // counts outputs of any type
-            }
+        if (this == SUM && type != ColumnType.NUMBER) {
+            throw new IllegalArgumentException("SUM aggregation needs a number output, not a " + type.feelName());
         }
+        if ((this == MIN || this == MAX) && !type.supportsComparisons()) {
+            throw new IllegalArgumentException("%s aggregation needs an output whose values are ordered, not a %s"
+                    .formatted(this, type.feelName()));
+        }
+        // COUNT counts outputs of any type
     }
 }

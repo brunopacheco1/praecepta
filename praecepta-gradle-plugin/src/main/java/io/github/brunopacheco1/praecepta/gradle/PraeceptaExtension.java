@@ -26,6 +26,7 @@ import org.gradle.api.provider.Property;
 public abstract class PraeceptaExtension {
 
     /** Creates the extension; Gradle does when the plugin is applied. */
+    @SuppressWarnings("java:S5993") // Gradle creates its managed types through public constructors only
     public PraeceptaExtension() {
         // Gradle implements the properties
     }

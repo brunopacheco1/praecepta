@@ -28,9 +28,10 @@ import org.gradle.api.tasks.Nested;
  */
 public abstract class Columns {
 
-    private final List<ColumnSpec> columns = new ArrayList<>();
+    private final List<ColumnSpec> declared = new ArrayList<>();
 
     /** Creates an empty list of columns; Gradle does for each table. */
+    @SuppressWarnings("java:S5993") // Gradle creates its managed types through public constructors only
     public Columns() {
         // columns are added by column(...)
     }
@@ -50,7 +51,7 @@ public abstract class Columns {
      */
     @Nested
     public List<ColumnSpec> getColumns() {
-        return List.copyOf(columns);
+        return List.copyOf(declared);
     }
 
     /**
@@ -66,7 +67,7 @@ public abstract class Columns {
         var column = getObjects().newInstance(ColumnSpec.class, name);
         column.getType().convention("STRING");
         column.getList().convention(false);
-        columns.add(column);
+        declared.add(column);
         return column;
     }
 

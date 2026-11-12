@@ -32,7 +32,7 @@ class FeelStringsTest {
     void strings_are_ordered_by_code_point_not_by_utf16_code_unit() {
         var tilde = "～"; // U+FF5E
         var horse = "🐎"; // U+1F40E, the code units U+D83D U+DC0E
-        Assertions.assertThat(horse.compareTo(tilde)).as("Java's order").isNegative();
+        Assertions.assertThat(horse).as("Java's order").isLessThan(tilde);
         Assertions.assertThat(FeelStrings.compare(horse, tilde)).isPositive();
         Assertions.assertThat(FeelStrings.compare(tilde, horse)).isNegative();
         Assertions.assertThat(FeelStrings.compare(String.valueOf((char) 0xE000), horse)).isNegative();

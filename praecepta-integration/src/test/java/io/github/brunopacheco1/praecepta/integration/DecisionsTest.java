@@ -156,7 +156,8 @@ class DecisionsTest {
         var overlapping = TableSource.of("overlapping.dmn", OVERLAPPING.getBytes(StandardCharsets.UTF_8));
         var unreachable = TableSource.of("unreachable.dmn", UNREACHABLE.getBytes(StandardCharsets.UTF_8));
 
-        Assertions.assertThatThrownBy(() -> Decisions.load(List.of(overlapping, unreachable), Severity.ERROR))
+        var sources = List.of(overlapping, unreachable);
+        Assertions.assertThatThrownBy(() -> Decisions.load(sources, Severity.ERROR))
                 .isInstanceOf(DecisionsException.class)
                 .hasMessageStartingWith("Cannot load decision tables: overlapping.dmn: decision 'Tier' has validation issues at ERROR")
                 .hasMessageContaining("ERROR rules [1, 2] both match some inputs (UNIQUE)");
@@ -212,10 +213,12 @@ class DecisionsTest {
 
     @Test
     void aggregations_dmn_does_not_define_are_rejected() {
-        Assertions.assertThatThrownBy(() -> Decision.of("names", typed("SUM", "string", "\"a\"", "\"b\"")))
+        var names = typed("SUM", "string", "\"a\"", "\"b\"");
+        Assertions.assertThatThrownBy(() -> Decision.of("names", names))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Table 'Out': SUM aggregation needs a number output, not a string");
-        Assertions.assertThatThrownBy(() -> Decision.of("flags", typed("MIN", "boolean", "true", "false")))
+        var flags = typed("MIN", "boolean", "true", "false");
+        Assertions.assertThatThrownBy(() -> Decision.of("flags", flags))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Table 'Out': MIN aggregation needs an output whose values are ordered, not a boolean");
         var twoOutputs = DmnReader.readAll(stream("""

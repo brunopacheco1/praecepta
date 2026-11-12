@@ -190,7 +190,7 @@ class PraeceptaPluginTest {
         fees("fees");
         fees("more fees");
 
-        Assertions.assertThatThrownBy(() -> task().generate())
+        Assertions.assertThatThrownBy(task()::generate)
                 .isInstanceOf(GradleException.class)
                 .hasMessage("Two tables generate the class Fees; set 'className' on one");
     }
@@ -204,7 +204,7 @@ class PraeceptaPluginTest {
             table.inputs(inputs -> inputs.column("country"));
             table.outputs(outputs -> outputs.column("tier"));
         });
-        Assertions.assertThatThrownBy(() -> task().generate())
+        Assertions.assertThatThrownBy(task()::generate)
                 .isInstanceOf(GradleException.class)
                 .hasMessageContaining("overlap");
 
@@ -213,14 +213,14 @@ class PraeceptaPluginTest {
         Assertions.assertThat(projectDir.resolve("build/generated/sources/praecepta/java/main/com/acme/rules/Tier.java")).exists();
 
         extension.getFailOn().set("SOMETIMES");
-        Assertions.assertThatThrownBy(() -> task().generate())
+        Assertions.assertThatThrownBy(task()::generate)
                 .isInstanceOf(GradleException.class)
                 .hasMessage("'failOn' must be ERROR, WARNING or NONE, not SOMETIMES");
     }
 
     @Test
     void configuration_errors_become_build_failures_naming_the_gradle_settings() {
-        Assertions.assertThatThrownBy(() -> task().generate())
+        Assertions.assertThatThrownBy(task()::generate)
                 .isInstanceOf(GradleException.class)
                 .hasMessageStartingWith("Register at least one table");
 
@@ -229,29 +229,30 @@ class PraeceptaPluginTest {
             table.inputs(inputs -> inputs.column("zone"));
             table.outputs(outputs -> outputs.column("fee", column -> column.getType().set("NUMBER")));
         });
-        Assertions.assertThatThrownBy(() -> task().generate())
+        Assertions.assertThatThrownBy(task()::generate)
                 .isInstanceOf(GradleException.class)
                 .hasMessageEndingWith(": 'hitPolicy' is required for Excel and CSV tables");
 
         extension.getTables().getByName("fees").getHitPolicy().set("SOMETIMES");
-        Assertions.assertThatThrownBy(() -> task().generate())
+        Assertions.assertThatThrownBy(task()::generate)
                 .isInstanceOf(GradleException.class)
                 .hasMessage("Table 'fees': 'hitPolicy' must be one of UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER, COLLECT,"
                         + " not SOMETIMES");
 
         extension.getTables().getByName("fees").getHitPolicy().set("COLLECT");
         extension.getTables().getByName("fees").getOutputs().getColumns().getFirst().getType().set("MONEY");
-        Assertions.assertThatThrownBy(() -> task().generate())
+        Assertions.assertThatThrownBy(task()::generate)
                 .isInstanceOf(GradleException.class)
                 .hasMessageStartingWith("Table 'fees', column 'fee': 'type' must be one of STRING, NUMBER,");
 
         extension.getTables().register("missing", table -> table.getSource().set(projectDir.resolve("src/main/rules/missing.csv").toFile()));
         extension.getTables().getByName("fees").getOutputs().getColumns().getFirst().getType().set("NUMBER");
-        Assertions.assertThatThrownBy(() -> task().generate())
+        Assertions.assertThatThrownBy(task()::generate)
                 .isInstanceOf(GradleException.class)
                 .hasMessageEndingWith("missing.csv does not exist");
 
-        Assertions.assertThatThrownBy(() -> extension.getTables().getByName("fees").inputs(inputs -> inputs.column(" ")))
+        var fees = extension.getTables().getByName("fees");
+        Assertions.assertThatThrownBy(() -> fees.inputs(inputs -> inputs.column(" ")))
                 .isInstanceOf(InvalidUserDataException.class)
                 .hasMessageStartingWith("Every column needs a name");
     }
@@ -260,7 +261,7 @@ class PraeceptaPluginTest {
     void a_table_without_a_source_is_reported_by_the_compiler() {
         extension.getTables().register("fees");
 
-        Assertions.assertThatThrownBy(() -> task().generate())
+        Assertions.assertThatThrownBy(task()::generate)
                 .isInstanceOf(GradleException.class)
                 .hasMessage("Every table needs a 'source'");
     }

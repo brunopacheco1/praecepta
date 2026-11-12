@@ -167,14 +167,20 @@ public record Decision(String name, String location, DecisionTable table, Praece
         public Map<String, String> min(Map<String, String> a, Map<String, String> b) {
             var x = value(a);
             var y = value(b);
-            return x == null ? b : y == null || FeelTemporals.compare(x, y) <= 0 ? a : b;
+            if (x == null) {
+                return b;
+            }
+            return y == null || FeelTemporals.compare(x, y) <= 0 ? a : b;
         }
 
         @Override
         public Map<String, String> max(Map<String, String> a, Map<String, String> b) {
             var x = value(a);
             var y = value(b);
-            return x == null ? b : y == null || FeelTemporals.compare(x, y) >= 0 ? a : b;
+            if (x == null) {
+                return b;
+            }
+            return y == null || FeelTemporals.compare(x, y) >= 0 ? a : b;
         }
 
         @Override

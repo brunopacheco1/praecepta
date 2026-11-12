@@ -76,7 +76,7 @@ class DefaultOutputsTest {
         var case1 = extraDays("Extra days case 1").evaluate(input);
         var case2 = extraDays("Extra days case 2").evaluate(input);
         var case3 = extraDays("Extra days case 3").evaluate(input);
-        Assertions.assertThat(List.of(case1, case2, case3)).allSatisfy(days -> Assertions.assertThat(days).hasSize(1));
+        Assertions.assertThat(List.of(case1, case2, case3)).isNotEmpty().allSatisfy(days -> Assertions.assertThat(days).hasSize(1));
         var sum = new BigDecimal(22).add(case1.getFirst().max(case3.getFirst())).add(case2.getFirst());
         Assertions.assertThat(sum).isEqualByComparingTo(total);
     }

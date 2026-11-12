@@ -37,7 +37,7 @@ class DevModeReloadTest {
 
     @RegisterExtension
     static final QuarkusDevModeTest TEST = new QuarkusDevModeTest()
-            .withApplicationRoot(root -> root
+            .withApplicationRoot(app -> app
                     .addClass(DiscountRoute.class)
                     .addAsResource("tables/discount.dmn", "rules/discount.dmn")
                     .addAsResource(new StringAsset(String.join("\n",

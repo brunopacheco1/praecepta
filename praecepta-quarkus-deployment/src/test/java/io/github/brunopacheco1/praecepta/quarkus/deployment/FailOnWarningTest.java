@@ -27,6 +27,7 @@ class FailOnWarningTest {
             });
 
     @Test
+    @SuppressWarnings("java:S2699") // assertException above is the assertion: Quarkus runs it on the build's failure
     void a_warning_fails_the_build() {
         // the extension checks the failure; a build that succeeds fails this test
     }

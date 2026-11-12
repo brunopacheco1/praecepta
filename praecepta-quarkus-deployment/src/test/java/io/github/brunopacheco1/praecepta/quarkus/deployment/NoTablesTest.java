@@ -23,11 +23,11 @@ class NoTablesTest {
     @RegisterExtension
     static final QuarkusExtensionTest TEST = new QuarkusExtensionTest()
             .withEmptyApplication()
-            .setLogRecordPredicate(record -> record.getLoggerName().equals(PraeceptaProcessor.class.getName()))
+            .setLogRecordPredicate(logRecord -> logRecord.getLoggerName().equals(PraeceptaProcessor.class.getName()))
             .assertLogRecords(records -> Assertions.assertThat(records)
-                    .anySatisfy(record -> {
-                        Assertions.assertThat(record.getLevel()).isEqualTo(Level.INFO);
-                        Assertions.assertThat(record.getMessage()).isEqualTo("No decision tables found at classpath*:rules/**/*.dmn");
+                    .anySatisfy(logRecord -> {
+                        Assertions.assertThat(logRecord.getLevel()).isEqualTo(Level.INFO);
+                        Assertions.assertThat(logRecord.getMessage()).isEqualTo("No decision tables found at classpath*:rules/**/*.dmn");
                     }));
 
     @Inject

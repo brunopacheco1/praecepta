@@ -39,7 +39,8 @@ public final class PraeceptaTablesBuildItem extends SimpleBuildItem {
 
         @Override
         public boolean equals(Object other) {
-            return other instanceof Table table && location.equals(table.location) && Arrays.equals(dmn, table.dmn);
+            return other instanceof Table(var otherLocation, var otherDmn) && location.equals(otherLocation)
+                    && Arrays.equals(dmn, otherDmn);
         }
 
         @Override

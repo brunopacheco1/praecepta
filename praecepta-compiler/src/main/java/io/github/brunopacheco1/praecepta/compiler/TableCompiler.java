@@ -43,6 +43,9 @@ import io.github.brunopacheco1.praecepta.loader.excel.ExcelLoader;
  * }</pre>
  */
 public final class TableCompiler {
+    /** A problem with a table, prefixed with the table's name. */
+    private static final String TABLE_PROBLEM = "Table '%s': %s";
+
 
     private TableCompiler() {
     }
@@ -165,7 +168,7 @@ public final class TableCompiler {
             try {
                 table.aggregation().check(table.outputs());
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Table '%s': %s".formatted(table.name(), e.getMessage()), e);
+                throw new IllegalArgumentException(TABLE_PROBLEM.formatted(table.name(), e.getMessage()), e);
             }
             // the generated classes aggregate a BigDecimal component, though DMN also counts any output and
             // takes the minimum or maximum of any ordered one, as the framework integrations do
@@ -196,7 +199,7 @@ public final class TableCompiler {
             table.namedInputs().forEach((name, type) -> bind(builder, name, type, zoned.contains(name), lists.contains(name)));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(e.getMessage().startsWith("Table '") ? e.getMessage()
-                    : "Table '%s': %s".formatted(table.name(), e.getMessage()), e);
+                    : TABLE_PROBLEM.formatted(table.name(), e.getMessage()), e);
         }
         if (failOn != null) {
             builder.failOn(failOn);
@@ -204,7 +207,7 @@ public final class TableCompiler {
         try {
             return builder.build().validationReport();
         } catch (RuntimeException e) {
-            throw new IllegalArgumentException("Table '%s': %s".formatted(table.name(), e.getMessage()), e);
+            throw new IllegalArgumentException(TABLE_PROBLEM.formatted(table.name(), e.getMessage()), e);
         }
     }
 

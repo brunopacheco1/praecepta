@@ -501,7 +501,8 @@ class DmnReaderTest {
                     <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"one"</text></outputEntry></rule>
                   </decisionTable>
                 </decision>""");
-        Assertions.assertThatThrownBy(() -> DmnReader.read(stream(xml)))
+        var dmn = stream(xml);
+        Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("Decision 'Amount', rule 1, output 'Amount'");
     }

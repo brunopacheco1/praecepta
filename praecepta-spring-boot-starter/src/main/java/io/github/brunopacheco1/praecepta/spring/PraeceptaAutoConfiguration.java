@@ -46,6 +46,11 @@ public class PraeceptaAutoConfiguration {
     /** What an engine bean's name starts with; the decision's name follows. */
     public static final String ENGINE_BEAN_PREFIX = "praecepta.";
 
+    /** Spring creates it; it only holds the names above and imports the beans. */
+    PraeceptaAutoConfiguration() {
+        // the beans come from DecisionsRegistrar and ActuatorConfiguration
+    }
+
     /** The Actuator endpoint, when Actuator is on the class path and the endpoint is available. */
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnClass({ Endpoint.class, ConditionalOnAvailableEndpoint.class })
