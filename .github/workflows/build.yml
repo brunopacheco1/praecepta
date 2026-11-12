@@ -45,6 +45,10 @@ jobs:
         # also checks SPDX headers (license-maven-plugin), runs the plugin's integration tests and
         # writes SBOMs (target/bom.json)
         run: mvn -B verify
+      - name: Test the workflow scripts
+        if: ${{ env.PRIMARY == 'true' }}
+        # their release-only paths (published_modules.py jars) would otherwise first run on a release tag
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
       - name: Check dependency licences
         if: ${{ env.PRIMARY == 'true' }}
         # every published module writes an SBOM; modules that are never published skip theirs

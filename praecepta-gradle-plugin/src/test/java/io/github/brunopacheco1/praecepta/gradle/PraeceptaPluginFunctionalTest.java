@@ -203,6 +203,18 @@ class PraeceptaPluginFunctionalTest {
                                 column("offer") { priority = listOf("iberian", "senior", "standard") }
                             }
                         }
+                        // an Excel workbook: Apache POI runs in the plugin's class loader
+                        register("matrix") {
+                            source = file("src/main/rules/matrix.xlsx")
+                            hitPolicy = "FIRST"
+                            inputs {
+                                column("inputOne")
+                                column("inputTwo")
+                            }
+                            outputs {
+                                column("output")
+                            }
+                        }
                     }
                 }
                 """.formatted(VERSION));
@@ -217,6 +229,8 @@ class PraeceptaPluginFunctionalTest {
                 .contains("java.util.List<String> nationalities, java.util.List<java.math.BigDecimal> ages");
         Assertions.assertThat(project.resolve("build/generated/resources/praecepta/main/com/acme/pricing/Offer.dmn")).content()
                 .contains("hitPolicy=\"PRIORITY\"");
+        Assertions.assertThat(project.resolve("build/generated/resources/praecepta/main/com/acme/pricing/Matrix.dmn")).content()
+                .contains("<text>\"TEST2\"</text>", "<text>\"rule3\"</text>");
     }
 
     @Test
@@ -303,7 +317,7 @@ class PraeceptaPluginFunctionalTest {
 
     private static void copyTables(Path project) throws IOException {
         var rules = Files.createDirectories(project.resolve("src/main/rules"));
-        for (var name : List.of("fees.csv", "overlapping.csv", "discount.csv", "nationalities.csv")) {
+        for (var name : List.of("fees.csv", "overlapping.csv", "discount.csv", "nationalities.csv", "matrix.xlsx")) {
             try {
                 Files.copy(Path.of(PraeceptaPluginFunctionalTest.class.getResource("/tables/" + name).toURI()), rules.resolve(name));
             } catch (URISyntaxException e) {

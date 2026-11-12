@@ -218,6 +218,12 @@ class PraeceptaFactoryTest {
     }
 
     @Test
+    void locations_set_to_nothing_stop_startup() {
+        Assertions.assertThat(startupFailure(Map.of("praecepta.locations", " , ")).problems())
+                .containsExactly("praecepta.locations is set but names no location");
+    }
+
+    @Test
     void enabled_false_turns_the_integration_off() {
         try (var context = ApplicationContext.run(Map.of("praecepta.enabled", false))) {
             Assertions.assertThat(context.containsBean(Decisions.class)).isFalse();

@@ -3,8 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # The Maven plugin built and integration-tested with each Maven version it supports. On pull
-# requests only when the plugin, the compiler, loader and engine it compiles tables with, or a
-# build file changes; always on main, and weekly so a new Maven release is noticed.
+# requests only when the plugin, the compiler, loader and engine it compiles tables with, the
+# integration core its native-app integration test uses, or a build file changes; always on main,
+# and weekly so a new Maven release is noticed.
 name: Maven versions
 on:
   push:
@@ -15,6 +16,7 @@ on:
       - 'praecepta-compiler/src/main/**'
       - 'praecepta-loader/src/main/**'
       - 'praecepta-engine/src/main/**'
+      - 'praecepta-integration/src/main/**'
       - '**/pom.xml'
       - '.mvn/**'
       - '.github/workflows/maven-versions.yml'

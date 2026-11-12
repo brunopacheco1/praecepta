@@ -36,8 +36,10 @@ import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
+import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
@@ -103,11 +105,15 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     /** Rules of a {@link #wide()} scenario: enough for masks of up to four words. */
     private static final int MAX_WIDE_RULES = 200;
     /**
-     * String values, in FEEL's order (by code point): a column's domain is the first two to four;
-     * comparisons and intervals use all six. The last two tell FEEL's order from UTF-16's: U+FF5E, and
-     * U+1F40E, which UTF-16 writes as two surrogates (U+D83D U+DC0E) and so puts before U+FF5E.
+     * String values, in FEEL's order (by code point): a column's domain is the first two to four, and now
+     * and then five or six; intervals use the first six, and comparisons all seven. The fifth and sixth tell
+     * FEEL's order from UTF-16's: U+FF5E, and U+1F40E, which UTF-16 writes as two surrogates (U+D83D U+DC0E)
+     * and so puts before U+FF5E. The seventh, U+1F40E followed by a tab, a quote and a backslash, can only be
+     * written with escape sequences.
      */
-    private static final List<String> LETTERS = List.of("a", "b", "c", "d", "～", "🐎");
+    private static final List<String> LETTERS = List.of("a", "b", "c", "d", "～", "🐎", "🐎\t\"\\");
+    /** How many of {@link #LETTERS} intervals and value lists use: all but the one with escape sequences. */
+    private static final int INTERVAL_LETTERS = 6;
     /** A character from U+E000 up: after U+1F40E's first surrogate in UTF-16, before U+1F40E by code point. */
     private static final String PRIVATE_USE = String.valueOf((char) 0xE000);
     /** The offsets times with a zone are written at. */
@@ -176,17 +182,35 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             for (int c = 0; c < columns.size(); c++) {
                 var column = columns.get(c);
                 var type = types.get(column);
-                var cell = CellParser.parse(rule.input().values().get(column), type);
+                var text = rule.input().values().get(column);
+                var cell = CellParser.parse(text, type);
                 if (lists.contains(column)) {
                     cells.put(column, DmnWriter.renderList(cell));
                 } else {
-                    cells.put(column, (r + c) % 3 == 0 ? variableCell(type, r, c) : DmnWriter.render(cell));
+                    cells.put(column, (r + c) % 3 == 0 ? variableCell(type, r, c) : feelCell(text, cell, type));
                 }
             }
             rewritten.add(new Praeceptum(rule.priority(), new PraeceptaInput(cells), rule.output()));
         }
         return new DecisionTableScenario(columns, types, allowedValues, List.copyOf(rewritten), inputs, true, zonedColumns, lists,
                 maskForm, defaults);
+    }
+
+    /**
+     * A cell as strict FEEL: as written, where strict FEEL reads it the same (as it reads quoted strings with
+     * escape sequences, so they are read by both parsers), else as {@link DmnWriter#render} writes it.
+     */
+    private static String feelCell(String text, UnaryTests cell, ColumnType type) {
+        if (text.indexOf('\\') >= 0) {
+            try {
+                if (CellParser.parseFeel(text, type).equals(cell)) {
+                    return text;
+                }
+            } catch (CellSyntaxException e) {
+                // not strict FEEL as written
+            }
+        }
+        return DmnWriter.render(cell);
     }
 
     private String variableCell(ColumnType type, int r, int c) {
@@ -288,10 +312,13 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     }
 
     private static Arbitrary<Column> column(boolean declareStrings) {
-        var string = Arbitraries.integers().between(2, 4).flatMap(size -> {
+        // mostly two to four letters; now and then the two that FEEL and UTF-16 order differently too
+        var sizes = Arbitraries.frequencyOf(Tuple.of(3, Arbitraries.integers().between(2, 4)),
+                Tuple.of(1, Arbitraries.integers().between(5, INTERVAL_LETTERS)));
+        var string = sizes.flatMap(size -> {
             var domain = LETTERS.subList(0, size);
             var declared = Arbitraries.of(domain).set().ofMinSize(1).ofMaxSize(size)
-                    .map(values -> String.join(",", values.stream().sorted().map(v -> "\"" + v + "\"").toList()));
+                    .map(values -> String.join(",", values.stream().sorted().map(v -> quoted(v, LETTERS.indexOf(v))).toList()));
             var maybe = declareStrings ? declared : oneTimeInThree(declared);
             return maybe.map(allowed -> new Column(ColumnType.STRING, domain, allowed));
         });
@@ -406,7 +433,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     /** A literal, written in every accepted style. */
     private static Arbitrary<String> literal(Column column) {
         return switch (column.type()) {
-            case STRING -> Arbitraries.of(column.domain()).flatMap(v -> Arbitraries.of(v, "\"" + v + "\"", escaped(v)));
+            case STRING -> stringLiteral(column.domain());
             case NUMBER -> Arbitraries.integers().between(0, 5).map(String::valueOf);
             case DATE -> Arbitraries.integers().between(0, 5).flatMap(d -> Arbitraries.of(
                     "date(\"" + DAY0.plusDays(d) + "\")", DAY0.plusDays(d).toString()));
@@ -420,9 +447,43 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         };
     }
 
-    /** A string literal whose characters are all written as FEEL code points: {@code "\\u0061"} for {@code a}. */
-    private static String escaped(String value) {
-        return value.chars().mapToObj(c -> "\\u%04x".formatted(c)).collect(Collectors.joining("", "\"", "\""));
+    /** One of the values, as a literal in each accepted style: unquoted (where it can be), and quoted in every form of {@link #quoted}. */
+    private static Arbitrary<String> stringLiteral(List<String> values) {
+        return Arbitraries.of(values).flatMap(v -> {
+            var styles = new ArrayList<String>();
+            if (v.chars().allMatch(c -> c > ' ' && c != '"' && c != '\\')) {
+                styles.add(v);
+            }
+            for (int form = 0; form < QUOTED_FORMS; form++) {
+                styles.add(quoted(v, form));
+            }
+            return Arbitraries.of(styles);
+        });
+    }
+
+    /** How many forms {@link #quoted} writes. */
+    private static final int QUOTED_FORMS = 4;
+
+    /**
+     * A string literal, its characters written in one of FEEL's forms (grammar rule 64), chosen by {@code form}
+     * modulo {@link #QUOTED_FORMS}: 0, as they are, with the single-letter escapes where needed ({@code \t},
+     * {@code \"}, {@code \\}); 1, every character as a backslash, an uppercase U and six hexadecimal digits; 2,
+     * every UTF-16 unit as a backslash, a lowercase u and four, so a character beyond U+FFFF as a surrogate pair;
+     * 3, the three mixed, character by character.
+     */
+    private static String quoted(String value, int form) {
+        var literal = new StringBuilder("\"");
+        int index = 0;
+        for (int i = 0; i < value.length(); i += Character.charCount(value.codePointAt(i)), index++) {
+            int codePoint = value.codePointAt(i);
+            switch (form % QUOTED_FORMS == 3 ? index % 3 : form % QUOTED_FORMS) {
+                case 0 -> literal.append(FeelLiterals.literal(Character.toString(codePoint)), 1,
+                        FeelLiterals.literal(Character.toString(codePoint)).length() - 1);
+                case 1 -> literal.append("\\U%06X".formatted(codePoint));
+                default -> Character.toString(codePoint).chars().forEach(unit -> literal.append("\\u%04x".formatted(unit)));
+            }
+        }
+        return literal.append('"').toString();
     }
 
     /**
@@ -469,7 +530,9 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         if (!column.type().supportsComparisons()) {
             return literal(column);
         }
-        var comparison = Combinators.combine(Arbitraries.of("<", "<=", ">", ">="), literal(column)).as((op, v) -> op + " " + v);
+        // a string compares with any of the letters, outside the column's domain too, so with those FEEL orders by code point
+        var bound = column.type() == ColumnType.STRING ? stringLiteral(LETTERS) : literal(column);
+        var comparison = Combinators.combine(Arbitraries.of("<", "<=", ">", ">="), bound).as((op, v) -> op + " " + v);
         var interval = column.type() == ColumnType.TIME || column.type() == ColumnType.DATE_TIME
                 ? Arbitraries.frequencyOf(Tuple.of(4, interval(column.type(), column.zoned())), Tuple.of(1, interval(column.type(), !column.zoned())),
                         Tuple.of(1, mixedInterval(column.type())))
@@ -508,7 +571,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                     : "time(\"" + DateTimeFormatter.ISO_LOCAL_TIME.format(TIME0.plusMinutes(30L * i)) + "\")";
             case DATE_TIME -> zone >= 0 ? FeelLiterals.literal(temporal(type, i, zone))
                     : "date and time(\"" + DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(MOMENT0.plusHours(12L * i)) + "\")";
-            case STRING -> "\"" + LETTERS.get(i) + "\"";
+            // in each of the quoted forms, by step and end
+            case STRING -> quoted(LETTERS.get(i), i + zone + 1);
             case DAY_TIME_DURATION -> FeelLiterals.literal(dayTime(i));
             case YEAR_MONTH_DURATION -> FeelLiterals.literal(yearMonth(i));
             case BOOLEAN -> throw new IllegalArgumentException("no intervals on " + type);
@@ -567,6 +631,9 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 options.add(LETTERS.get(5));
                 options.add(LETTERS.get(5) + "a");
                 options.add(PRIVATE_USE);
+                // which cells can only write with escape sequences, and a tab and a quote alone
+                options.add(LETTERS.get(6));
+                options.add("a\t\"");
                 yield Arbitraries.of(options);
             }
             case NUMBER -> Arbitraries.integers().between(-2, 12).<Object>map(half -> BigDecimal.valueOf(half).divide(BigDecimal.TWO));
