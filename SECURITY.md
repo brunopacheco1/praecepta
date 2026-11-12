@@ -12,7 +12,8 @@ ship in a patch release.
 
 | Version | Supported |
 |---|---|
-| 0.1.x (latest release) | Yes |
+| The latest minor release line ([releases](https://github.com/brunopacheco1/praecepta/releases)) | Yes |
+| Earlier lines | No: upgrade to the latest release |
 | `main` (unreleased) | Yes |
 
 ## Reporting a vulnerability

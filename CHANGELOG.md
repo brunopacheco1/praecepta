@@ -11,7 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
-## [0.5.0] - 2026-11-11
+## [0.5.0] - 2026-11-12
 
 Integrations: Praecepta now fits the build and the framework an application already uses. A Spring
 Boot starter, a Quarkus extension and a Micronaut module load DMN decision tables as engine beans and
