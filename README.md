@@ -34,7 +34,8 @@ Quarkus or Micronaut.
   YEAR_MONTH_DURATION columns: lists, `not(...)`, comparisons, intervals, `null`; unquoted `PT,ES`
   cells from earlier versions keep working
 - Times and date-times with or without a time zone; two with one compare by instant, and one with
-  a zone compares with one without by local time, as in FEEL
+  a zone compares with one without by local time (DMN 1.5, Table 54; see
+  [DMN conformance](docs/DMN-CONFORMANCE.md) for the cases it leaves open)
 - List inputs, such as a customer's nationalities: a cell holds when some element passes it
 - DMN output entries that name an input or compute with `+`, `-`, `*`, `/` and `**`
   (`(price - discount) * 1.2`, `Symptom + " is listed"`), evaluated only for the rules that match
@@ -174,13 +175,14 @@ Missing values follow FEEL: they fail comparisons and intervals, equal only `nul
 character by Unicode code point and case-sensitively (`"Zed" < "apple"`), so a character beyond U+FFFF,
 such as an emoji, comes after every other (`"🐎" > "～"`), where Java's `String.compareTo` would put it
 before U+E000 to U+FFFF. Where DMN 1.5 and its TCK leave a
-case open (`-` against a missing value, `=` between a time with a zone and one without), Praecepta's
-choice is recorded in [#86](https://github.com/brunopacheco1/praecepta/issues/86).
+case open (`-` against a missing value, `=` between a time with a zone and one without, two times at
+different offsets), Praecepta's choice is recorded in [DMN conformance](docs/DMN-CONFORMANCE.md).
 
 Times may have an offset (`Z`, `+01:00`) and date-times an offset or a zone id (`@Europe/Paris`).
-As in FEEL, two values with a time zone compare by the instant they denote (`time("09:00:00+01:00")`
-equals `time("08:00:00Z")`). When only one of the two has a zone, the other takes its offset (DMN 1.5,
-Table 54), so they compare by local time: `time("08:00:00")` matches `08:00`, `08:00Z` and
+Two values with a time zone compare by the instant they denote, as XML Schema compares them
+(`time("09:00:00+01:00")` equals `time("08:00:00Z")`; for times DMN 1.5 leaves this open). When only one
+of the two has a zone, the other takes its offset (DMN 1.5, Table 54, which says so for `<`; Praecepta
+applies it to `=` too), so they compare by local time: `time("08:00:00")` matches `08:00`, `08:00Z` and
 `08:00+05:00`, `< time("12:00:00+01:00")` matches `11:59`, and an interval may have an end of each
 kind. A time with a zone id (`time("08:00:00@Europe/Paris")`) is rejected, as it has no fixed offset.
 
@@ -800,7 +802,10 @@ engine against a naive reference implementation of DMN decision-table semantics 
 table Praecepta can read passes (83 of 86); the other three need inputs computed by other decisions
 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)), which Praecepta does not have yet.
 The pass rate, the results per test case and what each unsupported check needs are in
-[praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md).
+[praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md). Semantics are judged by DMN 1.5 and the TCK alone;
+where both leave a case open, what Praecepta does is recorded in
+[docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md), to be settled when a later DMN version or the TCK
+decides.
 
 # Benchmarks
 `praecepta-benchmarks` compares Praecepta in-process with Camunda 8's DMN engine (dmn-scala, as
@@ -876,6 +881,8 @@ Quarkus' build uses, brings `praecepta-compiler` and Apache POI; neither reaches
   framework integrations.
 - [Integrations](docs/INTEGRATIONS.md): what the build-tool and framework integrations share, and how
   they differ.
+- [DMN conformance](docs/DMN-CONFORMANCE.md): the cases DMN 1.5 and its TCK leave open, and what
+  Praecepta does in them.
 - [Security assurance case](docs/SECURITY-ASSURANCE.md): what to expect, threats, and how they are countered.
 - [Governance](GOVERNANCE.md): roles, decisions and continuity.
 - [Contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md) and [security policy](SECURITY.md).

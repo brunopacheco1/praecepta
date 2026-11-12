@@ -36,6 +36,14 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   default output: DMN 1.5, 10.3.2.10)`, and `Decisions.describe()` shows it with the kind
   `UNREACHABLE_DEFAULT_OUTPUT`. The TCK's tables with default outputs are not complete, so its results are
   unchanged.
+- **[docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md)** ([#86](https://github.com/brunopacheco1/praecepta/issues/86)):
+  the cases DMN 1.5 and the TCK leave open, with what each says and what Praecepta does, kept in the repository
+  rather than in an issue, and linked from the README and `praecepta-tck/RESULTS.md`: `-` and a missing input,
+  values outside the declared input values, intervals whose ends are missing or out of order, `=` between a
+  time with a zone and one without, times at different offsets, and from 0.6 a `null` default beside output
+  values and whether a missing input counts towards a complete table. COUNT with no match is marked settled
+  (0.5.0). It also says how Praecepta returns DMN's null result: no output, or an output whose value is null.
+  The README no longer calls those choices FEEL's.
 
 ### Changed
 - **`DmnReader` uses the JDK's own XML parser** ([#96](https://github.com/brunopacheco1/praecepta/issues/96)):

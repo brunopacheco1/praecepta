@@ -276,7 +276,8 @@ Quarkus application natively yet ([#99](https://github.com/brunopacheco1/praecep
 The main decisions and their reasons (strict DMN semantics, bitsets instead of a trie or generated
 code, the Java baseline, DMN as the exchange format, the licence) are recorded in
 [MODERNISATION.md](MODERNISATION.md). Security design is described in
-[SECURITY-ASSURANCE.md](SECURITY-ASSURANCE.md).
+[SECURITY-ASSURANCE.md](SECURITY-ASSURANCE.md). Semantics follow DMN 1.5 and its TCK only; where both leave
+a case open, what Praecepta does is recorded in [DMN-CONFORMANCE.md](DMN-CONFORMANCE.md).
 
 ### List inputs (#25)
 - **Declared beside the type, not as new types.** A list column keeps its element type
