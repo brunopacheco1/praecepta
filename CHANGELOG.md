@@ -52,7 +52,11 @@ and *Changed* if you deconstruct `DecisionTable.OutputColumn` with a record patt
   `@Identifier("Discount")` (or `@Named`), with the validation reports at runtime. In dev mode a changed
   table restarts the application (a new file under a `file:` location needs a manual restart, as Quarkus
   watches files, not directories). Apache POI stays in the build; the extension uses no reflection, but
-  the native-image workflow does not build a Quarkus application yet.
+  the native-image workflow does not build a Quarkus application yet. Like any Quarkus extension it
+  depends on `quarkus-arc`, and its deployment module on `quarkus-arc-deployment`. That brings Quarkus'
+  build-time core (EPL-2.0, UPL-1.0, and GPL-2.0 with the Classpath exception) into the deployment
+  module only. The licence check allows these licences for that module alone, and Jakarta EE APIs
+  (EPL-2.0 OR GPL-2.0 with the Classpath exception) for every module.
 - **`praecepta-micronaut`** ([#77](https://github.com/brunopacheco1/praecepta/issues/77)): Micronaut 4
   applications get their DMN decision tables as beans. At startup the module loads the files
   `praecepta.locations` finds (`classpath*:rules/**/*.dmn` by default) into a `Decisions` bean and

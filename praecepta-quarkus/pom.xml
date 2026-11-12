@@ -42,7 +42,6 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-arc</artifactId>
-            <scope>provided</scope>
         </dependency>
     </dependencies>
     <build>
@@ -58,8 +57,6 @@
                         </goals>
                         <configuration>
                             <deployment>${project.groupId}:${project.artifactId}-deployment:${project.version}</deployment>
-                            <!-- quarkus-arc is provided (see above), so the plugin cannot see Quarkus core's version -->
-                            <ignoreNotDetectedQuarkusCoreVersion>true</ignoreNotDetectedQuarkusCoreVersion>
                         </configuration>
                     </execution>
                 </executions>

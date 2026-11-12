@@ -21,6 +21,20 @@ ALLOWED = {
 }
 # Our own modules: covered by this repository's REUSE check.
 OWN_GROUP = "io.github.brunopacheco1"
+# Jakarta EE APIs and Eclipse Parsson (Eclipse EE4J), dual-licensed EPL-2.0 OR GPL-2.0 with the
+# Classpath exception. praecepta-quarkus depends on quarkus-arc, as Quarkus extensions do, which
+# brings them; Praecepta references them as dependencies and never bundles or modifies them.
+# Allowed for these groups only, so EPL does not spread to other dependencies unnoticed.
+EE4J_GROUPS = ("jakarta.", "org.eclipse.parsson")
+EE4J_ALLOWED = {"EPL-2.0"}
+# The Quarkus extension's deployment module runs only inside a Quarkus build, never in the
+# application. It depends on quarkus-arc-deployment, as Quarkus requires of every extension, which
+# brings Quarkus' own build-time core: JUnit and Eclipse Sisu (EPL-2.0), the GraalVM SDK (UPL-1.0) and
+# the class-file API backport (GPL-2.0 with the Classpath exception, OpenJDK's licence). Every Quarkus
+# build resolves these already. Allowed for this module only; every other module keeps ALLOWED.
+MODULE_ALLOWED = {
+    "praecepta-quarkus-deployment": {"EPL-2.0", "UPL-1.0", "GPL-2.0-with-classpath-exception"},
+}
 
 
 def licences(component):
@@ -46,13 +60,15 @@ def load_bom(path, root):
 def check_bom(bom, path):
     """Prints one line per third-party component; returns how many are not allowed."""
     module = bom.get("metadata", {}).get("component", {}).get("name", path)
+    allowed = ALLOWED | MODULE_ALLOWED.get(module, set())
     problems = 0
     for component in bom.get("components", []):
         if component.get("group") == OWN_GROUP:
             continue
         ids = licences(component)
         coordinates = f"{component.get('group', '')}:{component['name']}:{component.get('version', '')}"
-        if any(licence in ALLOWED for licence in ids):
+        ee4j = component.get("group", "").startswith(EE4J_GROUPS) and any(licence in EE4J_ALLOWED for licence in ids)
+        if ee4j or any(licence in allowed for licence in ids):
             print(f"ok           {module}: {coordinates} {ids}")
         else:
             problems += 1

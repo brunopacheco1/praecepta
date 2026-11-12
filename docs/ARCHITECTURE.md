@@ -208,7 +208,8 @@ Excel and CSV tables with `praecepta-compiler`, so Apache POI stays in the build
 native executable they live in the image heap, and produces the `Decisions` bean and one `@Singleton`
 synthetic bean per decision. Dev mode restarts the application when a file a class path pattern matches
 changes or appears, or when a `file:` table or a declared spreadsheet changes. `quarkus-arc` and
-`quarkus-arc-deployment` are `provided`, since every Quarkus application has them. The tests use
+`quarkus-arc-deployment` are compile dependencies, as Quarkus requires of an extension, so its tools
+check the application's Quarkus version against the extension's. The tests use
 `QuarkusExtensionTest` and `QuarkusDevModeTest` and run in the default build.
 
 ## Native images

@@ -24,7 +24,7 @@ Their internals are in [ARCHITECTURE.md](ARCHITECTURE.md).
 | Gradle plugin `io.github.brunopacheco1.praecepta` (`praecepta-gradle-plugin`) | Gradle 8.5+ | `praecepta-compiler`; the Gradle API (`provided`) | when the project builds |
 | `praecepta-spring-boot-starter` | Spring Boot 4 | `praecepta-integration`; Spring Boot (`provided`) | when the application starts |
 | `praecepta-micronaut` | Micronaut 4 | `praecepta-integration`; Micronaut (`provided`) | when the application starts |
-| `praecepta-quarkus` (and `praecepta-quarkus-deployment`, which Quarkus adds to its build) | Quarkus 3.40+ | `praecepta-integration`; `quarkus-arc` (`provided`) | when Quarkus builds the application |
+| `praecepta-quarkus` (and `praecepta-quarkus-deployment`, which Quarkus adds to its build) | Quarkus 3.40+ | `praecepta-integration`; `quarkus-arc` | when Quarkus builds the application |
 | `praecepta-compiler` | writing a build-tool integration | `praecepta-engine`, `praecepta-loader` | when you call it |
 | `praecepta-integration` | using the runtime core without a framework | `praecepta-engine` | when you call it |
 

@@ -657,9 +657,10 @@ A relative `source` is resolved against the project's directory; keep spreadshee
 the application. In dev mode, changing a DMN file or a declared spreadsheet restarts the application
 with the new table, as does adding a DMN file a class path location matches, and a table that fails
 validation shows on the error page until it is fixed. A file added under a `file:` location needs a
-manual restart (press `s`), since Quarkus watches files, not directories. The extension needs
-`quarkus-arc`, which it leaves to the application (`provided`) as every Quarkus application has it, so
-Quarkus' tools do not check which Quarkus version the extension was built for. It uses no reflection; the tables
+manual restart (press `s`), since Quarkus watches files, not directories. Like any Quarkus extension,
+it depends on `quarkus-arc`, and its deployment module on `quarkus-arc-deployment`, so Quarkus' tools
+check that the application's Quarkus version matches the one the extension was built for. The
+deployment module only runs inside the Quarkus build. It uses no reflection; the tables
 are read while the application initialises, and in a native executable while the image is built, but
 the native-image workflow does not build a Quarkus application yet (see [Native images](#native-images)).
 
