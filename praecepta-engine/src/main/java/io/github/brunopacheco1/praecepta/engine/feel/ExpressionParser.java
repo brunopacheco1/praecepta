@@ -55,7 +55,16 @@ final class ExpressionParser {
     private int operations;
 
     ExpressionParser(String text) {
-        this.text = text == null ? "" : text;
+        this.text = text == null ? "" : withoutComments(text);
+    }
+
+    /** The expression without FEEL's comments, as {@link FeelStrings#withoutComments} removes them. */
+    private static String withoutComments(String text) {
+        try {
+            return FeelStrings.withoutComments(text);
+        } catch (IllegalArgumentException e) {
+            throw new ExpressionSyntaxException("'%s' is not a supported output expression: %s".formatted(text, e.getMessage()));
+        }
     }
 
     OutputExpression parse() {

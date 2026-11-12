@@ -433,7 +433,10 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         Arbitrary<String> list = Arbitraries.oneOf(single, test(column), equality(single)).list().ofMinSize(2).ofMaxSize(3)
                 .map(parts -> String.join(", ", parts));
         Arbitrary<String> negated = Arbitraries.oneOf(single, list, test(column)).map(inner -> "not(" + inner + ")");
+        // FEEL's comments (10.3.1.2), which a string column in Praecepta's syntax keeps as text
+        int commented = column.type() == ColumnType.STRING ? 0 : 1;
         return Arbitraries.frequencyOf(
+                Tuple.of(commented, Arbitraries.oneOf(single, list, negated).map(inner -> "/* a */ " + inner + " // b")),
                 Tuple.of(4, Arbitraries.just("")),
                 Tuple.of(1, Arbitraries.just("-")),
                 Tuple.of(4, single),

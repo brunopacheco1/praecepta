@@ -88,6 +88,52 @@ public final class FeelStrings {
     static final String VERTICAL_SPACE = "a string literal may not hold a line break; write \\n or \\r";
 
     /** Whether a character is vertical space (U+000A to U+000D, grammar rule 62), which a string literal may not hold. */
+    /**
+     * The text with FEEL's comments (DMN 1.5, 10.3.1.2: "Java-style comments can be used, i.e., '//' to end of line
+     * and /* ... *&#47;") replaced by a space, outside string literals, whose backslashes escape the next character.
+     *
+     * @throws IllegalArgumentException if a block comment is not closed
+     */
+    static String withoutComments(String text) {
+        if (text.indexOf('/') < 0) {
+            return text;
+        }
+        var result = new StringBuilder(text.length());
+        int i = 0;
+        boolean inString = false;
+        while (i < text.length()) {
+            char c = text.charAt(i);
+            if (inString) {
+                result.append(c);
+                if (c == '\\' && i + 1 < text.length()) {
+                    result.append(text.charAt(++i));
+                } else if (c == '"') {
+                    inString = false;
+                }
+                i++;
+            } else if (text.startsWith("//", i)) {
+                int end = i;
+                while (end < text.length() && text.charAt(end) != '\n' && text.charAt(end) != '\r') {
+                    end++;
+                }
+                result.append(' ');
+                i = end;
+            } else if (text.startsWith("/*", i)) {
+                int end = text.indexOf("*/", i + 2);
+                if (end < 0) {
+                    throw new IllegalArgumentException("a comment /* is not closed");
+                }
+                result.append(' ');
+                i = end + 2;
+            } else {
+                inString = c == '"';
+                result.append(c);
+                i++;
+            }
+        }
+        return result.toString();
+    }
+
     static boolean isVerticalSpace(char c) {
         return c >= '\n' && c <= '\r';
     }

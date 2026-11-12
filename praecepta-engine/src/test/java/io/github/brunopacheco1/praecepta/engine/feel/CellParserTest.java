@@ -161,6 +161,28 @@ class CellParserTest {
     }
 
     @Test
+    void comments_are_ignored_outside_strings() {
+        // DMN 1.5, 10.3.1.2: "Java-style comments can be used, i.e., '//' to end of line and /* ... */"
+        Assertions.assertThat(CellParser.parseFeel("< 18 // minors", ColumnType.NUMBER))
+                .isEqualTo(positive(new Compare(Operator.LT, new BigDecimal(18))));
+        Assertions.assertThat(CellParser.parseFeel("/* adults */ >= 18, /* none */ null", ColumnType.NUMBER))
+                .isEqualTo(positive(new Compare(Operator.GE, new BigDecimal(18)), new NullTest()));
+        Assertions.assertThat(CellParser.parseFeel("\"a // b\", \"c /* d */\" // e\n", ColumnType.STRING))
+                .isEqualTo(positive(new Equals("a // b"), new Equals("c /* d */")));
+        Assertions.assertThat(CellParser.parseFeel("\"say \\\"//\\\"\" // quoted", ColumnType.STRING))
+                .isEqualTo(positive(new Equals("say \"//\"")));
+        Assertions.assertThat(CellParser.parse("not(1, // one\n2)", ColumnType.NUMBER))
+                .isEqualTo(negated(new Equals(BigDecimal.ONE), new Equals(new BigDecimal(2))));
+        Assertions.assertThat(CellParser.parseFeelList("list contains(?, \"PT\") // Portugal", ColumnType.STRING))
+                .isEqualTo(positive(new Equals("PT")));
+        // in Praecepta's syntax an unquoted string keeps them, as a URL does
+        Assertions.assertThat(CellParser.parse("http://example.com", ColumnType.STRING)).isEqualTo(positive(new Equals("http://example.com")));
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel("1 /* open", ColumnType.NUMBER))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining("a comment /* is not closed");
+    }
+
+    @Test
     void a_list_column_reads_not_equal_on_its_elements() {
         Assertions.assertThat(CellParser.parseFeelList("some x in ? satisfies x != \"PT\" or some x in ? satisfies x != null",
                 ColumnType.STRING)).isEqualTo(positive(new NotEqual(new Equals("PT")), new NotEqual(new NullTest())));

@@ -56,7 +56,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   numB, &gt; dateE, [lo..hi]  strict FEEL only: a name compares with that input ({@link UnaryTests.Name})
  * </pre>
  *
- * Tests are separated by commas outside quotes and brackets. Surrounding whitespace is ignored.
+ * Tests are separated by commas outside quotes and brackets. Surrounding whitespace is ignored, and so are
+ * comments ({@code < 18 // minors}, {@code /* adults *&#47; >= 18}), except in a string column in Praecepta's syntax,
+ * whose unquoted words keep them as text.
  * Times and date-times may have a time zone ({@link FeelTemporals}): a time an offset, a date-time an
  * offset or a zone id. A time with a zone id ({@code time("08:30:00@Europe/Paris")}) is rejected, as it
  * has no fixed offset. A value with a zone and one without compare by their local time, so an interval
@@ -177,7 +179,7 @@ public final class CellParser {
     private record Parser(ColumnType type, String cell, boolean strictFeel) {
 
         UnaryTests parse() {
-            var text = cell == null ? "" : cell.strip();
+            var text = text();
             if (text.isEmpty() || text.equals("-")) {
                 return new UnaryTests.Any();
             }
@@ -189,11 +191,30 @@ public final class CellParser {
             return new UnaryTests.Positive(tests(text));
         }
 
+        /**
+         * The cell without its comments ({@code //} to the end of the line, {@code /* ... *&#47;}), as FEEL allows them,
+         * and stripped. In Praecepta's syntax a string column keeps them: an unquoted word is text there, and may hold
+         * {@code //}, as a URL does.
+         */
+        private String text() {
+            if (cell == null) {
+                return "";
+            }
+            if (!strictFeel && type == ColumnType.STRING) {
+                return cell.strip();
+            }
+            try {
+                return FeelStrings.withoutComments(cell).strip();
+            } catch (IllegalArgumentException e) {
+                throw new CellSyntaxException(cell, e.getMessage());
+            }
+        }
+
         // ---- list columns ------------------------------------------------------------------------
 
         /** A list column's cell: {@code list contains(?, v)} and the other forms of {@link #parseFeelList}. */
         UnaryTests parseList() {
-            var text = cell == null ? "" : cell.strip();
+            var text = text();
             if (text.isEmpty() || text.equals("-")) {
                 return new UnaryTests.Any();
             }

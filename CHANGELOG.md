@@ -97,6 +97,11 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   (`'@"08:30:00"' is a time, not a date`); `DmnWriter` writes them as `date("...")`, `time("...")`, `date and
   time("...")` and `duration("...")`. Input values read from text are unchanged: a date-time input is still
   written with its time.
+- **Comments** ([#81](https://github.com/brunopacheco1/praecepta/issues/81)): `//` to the end of the line and
+  `/* ... */`, which DMN 1.5 allows in FEEL (10.3.1.2: "Java-style comments can be used"), are ignored outside
+  string literals, in cells, value lists, DMN entries and output expressions (`< 18 // minors`). In
+  Praecepta's syntax (Excel, CSV and code), a string column keeps them as text, as it always has, since an
+  unquoted word there may hold `//` (a URL). `DmnWriter` leaves them out.
 
 ### Changed
 - **`DmnReader` uses the JDK's own XML parser** ([#96](https://github.com/brunopacheco1/praecepta/issues/96)):

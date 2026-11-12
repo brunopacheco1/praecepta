@@ -170,6 +170,23 @@ class FeelLiteralFormsTest {
         Assertions.assertThat(engine.evaluate(input("2025-01-31T08:31"))).isEmpty();
     }
 
+    // ---- comments ------------------------------------------------------------------------------
+
+    @Test
+    void comments_in_cells_and_output_entries_are_ignored() {
+        var engine = engine(ColumnType.NUMBER, "< 18 // minors");
+        Assertions.assertThat(engine.evaluate(input("17"))).containsExactly("1");
+        var computed = PraeceptaEngine.<Map<String, String>, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .inputs(PraeceptaInput::new)
+                .columnType("x", ColumnType.NUMBER)
+                .output(output -> output.values().get("y"))
+                .rules(List.of(new Praeceptum(1, new PraeceptaInput(Map.of("x", "/* any */ -")),
+                        new PraeceptaOutput(Map.of(), Map.of(), Map.of("y", "x * 2 // doubled")))))
+                .build();
+        Assertions.assertThat(computed.evaluate(input("21"))).containsExactly("42");
+    }
+
     // ---- fixtures ------------------------------------------------------------------------------
 
     private static PraeceptaEngine<Map<String, String>, String> engine(ColumnType type, String cell) {

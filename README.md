@@ -104,7 +104,7 @@ Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drool
   Praecepta's input entries are FEEL *simple unary tests*: in DMN they may compare with another
   input (`> limit`) or test a list's elements, but not compute. Output entries may compute with `+`,
   `-`, `*`, `/` and `**` on strings and numbers, but call no functions. Some FEEL that fits a single
-  table is not read yet either: comments ([#81](https://github.com/brunopacheco1/praecepta/issues/81)), times with a zone id
+  table is not read yet either: times with a zone id
   ([#82](https://github.com/brunopacheco1/praecepta/issues/82)) and arithmetic on dates, times and
   durations ([#85](https://github.com/brunopacheco1/praecepta/issues/85)); see the
   [roadmap](docs/ROADMAP.md).
@@ -165,6 +165,9 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 | `null`, `= null` | only a missing value | all |
 | `!= null` | any value that is not missing | all |
 | `not(...)` | anything the list inside does not match | all |
+
+FEEL's comments are ignored: `< 18 // minors`, `/* adults */ >= 18` (DMN 1.5, 10.3.1.2), in cells and in
+output entries; in Praecepta's syntax a string column keeps them as text, as an unquoted URL holds `//`.
 
 Quoted strings take FEEL's escape sequences (DMN 1.5, grammar rule 64): `\"`, `\\`, `\'`, `\n` (a line
 feed), `\r`, `\t` (a tab), and a character by its code point, `\u00e9` or `\U01F40E`. A backslash before
