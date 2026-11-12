@@ -31,7 +31,7 @@ Quarkus or Micronaut.
 - All DMN hit policies: UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER and COLLECT
   (with SUM / MIN / MAX / COUNT aggregation)
 - DMN FEEL cells on STRING, NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION and
-  YEAR_MONTH_DURATION columns: lists, `not(...)`, comparisons, intervals, `null`; unquoted `PT,ES`
+  YEAR_MONTH_DURATION columns: lists, `not(...)`, comparisons, `=` and `!=`, intervals, `null`; unquoted `PT,ES`
   cells from earlier versions keep working
 - Times and date-times with or without a time zone; two with one compare by instant, and one with
   a zone compares with one without by local time (DMN 1.5, Table 54; see
@@ -104,7 +104,7 @@ Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drool
   Praecepta's input entries are FEEL *simple unary tests*: in DMN they may compare with another
   input (`> limit`) or test a list's elements, but not compute. Output entries may compute with `+`,
   `-`, `*`, `/` and `**` on strings and numbers, but call no functions. Some FEEL that fits a single
-  table is not read yet either: `=` and `!=` tests, at-literals such as `@"2025-01-31"`
+  table is not read yet either: at-literals such as `@"2025-01-31"`
   ([#81](https://github.com/brunopacheco1/praecepta/issues/81)), times with a zone id
   ([#82](https://github.com/brunopacheco1/praecepta/issues/82)) and arithmetic on dates, times and
   durations ([#85](https://github.com/brunopacheco1/praecepta/issues/85)); see the
@@ -159,7 +159,10 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 | `duration("P1Y2M")` or `P1Y2M` | that number of months (`P12M` equals `P1Y`) | YEAR_MONTH_DURATION |
 | `< 18`, `<= 18`, `> 18`, `>= 18`, `< "N"` | comparisons | all but BOOLEAN |
 | `[18..65)`, `(0..1]`, `]a..b[`, `["A".."M"]` | intervals: `[`/`]` closed, `(`/`)` or outward brackets open | all but BOOLEAN |
-| `null` | only a missing value | all |
+| `= 18`, `= "PT"` | the same as `18`, `"PT"` | all |
+| `!= "PT"`, `!= 18` | any value but that one, a missing one included (`!=` is `not(=)`, DMN 1.5, 10.3.2.15) | all |
+| `null`, `= null` | only a missing value | all |
+| `!= null` | any value that is not missing | all |
 | `not(...)` | anything the list inside does not match | all |
 
 Quoted strings take FEEL's escape sequences (DMN 1.5, grammar rule 64): `\"`, `\\`, `\'`, `\n` (a line
@@ -171,7 +174,8 @@ backslashes. In strict FEEL (DMN files), a quoted string may not hold a line bre
 33): write `\n` or `\r`. `DmnWriter` writes line breaks and tabs back as `\n`, `\r` and `\t`.
 
 Missing values follow FEEL: they fail comparisons and intervals, equal only `null`, and so satisfy
-`not("FR")`. Blank text counts as missing. Strings compare as FEEL orders them, character by
+`not("FR")` and `!= "FR"`. Unlike `not(...)`, which goes around a whole cell, `!=` is one test among
+the others: `!= 0, > 10` holds for every value but 0, and for a missing one. Blank text counts as missing. Strings compare as FEEL orders them, character by
 character by Unicode code point and case-sensitively (`"Zed" < "apple"`), so a character beyond U+FFFF,
 such as an emoji, comes after every other (`"🐎" > "～"`), where Java's `String.compareTo` would put it
 before U+E000 to U+FFFF. Where DMN 1.5 and its TCK leave a
@@ -355,7 +359,7 @@ Supported:
   output (`[{fee=null}]`), and COUNT counts the rule.
 
 Anything else is rejected with a message naming the decision, rule and column: function calls such as
-`upper case(a)`, `if`, `=` and `!=` tests and other FEEL literal forms
+`upper case(a)`, `if`, other FEEL literal forms
 ([#81](https://github.com/brunopacheco1/praecepta/issues/81)), a time with a zone id
 ([#82](https://github.com/brunopacheco1/praecepta/issues/82)), output entries that compute with dates,
 times or durations ([#85](https://github.com/brunopacheco1/praecepta/issues/85)), and inputs computed by

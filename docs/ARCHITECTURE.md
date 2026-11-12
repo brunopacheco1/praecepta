@@ -48,7 +48,7 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
    values. `CellParser` parses each cell, according to its column's type (`ColumnType`: STRING,
    NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION, YEAR_MONTH_DURATION; times and
    date-times with or without a time zone), into `UnaryTests`: the subset of DMN FEEL *simple unary
-   tests* that looks at one column value (lists, `not(...)`, comparisons, intervals, `null`,
+   tests* that looks at one column value (lists, `not(...)`, comparisons, `=` and `!=`, intervals, `null`,
    "any"). In a DMN table (strict FEEL) a cell may also compare with another input (`> limit`); the
    index sees such a cell as "any value", and the engine checks it on the rules the index leaves,
    with the inputs' values. The analysis then never counts those rules as overlapping or hiding

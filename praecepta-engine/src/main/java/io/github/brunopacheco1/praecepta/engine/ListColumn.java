@@ -83,7 +83,8 @@ final class ListColumn {
                 case UnaryTests.Negated negated -> negatedRules;
             }, bit);
             // a missing list: ? = null is true, every test of its elements unknown, so a positive cell holds only
-            // with null, and a not(...) never (its inside is true or unknown)
+            // with null (!= x holds for a missing value, but not for a missing list), and a not(...) never (its
+            // inside is true or unknown)
             if (cell instanceof UnaryTests.Any || cell instanceof UnaryTests.Positive && testsTheList(cell)) {
                 BitsetIndex.set(missingMask, bit);
             }

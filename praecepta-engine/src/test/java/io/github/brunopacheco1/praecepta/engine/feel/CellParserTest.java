@@ -26,11 +26,60 @@ import org.junit.jupiter.params.provider.ValueSource;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NotEqual;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Operator;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 
 class CellParserTest {
+
+    @Test
+    void equal_and_not_equal_tests_take_a_value_or_null() {
+        // DMN 1.5, grammar rule 7.a: ( "<" | "<=" | ">" | ">=" | "=" | "!=" ) , endpoint
+        Assertions.assertThat(CellParser.parseFeel("= 18", ColumnType.NUMBER)).isEqualTo(positive(new Equals(new BigDecimal(18))));
+        Assertions.assertThat(CellParser.parseFeel("!= \"PT\"", ColumnType.STRING))
+                .isEqualTo(positive(new NotEqual(new Equals("PT"))));
+        Assertions.assertThat(CellParser.parseFeel("!= other", ColumnType.STRING))
+                .isEqualTo(positive(new NotEqual(new Equals(new UnaryTests.Name("other")))));
+        // 10.3.2.15: e = null is "FEEL(e) is null", e != null "FEEL(e) is not null"
+        Assertions.assertThat(CellParser.parseFeel("= null", ColumnType.DATE)).isEqualTo(positive(new NullTest()));
+        Assertions.assertThat(CellParser.parseFeel("!= null", ColumnType.DATE)).isEqualTo(positive(new NotEqual(new NullTest())));
+        // one test among others, which not(...) around the cell cannot say
+        Assertions.assertThat(CellParser.parse("!=0, > 10", ColumnType.NUMBER))
+                .isEqualTo(positive(new NotEqual(new Equals(BigDecimal.ZERO)), new Compare(Operator.GT, BigDecimal.TEN)));
+        Assertions.assertThat(CellParser.parse("not(= true, != null)", ColumnType.BOOLEAN))
+                .isEqualTo(negated(new Equals(true), new NotEqual(new NullTest())));
+        // Praecepta's syntax: an unquoted word after = or != is a string, as elsewhere
+        Assertions.assertThat(CellParser.parse("!= PT, = ES", ColumnType.STRING))
+                .isEqualTo(positive(new NotEqual(new Equals("PT")), new Equals("ES")));
+        Assertions.assertThat(CellParser.parse("!= 2025-01-31", ColumnType.DATE))
+                .isEqualTo(positive(new NotEqual(new Equals(LocalDate.of(2025, 1, 31)))));
+    }
+
+    @Test
+    void a_list_column_reads_not_equal_on_its_elements() {
+        Assertions.assertThat(CellParser.parseFeelList("some x in ? satisfies x != \"PT\" or some x in ? satisfies x != null",
+                ColumnType.STRING)).isEqualTo(positive(new NotEqual(new Equals("PT")), new NotEqual(new NullTest())));
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = ';', value = {
+            "NUMBER;  !=;          missing value",
+            "NUMBER;  = ;          missing value",
+            "NUMBER;  != [1..2];   is not a number",
+            "BOOLEAN; = 1;         is not a boolean",
+    })
+    void equal_and_not_equal_need_a_value_of_the_column(ColumnType type, String cell, String reason) {
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel(cell, type))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining(reason);
+    }
+
+    @Test
+    void not_equal_negates_only_an_equality_or_null() {
+        Assertions.assertThatThrownBy(() -> new NotEqual(new Compare(Operator.LT, BigDecimal.ONE)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 
     @ParameterizedTest(name = "''{0}''")
     @NullAndEmptySource

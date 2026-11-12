@@ -209,6 +209,7 @@ public final class Workload {
             case NullTest n -> false;
             case UnaryTests.NullElement n -> false;
             case Equals equals -> compare(value, equals.value()) == 0;
+            case UnaryTests.NotEqual(var negated) -> !accepts(negated, value);
             case Compare comparison -> {
                 int cmp = compare(value, comparison.value());
                 yield switch (comparison.operator()) {
@@ -243,6 +244,7 @@ public final class Workload {
                     addWithNeighbours(values, range.low());
                     addWithNeighbours(values, range.high());
                 }
+                case UnaryTests.NotEqual notEqual -> UnaryTests.values(notEqual).forEach(value -> addWithNeighbours(values, value));
                 case NullTest nullTest -> { }
                 case UnaryTests.NullElement nullElement -> { }
             }

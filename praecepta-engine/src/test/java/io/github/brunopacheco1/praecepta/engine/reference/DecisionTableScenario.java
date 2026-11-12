@@ -52,7 +52,7 @@ import net.jqwik.api.Tuple;
  * A random decision table plus inputs to evaluate against it. Columns are STRING, NUMBER, DATE,
  * BOOLEAN, TIME or DATE_TIME, and cells use every form of the grammar: wildcards, literals (quoted
  * and legacy unquoted, with escape sequences, function and bare forms), lists, comparisons, intervals with every bracket
- * style, {@code not(...)} and {@code null}. String columns compare less often than the others, so
+ * style, {@code = x}, {@code != x} (and {@code != null}), {@code not(...)} and {@code null}. String columns compare less often than the others, so
  * that both kinds of string column (with and without comparisons) are common, and string inputs
  * include values between and around the letters the cells mention, among them characters beyond U+FFFF and
  * from U+E000 up, which FEEL orders by code point and UTF-16 would order otherwise. Values come from small domains, and dates are consecutive
@@ -229,9 +229,14 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     private String variableCell(ColumnType type, int r, int c) {
         var peers = columns.stream().filter(column -> types.get(column) == type).toList();
         var other = peers.get(r % peers.size());
-        var forms = type.supportsComparisons() && !lists.contains(other)
-                ? List.of("> " + other, other, "not(" + other + ")", "<= " + other + ", null")
-                : List.of(other, "not(" + other + ")");
+        List<String> forms;
+        if (lists.contains(other)) {
+            forms = List.of(other, "not(" + other + ")"); // a list is only named whole, which asks whether the value is in it
+        } else if (type.supportsComparisons()) {
+            forms = List.of("> " + other, other, "not(" + other + ")", "<= " + other + ", null", "!= " + other, "= " + other + ", > " + other);
+        } else {
+            forms = List.of(other, "not(" + other + ")", "!= " + other);
+        }
         return forms.get((r / 3 + c) % forms.size());
     }
 
@@ -424,17 +429,31 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     @SuppressWarnings("unchecked")
     private static Arbitrary<String> cell(Column column) {
         Arbitrary<String> single = literal(column);
-        Arbitrary<String> list = Arbitraries.oneOf(single, test(column)).list().ofMinSize(2).ofMaxSize(3).map(parts -> String.join(", ", parts));
+        Arbitrary<String> list = Arbitraries.oneOf(single, test(column), equality(single)).list().ofMinSize(2).ofMaxSize(3)
+                .map(parts -> String.join(", ", parts));
         Arbitrary<String> negated = Arbitraries.oneOf(single, list, test(column)).map(inner -> "not(" + inner + ")");
         return Arbitraries.frequencyOf(
                 Tuple.of(4, Arbitraries.just("")),
                 Tuple.of(1, Arbitraries.just("-")),
                 Tuple.of(4, single),
                 Tuple.of(comparisonWeight(column.type()), test(column)),
+                Tuple.of(2, equality(single)),
                 Tuple.of(2, list),
                 Tuple.of(1, negated),
                 Tuple.of(1, Arbitraries.just("null")),
                 Tuple.of(1, single.map(value -> "null, " + value)));
+    }
+
+    /**
+     * {@code = x} and {@code != x} (DMN 1.5, grammar rule 7.a), {@code = null} and {@code != null}: one test each, so
+     * that a list of tests holds them among others ({@code != 1, > 3}).
+     */
+    private static Arbitrary<String> equality(Arbitrary<String> single) {
+        return Arbitraries.frequencyOf(
+                Tuple.of(2, single.map(value -> "= " + value)),
+                Tuple.of(4, single.map(value -> "!= " + value)),
+                Tuple.of(1, Arbitraries.just("= null")),
+                Tuple.of(2, Arbitraries.just("!= null")));
     }
 
     private static int comparisonWeight(ColumnType type) {

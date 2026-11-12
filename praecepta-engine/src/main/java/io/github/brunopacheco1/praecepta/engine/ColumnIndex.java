@@ -33,6 +33,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NotEqual;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
@@ -67,7 +68,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * </ul>
  *
  * Membership is decided per class with FEEL's three-valued logic: a missing value fails comparisons
- * and intervals (unknown), equals only {@code null}, and so satisfies {@code not("A")}.
+ * and intervals (unknown), equals only {@code null}, and so satisfies {@code not("A")} and {@code != "A"}.
  *
  * <p>A STRING column bound to an enum precomputes one mask per constant, so its lookup is an array
  * access by ordinal instead of a hash lookup (the int-coded input path).
@@ -357,7 +358,8 @@ final class ColumnIndex {
 
         private static void collectStrings(UnaryTests cell, Set<String> into) {
             for (var test : cell.tests()) {
-                if (test instanceof Equals(var value)) {
+                var equality = test instanceof NotEqual(var negated) ? negated : test;
+                if (equality instanceof Equals(var value)) {
                     into.add((String) value);
                 }
             }
@@ -923,6 +925,10 @@ final class ColumnIndex {
     }
 
     private static Boolean test(Test test, ValueClass valueClass) {
+        if (test instanceof NotEqual(var negated)) { // != is not(=), so unknown stays unknown
+            var equal = test(negated, valueClass);
+            return equal == null ? null : !equal;
+        }
         if (valueClass instanceof ValueClass.Missing) {
             return switch (test) {
                 case NullTest n -> true;
@@ -930,9 +936,11 @@ final class ColumnIndex {
                 case Equals e -> false;       // null = x is false
                 case Compare c -> null;       // null < x is unknown
                 case Range r -> null;
+                case NotEqual n -> throw new IllegalStateException("decided above");
             };
         }
         return switch (test) {
+            case NotEqual n -> throw new IllegalStateException("decided above");
             case NullTest n -> false;
             case UnaryTests.NullElement n -> false;
             // literals are boundaries / written values, never inside other classes

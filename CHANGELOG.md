@@ -73,6 +73,15 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   on the minimal sets of rules the lists of each but the last can leave; past 1024 of them a rule is not
   reported unreachable, or the table's gaps are not reported, rather than reported wrongly. Tables without
   list columns get the same report as before.
+- **`=` and `!=` tests in cells** ([#81](https://github.com/brunopacheco1/praecepta/issues/81)): DMN 1.5 lets a
+  unary test start with `=` or `!=` (grammar rule 7.a), which cells, value lists and DMN files rejected (`'= 18'
+  is not a number`). `= 18` is the test `18`, `= null` the test `null`. `!= x` is `not(= x)` for one value
+  (10.3.2.15: "FEEL(e1 != e2) is FEEL(not(e1 = e2))"), so it holds for a missing value, which does not equal `x`,
+  and `!= null` holds for any value that is not missing; unlike `not(...)`, which goes around a whole cell, it is
+  one test among others (`!= 0, > 10`), and it may name another input in a DMN file (`!= home`). On a list column
+  it holds when some element differs. `UnaryTests.NotEqual` holds it; `DmnWriter` writes it back as `!= x` (on a
+  list column, `some x in ? satisfies x != "PT"`, which `DmnReader` reads), and the index, the validation report
+  and every integration treat it as the engine does.
 
 ### Changed
 - **`DmnReader` uses the JDK's own XML parser** ([#96](https://github.com/brunopacheco1/praecepta/issues/96)):
@@ -116,6 +125,10 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 - **Upgrade note:** a list input holding a missing element is evaluated rather than rejected
   ([#84](https://github.com/brunopacheco1/praecepta/issues/84)); code that relied on the
   `InvalidInputException` to catch such lists must check them itself.
+- **An unquoted string cell that starts with `=` or `!=` is now a test** ([#81](https://github.com/brunopacheco1/praecepta/issues/81)):
+  in Praecepta's syntax (Excel, CSV and code), `= PT` was the string `= PT`, and is now the test `= "PT"`; `!= PT`
+  now matches every value but `PT`. Before upgrading, search your string columns for cells that start with `=` or
+  `!=` and quote them (`"= PT"`) if they mean the text.
 
 ### Fixed
 - **Validation issues were logged twice in the integrations**

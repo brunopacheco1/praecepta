@@ -21,7 +21,8 @@ import java.util.Optional;
  * ({@link FeelTemporals}), equality included.
  *
  * <p>A missing (null) value follows FEEL's three-valued logic: {@code null} is true for it, a literal is
- * false, and a comparison or an interval is unknown, which is neither a match nor a mismatch.
+ * false (so {@code != x} is true), and a comparison or an interval is unknown, which is neither a match nor a
+ * mismatch.
  */
 public sealed interface UnaryTests {
 
@@ -79,8 +80,28 @@ public sealed interface UnaryTests {
     record NullElement() implements Test {
     }
 
-    /** A literal such as {@code "PT"}, {@code 18} or {@code date("2025-01-31")}: true when the value equals it. */
+    /**
+     * A literal such as {@code "PT"}, {@code 18} or {@code date("2025-01-31")}, or {@code = 18}: true when the value
+     * equals it.
+     */
     record Equals(Comparable<?> value) implements Test {
+    }
+
+    /**
+     * {@code != x} or {@code != null}: the opposite of the {@link Equals} or {@link NullTest} it holds, and unknown
+     * when that is unknown, as DMN 1.5 defines {@code !=} (10.3.2.15: "FEEL(e1 != e2) is FEEL(not(e1 = e2))"). So
+     * {@code != "PT"} holds for a missing value, which does not equal {@code "PT"}, and {@code != null} holds for any
+     * value that is not missing. Unlike {@code not(...)}, which only goes around a whole cell, it is one test among
+     * others: {@code != 0, > 10}.
+     *
+     * @param test the test it negates: an {@link Equals} or a {@link NullTest}
+     */
+    record NotEqual(Test test) implements Test {
+        public NotEqual {
+            if (!(test instanceof Equals || test instanceof NullTest)) {
+                throw new IllegalArgumentException("!= negates an equality or null, not " + test);
+            }
+        }
     }
 
     /** {@code < x}, {@code <= x}, {@code > x} or {@code >= x}: true when the value compares to {@code x} that way. */
@@ -124,14 +145,15 @@ public sealed interface UnaryTests {
     }
 
     /**
-     * The values a test compares with, literals or {@link Name}s: an equality's or comparison's value, an
-     * interval's two ends; none for {@code null}.
+     * The values a test compares with, literals or {@link Name}s: an equality's, inequality's or comparison's
+     * value, an interval's two ends; none for {@code null} and {@code != null}.
      */
     static List<Comparable<?>> values(Test test) {
         return switch (test) {
             case NullTest n -> List.of();
             case NullElement n -> List.of();
             case Equals(var value) -> List.of(value);
+            case NotEqual(var negated) -> values(negated);
             case Compare(var operator, var value) -> List.of(value);
             case Range(var low, var lowClosed, var high, var highClosed) -> List.of(low, high);
         };
@@ -147,6 +169,7 @@ public sealed interface UnaryTests {
                 case NullTest n -> false;
                 case NullElement n -> false;
                 case Equals(var value) -> value instanceof Name;
+                case NotEqual(var negated) -> negated instanceof Equals(var value) && value instanceof Name;
                 case Compare(var operator, var value) -> value instanceof Name;
                 case Range(var low, var lowClosed, var high, var highClosed) -> low instanceof Name || high instanceof Name;
             };

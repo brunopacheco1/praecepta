@@ -29,6 +29,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NotEqual;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
@@ -320,6 +321,7 @@ public final class DmnWriter {
             case UnaryTests.NullElement() -> "list contains(?, null)";
             case Equals(var value) -> "list contains(?, " + literal(value) + ")";
             case Compare c -> "some x in ? satisfies x " + test(c);
+            case NotEqual n -> "some x in ? satisfies x " + test(n);
             case Range r -> "some x in ? satisfies x in " + test(r);
         };
     }
@@ -330,6 +332,7 @@ public final class DmnWriter {
             // only CellParser.parseFeelList reads it, for a list column, whose cells renderList writes
             case UnaryTests.NullElement() -> throw new IllegalArgumentException("list contains(?, null) only tests a list's elements");
             case Equals(var value) -> literal(value);
+            case NotEqual(var negated) -> "!= " + test(negated);
             case Compare(var operator, var value) -> operator.symbol() + " " + literal(value);
             case Range(var low, var lowClosed, var high, var highClosed) -> (lowClosed ? "[" : "(") + literal(low) + ".."
                     + literal(high) + (highClosed ? "]" : ")");

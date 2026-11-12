@@ -14,6 +14,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Name;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NotEqual;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
@@ -21,7 +22,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
 /**
  * Decides, on concrete values, a cell that compares with other inputs ({@code > dateE},
  * {@code [numB..numC]}), with FEEL's three-valued logic: a comparison with a missing value is unknown,
- * so it fails, and so does its {@code not(...)}; {@code = x} is true when both are missing. A time or
+ * so it fails, and so does its {@code not(...)}; {@code = x} is true when both are missing, and {@code != x} is
+ * its opposite. A time or
  * date-time with a time zone and one without compare by their local time ({@link FeelTemporals}). A plain
  * name whose input holds a list ({@code Flu Symptoms}) is true when the value is in that list, as in
  * DMN; the engine only lets list inputs be named that way.
@@ -62,6 +64,10 @@ final class VariableCells {
         return switch (test) {
             case NullTest n -> value == null;
             case UnaryTests.NullElement n -> value == null; // only list columns' cells hold it, and they name no input
+            case NotEqual(var negated) -> {
+                var equal = test(negated, value, inputs); // != is not(=), so unknown stays unknown
+                yield equal == null ? null : !equal;
+            }
             case Equals(var literal) -> {
                 var other = resolve(literal, inputs);
                 if (other instanceof List<?> list) {

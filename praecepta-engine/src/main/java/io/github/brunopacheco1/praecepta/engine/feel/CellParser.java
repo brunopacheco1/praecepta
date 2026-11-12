@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NotEqual;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Operator;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
@@ -44,6 +45,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   duration("P1Y2M")        years and months duration (YEAR_MONTH_DURATION columns; a bare P1Y2M too)
  *   true, false              boolean literals (BOOLEAN columns)
  *   &lt; 18, &gt;= 2.5, &lt; "N"      comparisons (all but BOOLEAN columns; strings compare by code point, {@link FeelStrings#compare})
+ *   = 18, = null             the same as 18 and null
+ *   != "PT", != null         anything but that value, or anything but a missing value ({@link UnaryTests.NotEqual})
  *   [18..65), (0..1], ]a..b[  intervals; [ and ] include their end, ( ) and outward-facing brackets exclude it
  *   null                     only a missing value
  *   not(t1, t2)              anything but these tests
@@ -263,7 +266,8 @@ public final class CellParser {
             if (interval != null && !interval.isEmpty() && isBracketed(interval) && topLevelDots(interval) > 0) {
                 return interval(interval, topLevelDots(interval));
             }
-            if (OPERATORS.stream().anyMatch(operator -> test.startsWith(operator.symbol()))) {
+            if (OPERATORS.stream().anyMatch(operator -> test.startsWith(operator.symbol())) || test.startsWith("=")
+                    || test.startsWith("!=")) {
                 return test(test);
             }
             return null;
@@ -367,6 +371,12 @@ public final class CellParser {
                     return new Compare(operator, literal(text.substring(operator.symbol().length()).strip()));
                 }
             }
+            if (text.startsWith("!=")) {
+                return new NotEqual(equality(text.substring("!=".length()).strip()));
+            }
+            if (text.startsWith("=")) {
+                return equality(text.substring("=".length()).strip());
+            }
             if (isBracketed(text)) {
                 int dots = topLevelDots(text);
                 if (dots > 0) {
@@ -374,6 +384,15 @@ public final class CellParser {
                 }
             }
             return new Equals(literal(text));
+        }
+
+        /**
+         * The value after {@code =} or {@code !=}: {@code null}, which {@code = null} tests as the cell {@code null}
+         * does (DMN 1.5, 10.3.2.15: "e = null" is "FEEL(e) is null"), or a value, which {@code = x} tests as the cell
+         * {@code x} does.
+         */
+        private Test equality(String text) {
+            return text.equals("null") ? new NullTest() : new Equals(literal(text));
         }
 
         /** Whether a test opens with {@code [}, {@code (} or {@code ]} and closes with {@code ]}, {@code )} or {@code [}. */

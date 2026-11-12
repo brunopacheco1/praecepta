@@ -47,6 +47,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NotEqual;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
@@ -950,6 +951,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return switch (test) {
             case NullTest n -> n;
             case UnaryTests.NullElement n -> n;
+            case NotEqual n -> new NotEqual(resolve(n.test(), inputs));
             case Equals e -> new Equals(resolve(e.value(), inputs));
             case Compare c -> new Compare(c.operator(), resolve(c.value(), inputs));
             case Range r -> new Range(resolve(r.low(), inputs), r.lowClosed(), resolve(r.high(), inputs), r.highClosed());
@@ -960,8 +962,15 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return value instanceof UnaryTests.Name(var name) ? (Comparable<?>) inputs.apply(name) : value;
     }
 
-    /** FEEL on concrete values: a comparison with a missing value is unknown; null equals only null. */
+    /**
+     * FEEL on concrete values: a comparison with a missing value is unknown; null equals only null; {@code !=} is
+     * {@code not(=)} (DMN 1.5, 10.3.2.15), so it holds for a missing value unless it is {@code != null}.
+     */
     private static Boolean test(Test test, Object value) {
+        if (test instanceof NotEqual(var negated)) {
+            var equal = test(negated, value);
+            return equal == null ? null : !equal;
+        }
         if (value == null) {
             return switch (test) {
                 case NullTest n -> true;
@@ -969,6 +978,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                 case Equals e -> e.value() == null;
                 case Compare c -> null;
                 case Range r -> null;
+                case NotEqual n -> throw new IllegalStateException("decided above");
             };
         }
         if (test instanceof Equals e && e.value() == null) {
@@ -980,6 +990,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return switch (test) {
             case NullTest n -> false;
             case UnaryTests.NullElement n -> false;
+            case NotEqual n -> throw new IllegalStateException("decided above");
             case Equals e -> compare(value, e.value()) == 0;
             case Compare c -> switch (c.operator()) {
                 case LT -> compare(value, c.value()) < 0;
@@ -1013,6 +1024,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                     values.add(r.low());
                     values.add(r.high());
                 }
+                case NotEqual n -> values.addAll(UnaryTests.values(n));
                 case NullTest n -> {
                     // no value
                 }
