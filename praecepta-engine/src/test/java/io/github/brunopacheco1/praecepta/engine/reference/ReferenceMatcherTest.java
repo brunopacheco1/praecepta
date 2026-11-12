@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.ZoneOffset;
@@ -152,6 +153,23 @@ class ReferenceMatcherTest {
         // an empty list contains nothing; a missing one makes list contains null, so only ? = null holds
         Assertions.assertThat(ids(reference.matches(Map.of("nat", List.of())))).containsExactly("2");
         Assertions.assertThat(ids(reference.matches(nullValued("nat")))).containsExactly("3");
+    }
+
+    @Test
+    void the_representative_values_are_counted_as_they_are_listed() {
+        var rules = List.of(cell(1, "nat", "\"PT\""), cell(2, "nat", "not(\"BR\")"), cell(3, "nat", "not(\"ES\", \"FR\")"),
+                cell(4, "nat", "null"), cell(5, "n", "> 10"), cell(6, "n", "[1..5]"));
+        var reference = new ReferenceMatcher(rules, HitPolicy.COLLECT, Map.of(), Map.of("nat", ColumnType.STRING, "n", ColumnType.NUMBER),
+                Map.of(), false, Set.of(), Set.of("nat"));
+        for (var column : List.of("nat", "n")) {
+            for (var withMissing : List.of(true, false)) {
+                Assertions.assertThat(reference.representativeValueCount(column, withMissing))
+                        .as("%s, with a missing value: %s", column, withMissing)
+                        .isEqualTo(BigInteger.valueOf(reference.representativeValues(column, withMissing).size()));
+            }
+        }
+        // the lists are many: every subset of up to four of the pool's elements
+        Assertions.assertThat(reference.representativeValueCount("nat", false)).isGreaterThan(BigInteger.valueOf(10));
     }
 
     /** The table of #84, from DMN 1.5, Tables 49, 50 and 75. */

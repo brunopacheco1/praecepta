@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -210,11 +211,12 @@ class EngineMatchesReferencePropertiesTest {
     void wide_tables_validation_report_matches_the_reference(@ForAll("wideScenarios") DecisionTableScenario s,
             @ForAll("priorities") List<String> priority, @ForAll boolean perColumn) {
         var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of(), perColumn);
-        long work = s.rules().size();
+        // counted, not listed: a list column may have more representative lists than the heap holds
+        var work = BigInteger.valueOf(s.rules().size());
         for (var column : s.columns()) {
-            work *= reference.representativeValues(column, true).size();
+            work = work.multiply(reference.representativeValueCount(column, true));
         }
-        Assume.that(work <= MAX_WIDE_ANALYSIS_WORK);
+        Assume.that(work.compareTo(BigInteger.valueOf(MAX_WIDE_ANALYSIS_WORK)) <= 0);
         assertSameFindings(s, priority, perColumn);
     }
 

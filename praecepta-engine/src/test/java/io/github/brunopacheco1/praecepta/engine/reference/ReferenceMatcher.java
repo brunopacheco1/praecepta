@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.MathContext;
 import java.time.Duration;
 import java.time.Instant;
@@ -610,6 +611,37 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * for removing an element never makes a positive cell match or a {@code not(...)} cell fail.
      */
     private void representativeLists(String column, boolean withMissing, boolean hidden, Consumer<Object> sink) {
+        var pool = listPool(column, withMissing, hidden);
+        subLists(pool.elements(), 0, new ArrayList<>(), pool.size(), sink);
+        if (withMissing) {
+            sink.accept(null);
+        }
+    }
+
+    /**
+     * How many values {@link #representativeValues} gives for a column, counted without building them, since a list
+     * column may have too many lists to hold.
+     */
+    public BigInteger representativeValueCount(String column, boolean withMissing) {
+        if (!lists.contains(column)) {
+            return BigInteger.valueOf(representativeValues(column, withMissing).size());
+        }
+        var pool = listPool(column, withMissing, false);
+        int n = pool.elements().size();
+        var count = BigInteger.ZERO;
+        var choose = BigInteger.ONE; // n choose k, from k = 0
+        for (int k = 0; k <= pool.size(); k++) {
+            count = count.add(choose);
+            choose = choose.multiply(BigInteger.valueOf(n - k)).divide(BigInteger.valueOf(k + 1L));
+        }
+        return withMissing ? count.add(BigInteger.ONE) : count;
+    }
+
+    /** The elements {@link #representativeLists} draws its lists from, and how many a list holds at most. */
+    private record ListPool(List<Object> elements, int size) {
+    }
+
+    private ListPool listPool(String column, boolean withMissing, boolean hidden) {
         var cells = rules.stream().map(rule -> parse(rule.input().values().get(column), column)).toList();
         var allowed = allowedValues.containsKey(column) ? CellParser.parse(allowedValues.get(column), type(column)) : null;
         var bySignature = new LinkedHashMap<List<Boolean>, Object>();
@@ -626,10 +658,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                 rulingOut.add(pool.stream().map(e -> some(tests(cell), Collections.singletonList(single(e))) != Boolean.FALSE).toList());
             }
         }
-        subLists(pool, 0, new ArrayList<>(), Math.min(rulingOut.size() + 2, pool.size()), sink);
-        if (withMissing) {
-            sink.accept(null);
-        }
+        return new ListPool(pool, Math.min(rulingOut.size() + 2, pool.size()));
     }
 
     /** Every list of at most {@code size} elements of {@code pool} from {@code from} on, in pool order, after {@code prefix}. */
