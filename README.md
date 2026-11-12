@@ -85,6 +85,7 @@ Or let your build or framework do it:
 | Spring Boot 4 | [`praecepta-spring-boot-starter`](#praecepta-spring-boot-starter) | Loads the DMN files under `rules/` at startup and injects one engine per decision. |
 | Micronaut 4 | [`praecepta-micronaut`](#praecepta-micronaut) | The same, for Micronaut. |
 | Quarkus 3.40+ | [`praecepta-quarkus`](#praecepta-quarkus-extension) | Validates the tables while Quarkus builds the application, and injects one engine per decision. |
+| Another framework, or none | [`praecepta-integration`](#praecepta-integration) | Loads DMN files into named engines, as the framework integrations do. |
 | GraalVM | nothing | [Native images](#native-images) need no configuration for Praecepta. |
 
 Every module is published to Maven Central under the same version. How the integrations fit together,
@@ -405,7 +406,8 @@ Generated code belongs to your project, so it carries no Praecepta licence heade
 ## Praecepta Gradle Plugin
 Does for Gradle what the Maven plugin does, with the same settings and the same generated files.
 Runs on Gradle 8.5 and later (CI tests 8.5, the last 8.x and the current 9.x) on Java 21+. It is
-published to Maven Central only, with its plugin marker, so Gradle finds it there:
+published to Maven Central only, with its plugin marker, so Gradle finds it there (the Gradle Plugin
+Portal is [#93](https://github.com/brunopacheco1/praecepta/issues/93)):
 
 ```kotlin
 // settings.gradle.kts
@@ -664,6 +666,42 @@ deployment module only runs inside the Quarkus build. It uses no reflection; the
 are read while the application initialises, and in a native executable while the image is built, but
 the native-image workflow does not build a Quarkus application yet (see [Native images](#native-images)).
 
+## Praecepta Integration
+What the Spring Boot, Micronaut and Quarkus integrations share, for another framework or none: it finds
+DMN files, builds one engine per decision table, and evaluates them by name. It needs only the engine.
+
+```xml
+<dependency>
+  <groupId>io.github.brunopacheco1</groupId>
+  <artifactId>praecepta-integration</artifactId>
+  <version>0.5.0</version>
+</dependency>
+```
+
+```java
+import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
+import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
+import io.github.brunopacheco1.praecepta.integration.Decisions;
+import io.github.brunopacheco1.praecepta.integration.TableLocations;
+
+var sources = TableLocations.find(List.of(TableLocations.DEFAULT), getClass().getClassLoader());
+var decisions = Decisions.load(sources, Severity.ERROR);
+
+List<Map<String, String>> discount = decisions.evaluate("Discount", Map.of("country", "PT", "age", "42"));
+PraeceptaEngine<Map<String, String>, Map<String, String>> engine = decisions.engine("Discount");
+```
+
+- **Locations** are the integrations' patterns: `TableLocations.DEFAULT` is `classpath*:rules/**/*.dmn`,
+  `classpath:` and `classpath*:` search every class path root from a directory, `file:` the file system;
+  `*` matches within a directory, `**` across them. `TableSource.of(path)`, `of(url)` or
+  `of(name, bytes)` load a file you already have.
+- **Loading fails** with a `DecisionsException` that lists every problem at once: a file that cannot be
+  read, two decisions with the same name, or validation issues at the given severity or above (`null`
+  for none).
+- **Inputs and outputs** are maps of text, as in the framework integrations. `decisions.get("Discount")`
+  gives the table, its validation report and its engine; `decisions.names()` and `decisions.describe()`
+  list them.
+
 ## Native images
 Applications using Praecepta build as GraalVM native executables with no configuration for Praecepta
 itself: the engine uses no reflection, and the jars carry the reachability metadata they need under
@@ -729,9 +767,9 @@ The framework integrations use no reflection either, and with the default `praec
 integration core's metadata covers their files. The Spring Boot starter works with Spring AOT, which a
 Spring native image needs, and its tests run the AOT processing and start an application from the
 generated code; Quarkus' tests check that the validated tables become resources registered for the image.
-CI does not yet build a Spring Boot, Micronaut or Quarkus application natively, though, so those native
-executables are untested; files at other locations must be registered through the framework's own native
-support.
+CI does not yet build a Spring Boot, Micronaut or Quarkus application natively, though
+([#99](https://github.com/brunopacheco1/praecepta/issues/99)), so those native executables are untested;
+files at other locations must be registered through the framework's own native support.
 
 # Building and Testing
 Building Praecepta needs **Java 21** or later and Maven 3.9+; CI builds on Java 21, 25 and 27. From the repository root:
@@ -810,9 +848,10 @@ Praecepta Engine has no runtime dependencies; it reads DMN with the JDK's XML pa
 Praecepta Loader depends on Apache POI. The Maven and Gradle plugins use it at build time only, through
 `praecepta-compiler`, so an application that compiles its tables needs only the engine at runtime. The
 Spring Boot, Micronaut and Quarkus integrations need only `praecepta-integration`, which needs only the
-engine; the framework itself is the application's own (`provided`), so they bring no version of it. The
-Quarkus extension's deployment module, which only Quarkus' build uses, brings `praecepta-compiler` and
-Apache POI; neither reaches the application.
+engine; Spring Boot and Micronaut are the application's own (`provided`), so the integrations bring no
+version of them. The Quarkus extension depends on `quarkus-arc`, as every Quarkus extension does, so
+Quarkus' tools can check it matches the application's Quarkus version. Its deployment module, which only
+Quarkus' build uses, brings `praecepta-compiler` and Apache POI; neither reaches the application.
 
 # Roadmap
 [docs/ROADMAP.md](docs/ROADMAP.md) has the plans for the next year; past decisions and their reasons are in

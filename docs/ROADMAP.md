@@ -31,7 +31,7 @@ fits the build and the framework an application already uses:
 The TCK stays at 83 of 86 checks; the other 3 need decision requirement graphs.
 
 ## Next: 0.6
-The DMN 1.5 gaps that a review of 0.4 against the specification found in single tables:
+The DMN 1.5 gaps that the reviews of 0.4 and 0.5 against the specification found in single tables:
 - **Analysis of rules that test list columns**
   ([#78](https://github.com/brunopacheco1/praecepta/issues/78)): overlaps, unreachable rules and
   gaps for them too.
@@ -47,6 +47,20 @@ The DMN 1.5 gaps that a review of 0.4 against the specification found in single 
 - **Behaviour that DMN 1.5 and the TCK leave undecided**
   ([#86](https://github.com/brunopacheco1/praecepta/issues/86)): recorded, and settled when a later
   DMN version or the TCK decides it.
+- **Aggregations over null outputs** ([#90](https://github.com/brunopacheco1/praecepta/issues/90)): SUM, MIN and MAX give null when a matching rule's
+  output is null, as DMN 1.5 defines them, instead of skipping it.
+- **Default outputs**: a warning for a complete table that declares one
+  ([#91](https://github.com/brunopacheco1/praecepta/issues/91)), and multi-output tables that tell a null default from no default
+  ([#92](https://github.com/brunopacheco1/praecepta/issues/92)).
+
+And for the integrations shipped in 0.5:
+- **The Gradle plugin on the Gradle Plugin Portal** ([#93](https://github.com/brunopacheco1/praecepta/issues/93)), so `pluginManagement` needs no
+  `mavenCentral()`.
+- **Micronaut 5** ([#94](https://github.com/brunopacheco1/praecepta/issues/94)) and **native builds of Spring Boot, Micronaut and Quarkus
+  applications in CI** ([#99](https://github.com/brunopacheco1/praecepta/issues/99)).
+- Smaller fixes: validation issues logged once ([#95](https://github.com/brunopacheco1/praecepta/issues/95)), `DmnReader` pinned to the JDK's XML parser
+  ([#96](https://github.com/brunopacheco1/praecepta/issues/96)), a current Gradle API ([#97](https://github.com/brunopacheco1/praecepta/issues/97)) and published POMs without the JUnit BOM
+  ([#98](https://github.com/brunopacheco1/praecepta/issues/98)).
 
 ## 0.7
 - **Decision requirement graphs** (decisions feeding other decisions,
