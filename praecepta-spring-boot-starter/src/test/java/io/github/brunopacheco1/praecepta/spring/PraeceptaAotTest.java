@@ -7,11 +7,15 @@ package io.github.brunopacheco1.praecepta.spring;
 
 import java.util.Map;
 
+import jakarta.inject.Named;
+
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.test.tools.CompileWithForkedClassLoader;
 import org.springframework.aot.test.generate.TestGenerationContext;
 import org.springframework.beans.factory.annotation.BeanFactoryAnnotationUtils;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.annotation.AnnotationConfigUtils;
 import org.springframework.context.aot.ApplicationContextAotGenerator;
@@ -56,6 +60,40 @@ class PraeceptaAotTest {
                     .hasRootCauseInstanceOf(DecisionsException.class)
                     .rootCause().hasMessageContaining("praecepta.fail-on must be ERROR, WARNING or NONE, not sometimes");
         });
+    }
+
+    @Test
+    void engines_processed_ahead_of_time_are_injected_with_qualifier_and_with_named() {
+        var generationContext = new TestGenerationContext();
+        var context = context(new MockEnvironment());
+        context.registerBean(Shipping.class);
+        var initializer = new ApplicationContextAotGenerator().processAheadOfTime(context, generationContext);
+        generationContext.writeGeneratedContent();
+
+        TestCompiler.forSystem().with(generationContext).compile(compiled -> {
+            var application = start(compiled.getInstance(ApplicationContextInitializer.class, initializer.toString()), new MockEnvironment());
+            var decisions = application.getBean(PraeceptaAutoConfiguration.DECISIONS_BEAN, Decisions.class);
+            var shipping = application.getBean(Shipping.class);
+            Assertions.assertThat(shipping.carrier).isSameAs(decisions.engine("Carrier"));
+            Assertions.assertThat(shipping.fee).isSameAs(decisions.engine("Fee"));
+            var definition = (AbstractBeanDefinition) application.getBeanFactory().getBeanDefinition("praecepta.Discount");
+            Assertions.assertThat(DecisionsRegistrar.QUALIFIER_TYPES)
+                    .allSatisfy(type -> Assertions.assertThat(definition.getQualifier(type).getAttribute("value")).isEqualTo("Discount"));
+            application.close();
+        });
+    }
+
+    /** An application bean injecting engines the two ways the starter supports. */
+    static class Shipping {
+
+        final PraeceptaEngine<Map<String, String>, Map<String, String>> carrier;
+        final PraeceptaEngine<Map<String, String>, Map<String, String>> fee;
+
+        Shipping(@Named("Carrier") PraeceptaEngine<Map<String, String>, Map<String, String>> carrier,
+                @Qualifier("Fee") PraeceptaEngine<Map<String, String>, Map<String, String>> fee) {
+            this.carrier = carrier;
+            this.fee = fee;
+        }
     }
 
     private static GenericApplicationContext context(MockEnvironment environment) {
