@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    SPDX-FileCopyrightText: Bruno Pacheco
+
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>@spring-boot.version@</version>
+        <relativePath/>
+    </parent>
+    <groupId>it.praecepta</groupId>
+    <artifactId>spring-boot-app</artifactId>
+    <version>1.0</version>
+    <description>
+        Integration test (#99): a Spring Boot application using the starter, built as a GraalVM native executable
+        the way Spring Boot documents it (its parent's native profile: Spring AOT, then native-maven-plugin), run,
+        and made to evaluate decisions through the beans it injects. It exits with 1 if an answer is wrong.
+    </description>
+
+    <properties>
+        <java.version>21</java.version>
+        <!-- native-maven-plugin is the version Spring Boot manages, as for its users -->
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.brunopacheco1</groupId>
+            <artifactId>praecepta-spring-boot-starter</artifactId>
+            <version>@project.version@</version>
+        </dependency>
+        <!-- engines injected with @Named, as well as with @Qualifier -->
+        <dependency>
+            <groupId>jakarta.inject</groupId>
+            <artifactId>jakarta.inject-api</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.graalvm.buildtools</groupId>
+                <artifactId>native-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <!--
+                Spring Boot's own native profile (spring-boot-starter-parent) runs Spring AOT and prepares
+                native-maven-plugin; this adds the native build to package and runs the executable.
+            -->
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>build-native</id>
+                                <goals>
+                                    <goal>compile-no-fork</goal>
+                                </goals>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>@exec-maven-plugin.version@</version>
+                        <executions>
+                            <execution>
+                                <id>run-native</id>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <phase>integration-test</phase>
+                                <configuration>
+                                    <executable>${project.build.directory}/${project.artifactId}</executable>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

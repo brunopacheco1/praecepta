@@ -35,6 +35,16 @@ JDK and enable the `native` profile; it takes a few minutes, and CI does it in t
 mvn -pl praecepta-maven-plugin -am verify -Pnative
 ```
 
+The Spring Boot, Micronaut and Quarkus integrations are built natively by the test applications of
+`praecepta-native-tests` (`src/it/*-app`), which are in the reactor only with the `native-frameworks`
+profile. Each takes a few minutes and GraalVM for JDK 25 (on GraalVM for JDK 21 only the Micronaut one runs:
+Spring Boot 4 and Quarkus 3.40 need 25), and CI runs them in the `Native frameworks` workflow;
+`-Dinvoker.test` picks one:
+
+```
+mvn -P native-frameworks -pl praecepta-native-tests -am verify -DskipTests -Dinvoker.test=quarkus-app
+```
+
 The Gradle plugin's functional tests build small Gradle projects with Gradle TestKit, which downloads
 a Gradle distribution, so they run only when asked for, on a Java that Gradle version runs on:
 
@@ -50,8 +60,10 @@ The code targets **Java 21** (`--release 21`): newer language features or APIs f
 CI builds and tests on Java 21, 25 and 27, runs the Maven plugin's integration tests on Maven 3.9,
 3.10 and 4.0 (on pull requests only when the plugin, the engine or a POM changes), and the Gradle
 plugin's functional tests on Gradle 8.5, 8.14 and 9 and a check that the Plugin Portal build publishes
-Maven's files unchanged (on pull requests only when that plugin, the compiler, loader or engine changes), and the native-image test project with GraalVM for JDK 21 and 25
-(on pull requests only when what goes into the executable changes). A newer push to a pull request
+Maven's files unchanged (on pull requests only when that plugin, the compiler, loader or engine changes),
+the native-image test project with GraalVM for JDK 21 and 25 (on pull requests only when what goes into
+the executable changes), and the framework applications natively (weekly, and on pull requests only when
+a framework module, the integration core or the applications change). A newer push to a pull request
 cancels the checks still running for the previous one.
 
 ## Code style

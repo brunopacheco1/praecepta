@@ -470,6 +470,18 @@ SPDX-License-Identifier: Apache-2.0</inlineHeader>
 
     <profiles>
         <!--
+            The framework integrations as GraalVM native executables (#99): praecepta-native-tests builds a Spring
+            Boot, a Micronaut and a Quarkus application natively and runs them. Minutes per application and
+            GraalVM's native-image needed, so only the native-frameworks workflow (native-frameworks.yml) enables it:
+            mvn -P native-frameworks -pl praecepta-native-tests -am verify
+        -->
+        <profile>
+            <id>native-frameworks</id>
+            <modules>
+                <module>praecepta-native-tests</module>
+            </modules>
+        </profile>
+        <!--
             Maven Central release: sources, javadoc, GPG signatures, publication through the Central
             Portal. Used by .github/workflows/release.yml; see docs/RELEASING.md. Signing reads the
             key from MAVEN_GPG_KEY / MAVEN_GPG_PASSPHRASE (no gpg keyring needed).

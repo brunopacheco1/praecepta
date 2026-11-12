@@ -1,0 +1,70 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# The framework integrations as GraalVM native executables (#99): builds the test applications of
+# praecepta-native-tests (a Spring Boot, a Micronaut and a Quarkus application, each with the framework's own
+# native build), runs each executable, and checks the answers it gets from the injected engines. A native
+# build takes minutes, so this runs on pull requests only when a framework module, the integration core or the
+# test applications change, weekly so new GraalVM and framework releases are noticed, and on demand.
+name: Native frameworks
+on:
+  pull_request:
+    paths:
+      - 'praecepta-integration/src/main/**'
+      - 'praecepta-spring-boot-starter/src/main/**'
+      - 'praecepta-micronaut/src/main/**'
+      - 'praecepta-quarkus/src/main/**'
+      - 'praecepta-quarkus-deployment/src/main/**'
+      - 'praecepta-integration/pom.xml'
+      - 'praecepta-spring-boot-starter/pom.xml'
+      - 'praecepta-micronaut/pom.xml'
+      - 'praecepta-quarkus/pom.xml'
+      - 'praecepta-quarkus-deployment/pom.xml'
+      - 'praecepta-native-tests/**'
+      # the framework versions
+      - 'pom.xml'
+      - '.github/workflows/native-frameworks.yml'
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# a newer push to the same pull request replaces the run in progress
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  native:
+    # GraalVM for the current LTS, and for Java 21 where the framework supports it: Spring Boot 4 and
+    # Quarkus 3.40 need GraalVM for JDK 25
+    name: ${{ matrix.app }} (GraalVM for JDK ${{ matrix.java }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: spring-boot-app
+            java: '25'
+          - app: micronaut-app
+            java: '21'
+          - app: micronaut-app
+            java: '25'
+          - app: quarkus-app
+            java: '25'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: graalvm/setup-graalvm@f70bc8032f90a104502824a54bcb94b6f01715bc # v1.6.8
+        with:
+          distribution: graalvm-community
+          java-version: ${{ matrix.java }}
+          cache: maven
+      - name: Build the native executable and run it
+        # the native-frameworks profile adds praecepta-native-tests to the reactor; its invoker builds the
+        # application natively and runs it. The unit tests already ran in the Java CI workflow.
+        run: |
+          native-image --version
+          mvn -B -P native-frameworks -pl praecepta-native-tests -am verify -DskipTests -Dinvoker.test=${{ matrix.app }}

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:camunda="http://camunda.org/schema/1.0/dmn" id="Definitions_0x1y2z" name="Discounts" namespace="http://camunda.org/schema/1.0/dmn" exporter="Camunda Modeler" exporterVersion="5.40.0" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.8.0">
+  <decision id="discount" name="Discount">
+    <decisionTable id="DecisionTable_1abc" hitPolicy="RULE ORDER">
+      <input id="Input_1" label="Customer country" camunda:inputVariable="country">
+        <inputExpression id="InputExpression_1" typeRef="string">
+          <text>country</text>
+        </inputExpression>
+        <inputValues id="UnaryTests_1">
+          <text>"PT","ES","FR"</text>
+        </inputValues>
+      </input>
+      <input id="InputClause_0age" label="Age">
+        <inputExpression id="LiteralExpression_0age" typeRef="integer">
+          <text>customer.age</text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_since" label="Customer since">
+        <inputExpression id="LiteralExpression_since" typeRef="date">
+          <text>since</text>
+        </inputExpression>
+      </input>
+      <output id="Output_1" label="Discount" name="discount" typeRef="number" />
+      <output id="OutputClause_tier" label="Tier" name="tier" typeRef="string">
+        <outputValues id="UnaryTests_tier">
+          <text>"gold","silver"</text>
+        </outputValues>
+      </output>
+      <annotation id="Annotation_1">
+        <text>Why</text>
+      </annotation>
+      <rule id="DecisionRule_0aaa">
+        <description>Loyal Iberian adults</description>
+        <inputEntry id="UnaryTests_0r1a">
+          <text>"PT","ES"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0r1b">
+          <text>[18..65)</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0r1c">
+          <text>&lt; date("2020-01-01")</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_0r1a">
+          <text>0.15</text>
+        </outputEntry>
+        <outputEntry id="LiteralExpression_0r1b">
+          <text>"gold"</text>
+        </outputEntry>
+        <annotationEntry>
+          <text>loyalty</text>
+        </annotationEntry>
+      </rule>
+      <rule id="DecisionRule_0bbb">
+        <inputEntry id="UnaryTests_0r2a">
+          <text>not("FR")</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0r2b">
+          <text>&gt;= 18</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0r2c">
+          <text></text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_0r2a">
+          <text>0.05</text>
+        </outputEntry>
+        <outputEntry id="LiteralExpression_0r2b">
+          <text>"silver"</text>
+        </outputEntry>
+        <annotationEntry>
+          <text></text>
+        </annotationEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram>
+      <dmndi:DMNShape dmnElementRef="discount">
+        <dc:Bounds height="80" width="180" x="160" y="100" />
+      </dmndi:DMNShape>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>

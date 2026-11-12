@@ -658,7 +658,9 @@ Micronaut endpoints it is sensitive by default, since the reports show the rules
 `endpoints.praecepta.sensitive: false`, or secure it with Micronaut Security.
 
 Micronaut builds the module's beans and binds its settings at compile time, so it needs no reflection
-and no annotation processing in your build. In a native image, include the DMN files as resources.
+and no annotation processing in your build. Micronaut's native build (`-Dpackaging=native-image`) needs
+nothing more for DMN files under `rules/`; register files elsewhere as resources (see
+[Native images](#native-images)).
 
 ## Praecepta Quarkus Extension
 Runs on Quarkus 3.40 and later with Java 21+. Add the extension to a Quarkus application:
@@ -731,8 +733,8 @@ manual restart (press `s`), since Quarkus watches files, not directories. Like a
 it depends on `quarkus-arc`, and its deployment module on `quarkus-arc-deployment`, so Quarkus' tools
 check that the application's Quarkus version matches the one the extension was built for. The
 deployment module only runs inside the Quarkus build. It uses no reflection; the tables
-are read while the application initialises, and in a native executable while the image is built, but
-the native-image workflow does not build a Quarkus application yet (see [Native images](#native-images)).
+are read while the application initialises, and in a native executable while the image is built
+(`mvn package -Dnative` needs nothing more; see [Native images](#native-images)).
 
 ## Praecepta Integration
 What the Spring Boot, Micronaut and Quarkus integrations share, for another framework or none: it finds
@@ -832,12 +834,16 @@ in module `java.logging`): register those for your locale, or limit exact handli
 (`--exact-reachability-metadata=com.acme`).
 
 The framework integrations use no reflection either, and with the default `praecepta.locations` the
-integration core's metadata covers their files. The Spring Boot starter works with Spring AOT, which a
-Spring native image needs, and its tests run the AOT processing and start an application from the
-generated code; Quarkus' tests check that the validated tables become resources registered for the image.
-CI does not yet build a Spring Boot, Micronaut or Quarkus application natively, though
-([#99](https://github.com/brunopacheco1/praecepta/issues/99)), so those native executables are untested;
-files at other locations must be registered through the framework's own native support.
+integration core's metadata covers their files; files at other locations must be registered through the
+framework's own native support. CI builds an application of each framework as a native executable with
+the framework's own native build, starts it, and checks the answers of the engines and the `Decisions`
+bean it injects (`praecepta-native-tests`, weekly and when an integration changes):
+
+| Framework | Native build | GraalVM for JDK | The application |
+|---|---|---|---|
+| Spring Boot | Spring Boot's `native` profile (`spring-boot-starter-parent`): Spring AOT, then `native-maven-plugin` | 25 (Spring Boot 4 needs it) | DMN files under `src/main/resources/rules/`, one in a subdirectory; engines injected with `@Qualifier` and `@Named` |
+| Micronaut | `mvn package -Dpackaging=native-image` (`micronaut-parent`) | 21 and 25 | The same DMN files; engines injected with `@Named` |
+| Quarkus | `mvn package -Dnative` | 25 (Quarkus 3.40 needs it) | A DMN file under `src/main/resources/rules/` and a CSV table declared in `application.properties`; engines injected with `@Identifier` and `@Named` |
 
 # Building and Testing
 Building Praecepta needs **Java 21** or later and Maven 3.9+; CI builds on Java 21, 25 and 27. From the repository root:

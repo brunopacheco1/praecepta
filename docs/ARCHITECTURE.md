@@ -26,6 +26,7 @@ builds an engine once and calls it.
 | `praecepta-quarkus-deployment` | runtime, compiler, Quarkus ArC deployment | Quarkus extension, build time: finds DMN files, compiles declared Excel and CSV tables, validates them and fails the build on the configured issues; reloads changed tables in dev mode (`PraeceptaProcessor`). |
 | `praecepta-benchmarks` | engine, Camunda 8, Drools, JMH | Compares Praecepta with other engines; not published. |
 | `praecepta-tck` | engine | Runs the DMN TCK's decision-table cases; not published. |
+| `praecepta-native-tests` | the framework modules | A Spring Boot, a Micronaut and a Quarkus application, built as GraalVM native executables and run; in the reactor only with the `native-frameworks` profile; not published. |
 
 The build-tool and framework integrations build on `praecepta-compiler` and `praecepta-integration`, so
 that they behave alike; what they share (settings, bean names, reports, failures) is in
@@ -286,10 +287,17 @@ releases. `praecepta-maven-plugin/src/it/native-app` is an application that uses
 runs its checks on the JVM, and the `Native image` workflow (`-Pnative`) builds it with GraalVM for JDK 21
 and 25 and runs the executable, with `--exact-reachability-metadata` on 25, so a resource no metadata
 registers fails the run instead of reading as absent. The framework modules use no reflection and rely
-on the integration core's metadata for the default location (the Quarkus extension registers the tables
-it validated, which its tests check at build-step level, and the Spring Boot starter's tests run Spring
-AOT and start an application from the generated code), but no CI job builds a Spring Boot, Micronaut or
-Quarkus application natively yet ([#99](https://github.com/brunopacheco1/praecepta/issues/99)).
+on the integration core's metadata for the default location; the Quarkus extension registers the tables
+it validated, and the Spring Boot starter's AOT processor (`DecisionsAotProcessor`) writes the engine
+beans' definitions, with both their qualifiers, as code. `praecepta-native-tests` holds an application per
+framework (`src/it/spring-boot-app`, `micronaut-app`, `quarkus-app`), each a user project built by
+`maven-invoker-plugin` with the framework's own native build (Spring Boot's `native` profile, Micronaut's
+`native-image` packaging, Quarkus' `-Dnative`), then run; it evaluates decisions through the beans it
+injects and exits with 1 on a wrong answer. The module is in the reactor only with the `native-frameworks`
+profile, so the default build does not need GraalVM; the `Native frameworks` workflow builds each
+application with GraalVM for JDK 25, and Micronaut's with JDK 21 too (Spring Boot 4 and Quarkus 3.40 need
+GraalVM 25; the invoker skips them on an older one). Each takes its framework's defaults, the
+`native-maven-plugin` version included, as its users would.
 
 ## Design decisions
 The main decisions and their reasons (strict DMN semantics, bitsets instead of a trie or generated

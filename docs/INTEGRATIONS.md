@@ -218,7 +218,9 @@ framework's own native support (Spring's `RuntimeHints`, Micronaut's resource co
 it while the application is built (the engine beans are then those of the decisions found at that time,
 and the tables are read again at startup). The Quarkus extension registers the tables it validated
 itself. CI builds and runs a native application that uses the
-engine, the CSV loader, `praecepta-integration` and generated classes, with GraalVM for JDK 21 and 25; it
-does not build a Spring Boot, Micronaut or Quarkus application natively yet. `ExcelLoader` does not work
+engine, the CSV loader, `praecepta-integration` and generated classes, with GraalVM for JDK 21 and 25, and
+a Spring Boot, a Micronaut and a Quarkus application, each with its framework's own native build
+(`praecepta-native-tests`), which evaluate decisions through the beans they inject. A change to an
+integration must keep them passing (the `Native frameworks` workflow). `ExcelLoader` does not work
 in a native image: compile Excel tables at build time. Details are in the
 [README](../README.md#native-images).

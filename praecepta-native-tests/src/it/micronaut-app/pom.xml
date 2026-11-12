@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    SPDX-FileCopyrightText: Bruno Pacheco
+
+    SPDX-License-Identifier: Apache-2.0
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.micronaut.platform</groupId>
+        <artifactId>micronaut-parent</artifactId>
+        <version>@micronaut-platform.version@</version>
+        <relativePath/>
+    </parent>
+    <groupId>it.praecepta</groupId>
+    <artifactId>micronaut-app</artifactId>
+    <version>1.0</version>
+    <!-- native-image, which the invoker sets, for Micronaut's native build: mvn package -Dpackaging=native-image -->
+    <packaging>${packaging}</packaging>
+    <description>
+        Integration test (#99): a Micronaut application using the module, built as a GraalVM native executable
+        the way Micronaut documents it (-Dpackaging=native-image), run, and made to evaluate decisions through the
+        beans it injects. It exits with 1 if an answer is wrong.
+    </description>
+
+    <properties>
+        <packaging>jar</packaging>
+        <jdk.version>21</jdk.version>
+        <release.version>21</release.version>
+        <exec.mainClass>it.micronautapp.MicronautApp</exec.mainClass>
+        <!-- native-maven-plugin is the version Micronaut manages, as for its users: later ones read GraalVM's
+             shared metadata repository in a format that GraalVM for JDK 21 does not -->
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.micronaut</groupId>
+            <artifactId>micronaut-inject</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.brunopacheco1</groupId>
+            <artifactId>praecepta-micronaut</artifactId>
+            <version>@project.version@</version>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.micronaut.maven</groupId>
+                <artifactId>micronaut-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <!-- runs the executable that -Dpackaging=native-image built -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>run-native</id>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <phase>integration-test</phase>
+                        <configuration>
+                            <executable>${project.build.directory}/${project.artifactId}</executable>
+                            <!-- not the JVM's arguments that micronaut-parent configures for exec:exec -->
+                            <arguments combine.self="override"/>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
