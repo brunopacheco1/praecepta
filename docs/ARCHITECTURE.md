@@ -173,6 +173,18 @@ that compiles nothing and publishes the jars and POM that Maven built (fetched f
 both repositories serve the same files. The same workflow checks on every change that this build
 publishes Maven's files byte for byte.
 
+The plugin compiles against the Gradle 8.11.1 API on purpose, although Gradle 9 is current
+([#97](https://github.com/brunopacheco1/praecepta/issues/97), closed). `dev.gradleplugins:gradle-api` is the
+only Gradle API on Maven Central, and its last release is 8.11.1; but an older API is what the plugin
+needs: compiling against it keeps the plugin to API that Gradle 8.5, the oldest version it supports,
+already has, and the plugin uses nothing newer. That it works on current Gradle is shown by the
+functional tests, which the `Gradle versions` workflow runs on Gradle 8.5, the last 8.x and the current
+9.x. The two ways to a newer API would cost the release its reproducibility: taking the API from
+Gradle's own repository would add a repository other than Maven Central to the release build and to
+Reproducible Central's rebuild of it, and building the plugin with Gradle would take it out of the single
+Maven reactor that builds and rebuilds every module the same way. Should the plugin ever need API newer
+than 8.11, that decision is to be made again.
+
 ## Framework integrations
 `praecepta-integration` turns DMN files into named engines for the Spring Boot, Micronaut and Quarkus
 integrations: `TableLocations` finds files by pattern (`classpath*:rules/**/*.dmn`), `Decisions.load`
