@@ -145,7 +145,9 @@ is the name a table is registered under, so the generated class is named by `cla
 | Report endpoint | Actuator endpoint `praecepta` (`/actuator/praecepta`, `/actuator/praecepta/{name}`), exposed under Actuator's usual rules | management endpoint `praecepta` (`/praecepta`, `/praecepta/{name}`) with `micronaut-management`, sensitive by default | none yet; `decisions.describe()` gives the same at runtime |
 
 Warnings are one line per issue, prefixed with the decision's name:
-`Discount: WARNING rule 3 can never be selected`. The endpoints return `Decisions.describe()`,
+`Discount: WARNING rule 3 can never be selected`. Each issue is logged once, through the framework's logging:
+the engines do not log their reports as well, and in Quarkus the application's startup does not repeat what
+the build logged. The endpoints return `Decisions.describe()`,
 `{"decisions": {"Discount": {...}}}`, or one decision's description (404 for an unknown name): `name`,
 `location`, `hitPolicy`, `aggregation`, `rules` (the number of rules), `inputs` and `outputs` (`name`,
 `type`, and `list` for inputs), and `issues` (`severity`, `kind`, `rules`, `detail`, `example`,
@@ -169,7 +171,7 @@ List<Map<String, String>> discount = decisions.evaluate("Discount", Map.of("coun
 | `TableLocations` | Finds DMN files by pattern on the class path (directories, jars, and a native image's resources) or the file system: `find(patterns, classLoader)`, `find(location, classLoader)`, `split("a,b")`, `Location.parse(pattern).matches(path)`. `TableLocations.DEFAULT` is the default pattern. |
 | `DecisionsLoader` | What a framework does with its settings: `new DecisionsLoader("praecepta", locations, failOn).load(finder, log)` reads `locations` (null for the default) and `fail-on`, finds the files with the framework's lookup (`finder`), loads them, fails with every problem worded as above, and logs what it loaded and the issues below `fail-on`. |
 | `TableSource` | A DMN file: where it is (for messages and reports) and how to open it. `TableSource.of(Path)`, `of(URL)`, `of(location, bytes)`. |
-| `Decisions` | The decisions by name: `Decisions.load(sources, failOn)`, `get(name)`, `find(name)`, `engine(name)`, `evaluate(name, input)`, `names()`, `all()`, `describe()`; `Decisions.failOn("ERROR")` reads a severity as the settings above do. Immutable and thread-safe. |
+| `Decisions` | The decisions by name: `Decisions.load(sources, failOn)`, `get(name)`, `find(name)`, `engine(name)`, `evaluate(name, input)`, `names()`, `all()`, `describe()`; `Decisions.failOn("ERROR")` reads a severity as the settings above do. Immutable and thread-safe. Each engine logs its validation report, as `PraeceptaEngine` does by default; `Decisions.load(sources, failOn, false)` builds them without, for a caller that reports `Decision.report()` itself (as `DecisionsLoader` does). |
 | `Decision` | One decision: its `name`, `location`, `table`, `engine` and validation `report`; `describe()` as plain maps. |
 | `DecisionsException` | Everything that went wrong while loading, as `problems()` (`<location>: <what>`), all at once. |
 
@@ -191,7 +193,8 @@ What the Maven and Gradle plugins do, and another tool should too:
   the configuration or the table, and for validation issues at `failOn`; the tool reports it as its build
   failure, unchanged.
 - Every other issue of `report()` is logged as a warning, prefixed with the class name
-  (`Fees: WARNING rule 3 can never be selected`).
+  (`Fees: WARNING rule 3 can never be selected`). The compiler does not log the report itself (its engine is
+  built with `logValidationReport(false)`), so each issue appears once.
 - Two tables that generate the same class are rejected: `Two tables generate the class <X>; set <name> on
   one`, with the tool's spelling of `name`.
 - Relative sources are resolved against the project directory, and the results go to the tool's

@@ -177,8 +177,10 @@ public final class TableCompiler {
                         .formatted(table.name(), table.aggregation(), table.outputs().getFirst().type().feelName()));
             }
         }
+        // the build tool logs the report's issues, one line each (CompiledTable.report()): the engine does not log it too
         var builder = PraeceptaEngine.<Object, PraeceptaOutput>builder()
                 .table(table)
+                .logValidationReport(false)
                 .output(new OutputStrategy<>() {
                     @Override
                     public PraeceptaOutput transform(PraeceptaOutput output) {

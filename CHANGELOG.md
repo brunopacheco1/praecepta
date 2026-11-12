@@ -16,6 +16,25 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   default, so `plugins { id("io.github.brunopacheco1.praecepta") version "..." }` needs no
   `pluginManagement` repository. The Portal serves the same jars and POM as Maven Central: the release
   uploads the files Maven built, fetched from Maven Central, and does not rebuild them with Gradle.
+- `PraeceptaEngine.Builder.logValidationReport(boolean)`: whether `build()` logs the validation report as a
+  warning through `System.Logger`, as it always did and still does by default. Turn it off when you report
+  `validationReport()` yourself ([#95](https://github.com/brunopacheco1/praecepta/issues/95)).
+  `praecepta-integration` gains `Decisions.load(sources, failOn, logReports)` and
+  `Decision.of(location, table, logReport)` to build its engines so; `Decisions.load(sources, failOn)` and
+  `Decision.of(location, table)` keep the engine's logging.
+
+### Fixed
+- **Validation issues were logged twice in the integrations**
+  ([#95](https://github.com/brunopacheco1/praecepta/issues/95)): the Spring Boot starter and the Micronaut
+  module logged each issue as a warning, one line per issue, and the engine logged the whole report again
+  through `System.Logger` (which Spring Boot routes to its own logging); the Quarkus extension logged the
+  issues at build time and its engines logged them again when the application started. `DecisionsLoader`,
+  which the three use, now builds the engines without their own logging, and Quarkus' runtime does too, so
+  each issue is logged once, by the framework's logger (in Quarkus, by the build). The engine that
+  `praecepta-compiler` validates a table with no longer logs either, since the Maven and Gradle plugins (and
+  Quarkus, for the tables it compiles) log `CompiledTable.report()` themselves; another build tool using
+  `TableCompiler` logs the report as [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) describes. The classes the
+  build plugins generate are unchanged: their engines still log the report when the application loads them.
 
 ## [0.5.0] - 2026-11-12
 

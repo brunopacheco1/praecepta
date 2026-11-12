@@ -182,7 +182,11 @@ tables, duplicate names, and validation issues at the configured severity. Maps 
 because a container finds its tables at runtime; typed records remain the build plugins' job. What each
 framework does with its settings, from `locations` and `fail-on` to the log lines, is one class,
 `DecisionsLoader`, given the framework's resource lookup and logger, so the three word their problems
-alike. Aggregations follow `AggregationOperator.check`, the engine's statement of where DMN defines them,
+alike. It logs each validation issue once, through the framework's logger, so the engines it builds do not
+log their reports themselves (`Decisions.load(sources, failOn, false)`, which builds them with
+`logValidationReport(false)`); nor does the engine `TableCompiler` validates with, as the build tools log
+its report. At startup, Quarkus builds its engines without logging either, since its build logged the
+issues. Aggregations follow `AggregationOperator.check`, the engine's statement of where DMN defines them,
 and compare values of the output's type (`FeelLiterals.value`, `FeelTemporals.compare`).
 
 The Spring Boot starter loads the tables while the context registers its bean definitions (an

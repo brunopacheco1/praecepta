@@ -100,7 +100,8 @@ public final class DecisionsLoader {
 
     /**
      * Finds and loads the tables, then logs how many decisions were loaded and every validation issue below
-     * {@code fail-on} as a warning.
+     * {@code fail-on} as a warning, once: the engines do not log their reports themselves
+     * ({@link Decisions#load(java.util.Collection, Severity, boolean)}).
      *
      * @throws DecisionsException listing every problem with the settings, the locations or the tables
      */
@@ -127,7 +128,8 @@ public final class DecisionsLoader {
 
         var decisions = Decisions.empty();
         try {
-            decisions = Decisions.load(sources.values(), severity);
+            // the issues are logged below, through the framework's logger, once each: not by the engines too
+            decisions = Decisions.load(sources.values(), severity, false);
         } catch (DecisionsException e) {
             problems.addAll(e.problems());
         }

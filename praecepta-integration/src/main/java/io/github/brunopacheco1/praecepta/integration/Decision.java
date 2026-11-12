@@ -61,13 +61,28 @@ public record Decision(String name, String location, DecisionTable table, Praece
     }
 
     /**
-     * Builds a table's map-based engine and validates it. Validation never fails here;
-     * {@link Decisions#load} decides what fails.
+     * Builds a table's map-based engine and validates it, the engine logging its validation report as
+     * {@code PraeceptaEngine} does by default. Validation never fails here; {@link Decisions#load} decides what
+     * fails.
      *
      * @throws IllegalArgumentException if the table cannot be built into an engine, such as an aggregation
      *                                  that DMN does not define for its outputs ({@link AggregationOperator#check})
      */
     public static Decision of(String location, DecisionTable table) {
+        return of(location, table, true);
+    }
+
+    /**
+     * Builds a table's map-based engine and validates it. Validation never fails here;
+     * {@link Decisions#load} decides what fails.
+     *
+     * @param logReport whether the engine logs its validation report
+     *                  ({@code PraeceptaEngine.Builder.logValidationReport}); false when the caller reports
+     *                  {@link #report()} itself, as {@link DecisionsLoader} does
+     * @throws IllegalArgumentException if the table cannot be built into an engine, such as an aggregation
+     *                                  that DMN does not define for its outputs ({@link AggregationOperator#check})
+     */
+    public static Decision of(String location, DecisionTable table, boolean logReport) {
         PraeceptaEngine<Map<String, String>, Map<String, String>> engine;
         try {
             if (table.aggregation() != null) {
@@ -77,6 +92,7 @@ public record Decision(String name, String location, DecisionTable table, Praece
                     .table(table)
                     .inputs(PraeceptaInput::new)
                     .output(new MapOutput(table.aggregation() == null ? null : table.outputs().getFirst()))
+                    .logValidationReport(logReport)
                     .build();
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("Table '%s': %s".formatted(table.name(), e.getMessage()), e);

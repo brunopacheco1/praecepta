@@ -230,6 +230,14 @@ class EngineMatchesReferencePropertiesTest {
                     .collect(Collectors.toSet());
             Assertions.assertThat(actual).as("policy %s", policy)
                     .containsExactlyInAnyOrderElementsOf(reference.expectedFindings(s.columns()));
+            // not logging the report (as the integrations build their engines) leaves it as it is
+            var quiet = PraeceptaEngine.<Map<String, Object>, PraeceptaOutput>builder()
+                    .table(s.table(rules, policy, priority))
+                    .output(output -> output)
+                    .logValidationReport(false);
+            configure(quiet, s, perColumn);
+            Assertions.assertThat(quiet.build().validationReport()).as("policy %s, not logged", policy)
+                    .isEqualTo(engine.validationReport());
         }
     }
 

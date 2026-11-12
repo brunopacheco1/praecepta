@@ -28,6 +28,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import javax.tools.ToolProvider;
 
@@ -668,6 +672,43 @@ class TableCompilerTest {
         Assertions.assertThat(options.failOn()).isEqualTo(Severity.ERROR);
         Assertions.assertThatThrownBy(() -> TableCompiler.compile(overlapping, options)).hasMessageContaining("overlap");
         Assertions.assertThat(TableCompiler.compile(overlapping, options.withFailOn(null)).report().issues()).isNotEmpty();
+    }
+
+    /** The build tool logs the report, one line per issue: the engine that validates the table does not log it too (#95). */
+    @Test
+    void compiling_leaves_logging_the_report_to_the_build_tool() {
+        var overlapping = new TableDefinition(table("overlapping.csv"), "Tier", null, HitPolicy.UNIQUE, null,
+                List.of(ColumnDefinition.of("country", ColumnType.STRING)), List.of(ColumnDefinition.of("tier", ColumnType.STRING)));
+        var logger = Logger.getLogger(PraeceptaEngine.class.getName());
+        var records = new ArrayList<LogRecord>();
+        var handler = new Handler() {
+            @Override
+            public void publish(LogRecord logRecord) {
+                records.add(logRecord);
+            }
+
+            @Override
+            public void flush() {
+                // nothing buffered
+            }
+
+            @Override
+            public void close() {
+                // nothing to release
+            }
+        };
+        // the build's test-logging.properties keeps the engine's warnings quiet: let them through to the handler
+        var level = logger.getLevel();
+        logger.setLevel(Level.ALL);
+        logger.addHandler(handler);
+        try {
+            var compiled = TableCompiler.compile(overlapping, CompilerOptions.of(PACKAGE, "test").withFailOn(null));
+            Assertions.assertThat(compiled.report().issues()).isNotEmpty();
+            Assertions.assertThat(records).isEmpty();
+        } finally {
+            logger.removeHandler(handler);
+            logger.setLevel(level);
+        }
     }
 
     @Test

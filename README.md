@@ -224,6 +224,10 @@ Notes:
 - An input matching several rules under `UNIQUE` (or rules with different outputs under `ANY`)
   throws `HitPolicyViolationException`.
 - `.failOn(Severity.ERROR)` makes `build()` reject tables whose validation report has errors.
+- `build()` logs a table's validation issues as one warning through `System.Logger` (by default
+  `java.util.logging`, logger `io.github.brunopacheco1.praecepta.engine.PraeceptaEngine`).
+  `.logValidationReport(false)` turns that off when you report `validationReport()` yourself, as the
+  framework integrations and the build plugins do.
 - `.inputs(order -> new PraeceptaInput(...))` binds all columns from a map instead of per column.
 - `.enumInput("country", Country.class, Order::country)` binds a column to an enum. Lookups then
   index an array by ordinal instead of hashing, and the enum's constants become the column's

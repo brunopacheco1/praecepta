@@ -220,7 +220,7 @@ public final class PraeceptaEngine<I, O> {
         // rules that test a list column match lists the index's classes cannot describe: the analysis leaves them out too
         var unseenRules = listRules(index);
         BitsetIndex.or(unseenRules, variableRules);
-        report = validate(index, rules, hitPolicy, unseenRules, numericOutputs, builder.failOn);
+        report = validate(index, rules, hitPolicy, unseenRules, numericOutputs, builder.failOn, builder.logValidationReport);
     }
 
     /** Starts configuring an engine. */
@@ -307,7 +307,10 @@ public final class PraeceptaEngine<I, O> {
         return inputs;
     }
 
-    /** Findings of the static analysis performed at build time. */
+    /**
+     * Findings of the static analysis performed at build time; {@link Builder#build()} also logs them, unless
+     * {@link Builder#logValidationReport(boolean)} turned that off.
+     */
     public ValidationReport validationReport() {
         return report;
     }
@@ -957,10 +960,10 @@ public final class PraeceptaEngine<I, O> {
 
     /**
      * Runs the static analysis, most severe findings first. Fails if a finding is at least as severe
-     * as {@code failOn}; otherwise logs the findings as a warning.
+     * as {@code failOn}; otherwise logs the findings as a warning, unless {@code log} is false.
      */
     private static ValidationReport validate(BitsetIndex index, List<Praeceptum> rules, HitPolicy hitPolicy, long[] variableRules,
-            Set<String> numericOutputs, Severity failOn) {
+            Set<String> numericOutputs, Severity failOn, boolean log) {
         var analysed = TableAnalysis.analyse(index, rules, hitPolicy, variableRules, output -> comparable(output, numericOutputs));
         var report = new ValidationReport(analysed.stream()
                 .sorted(Comparator.comparing(Issue::severity).reversed())
@@ -968,7 +971,7 @@ public final class PraeceptaEngine<I, O> {
         if (failOn != null && report.hasIssuesAtLeast(failOn)) {
             throw new InvalidDecisionTableException(report);
         }
-        if (!report.isEmpty()) {
+        if (log && !report.isEmpty()) {
             LOG.log(Level.WARNING, "Decision table has {0} validation issue(s):\n{1}", report.issues().size(), report);
         }
         return report;
@@ -988,6 +991,7 @@ public final class PraeceptaEngine<I, O> {
         private AggregationOperator aggregation;
         private List<Praeceptum> rules;
         private Severity failOn;
+        private boolean logValidationReport = true;
         private Masks.Form maskForm = Masks.Form.AUTO;
         /** The output when no rule matches, or null. */
         private PraeceptaOutput defaultOutput;
@@ -1313,6 +1317,18 @@ public final class PraeceptaEngine<I, O> {
         /** Fail {@link #build()} with an {@link InvalidDecisionTableException} if validation finds issues this severe. */
         public Builder<I, O> failOn(Severity severity) {
             this.failOn = Objects.requireNonNull(severity, "severity");
+            return this;
+        }
+
+        /**
+         * Whether {@link #build()} logs the validation report, if it has issues, as one warning through
+         * {@link System.Logger} (logger {@code io.github.brunopacheco1.praecepta.engine.PraeceptaEngine}).
+         * It does by default; turn it off when the caller reports {@link PraeceptaEngine#validationReport()}
+         * itself, as the framework integrations and the build plugins do, so that each issue is logged once.
+         * The report is the same either way, and {@link #failOn} still applies.
+         */
+        public Builder<I, O> logValidationReport(boolean log) {
+            this.logValidationReport = log;
             return this;
         }
 
