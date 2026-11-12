@@ -128,7 +128,9 @@ An engine is **immutable** once built: any number of threads may share it withou
   decision variable's, whose item type for a multi-hit table, and none for COUNT. A table's default output (`DecisionTable.defaultOutput`, from each output's
   `defaultOutputEntry`) is converted once when the engine is built and returned when no rule matches,
   before the hit policy or the aggregation is applied (DMN 1.5, 10.3.2.10), so it costs nothing at
-  evaluation; without one, no match gives no output under every aggregation, COUNT included.
+  evaluation; without one, no match gives no output under every aggregation, COUNT included. Each
+  `OutputColumn` says whether it declares a default (`hasDefault`), since a default of `null` must be told
+  from none: with several outputs, defaults that are all `null` still make a default output, of nulls.
   It uses the JDK's own XML parser (`DocumentBuilderFactory.newDefaultInstance()`, never one JAXP finds
   on the class path) with DTDs and external entities disabled. Anything it does not
   support (a time with a zone id, function calls, inputs computed by other decisions) is rejected

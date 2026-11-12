@@ -41,6 +41,11 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   no published module depends on JUnit. The parent now declares the JUnit artifacts the build uses
   (`junit-jupiter`, its `-api`, `-engine` and `-params`, and `junit-platform-commons`, `-engine` and
   `-launcher`) each at `junit.version`. Every module resolves the same JUnit as before.
+- `DecisionTable.OutputColumn` has a fifth component, `hasDefault`
+  ([#92](https://github.com/brunopacheco1/praecepta/issues/92)): whether the output declares a default value,
+  which tells a default of `null` from none. The constructor with four arguments remains and sets it when the
+  default value is not null; the canonical one rejects a default value without `hasDefault`. A record pattern
+  that deconstructs `OutputColumn` needs the new component.
 
 ### Fixed
 - **Validation issues were logged twice in the integrations**
@@ -54,6 +59,18 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   Quarkus, for the tables it compiles) log `CompiledTable.report()` themselves; another build tool using
   `TableCompiler` logs the report as [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) describes. The classes the
   build plugins generate are unchanged: their engines still log the report when the application loads them.
+- **A `null` default output value is a default** ([#92](https://github.com/brunopacheco1/praecepta/issues/92)):
+  `DmnReader` read `<defaultOutputEntry><text>null</text></defaultOutputEntry>` as no default, so a table with
+  several outputs whose declared defaults were all `null` gave no output when no rule matched. DMN 1.5 builds
+  the default output from the outputs' defaults, a context with an entry per output (10.3.2.10, step 2; Table
+  46), and gives null only when no default is specified. `DmnReader` now keeps a `null` default
+  (`OutputColumn.hasDefault`, see *Changed*), `DmnWriter` writes it back, and `DecisionTable.defaultOutput()`
+  is present when any output declares a default; the engine, the generated classes and the framework
+  integrations' map-based engine all take it from there. **This changes results** for tables that declare a
+  `null` default: where no rule matches, they now give an output whose values are null (`[{Status=null,
+  Rate=null}]` in the integrations, an output record with null components in a generated class, a present
+  `Optional` for a single-hit table or an aggregation, COUNT included) instead of none. A blank
+  `defaultOutputEntry` is still no default.
 - **SUM, MIN and MAX of a missing output are missing**
   ([#90](https://github.com/brunopacheco1/praecepta/issues/90)): a COLLECT aggregation skipped the matching
   rules whose output was missing (a `null` output entry, an output that names a missing input, an expression

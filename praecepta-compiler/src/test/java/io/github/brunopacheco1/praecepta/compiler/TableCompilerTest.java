@@ -198,6 +198,60 @@ class TableCompilerTest {
         }
     }
 
+    /**
+     * A default of {@code null} is a default (#92): with several outputs whose defaults are all {@code null}, no rule
+     * matching gives an output whose components are all null, a context of nulls in DMN (10.3.2.10, Table 46), in
+     * the generated class and in the map-based engine alike; the DMN resource the generated class reads keeps them.
+     */
+    @Test
+    void null_defaults_reach_the_generated_class_and_the_map_based_engine() throws Exception {
+        var dmn = out.resolve("null-defaults.dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="approval" name="approval"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="number"><text>score</text></inputExpression></input>
+                    <output name="status" typeRef="string"><defaultOutputEntry><text>null</text></defaultOutputEntry></output>
+                    <output name="rate" typeRef="number"><defaultOutputEntry><text>null</text></defaultOutputEntry></output>
+                    <rule><inputEntry><text>&gt;= 700</text></inputEntry>
+                      <outputEntry><text>"approved"</text></outputEntry><outputEntry><text>1.5</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var result = compile(new TableDefinition(dmn, "Approval", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.dmn())
+                .contains("<defaultOutputEntry id=\"output_default_0\"><text>null</text></defaultOutputEntry>")
+                .contains("<defaultOutputEntry id=\"output_default_1\"><text>null</text></defaultOutputEntry>");
+        Assertions.assertThat(result.sources().get("Approval"))
+                .contains("@return the selected output, or the table's default output if no rule matches");
+        var decision = Decision.of("approval", DmnReader.read(Files.newInputStream(dmn)));
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".ApprovalInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Approval").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(new BigDecimal(500))))
+                    .get().hasToString("ApprovalOutput[status=null, rate=null]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(new BigDecimal(800))))
+                    .get().hasToString("ApprovalOutput[status=approved, rate=1.5]");
+        }
+        var nulls = new HashMap<String, String>();
+        nulls.put("status", null);
+        nulls.put("rate", null);
+        Assertions.assertThat(decision.evaluate(Map.of("score", "500"))).containsExactly(nulls);
+
+        // without the defaults, no rule matching gives nothing
+        Files.writeString(dmn, Files.readString(dmn).replace("<defaultOutputEntry><text>null</text></defaultOutputEntry>", ""));
+        var none = compile(new TableDefinition(dmn, "Approval", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        Assertions.assertThat(none.dmn()).doesNotContain("defaultOutputEntry");
+        Assertions.assertThat(none.sources().get("Approval")).contains("@return the selected output, or empty if no rule matches");
+        try (var loader = compileAndLoad(none)) {
+            var input = loader.loadClass(PACKAGE + ".ApprovalInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Approval").getMethod("evaluate", input);
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, input.getDeclaredConstructors()[0].newInstance(new BigDecimal(500))))
+                    .isEmpty();
+        }
+        Assertions.assertThat(Decision.of("approval", DmnReader.read(Files.newInputStream(dmn))).evaluate(Map.of("score", "500"))).isEmpty();
+    }
+
     /** The default output is a COLLECT aggregation's result when no rule matches, COUNT's too (DMN 1.5, 10.3.2.10). */
     @ParameterizedTest
     @CsvSource({"SUM, 1234567890123456789012345678901235", "COUNT, 2", "MAX, 1234567890123456789012345678901234"})

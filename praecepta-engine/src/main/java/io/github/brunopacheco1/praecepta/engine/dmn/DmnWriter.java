@@ -42,7 +42,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * compare with, also gets an {@code inputData} element, which Drools needs to bind input values. An
  * input that holds lists is typed by a collection item definition (of an item type with its input
  * values, if it declares any), and a list column's cells are written with FEEL's list functions
- * ({@link #renderList}). An output's default value is written as its {@code defaultOutputEntry}.
+ * ({@link #renderList}). An output's default value is written as its {@code defaultOutputEntry}, {@code null}
+ * for an output whose default is {@code null} ({@link OutputColumn#hasDefault}).
  *
  * <p>The result is read back unchanged by {@link DmnReader}, and is evaluated identically by
  * Camunda 8 and Drools (checked by the benchmark module).
@@ -200,7 +201,7 @@ public final class DmnWriter {
     /** An output, with its value list and its default value ({@code defaultOutputEntry}), if it has them, in that order. */
     private static void output(StringBuilder xml, int c, OutputColumn output) {
         xml.append("      <output").append(idAndName("output_" + c, output.name())).append(typed(output.type()));
-        if (output.values().isEmpty() && output.defaultValue() == null) {
+        if (output.values().isEmpty() && !output.hasDefault()) {
             xml.append("/>\n");
             return;
         }
@@ -211,7 +212,7 @@ public final class DmnWriter {
                     .collect(Collectors.joining(", "));
             expression(xml, "outputValues", id("output_values_" + c), values);
         }
-        if (output.defaultValue() != null) {
+        if (output.hasDefault()) {
             var value = outputLiteral(output.defaultValue(), output.type(), "default output of '" + output.name() + "'");
             expression(xml, "defaultOutputEntry", id("output_default_" + c), value);
         }

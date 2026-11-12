@@ -74,9 +74,9 @@ integrations find their tables at runtime, so their engines take maps instead:
   `sum`, `min` and `max` are null for a list that holds null (10.3.4.4): the one map maps the output to null
   (`[{fee=null}]`), as the build plugins' generated classes give an output whose component is null; COUNT
   counts that rule. When no rule matches, a table whose outputs declare
-  default values (`defaultOutputEntry`) gives one map of them, null for an output without one, and any
-  other table no map, whatever its hit policy or aggregation (DMN 1.5, 10.3.2.10, step 2): a COUNT then
-  gives no map rather than `0`, as the generated classes give an empty `Optional`.
+  default values (`defaultOutputEntry`, `null` included) gives one map of them, null for an output without
+  one, and any other table no map, whatever its hit policy or aggregation (DMN 1.5, 10.3.2.10, step 2): a
+  COUNT then gives no map rather than `0`, as the generated classes give an empty `Optional`.
 - **Validation** is that of the map-based engine. Times and date-times read from text may have a time zone
   or not, so gaps are looked for among both kinds.
 - **Generated classes are not beans.** They are static and need no container; declare one as a bean

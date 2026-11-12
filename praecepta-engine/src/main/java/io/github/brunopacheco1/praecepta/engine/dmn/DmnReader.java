@@ -60,7 +60,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * named inputs whose {@code inputData} is such a collection (see {@link DecisionTable#listInputs}); input
  * entries in Praecepta's FEEL subset (lists, {@code not(...)}, {@code null}, comparisons, intervals, {@code -}); input and output value
  * lists; outputs' default values ({@code defaultOutputEntry}, see {@link DecisionTable#defaultOutput}) that are
- * literals; output entries that are literals or name one of the table's inputs (of the output's type, or
+ * literals, {@code null} included ({@link DecisionTable.OutputColumn#hasDefault}); output entries that are
+ * literals or name one of the table's inputs (of the output's type, or
  * any input for a string output; an input is a column or an input the cells compare with, and holds single
  * values), or that join string and number literals and the table's inputs with
  * {@code +}, {@code -}, {@code *}, {@code /} and {@code **} ({@link OutputExpression}, kept as written in
@@ -316,7 +317,10 @@ public final class DmnReader {
                     .orElseThrow(() -> new InvalidDecisionTableException(outputWhere + ": the output value list must be a list of values"))
                     .stream().map(FeelLiterals::text).toList();
         }
-        return new OutputColumn(column, type, values, defaultValue(output, type, values, outputWhere));
+        var defaultValue = defaultValue(output, type, values, outputWhere);
+        return defaultValue == null
+                ? new OutputColumn(column, type, values)
+                : new OutputColumn(column, type, values, defaultValue.text(), true);
     }
 
     /**
@@ -350,15 +354,17 @@ public final class DmnReader {
 
     /**
      * An output's default value ({@code defaultOutputEntry}), the value when no rule matches, as plain text like
-     * a literal output entry; null if it has none, or if it is {@code null}, which is what having none gives
-     * (DMN 1.5, 10.3.2.10). It must be a literal of the output's type: a default that names an input or
-     * computes a value is rejected, since the engine gives the default without evaluating anything. When the output
-     * has a value list, the default must be one of its values (DMN 1.5, Table 46: "The default output value is one of
-     * the output values").
+     * a literal output entry, whose text is null for a default of {@code null}; null if the output has none (no
+     * {@code defaultOutputEntry}, or a blank one). A {@code null} default is a default: in a table with several
+     * outputs, the default output is then a context with that output null (DMN 1.5, 10.3.2.10 and Table 46), where
+     * a table whose outputs have no default gives null. It must be a literal of the output's type: a default that
+     * names an input or computes a value is rejected, since the engine gives the default without evaluating
+     * anything. When the output has a value list, a default other than {@code null} must be one of its values (DMN
+     * 1.5, Table 46: "The default output value is one of the output values").
      *
      * @param values the output's value list, as plain text; empty if it has none
      */
-    private static String defaultValue(Element output, ColumnType type, List<String> values, String where) {
+    private static LiteralOutput defaultValue(Element output, ColumnType type, List<String> values, String where) {
         var text = nonBlankText(output, "defaultOutputEntry");
         if (text == null) {
             return null;
@@ -372,7 +378,7 @@ public final class DmnReader {
             throw new InvalidDecisionTableException("%s: default output '%s' is not in its output values %s"
                     .formatted(where, text.strip(), values));
         }
-        return literal.text();
+        return literal;
     }
 
     /** Whether two values of an output, as plain text, are the same: numbers by value ({@code 1.50} is {@code 1.5}). */

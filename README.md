@@ -308,7 +308,9 @@ Supported:
 - **Default output values** (`defaultOutputEntry`, literals of the output's type, and one of its output
   values when it lists them), which are the result when no rule matches, whatever the hit policy or
   aggregation (`[{Status=Declined, Rate=null}]` rather than `[]`; an output without a default is null in
-  it). `Builder.defaultOutput(...)` gives a table built in code the same.
+  it). A default of `null` is a default too: a table whose outputs all default to `null` gives
+  `[{Status=null, Rate=null}]`, and one whose outputs declare no default gives `[]` (DMN 1.5, 10.3.2.10).
+  `Builder.defaultOutput(...)` gives a table built in code the same.
 - **A single output typed by its decision**: DMN 1.5 says the output clause of a single-output table has
   no `typeRef` of its own (Table 34), so its type is the decision table's `typeRef`, or else the decision
   variable's (the item type of a list for a multi-hit table; nothing for COUNT, whose result is a number).

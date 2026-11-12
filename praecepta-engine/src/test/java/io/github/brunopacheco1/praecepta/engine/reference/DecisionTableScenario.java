@@ -17,6 +17,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -78,12 +79,14 @@ import net.jqwik.api.Tuple;
  * {@code "a"}, a value a string input may also have.
  *
  * <p>Half of the scenarios declare default output values ({@link #defaults}) for some of those outputs,
- * which the table returns when no rule matches.
+ * which the table returns when no rule matches; a declared default may be {@code null}, so that now and then
+ * every declared default is null.
  *
  * @param zonedColumns the time and date-time columns whose inputs have a time zone
  * @param lists        the columns that hold lists
  * @param maskForm     the form the engine stores its masks in
- * @param defaults     the default value of each output that has one (DMN's {@code defaultOutputEntry}); empty for none
+ * @param defaults     the default value of each output that has one (DMN's {@code defaultOutputEntry}), null for a
+ *                     default of {@code null}; empty for none
  */
 public record DecisionTableScenario(List<String> columns, Map<String, ColumnType> types, Map<String, String> allowedValues,
         List<Praeceptum> rules, List<Map<String, Object>> inputs, boolean feelCells, Set<String> zonedColumns,
@@ -237,9 +240,9 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         return new DecisionTable("scenario", policy, null, inputColumns, outputs, tableRules, feelCells, lists);
     }
 
-    /** An output column with its value list and its default value, if the scenario gives it one. */
+    /** An output column with its value list and its default value, if the scenario gives it one ({@code null} included). */
     public DecisionTable.OutputColumn output(String name, ColumnType type, List<String> values) {
-        return new DecisionTable.OutputColumn(name, type, values, defaults.get(name));
+        return new DecisionTable.OutputColumn(name, type, values, defaults.get(name), defaults.containsKey(name));
     }
 
     /**
@@ -255,23 +258,27 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
         return new PraeceptaOutput(values);
     }
 
-    /** No default output one time in two; otherwise one for some of the outputs. */
+    /**
+     * No default output one time in two; otherwise one for some of the outputs, each of which may be {@code null}
+     * (#92): the outputs id, out, n and echo each take a digit in base 3 of {@code outputs}, 0 for no default, 1 for
+     * a value and 2 for {@code null}.
+     */
     private static Arbitrary<Map<String, String>> defaultValues() {
-        var some = Combinators.combine(Arbitraries.integers().between(1, 15), Arbitraries.of(OUT_VALUES)).as((outputs, out) -> {
+        var some = Combinators.combine(Arbitraries.integers().between(1, 80), Arbitraries.of(OUT_VALUES)).as((outputs, out) -> {
             var defaults = new HashMap<String, String>();
-            if ((outputs & 1) != 0) {
-                defaults.put(ID, "0");
+            var names = List.of(ID, OUT, NUMBER, ECHO);
+            var values = List.of("0", out, "1.50", "none");
+            int digits = outputs;
+            for (int i = 0; i < names.size(); i++, digits /= 3) {
+                switch (digits % 3) {
+                    case 1 -> defaults.put(names.get(i), values.get(i));
+                    case 2 -> defaults.put(names.get(i), null);
+                    default -> {
+                        // no default
+                    }
+                }
             }
-            if ((outputs & 2) != 0) {
-                defaults.put(OUT, out);
-            }
-            if ((outputs & 4) != 0) {
-                defaults.put(NUMBER, "1.50");
-            }
-            if ((outputs & 8) != 0) {
-                defaults.put(ECHO, "none");
-            }
-            return Map.copyOf(defaults);
+            return Collections.unmodifiableMap(defaults);
         });
         return Arbitraries.oneOf(Arbitraries.just(Map.<String, String>of()), some);
     }
