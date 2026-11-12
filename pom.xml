@@ -12,7 +12,7 @@
     <groupId>io.github.brunopacheco1</groupId>
     <artifactId>praecepta</artifactId>
     <packaging>pom</packaging>
-    <version>0.5.0-SNAPSHOT</version>
+    <version>0.6.0-SNAPSHOT</version>
     <name>praecepta</name>
     <description>DMN decision tables for Java: strict hit policies, bitset matching, build-time validation.</description>
     <url>https://github.com/brunopacheco1/praecepta</url>
@@ -48,7 +48,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <!-- reproducible builds: fixed timestamps in every archive; the release process updates it -->
-        <project.build.outputTimestamp>2026-11-11T21:47:38Z</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2026-11-12T17:20:56Z</project.build.outputTimestamp>
         <java.version>21</java.version>
         <maven.compiler.release>${java.version}</maven.compiler.release>
 
