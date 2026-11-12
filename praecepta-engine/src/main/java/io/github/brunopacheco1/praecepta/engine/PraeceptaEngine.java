@@ -438,21 +438,6 @@ public final class PraeceptaEngine<I, O> {
         }
     }
 
-    /** The rules (bits) whose cell in a column that holds lists is not "any value". */
-    private static long[] listRules(BitsetIndex index) {
-        var rules = new long[index.words()];
-        var all = index.allRules();
-        for (int c = 0; c < index.columnCount(); c++) {
-            var column = index.column(c);
-            if (column.holdsLists()) {
-                var constrained = all.clone();
-                BitsetIndex.andNot(constrained, column.rulesAcceptingAnyList());
-                BitsetIndex.or(rules, constrained);
-            }
-        }
-        return rules;
-    }
-
     /** The variable cells by bit, with columns as positions in the evaluation order; null for rules without any. */
     private static VariableCell[][] variableCellsByBit(Map<Integer, Map<String, UnaryTests>> byRule, int[] bitToRule,
             List<String> evaluationOrder) {
@@ -1023,10 +1008,8 @@ public final class PraeceptaEngine<I, O> {
                 TableAnalysis.analyse(index, rules, hitPolicy, variableRules, output -> comparable(output, numericOutputs)));
         if (hasDefaultOutput) {
             // DMN 1.5, 10.3.2.10: "A complete decision table SHALL NOT specify a default output value"
-            // the completeness search sees single-value classes only: rules that test a list column are left out
             var seen = index.allRules();
             BitsetIndex.andNot(seen, variableRules);
-            BitsetIndex.andNot(seen, listRules(index));
             if (Completeness.isComplete(index, seen)) {
                 analysed.add(new Issue(ValidationReport.Kind.UNREACHABLE_DEFAULT_OUTPUT, List.of()));
             }

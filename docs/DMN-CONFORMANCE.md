@@ -30,6 +30,8 @@ settled stays here, marked as such, with the release that settled it.
 | 6 | [COUNT when no rule matches](#6-count-when-no-rule-matches) | settled in 0.5.0 |
 | 7 | [A `null` default output value beside output values](#7-a-null-default-output-value-beside-output-values) | open |
 | 8 | [A complete table, and missing inputs](#8-a-complete-table-and-missing-inputs) | open |
+| 9 | [A time with a zone id against a time in another zone, at an offset or without a zone](#9-a-time-with-a-zone-id-against-a-time-in-another-zone-at-an-offset-or-without-a-zone) | open |
+| 10 | [The difference of two times in different zones, or one with a zone and one without](#10-the-difference-of-two-times-in-different-zones-or-one-with-a-zone-and-one-without) | open |
 
 How Praecepta returns DMN's null result, which is a choice of representation rather than of semantics,
 is [at the end](#how-a-null-result-is-returned).
@@ -110,7 +112,34 @@ integrations alike.
   value counts as an input in every column, as the engine accepts one (case 2) and `-` matches it (case 1).
   So a table is reported as complete (`UNREACHABLE_DEFAULT_OUTPUT`, an ERROR) only when its default can
   really never be given: a table whose rules cover every declared value but not a missing one is not
-  reported, since its default is what a missing input gives.
+  reported, since its default is what a missing input gives. For the same reason the search counts every
+  list a list column takes (a missing list, the empty list and lists holding missing elements), and a time
+  with a zone id where map-based inputs or a list take one though no cell names one (case 9).
+
+## 9. A time with a zone id against a time in another zone, at an offset or without a zone
+- **DMN 1.5.** 10.3.4.1 lets a time name a zone id (`time("10:30:00@Europe/Paris")`), which has no offset
+  without a date. Neither 10.3.2.3.4 nor Tables 53 and 54 say how such a time compares with one in another
+  zone, with one at an offset, or with one without a zone.
+- **TCK.** `0068-feel-equality` compares two times in the same zone, and leaves the other cases out
+  "pending RTF equality comparisons with zones clarification".
+- **Praecepta (since 0.6.0, [#82](https://github.com/brunopacheco1/praecepta/issues/82)).** Two times in the
+  same zone compare by local time. Any other comparison of a time with a zone id is taken as one FEEL does not
+  define, which is null (10.3.2.2): neither a test nor its `not(...)` matches, an interval's ends must be in
+  one zone, and a COLLECT MIN or MAX over such times in two zones fails with an `IllegalArgumentException`.
+  A column of map-based inputs whose cells name no zone id still takes such a time, which only the cells that
+  accept any value match; the analyses of overlaps, unreachable rules and gaps leave it out, the completeness
+  search (case 8) does not.
+
+## 10. The difference of two times in different zones, or one with a zone and one without
+- **DMN 1.5.** Table 57 defines `e1 - e2` of two times as the difference of their values (10.3.2.3.4), which
+  says nothing of offsets or zone ids (case 5); for date-times it makes the subtraction undefined where only
+  one has a zone, but it does not say so for times.
+- **TCK.** `0100-arithmetic` subtracts times without a zone, at one offset, and in one zone id
+  (`@"10:10:10@Australia/Melbourne" - @"11:10:10@Australia/Melbourne"`), and no others.
+- **Praecepta (since 0.6.0, [#85](https://github.com/brunopacheco1/praecepta/issues/85)).** Times subtract as
+  they compare (cases 4, 5 and 9): by instant when both have an offset, by local time when one has none or
+  both have a zone id in one zone, and the result is null for a time with a zone id and any time not in its
+  zone.
 
 ## How a null result is returned
 DMN 1.5 gives a decision table one result, which may be null; Praecepta's engine returns a list of

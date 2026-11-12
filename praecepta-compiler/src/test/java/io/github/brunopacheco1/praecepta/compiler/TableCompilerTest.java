@@ -359,6 +359,56 @@ class TableCompilerTest {
         Assertions.assertThat(decision.evaluate(Map.of("zone", "islands", "extra", "1"))).containsExactly(Map.of("total", withExtra));
     }
 
+    /**
+     * The 0.6 features together in generated code, as in the map-based engine: output expressions over a date (#85),
+     * one of which has no result on 31 January, a {@code null} default output (#92), and cells with an at-literal and
+     * comments (#81). The generated code aggregates numbers only, so the MIN of such dates (#90) is checked in the
+     * map-based engine's tests.
+     */
+    @Test
+    void generated_code_computes_dates_and_gives_a_null_default_as_the_map_based_engine() throws Exception {
+        var dmn = out.resolve("due.dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="due" name="due"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="date"><text>sent</text></inputExpression></input>
+                    <input><inputExpression typeRef="string"><text>service</text></inputExpression></input>
+                    <output name="due" typeRef="date"><defaultOutputEntry><text>null</text></defaultOutputEntry></output>
+                    <rule><inputEntry><text>&gt;= @"2025-01-01" // this year</text></inputEntry><inputEntry><text>"express"</text></inputEntry>
+                      <outputEntry><text>sent + @"P1M" /* a month later, if that day exists */</text></outputEntry></rule>
+                    <rule><inputEntry><text>-</text></inputEntry><inputEntry><text>"standard", "express"</text></inputEntry>
+                      <outputEntry><text>sent + duration("P14D")</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var result = compile(new TableDefinition(dmn, "Due", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        var decision = Decision.of("due", DmnReader.read(Files.newInputStream(dmn)));
+        var cases = new String[][] {
+            {"2025-01-10", "express", "2025-02-10"},
+            {"2025-01-31", "express", null}, // no 31 February: FEEL gives null
+            {"2025-01-31", "standard", "2025-02-14"},
+            {"2024-12-31", "express", "2025-01-14"},
+            {"2025-01-10", "economy", null}, // no rule: the null default
+            {null, "standard", null},
+        };
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".DueInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Due").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            for (var row : cases) {
+                var sent = row[0] == null ? null : LocalDate.parse(row[0]);
+                Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(sent, row[1])))
+                        .as("%s", Arrays.toString(row))
+                        .get().hasToString("DueOutput[due=" + row[2] + "]");
+                var values = new HashMap<String, String>();
+                values.put("sent", row[0]);
+                values.put("service", row[1]);
+                var expected = new HashMap<String, String>();
+                expected.put("due", row[2]);
+                Assertions.assertThat(decision.evaluate(values)).as("%s", Arrays.toString(row)).containsExactly(expected);
+            }
+        }
+    }
+
     /** A COLLECT table aggregating one number output whose default is 9.90; on the islands, two rules sum to 35 digits. */
     private Path totals(String aggregation) throws IOException {
         var dmn = out.resolve("totals-" + aggregation + ".dmn");

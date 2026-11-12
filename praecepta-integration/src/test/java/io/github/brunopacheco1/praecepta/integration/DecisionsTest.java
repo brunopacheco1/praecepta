@@ -485,6 +485,83 @@ class DecisionsTest {
         return text.replace("&", "&amp;").replace("<", "&lt;");
     }
 
+    /**
+     * The 0.6 features together in the map-based engine: an output expression over a date (#85), whose missing
+     * result makes the MIN missing (#90), a {@code null} default output (#92), and cells with at-literals and
+     * comments (#81).
+     */
+    static final String DUE = """
+            <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+              <decision id="due" name="Due"><decisionTable hitPolicy="COLLECT" aggregation="MIN">
+                <input><inputExpression typeRef="date"><text>sent</text></inputExpression></input>
+                <input><inputExpression typeRef="string"><text>service</text></inputExpression></input>
+                <output name="due" typeRef="date"><defaultOutputEntry><text>null</text></defaultOutputEntry></output>
+                <rule><inputEntry><text>&gt;= @"2025-01-01" // this year</text></inputEntry><inputEntry><text>"express", "standard"</text></inputEntry>
+                  <outputEntry><text>sent + duration("P14D")</text></outputEntry></rule>
+                <rule><inputEntry><text>-</text></inputEntry><inputEntry><text>"express"</text></inputEntry>
+                  <outputEntry><text>sent + @"P1M" /* a month later, if that day exists */</text></outputEntry></rule>
+              </decisionTable></decision>
+            </definitions>""";
+
+    @ParameterizedTest
+    @CsvSource(nullValues = "null", value = {
+            // sent, service: the rules' dates -> the earliest
+            "2025-01-10, standard, 2025-01-24",
+            "2025-01-10, express,  2025-01-24",        // 2025-01-24 and 2025-02-10
+            "2025-01-20, express,  2025-02-03",        // 2025-02-03 and 2025-02-20
+            "2025-01-31, express,  null",              // 2025-02-14 and no 31 February: FEEL's min([..., null]) is null
+            "2024-12-31, standard, null",              // no rule: the default, null
+            "2024-12-31, express,  2025-01-31",        // the second rule alone
+            "null,       express,  null",              // a missing date: both outputs missing
+    })
+    void temporal_output_expressions_aggregate_with_missing_results_and_a_null_default(String sent, String service, String due) {
+        var engine = Decision.of("due", DmnReader.read(stream(DUE))).engine();
+        var input = new HashMap<String, String>();
+        input.put("sent", sent);
+        input.put("service", service);
+        var expected = new HashMap<String, String>();
+        expected.put("due", due);
+        Assertions.assertThat(engine.evaluate(input)).containsExactly(expected);
+    }
+
+    /** A list of dates whose rules test it with the new literal forms (#81), and one asks for a missing element (#84). */
+    @Test
+    void list_cells_with_the_new_literal_forms_and_a_missing_element_test_text_lists() {
+        var engine = Decision.of("due", DmnReader.read(stream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <itemDefinition name="tDates" isCollection="true"><typeRef>date</typeRef></itemDefinition>
+                  <decision id="due" name="Due"><decisionTable hitPolicy="COLLECT">
+                    <input><inputExpression typeRef="tDates"><text>due dates</text></inputExpression></input>
+                    <output name="id" typeRef="string"/>
+                    <rule><inputEntry><text>list contains(?, @"2025-01-31")</text></inputEntry><outputEntry><text>"january"</text></outputEntry></rule>
+                    <rule><inputEntry><text>some x in ? satisfies x != date(2025, 1, 31) // any other</text></inputEntry>
+                      <outputEntry><text>"other"</text></outputEntry></rule>
+                    <rule><inputEntry><text>list contains(?, null)</text></inputEntry><outputEntry><text>"missing"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>"""))).engine();
+        Assertions.assertThat(engine.evaluate(Map.of("due dates", "[2025-01-31]"))).containsExactly(Map.of("id", "january"));
+        Assertions.assertThat(engine.evaluate(Map.of("due dates", "[2025-01-31, null]")))
+                .containsExactly(Map.of("id", "january"), Map.of("id", "other"), Map.of("id", "missing"));
+        Assertions.assertThat(engine.evaluate(Map.of("due dates", "[]"))).isEmpty();
+    }
+
+    /** The completeness search of #91 sees list columns (#78): a list table that every list matches has no use for a default. */
+    @Test
+    void a_list_table_that_every_list_matches_reports_its_default_output() {
+        var table = DmnReader.read(stream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <itemDefinition name="tStrings" isCollection="true"><typeRef>string</typeRef></itemDefinition>
+                  <decision id="offer" name="Offer"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="tStrings"><text>nationalities</text></inputExpression></input>
+                    <output name="offer" typeRef="string"><defaultOutputEntry><text>"none"</text></defaultOutputEntry></output>
+                    <rule><inputEntry><text>list contains(?, "PT")</text></inputEntry><outputEntry><text>"local"</text></outputEntry></rule>
+                    <rule><inputEntry><text>not(list contains(?, "PT"))</text></inputEntry><outputEntry><text>"abroad"</text></outputEntry></rule>
+                    <rule><inputEntry><text>? = null</text></inputEntry><outputEntry><text>"unknown"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>"""));
+        Assertions.assertThat(Decision.of("offer", table).describe().get("issues").toString()).contains("UNREACHABLE_DEFAULT_OUTPUT");
+    }
+
     private static InputStream stream(String dmn) {
         return new ByteArrayInputStream(dmn.getBytes(StandardCharsets.UTF_8));
     }

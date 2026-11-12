@@ -801,6 +801,15 @@ final class ColumnIndex {
         return lists != null ? lists.elements().groupsOtherValues() : otherMask != null;
     }
 
+    /**
+     * The mask of a valid time with a zone id in a column whose inputs may have one though its cells name none, which
+     * is no class (the other analyses leave such times out, so that tables without zone ids keep their reports); null
+     * if the column has no such inputs, or its declared input values do not allow them. {@link Completeness} visits it.
+     */
+    long[] hiddenZoneIdMask() {
+        return hiddenZoneIdMask != null && (!hasAllowedValues || hiddenZoneIdAllowed) ? hiddenZoneIdMask : null;
+    }
+
     /** Whether a valid input can fall in the class: it holds some value and the declared input values allow it. */
     boolean canOccur(int valueClass) {
         return !empty[valueClass] && allowed[valueClass];

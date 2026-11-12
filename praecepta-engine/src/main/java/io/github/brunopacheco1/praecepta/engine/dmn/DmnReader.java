@@ -598,7 +598,7 @@ public final class DmnReader {
      */
     private static LiteralOutput literalOutput(String text, ColumnType type) {
         var literal = text.strip();
-        if (literal.isEmpty() || literal.equals("null")) {
+        if (literal.isEmpty() || literal.equals("null") || isNull(literal, type)) {
             return new LiteralOutput(null);
         }
         var types = type == ColumnType.STRING && !literal.startsWith("\"") ? UNQUOTED_OUTPUT_TYPES : List.of(type);
@@ -609,6 +609,15 @@ public final class DmnReader {
             }
         }
         return null;
+    }
+
+    /** Whether an entry is FEEL's {@code null} with comments around it, as {@code null // no fee}. */
+    private static boolean isNull(String literal, ColumnType type) {
+        try {
+            return CellParser.parseFeel(literal, type) instanceof UnaryTests.Positive(var tests) && tests.equals(List.of(new UnaryTests.NullTest()));
+        } catch (CellSyntaxException e) {
+            return false;
+        }
     }
 
     /** The value of an entry that is a single literal of the type (no list, comparison or name). */

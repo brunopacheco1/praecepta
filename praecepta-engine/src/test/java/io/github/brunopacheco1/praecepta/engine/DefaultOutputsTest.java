@@ -134,6 +134,15 @@ class DefaultOutputsTest {
         Assertions.assertThat(mapEngine(blank).evaluate(Map.of("score", "500"))).isEmpty();
     }
 
+    /** A {@code null} default may carry FEEL comments (#81 with #92), as any other literal may. */
+    @Test
+    void a_null_default_with_a_comment_is_a_null_default() {
+        var table = read(FEES.formatted("SUM", "null // no fee /* yet */"));
+        Assertions.assertThat(table.outputs().getFirst()).isEqualTo(new OutputColumn("Fee", ColumnType.NUMBER, List.of(), null, true));
+        Assertions.assertThat(mapEngine(table).evaluate(Map.of("score", "500"))).containsExactly(values("Fee", null));
+        Assertions.assertThat(read(FEES.formatted("SUM", "/* none */ 0")).outputs().getFirst().defaultValue()).isEqualTo("0");
+    }
+
     /**
      * DMN 1.5, 10.3.2.10, step 2, with several outputs: the default is a context of the outputs' defaults (Table 46),
      * null for an output without one. When every output declares {@code null}, the result is that context, all null;

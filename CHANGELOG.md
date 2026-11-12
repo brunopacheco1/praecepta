@@ -30,8 +30,13 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   index's classes, like the other analyses, that unlike the gap search also visits a missing value in every
   column (which the engine accepts, and `-` matches) and the strings no rule mentions in a column without
   declared values. So a table whose rules cover every declared value but not a missing one is not reported:
-  its default is what a missing input gives. Rules that compare with another input or test a list are left
-  out, as from the other analyses, so a table complete only through them is not reported. Its message is
+  its default is what a missing input gives. A list column is searched as every list it takes, a missing one,
+  the empty one and lists holding missing elements included (with the list analysis of
+  [#78](https://github.com/brunopacheco1/praecepta/issues/78)), and a time column of map-based inputs, or of
+  lists, whose cells name no zone id as every time it takes, one with a zone id
+  ([#82](https://github.com/brunopacheco1/praecepta/issues/82)) included, which only the cells that accept any
+  value match. Rules that compare with another input are left out, as from the other analyses, so a table
+  complete only through them is not reported. Its message is
   `ERROR every input matches a rule, so the default output is never given (a complete table declares no
   default output: DMN 1.5, 10.3.2.10)`, and `Decisions.describe()` shows it with the kind
   `UNREACHABLE_DEFAULT_OUTPUT`. The TCK's tables with default outputs are not complete, so its results are
@@ -99,7 +104,8 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   written with its time.
 - **Comments** ([#81](https://github.com/brunopacheco1/praecepta/issues/81)): `//` to the end of the line and
   `/* ... */`, which DMN 1.5 allows in FEEL (10.3.1.2: "Java-style comments can be used"), are ignored outside
-  string literals, in cells, value lists, DMN entries and output expressions (`< 18 // minors`). In
+  string literals, in cells, value lists, DMN entries, default output values (`null // no fee` is a `null`
+  default, [#92](https://github.com/brunopacheco1/praecepta/issues/92)) and output expressions (`< 18 // minors`). In
   Praecepta's syntax (Excel, CSV and code), a string column keeps them as text, as it always has, since an
   unquoted word there may hold `//` (a URL). `DmnWriter` leaves them out.
 - **Times with a zone id** ([#82](https://github.com/brunopacheco1/praecepta/issues/82)): a time may name a zone
@@ -133,7 +139,7 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   date and time counts as UTC midnight (10.3.2.3.5), as the DMN TCK's `0100-arithmetic` expects. Times subtract
   as they compare: by instant when both have an offset, by local time when one has none or both have a zone id
   in one zone, and not at all for a time with a zone id and any other; DMN 1.5 leaves those cases open, so they
-  belong with [#86](https://github.com/brunopacheco1/praecepta/issues/86). Types FEEL does not combine
+  are recorded in [DMN conformance](docs/DMN-CONFORMANCE.md). Types FEEL does not combine
   (`due + 1`, `elapsed + tenure`) are still rejected when the engine is built, now naming both types
   (`+ combines a date and a number, which gives null in FEEL`). The engine, the classes the build plugins
   generate (which evaluate through it), `praecepta-integration`'s map engines and `DmnWriter`, which writes the

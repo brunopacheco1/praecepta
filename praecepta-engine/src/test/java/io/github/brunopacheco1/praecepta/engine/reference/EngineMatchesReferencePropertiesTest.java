@@ -318,8 +318,28 @@ class EngineMatchesReferencePropertiesTest {
         assertUnreachableDefaultMatchesCompleteness(s, catchAll, perColumn);
     }
 
+    /**
+     * As {@link #a_default_output_is_reported_unreachable_exactly_when_every_input_matches_a_rule}, with three rules that
+     * split a column by a cell, its opposite and {@code null}: complete unless some value leaves the cell unknown, as a
+     * list holding a missing element does.
+     */
+    @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void a_default_output_after_a_three_way_split_is_reported_unreachable_exactly_when_it_is_complete(
+            @ForAll("scenarios") DecisionTableScenario s, @ForAll boolean perColumn) {
+        assertUnreachableDefaultMatchesCompleteness(s, s.withThreeWaySplit(s.rules()), perColumn);
+    }
+
+    @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void a_temporal_tables_default_output_after_a_three_way_split_is_reported_unreachable_exactly_when_it_is_complete(
+            @ForAll("temporalScenarios") DecisionTableScenario s, @ForAll boolean perColumn) {
+        assertUnreachableDefaultMatchesCompleteness(s, s.withThreeWaySplit(s.rules()), perColumn);
+    }
+
     private static void assertUnreachableDefaultMatchesCompleteness(DecisionTableScenario s, boolean catchAll, boolean perColumn) {
-        var rules = catchAll ? s.withCatchAll(s.rules()) : s.rules();
+        assertUnreachableDefaultMatchesCompleteness(s, catchAll ? s.withCatchAll(s.rules()) : s.rules(), perColumn);
+    }
+
+    private static void assertUnreachableDefaultMatchesCompleteness(DecisionTableScenario s, List<Praeceptum> rules, boolean perColumn) {
         var engine = engine(s, rules, HitPolicy.COLLECT, List.of(), perColumn);
         var reference = s.reference(rules, HitPolicy.COLLECT, Map.of(), perColumn);
         var reported = engine.validationReport().issues(Kind.UNREACHABLE_DEFAULT_OUTPUT);

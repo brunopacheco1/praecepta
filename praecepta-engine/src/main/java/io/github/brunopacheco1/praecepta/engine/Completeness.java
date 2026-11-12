@@ -23,7 +23,15 @@ import java.util.Set;
  * values ({@code -} matches it, and so does {@code null}): a table whose rules cover every declared value but not a
  * missing one still gives its default for a missing input. And it visits the class of strings no rule mentions in a
  * string column without declared values, since such a string is an input too. Every class an input can fall in is
- * visited ({@link ColumnIndex#canOccur}), so the search is exact over the rules it is given.
+ * visited ({@link ColumnIndex#canOccur}), and so is a time with a zone id in a column of map-based inputs whose cells
+ * name none, which the other analyses leave out ({@link ColumnIndex#hiddenZoneIdMask}: only the cells that accept any
+ * value match it), so the search is exact over the rules it is given.
+ *
+ * <p>A column that holds lists is searched as the sets of rules its lists can match ({@link ListAnalysis#everyOutcome}):
+ * every list, a missing one, the empty one and ones holding missing elements included, of which only the minimal sets
+ * under inclusion need searching, since fewer rules left only make an input that matches none easier to find. A list
+ * matching none of the rules left makes the table incomplete. Past {@link ListAnalysis#MAX_OUTCOMES} sets the search
+ * gives up and the table counts as incomplete, so a table is never reported complete wrongly.
  *
  * <p>The search fixes one class per column, keeping the rules that accept every class fixed so far; it stops as
  * soon as no rule is left (an input that matches none) or one rule accepts every class of the columns left. Classes
@@ -34,6 +42,8 @@ final class Completeness {
 
     /** Per column, the masks of the classes an input can fall in, a missing value's included; one per distinct mask. */
     private final long[][][] classMasks;
+    /** Per column, its analysis if it holds lists (its {@link #classMasks} are then null); else null. */
+    private final ListAnalysis[] lists;
     /**
      * Per column, the rules that accept every class of that column and the columns after it, so that "some rule
      * covers what is left" is one intersection. {@code coversRest[columns]} is all rules.
@@ -44,12 +54,19 @@ final class Completeness {
     private Completeness(BitsetIndex index) {
         int columns = index.columnCount();
         classMasks = new long[columns][][];
+        lists = new ListAnalysis[columns];
         coversRest = new long[columns + 1][];
         coversRest[columns] = index.allRules();
         for (int c = columns - 1; c >= 0; c--) {
             var col = index.column(c);
-            var distinct = new LinkedHashMap<List<Long>, long[]>();
             var rest = coversRest[c + 1].clone();
+            if (col.holdsLists()) {
+                lists[c] = new ListAnalysis(col, index.words());
+                BitsetIndex.and(rest, col.rulesAcceptingAnyList()); // only - accepts every list, a missing one included
+                coversRest[c] = rest;
+                continue;
+            }
+            var distinct = new LinkedHashMap<List<Long>, long[]>();
             for (int k = 0; k < col.classCount(); k++) {
                 if (col.canOccur(k)) {
                     var dense = index.allRules();
@@ -57,6 +74,13 @@ final class Completeness {
                     distinct.putIfAbsent(key(dense), dense);
                     BitsetIndex.and(rest, dense);
                 }
+            }
+            var hidden = col.hiddenZoneIdMask();
+            if (hidden != null) {
+                var dense = index.allRules();
+                Masks.and(dense, hidden);
+                distinct.putIfAbsent(key(dense), dense);
+                BitsetIndex.and(rest, dense);
             }
             classMasks[c] = distinct.values().toArray(long[][]::new);
             coversRest[c] = rest;
@@ -87,13 +111,26 @@ final class Completeness {
             return true;
         }
         var next = new LinkedHashMap<List<Long>, long[]>(); // classes leading to the same candidates are searched once
-        for (var mask : classMasks[column]) {
-            var left = candidates.clone();
-            BitsetIndex.and(left, mask);
-            if (BitsetIndex.isEmpty(left)) {
-                return false; // inputs of this class match none of the rules
+        if (lists[column] != null) {
+            var outcomes = lists[column].everyOutcome(candidates);
+            if (outcomes == null) {
+                return false; // too many to search: not proven complete
             }
-            next.putIfAbsent(key(left), left);
+            for (var outcome : outcomes) {
+                if (BitsetIndex.isEmpty(outcome.matches())) {
+                    return false; // such lists match none of the rules
+                }
+                next.putIfAbsent(key(outcome.matches()), outcome.matches());
+            }
+        } else {
+            for (var mask : classMasks[column]) {
+                var left = candidates.clone();
+                BitsetIndex.and(left, mask);
+                if (BitsetIndex.isEmpty(left)) {
+                    return false; // inputs of this class match none of the rules
+                }
+                next.putIfAbsent(key(left), left);
+            }
         }
         var fewestFirst = new ArrayList<>(next.values());
         fewestFirst.sort(Comparator.comparingInt(BitsetIndex::count));

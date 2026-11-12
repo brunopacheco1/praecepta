@@ -988,6 +988,46 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     }
 
     /**
+     * The rules, then three more that split one column three ways, with every other cell {@code -}: a cell of the
+     * first rule there (one that names no other input and is not {@code -}), its opposite ({@code not(...)} around it,
+     * or its tests without the {@code not}), and {@code null} ({@code ? = null} for a list). They cover every input
+     * exactly when that cell is true or false for every value, so whether the table is complete then turns on FEEL's
+     * three-valued logic: a list holding a missing element, or a time with a zone id against a cell of another zone,
+     * leaves both the cell and its opposite unknown. The rules alone if the first rule has no such cell.
+     */
+    public List<Praeceptum> withThreeWaySplit(List<Praeceptum> rules) {
+        if (rules.isEmpty()) {
+            return rules;
+        }
+        for (var column : columns) {
+            var text = rules.getFirst().input().values().get(column);
+            var type = types.get(column);
+            boolean list = lists.contains(column);
+            var cell = !feelCells ? CellParser.parse(text, type) : list ? CellParser.parseFeelList(text, type) : CellParser.parseFeel(text, type);
+            if (cell instanceof UnaryTests.Any || cell.namesInputs()) {
+                continue;
+            }
+            var opposite = cell instanceof UnaryTests.Negated(var tests) ? new UnaryTests.Positive(tests) : new UnaryTests.Negated(cell.tests());
+            var split = new ArrayList<>(rules);
+            for (var part : List.of(text, render(opposite, list), feelCells && list ? "? = null" : "null")) {
+                var cells = new HashMap<String, String>();
+                columns.forEach(other -> cells.put(other, "-"));
+                cells.put(column, part);
+                int id = split.size() + 1;
+                split.add(new Praeceptum(id, new PraeceptaInput(cells),
+                        new PraeceptaOutput(Map.of(ID, String.valueOf(id), OUT, OUT_VALUES.getFirst(), NUMBER, "1", ECHO, ECHO_VALUE))));
+            }
+            return List.copyOf(split);
+        }
+        return rules;
+    }
+
+    /** A cell as this scenario's cells are written: strict FEEL ({@code list contains(?, ...)} for a list), or Praecepta's syntax. */
+    private String render(UnaryTests cell, boolean list) {
+        return feelCells && list ? DmnWriter.renderList(cell) : DmnWriter.render(cell);
+    }
+
+    /**
      * The rules with {@link #NUMBER} as their only output, a literal or an expression, which may give a missing
      * value: what a COLLECT aggregation aggregates, since DMN aggregates a single output (8.2.11).
      */

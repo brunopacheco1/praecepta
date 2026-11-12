@@ -5,10 +5,12 @@
  */
 package io.github.brunopacheco1.praecepta.engine;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -146,6 +148,88 @@ class UnreachableDefaultOutputTest {
         Assertions.assertThat(comparing.evaluate(Map.of("amount", "5"))).as("no limit: neither rule matches").containsExactly("C");
         var withAny = limits(rule(1, "amount", "<= limit"), rule(2, "amount", "-"));
         Assertions.assertThat(withAny.validationReport().issues()).containsExactly(UNREACHABLE_DEFAULT);
+    }
+
+    /**
+     * A list column is searched as every list it takes (#78 with #91): a missing one, the empty one and ones holding
+     * missing elements included. {@code "PT"} and {@code not("PT")} cover every list that is there, but not a missing
+     * one, which only {@code null} (Praecepta's {@code ? = null}) matches.
+     */
+    @Test
+    void a_list_column_is_complete_only_when_every_list_a_missing_one_included_matches_a_rule() {
+        var lists = engine(HitPolicy.FIRST, Map.of(), rule(1, "nationalities", "\"PT\""), rule(2, "nationalities", "not(\"PT\")"))
+                .listColumnType("nationalities", ColumnType.STRING)
+                .build();
+        Assertions.assertThat(lists.validationReport().issues()).isEmpty();
+        Assertions.assertThat(lists.evaluate(values("nationalities", null))).containsExactly("C");
+        Assertions.assertThat(lists.evaluate(Map.of("nationalities", "[]"))).containsExactly("B");
+        var withNull = engine(HitPolicy.FIRST, Map.of(), rule(1, "nationalities", "\"PT\""), rule(2, "nationalities", "not(\"PT\")"),
+                rule(3, "nationalities", "null"))
+                .listColumnType("nationalities", ColumnType.STRING)
+                .build();
+        Assertions.assertThat(withNull.validationReport().issues()).containsExactly(UNREACHABLE_DEFAULT);
+    }
+
+    /**
+     * A list holding a missing element ({@code [10, null]}) leaves {@code some x in ? satisfies x >= 18} and its
+     * {@code not(...)} both unknown (#84), so it gives the default, until a rule asks for such an element with
+     * {@code list contains(?, null)}.
+     */
+    @Test
+    void a_list_holding_a_missing_element_reaches_the_default_until_a_rule_asks_for_one() {
+        var ages = List.of(listRule(1, "some x in ? satisfies x >= 18"), listRule(2, "not(some x in ? satisfies x >= 18)"),
+                listRule(3, "? = null"));
+        var unknown = lists("ages", ColumnType.NUMBER, ages);
+        Assertions.assertThat(unknown.validationReport().issues()).isEmpty();
+        Assertions.assertThat(unknown.evaluate(Map.of("ages", "[10, null]"))).containsExactly("C");
+        var withNullElement = new ArrayList<>(ages);
+        withNullElement.add(listRule(4, "list contains(?, null)"));
+        Assertions.assertThat(lists("ages", ColumnType.NUMBER, withNullElement).validationReport().issues()).containsExactly(UNREACHABLE_DEFAULT);
+    }
+
+    /**
+     * Map-based inputs read a time with a zone id even in a column whose cells name none (#82), and only the cells
+     * that accept any value ({@code -}, {@code != null}, {@code not(null)}) match it. The other analyses leave such a
+     * time out, but it reaches the default, so the table is not complete without such a cell.
+     */
+    @Test
+    void a_time_with_a_zone_id_reaches_the_default_where_the_cells_name_no_zone_id() {
+        var types = Map.of("at", ColumnType.TIME);
+        var halves = engine(HitPolicy.FIRST, Map.of(), types, rule(1, "at", "< 12:00:00"), rule(2, "at", ">= 12:00:00"), rule(3, "at", "null"))
+                .build();
+        Assertions.assertThat(halves.validationReport().issues(Kind.UNREACHABLE_DEFAULT_OUTPUT)).isEmpty();
+        Assertions.assertThat(halves.evaluate(Map.of("at", "10:30:00@Europe/Paris"))).containsExactly("C");
+        var anyTime = engine(HitPolicy.FIRST, Map.of(), types, rule(1, "at", "< 12:00:00"), rule(2, "at", ">= 12:00:00"),
+                rule(3, "at", "null"), rule(4, "at", "!= null")).build();
+        Assertions.assertThat(anyTime.validationReport().issues(Kind.UNREACHABLE_DEFAULT_OUTPUT)).containsExactly(UNREACHABLE_DEFAULT);
+        // in a list, such an element is unknown to every comparison, and != null holds for it
+        var slots = List.of(listRule(1, "some x in ? satisfies x < time(\"12:00:00\")"),
+                listRule(2, "not(some x in ? satisfies x < time(\"12:00:00\"))"), listRule(3, "? = null"), listRule(4, "list contains(?, null)"));
+        var timeLists = lists("slots", ColumnType.TIME, slots);
+        Assertions.assertThat(timeLists.validationReport().issues(Kind.UNREACHABLE_DEFAULT_OUTPUT)).isEmpty();
+        Assertions.assertThat(timeLists.evaluate(Map.of("slots", "[10:30:00@Europe/Paris]"))).containsExactly("C");
+        var withAnyElement = new ArrayList<>(slots);
+        withAnyElement.add(listRule(5, "some x in ? satisfies x != null"));
+        Assertions.assertThat(lists("slots", ColumnType.TIME, withAnyElement).validationReport().issues(Kind.UNREACHABLE_DEFAULT_OUTPUT))
+                .containsExactly(UNREACHABLE_DEFAULT);
+    }
+
+    /** A DMN table (strict FEEL) of FIRST rules over one list column, whose cells the rules hold under {@code "list"}; default C. */
+    private static PraeceptaEngine<Map<String, String>, String> lists(String column, ColumnType type, List<Praeceptum> rules) {
+        var renamed = rules.stream()
+                .map(rule -> new Praeceptum(rule.priority(), new PraeceptaInput(Map.of(column, rule.input().values().get("list"))), rule.output()))
+                .toList();
+        var table = new DecisionTable("lists", HitPolicy.FIRST, null, List.of(new DecisionTable.InputColumn(column, type)),
+                List.of(new DecisionTable.OutputColumn("rating", ColumnType.STRING, List.of(), "C")), renamed, true, Set.of(column));
+        return PraeceptaEngine.<Map<String, String>, String>builder()
+                .table(table)
+                .inputs(PraeceptaInput::new)
+                .output(output -> output.values().get("rating"))
+                .build();
+    }
+
+    private static Praeceptum listRule(int id, String cell) {
+        return rule(id, "list", cell);
     }
 
     /** A DMN table (strict FEEL) whose number column {@code amount} may compare with the input {@code limit}; default C. */

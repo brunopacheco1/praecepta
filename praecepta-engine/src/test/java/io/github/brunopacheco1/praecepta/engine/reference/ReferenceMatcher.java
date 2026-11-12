@@ -533,10 +533,15 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         }
         for (var column : columns) {
             var cells = rules.stream().map(rule -> parse(rule.input().values().get(column), column)).toList();
-            // a cell such as "= null, != null" constrains nothing, as - does
-            var values = representativeValues(column, true);
-            boolean constrained = cells.stream()
-                    .anyMatch(cell -> values.stream().anyMatch(value -> !accepts(cell, single(value), name -> null)));
+            // a cell such as "= null, != null" constrains nothing, as - does; a list cell other than - fails the empty
+            // list or a missing one
+            boolean constrained;
+            if (lists.contains(column)) {
+                constrained = cells.stream().anyMatch(cell -> !(cell instanceof UnaryTests.Any));
+            } else {
+                var values = representativeValues(column, true);
+                constrained = cells.stream().anyMatch(cell -> values.stream().anyMatch(value -> !accepts(cell, single(value), name -> null)));
+            }
             boolean compares = cells.stream().flatMap(cell -> tests(cell).stream())
                     .anyMatch(test -> test instanceof Compare || test instanceof Range);
             if (type(column) == ColumnType.STRING && constrained && !compares && !allowedValues.containsKey(column)) {
@@ -552,7 +557,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * rule.
      */
     public boolean everyInputMatches(List<String> columns) {
-        return representativeInputs(columns, true).stream()
+        return everyRepresentativeInput(columns).stream()
                 .filter(input -> invalidColumn(input) == null)
                 .allMatch(input -> !matches(input).isEmpty());
     }
@@ -563,7 +568,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      */
     public boolean everyInputMatchesAnAnalysedRule(List<String> columns) {
         var analysed = rules.stream().filter(rule -> !isVariable(rule)).toList();
-        return representativeInputs(columns, true).stream()
+        return everyRepresentativeInput(columns).stream()
                 .filter(input -> invalidColumn(input) == null)
                 .allMatch(input -> analysed.stream().anyMatch(rule -> ruleAccepts(rule, input)));
     }
@@ -584,10 +589,10 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     public List<Object> representativeValues(String column, boolean withMissing) {
         if (lists.contains(column)) {
             var values = new ArrayList<Object>();
-            representativeLists(column, withMissing, values::add);
+            representativeLists(column, withMissing, false, values::add);
             return values;
         }
-        return representativeElements(column, withMissing, bothKinds);
+        return representativeElements(column, withMissing, bothKinds, false);
     }
 
     /**
@@ -604,11 +609,11 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * that rules out each {@code not(...)} cell that must not match (one per set of such elements at most),
      * for removing an element never makes a positive cell match or a {@code not(...)} cell fail.
      */
-    private void representativeLists(String column, boolean withMissing, Consumer<Object> sink) {
+    private void representativeLists(String column, boolean withMissing, boolean hidden, Consumer<Object> sink) {
         var cells = rules.stream().map(rule -> parse(rule.input().values().get(column), column)).toList();
         var allowed = allowedValues.containsKey(column) ? CellParser.parse(allowedValues.get(column), type(column)) : null;
         var bySignature = new LinkedHashMap<List<Boolean>, Object>();
-        for (var element : representativeElements(column, withMissing, true)) {
+        for (var element : representativeElements(column, withMissing, true, hidden)) {
             if (element == null || allowed == null || accepts(allowed, single(element), name -> null)) {
                 bySignature.putIfAbsent(cells.stream().map(cell -> some(tests(cell), Collections.singletonList(single(element)))).toList(),
                         element);
@@ -640,8 +645,12 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         }
     }
 
-    /** The representative single values of a column, of both kinds of time if {@code eitherKind}. */
-    private List<Object> representativeElements(String column, boolean withMissing, boolean eitherKind) {
+    /**
+     * The representative single values of a column, of both kinds of time if {@code eitherKind}; with {@code hidden},
+     * also a time with a zone id where map-based inputs take one though no cell names one, which the engine's analyses
+     * leave out but its completeness search visits.
+     */
+    private List<Object> representativeElements(String column, boolean withMissing, boolean eitherKind, boolean hidden) {
         var type = type(column);
         var cells = new ArrayList<UnaryTests>();
         rules.forEach(rule -> cells.add(parse(rule.input().values().get(column), column)));
@@ -665,9 +674,12 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                 if (eitherKind || zonedColumns.contains(column)) {
                     values.addAll(orderedRepresentatives(type, cells, true));
                 }
-                // read from text, a time with a zone id counts only where a cell names one (the engine leaves it out elsewhere)
-                if (zoneIds || bothKinds && cells.stream().anyMatch(cell -> literals(cell).stream().anyMatch(ZonedTime.class::isInstance))) {
+                // read from text, or as a list's element, a time with a zone id counts only where a cell names one (the
+                // engine's analyses leave it out elsewhere, but its completeness search does not)
+                if (zoneIds || eitherKind && cells.stream().anyMatch(cell -> literals(cell).stream().anyMatch(ZonedTime.class::isInstance))) {
                     values.addAll(zoneIdRepresentatives(cells));
+                } else if (hidden && eitherKind && type == ColumnType.TIME) {
+                    values.add(new ZonedTime(LocalTime.NOON, ZoneId.of("Pacific/Kiritimati")));
                 }
             }
             default -> values.addAll(orderedRepresentatives(type, cells, false));
@@ -683,10 +695,19 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * the cartesian product of their {@link #representativeValues representative values}.
      */
     public List<Map<String, Object>> representativeInputs(Map<String, Object> partial, List<String> columns, boolean withMissing) {
+        return representativeInputs(partial, columns, withMissing, false);
+    }
+
+    /**
+     * As {@link #representativeInputs(Map, List, boolean)}; with {@code hidden}, also the times with a zone id that the
+     * engine's analyses leave out (see {@link #representativeElements}).
+     */
+    private List<Map<String, Object>> representativeInputs(Map<String, Object> partial, List<String> columns, boolean withMissing,
+            boolean hidden) {
         List<Map<String, Object>> inputs = new ArrayList<>();
         inputs.add(new HashMap<>(partial));
         for (var column : columns) {
-            var options = distinctValues(column, withMissing);
+            var options = distinctValues(column, withMissing, hidden);
             var next = new ArrayList<Map<String, Object>>();
             for (var shorter : inputs) {
                 for (var option : options) {
@@ -707,8 +728,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * set are alike to every rule, and an input that combines them with the same values of the other columns
      * matches the same rules. This keeps the product of several list columns small.
      */
-    private List<Object> distinctValues(String column, boolean withMissing) {
-        return new ArrayList<>(bySignature(column, withMissing).values());
+    private List<Object> distinctValues(String column, boolean withMissing, boolean hidden) {
+        return new ArrayList<>(bySignature(column, withMissing, hidden).values());
     }
 
     /**
@@ -721,7 +742,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         all.set(0, rules.size());
         Set<BitSet> sets = new LinkedHashSet<>(List.of(all));
         for (var column : columns) {
-            var accepting = bySignature(column, true).keySet().stream().map(signature -> {
+            var accepting = bySignature(column, true, false).keySet().stream().map(signature -> {
                 var set = new BitSet();
                 for (int r = 0; r < signature.size(); r++) {
                     set.set(r, signature.get(r));
@@ -742,7 +763,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     }
 
     /** The {@link #distinctValues} of a column, each by the rules whose cell in the column accepts it. */
-    private Map<List<Boolean>, Object> bySignature(String column, boolean withMissing) {
+    private Map<List<Boolean>, Object> bySignature(String column, boolean withMissing, boolean hidden) {
         var bySignature = new LinkedHashMap<List<Boolean>, Object>();
         Consumer<Object> keep = option -> {
             var alone = new HashMap<String, Object>();
@@ -752,9 +773,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             }
         };
         if (lists.contains(column)) {
-            representativeLists(column, withMissing, keep); // many lists: kept one by one
+            representativeLists(column, withMissing, hidden, keep); // many lists: kept one by one
         } else {
-            representativeElements(column, withMissing, bothKinds).forEach(keep);
+            representativeElements(column, withMissing, bothKinds, hidden).forEach(keep);
         }
         return bySignature;
     }
@@ -771,6 +792,11 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     private List<Map<String, Object>> representativeInputs(List<String> columns, boolean withMissing) {
         return representativeInputs(Map.of(), columns, withMissing);
+    }
+
+    /** Every input completeness asks about: missing values, and times with a zone id that no cell names, included. */
+    private List<Map<String, Object>> everyRepresentativeInput(List<String> columns) {
+        return representativeInputs(Map.of(), columns, true, true);
     }
 
     /**

@@ -370,8 +370,9 @@ Supported:
   `[{Status=null, Rate=null}]`, and one whose outputs declare no default gives `[]` (DMN 1.5, 10.3.2.10).
   `Builder.defaultOutput(...)` gives a table built in code the same. "A complete decision table SHALL NOT
   specify a default output value" (10.3.2.10): when every input matches a rule, a missing value in any
-  column included, the validation report has the ERROR `UNREACHABLE_DEFAULT_OUTPUT`, so the build plugins
-  and the framework integrations reject the table by default.
+  column, a missing list and a list holding a missing element included, the validation report has the ERROR
+  `UNREACHABLE_DEFAULT_OUTPUT`, so the build plugins and the framework integrations reject the table by
+  default.
 - **A single output typed by its decision**: DMN 1.5 says the output clause of a single-output table has
   no `typeRef` of its own (Table 34), so its type is the decision table's `typeRef`, or else the decision
   variable's (the item type of a list for a multi-hit table; nothing for COUNT, whose result is a number).

@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -39,7 +40,8 @@ import java.util.stream.Collectors;
  * <li><b>Outcomes</b> ({@link #outcomes}): when a table has several list columns, the search fixes all but the
  * last by the rules each list leaves; only the minimal sets of rules (under inclusion) need searching, since
  * fewer remaining rules only make a gap or a witness easier. They are found by adding one element class
- * at a time and dropping every set another one is inside of. This is bounded ({@link #MAX_OUTCOMES}); past
+ * at a time and dropping every set another one is inside of. {@link Completeness} asks the same of every list
+ * ({@link #everyOutcome}). This is bounded ({@link #MAX_OUTCOMES}); past
  * the bound the analysis leaves out what it cannot decide, so it never reports a finding that is false.</li>
  * </ul>
  */
@@ -61,6 +63,13 @@ final class ListAnalysis {
     private final long[][] passes;
     /** Per entry of {@link #classes}: the negated rules whose inside it leaves true or unknown, which no list holding it matches. */
     private final long[][] rulesOut;
+    /**
+     * For an element that is a time with a zone id the element index has no class for ({@link ColumnIndex#hiddenZoneIdMask}):
+     * the positive rules it passes and the negated rules it rules out; null if the column takes no such element. Only
+     * {@link #everyOutcome} counts it, as the other questions leave such times out, as for single values.
+     */
+    private final long[] hiddenPasses;
+    private final long[] hiddenRulesOut;
 
     ListAnalysis(ColumnIndex column, int words) {
         this.column = column;
@@ -87,6 +96,19 @@ final class ListAnalysis {
             for (int w = 0; w < words; w++) {
                 passes[i][w] = mask[w] & positiveRules[w];
                 rulesOut[i][w] = ~mask[w] & negatedRules[w];
+            }
+        }
+        var hidden = elements.hiddenZoneIdMask();
+        if (hidden == null) {
+            hiddenPasses = null;
+            hiddenRulesOut = null;
+        } else {
+            var mask = Masks.dense(hidden, words);
+            hiddenPasses = new long[words];
+            hiddenRulesOut = new long[words];
+            for (int w = 0; w < words; w++) {
+                hiddenPasses[w] = mask[w] & positiveRules[w];
+                hiddenRulesOut[w] = ~mask[w] & negatedRules[w];
             }
         }
     }
@@ -225,7 +247,8 @@ final class ListAnalysis {
 
     /**
      * The lists that leave some rules matching: one of them, its element classes (indices into
-     * {@link #classes}) or the missing list, and the rules it matches.
+     * {@link #classes}, or one past them for a time with a zone id that no cell names) or the missing list, and the
+     * rules it matches.
      */
     record Outcome(long[] matches, List<Integer> elements, boolean missing) {
         @Override
@@ -252,6 +275,20 @@ final class ListAnalysis {
      * {@link #MAX_OUTCOMES}.
      */
     List<Outcome> outcomes(long[] relevant, int required, boolean withMissing) {
+        return outcomes(relevant, required, withMissing, false);
+    }
+
+    /**
+     * Of every list the column takes, a missing one, ones holding missing elements and ones holding a time with a zone
+     * id that no cell names included, the sets of rules of {@code relevant} they match that are minimal under
+     * inclusion, for {@link Completeness}; null if there are more than {@link #MAX_OUTCOMES}. An empty set among them
+     * means some list matches none of the rules.
+     */
+    List<Outcome> everyOutcome(long[] relevant) {
+        return outcomes(relevant, -1, true, true);
+    }
+
+    private List<Outcome> outcomes(long[] relevant, int required, boolean withMissing, boolean withHidden) {
         var rules = relevant.clone();
         if (required >= 0) {
             BitsetIndex.set(rules, required);
@@ -267,23 +304,13 @@ final class ListAnalysis {
             if (!inDomain(i, withMissing) || requiredNegated && BitsetIndex.get(rulesOut[i], required)) {
                 continue;
             }
-            var adds = passes[i].clone();
-            BitsetIndex.and(adds, rules);
-            var removes = rulesOut[i].clone();
-            BitsetIndex.and(removes, rules);
-            if (!seenTypes.add(key(adds, removes))) {
-                continue; // a class that changes the same rules as one already added
+            if (!addElement(outcomes, seenTypes, rules, passes[i], rulesOut[i], i, required)) {
+                return null;
             }
-            for (var outcome : List.copyOf(outcomes)) {
-                var matches = outcome.matches().clone();
-                BitsetIndex.or(matches, adds);
-                BitsetIndex.andNot(matches, removes);
-                var elementsHeld = new ArrayList<>(outcome.elements());
-                elementsHeld.add(i);
-                if (!keepMinimal(outcomes, new Outcome(matches, List.copyOf(elementsHeld), false), required)) {
-                    return null;
-                }
-            }
+        }
+        // a time with a zone id no cell names, which has no class: its index is one past the classes'
+        if (withHidden && hiddenPasses != null && !addElement(outcomes, seenTypes, rules, hiddenPasses, hiddenRulesOut, classes.length, required)) {
+            return null;
         }
         if (required >= 0) {
             outcomes.removeIf(outcome -> !BitsetIndex.get(outcome.matches(), required));
@@ -294,6 +321,34 @@ final class ListAnalysis {
             keepMinimal(outcomes, new Outcome(missing, List.of(), true), required);
         }
         return List.copyOf(outcomes);
+    }
+
+    /**
+     * Adds to every outcome so far an element that passes {@code passes} and rules out {@code rulesOut}, keeping the
+     * minimal ones; nothing if an element changing the same rules was added before.
+     *
+     * @return false if there are now more than {@link #MAX_OUTCOMES}
+     */
+    private static boolean addElement(List<Outcome> outcomes, Set<List<Long>> seenTypes, long[] rules, long[] passes, long[] rulesOut,
+            int element, int required) {
+        var adds = passes.clone();
+        BitsetIndex.and(adds, rules);
+        var removes = rulesOut.clone();
+        BitsetIndex.and(removes, rules);
+        if (!seenTypes.add(key(adds, removes))) {
+            return true; // a class that changes the same rules as one already added
+        }
+        for (var outcome : List.copyOf(outcomes)) {
+            var matches = outcome.matches().clone();
+            BitsetIndex.or(matches, adds);
+            BitsetIndex.andNot(matches, removes);
+            var elementsHeld = new ArrayList<>(outcome.elements());
+            elementsHeld.add(element);
+            if (!keepMinimal(outcomes, new Outcome(matches, List.copyOf(elementsHeld), false), required)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

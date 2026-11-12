@@ -129,7 +129,10 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
    (declared inputs that no rule covers, with an example), and, for a table with a default output, whether
    it is complete (`Completeness`): whether every input, a missing value in any column and a string no rule
    mentions included, matches a rule, so that the default can never be given (an ERROR,
-   `UNREACHABLE_DEFAULT_OUTPUT`). The analysis is exact, because it searches
+   `UNREACHABLE_DEFAULT_OUTPUT`). It searches a list column as the minimal sets of rules every list it takes
+   can match (`ListAnalysis.everyOutcome`: missing lists and missing elements included), and it also visits
+   the time with a zone id that a column takes though no cell names one, which the other analyses leave out
+   (`ColumnIndex.hiddenZoneIdMask`). The analysis is exact, because it searches
    the same column classes the index uses. A list column is searched as the sets of its element
    classes (`ListAnalysis`): rules `"PT"` and `"BR"` overlap on `["PT","BR"]`. Which rules a list
    matches depends only on which element classes it holds, and adding an element only adds positive
