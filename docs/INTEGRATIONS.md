@@ -79,7 +79,7 @@ integrations find their tables at runtime, so their engines take maps instead:
   one, and any other table no map, whatever its hit policy or aggregation (DMN 1.5, 10.3.2.10, step 2): a
   COUNT then gives no map rather than `0`, as the generated classes give an empty `Optional`.
 - **Validation** is that of the map-based engine. Times and date-times read from text may have a time zone
-  or not, so gaps are looked for among both kinds.
+  or not, so gaps are looked for among both kinds (and among times with a zone id, where the cells name one).
 - **Generated classes are not beans.** They are static and need no container; declare one as a bean
   yourself if you want it injected. The DMN resources the build plugins write are ordinary DMN files, so a
   location pattern that covers their package (`classpath*:com/acme/pricing/*.dmn`) gives them map-based

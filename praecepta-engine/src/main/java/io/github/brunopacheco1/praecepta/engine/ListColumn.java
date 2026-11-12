@@ -22,6 +22,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
+import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 
 /**
  * The matching of a column whose values are lists, such as a customer's nationalities. A cell holds
@@ -300,7 +301,7 @@ final class ListColumn {
             case NUMBER -> value instanceof Number;
             case DATE -> value instanceof LocalDate;
             case BOOLEAN -> value instanceof Boolean;
-            case TIME -> value instanceof LocalTime || value instanceof OffsetTime;
+            case TIME -> value instanceof LocalTime || value instanceof OffsetTime || value instanceof ZonedTime;
             case DATE_TIME -> value instanceof LocalDateTime || value instanceof ZonedDateTime;
             case DAY_TIME_DURATION -> value instanceof Duration;
             case YEAR_MONTH_DURATION -> value instanceof Period || value instanceof YearsAndMonths;

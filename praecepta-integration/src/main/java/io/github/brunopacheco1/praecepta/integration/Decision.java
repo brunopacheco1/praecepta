@@ -154,11 +154,11 @@ public record Decision(String name, String location, DecisionTable table, Praece
      * 10.3.2.10): SUM adds numbers with FEEL's precision (34 significant digits, 10.3.2.3.1) and keeps their
      * scale ({@code 10.50} and {@code 1.50} give {@code 12.00}), as the generated code of the build plugins
      * does; MIN and MAX keep the smallest or the largest value as written, ordered as FEEL orders values of the
-     * output's type ({@link FeelTemporals#compare}); COUNT gives the number of matches. None of them sees a
-     * missing value: where the output is missing in a matching rule, the engine gives that rule's map, the
-     * output mapped to null, as FEEL's {@code sum}, {@code min} and {@code max} are null for a list that holds
-     * null (10.3.4.4). None is called when no rule matches: the engine then gives the default output, or none
-     * (10.3.2.10, step 2).
+     * output's type ({@link FeelTemporals#compare}), and fail on times with a zone id in two zones, which DMN 1.5
+     * does not order; COUNT gives the number of matches. None of them sees a missing value: where the output is
+     * missing in a matching rule, the engine gives that rule's map, the output mapped to null, as FEEL's
+     * {@code sum}, {@code min} and {@code max} are null for a list that holds null (10.3.4.4). None is called when
+     * no rule matches: the engine then gives the default output, or none (10.3.2.10, step 2).
      *
      * @param aggregated the output a COLLECT aggregation aggregates, or null for none
      */

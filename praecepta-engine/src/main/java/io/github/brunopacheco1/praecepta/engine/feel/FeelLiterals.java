@@ -20,7 +20,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 
 /**
  * Writes column values ({@code String}, {@code BigDecimal}, {@code LocalDate}, {@code Boolean},
- * {@code LocalTime}, {@code OffsetTime}, {@code LocalDateTime}, {@code ZonedDateTime}, {@code Duration},
+ * {@code LocalTime}, {@code OffsetTime}, {@link ZonedTime}, {@code LocalDateTime}, {@code ZonedDateTime}, {@code Duration},
  * {@link YearsAndMonths}) as FEEL literals, or as the plain text that outputs and map-based inputs use.
  * {@link FeelTemporals} reads times and date-times back from that text.
  */
@@ -31,7 +31,7 @@ public final class FeelLiterals {
 
     /**
      * The FEEL literal of a value: {@code "PT"} (escaped), {@code 2.5}, {@code true},
-     * {@code date("2025-01-31")}, {@code time("08:30:00")}, {@code time("08:30:00+01:00")},
+     * {@code date("2025-01-31")}, {@code time("08:30:00")}, {@code time("08:30:00+01:00")}, {@code time("08:30:00@Europe/Paris")},
      * {@code date and time("2025-01-31T08:30:00")}, {@code date and time("2025-01-31T08:30:00Z")},
      * {@code date and time("2025-01-31T08:30:00@Europe/Paris")}, {@code duration("P1DT2H")},
      * {@code duration("P1Y2M")}, or {@code null}.
@@ -43,6 +43,7 @@ public final class FeelLiterals {
             case LocalDate date -> "date(\"" + date + "\")";
             case LocalTime time -> "time(\"" + text(time) + "\")";
             case OffsetTime time -> "time(\"" + text(time) + "\")";
+            case ZonedTime time -> "time(\"" + time + "\")";
             case LocalDateTime dateTime -> "date and time(\"" + text(dateTime) + "\")";
             // FEEL has no literal for the later of two equal local times in a zone: the offset keeps its instant
             case ZonedDateTime dateTime -> "date and time(\"" + (isLaterAtOverlap(dateTime)
@@ -83,8 +84,8 @@ public final class FeelLiterals {
      * ({@code P1DT2H}, {@code P1Y2M}). A string is its own value; other text is read without its surrounding
      * whitespace.
      *
-     * @return a {@code String}, {@code BigDecimal}, {@code Boolean}, {@code LocalDate}, {@code LocalTime} or
-     *         {@code OffsetTime}, {@code LocalDateTime} or {@code ZonedDateTime}, {@code Duration}, or
+     * @return a {@code String}, {@code BigDecimal}, {@code Boolean}, {@code LocalDate}, {@code LocalTime},
+     *         {@code OffsetTime} or {@link ZonedTime}, {@code LocalDateTime} or {@code ZonedDateTime}, {@code Duration}, or
      *         {@link YearsAndMonths}
      * @throws IllegalArgumentException if the text is not a value of the type
      */

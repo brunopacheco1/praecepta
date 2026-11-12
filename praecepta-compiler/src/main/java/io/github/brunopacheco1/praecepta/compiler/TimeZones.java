@@ -20,10 +20,12 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
+import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 
 /**
  * Which time and date-time columns generated code gives a Java type with a time zone ({@code OffsetTime},
- * {@code ZonedDateTime}) instead of one without ({@code LocalTime}, {@code LocalDateTime}). A record
+ * {@code ZonedDateTime}), or with a zone id for a time ({@link ZonedTime}), instead of one without ({@code LocalTime},
+ * {@code LocalDateTime}). A record
  * component has one Java type, while FEEL lets a column hold values of both kinds, so the table decides:
  * <ul>
  * <li>an input takes values with a zone when the literals written for it (its cells and input value
@@ -33,16 +35,35 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * <li>an output has values with a zone when its literal values (its default value included) all have one and so do the inputs its
  * rules name, and there is at least one of them.</li>
  * </ul>
- * A column, or a group of linked inputs, whose literals mix the two kinds is rejected: FEEL compares a value with
+ * A column, or a group of linked inputs, whose literals mix kinds is rejected: FEEL compares a value with
  * a zone and one without by local time, so the engine evaluates such a table, but the table does not say which
- * kind its generated component should take.
+ * kind its generated component should take. A time with a zone id is a kind of its own.
  */
 final class TimeZones {
 
-    private enum Kind { LOCAL, ZONED }
+    /** Without a time zone, with an offset or a zone id that gives one, or, for a time, with a zone id. */
+    enum Kind { LOCAL, ZONED, ZONE_ID }
 
-    /** The inputs (columns, then the other inputs cells compare with) and outputs whose values have a time zone. */
-    record Zoned(Set<String> inputs, Set<String> outputs) {
+    /**
+     * The inputs (columns, then the other inputs cells compare with) and outputs whose values have a time zone, and
+     * the time inputs and outputs whose values have a zone id.
+     */
+    record Zoned(Set<String> inputs, Set<String> outputs, Set<String> zoneIdInputs, Set<String> zoneIdOutputs) {
+
+        Kind input(String name) {
+            return kind(inputs, zoneIdInputs, name);
+        }
+
+        Kind output(String name) {
+            return kind(outputs, zoneIdOutputs, name);
+        }
+
+        private static Kind kind(Set<String> zoned, Set<String> zoneIds, String name) {
+            if (zoned.contains(name)) {
+                return Kind.ZONED;
+            }
+            return zoneIds.contains(name) ? Kind.ZONE_ID : Kind.LOCAL;
+        }
     }
 
     private TimeZones() {
@@ -53,11 +74,23 @@ final class TimeZones {
      *                                  with and without a time zone
      */
     static Zoned of(DecisionTable table) {
-        var inputs = zonedInputs(table);
-        return new Zoned(inputs, zonedOutputs(table, inputs));
+        var inputs = inputKinds(table);
+        var outputs = outputKinds(table, inputs);
+        return new Zoned(named(inputs, Kind.ZONED), named(outputs, Kind.ZONED), named(inputs, Kind.ZONE_ID), named(outputs, Kind.ZONE_ID));
     }
 
-    private static Set<String> zonedInputs(DecisionTable table) {
+    private static Set<String> named(Map<String, Kind> kinds, Kind kind) {
+        var names = new LinkedHashSet<String>();
+        kinds.forEach((name, itsKind) -> {
+            if (itsKind == kind) {
+                names.add(name);
+            }
+        });
+        return names;
+    }
+
+    /** The kind of each time and date-time input, in order; LOCAL for one that names no value with a zone. */
+    private static Map<String, Kind> inputKinds(DecisionTable table) {
         var types = new LinkedHashMap<String, ColumnType>();
         table.inputs().forEach(column -> types.put(column.name(), column.type()));
         table.namedInputs().forEach(types::putIfAbsent);
@@ -84,41 +117,39 @@ final class TimeZones {
         var byGroup = new HashMap<String, Set<Kind>>();
         kinds.forEach((column, columnKinds) -> byGroup.computeIfAbsent(groups.root(column), any -> EnumSet.noneOf(Kind.class))
                 .addAll(columnKinds));
-        var zoned = new LinkedHashSet<String>();
+        var inputKinds = new LinkedHashMap<String, Kind>();
         for (var input : types.entrySet()) {
             var groupKinds = byGroup.getOrDefault(groups.root(input.getKey()), Set.of());
             if (groupKinds.size() > 1) {
-                throw mixed(table, "input '" + input.getKey() + "'", input.getValue());
+                throw mixed(table, "input '" + input.getKey() + "'", input.getValue(), groupKinds);
             }
-            if (isTemporal(input.getValue()) && groupKinds.contains(Kind.ZONED)) {
-                zoned.add(input.getKey());
+            if (isTemporal(input.getValue())) {
+                inputKinds.put(input.getKey(), groupKinds.isEmpty() ? Kind.LOCAL : groupKinds.iterator().next());
             }
         }
-        return zoned;
+        return inputKinds;
     }
 
-    private static Set<String> zonedOutputs(DecisionTable table, Set<String> zonedInputs) {
-        var zoned = new LinkedHashSet<String>();
+    private static Map<String, Kind> outputKinds(DecisionTable table, Map<String, Kind> inputKinds) {
+        var kinds = new LinkedHashMap<String, Kind>();
         for (var output : table.outputs()) {
             if (!isTemporal(output.type())) {
                 continue;
             }
-            var kinds = outputKinds(table, output, zonedInputs);
-            if (kinds.size() > 1) {
-                throw mixed(table, "output '" + output.name() + "'", output.type());
+            var outputKinds = outputKinds(table, output, inputKinds);
+            if (outputKinds.size() > 1) {
+                throw mixed(table, "output '" + output.name() + "'", output.type(), outputKinds);
             }
-            if (kinds.contains(Kind.ZONED)) {
-                zoned.add(output.name());
-            }
+            kinds.put(output.name(), outputKinds.isEmpty() ? Kind.LOCAL : outputKinds.iterator().next());
         }
-        return zoned;
+        return kinds;
     }
 
     /**
      * The kinds of the values a time or date-time output takes: those of the inputs the rules name, of the rules'
      * literals, and of the output's default value.
      */
-    private static Set<Kind> outputKinds(DecisionTable table, DecisionTable.OutputColumn output, Set<String> zonedInputs) {
+    private static Set<Kind> outputKinds(DecisionTable table, DecisionTable.OutputColumn output, Map<String, Kind> inputKinds) {
         var kinds = EnumSet.noneOf(Kind.class);
         if (output.defaultValue() != null) {
             kinds.add(kind(parse(output.defaultValue(), output.type(), table, output.name())));
@@ -127,7 +158,7 @@ final class TimeZones {
             var input = rule.output().references().get(output.name());
             var text = rule.output().values().get(output.name());
             if (input != null) {
-                kinds.add(zonedInputs.contains(input) ? Kind.ZONED : Kind.LOCAL);
+                kinds.add(inputKinds.getOrDefault(input, Kind.LOCAL));
             } else if (text != null) {
                 kinds.add(kind(parse(text, output.type(), table, output.name())));
             }
@@ -144,9 +175,10 @@ final class TimeZones {
         }
     }
 
-    private static IllegalArgumentException mixed(DecisionTable table, String what, ColumnType type) {
-        return new IllegalArgumentException(("Table '%s': %s takes %s values both with and without a time zone, "
-                + "but its generated record component holds one kind").formatted(table.name(), what, feelName(type)));
+    private static IllegalArgumentException mixed(DecisionTable table, String what, ColumnType type, Set<Kind> kinds) {
+        var kindsOf = kinds.contains(Kind.ZONE_ID) ? "both with a zone id and without one" : "both with and without a time zone";
+        return new IllegalArgumentException(("Table '%s': %s takes %s values %s, but its generated record component holds one kind")
+                .formatted(table.name(), what, feelName(type), kindsOf));
     }
 
     private static boolean isTemporal(ColumnType type) {
@@ -158,6 +190,9 @@ final class TimeZones {
     }
 
     private static Kind kind(Object value) {
+        if (value instanceof ZonedTime) {
+            return Kind.ZONE_ID;
+        }
         return FeelTemporals.hasZone(value) ? Kind.ZONED : Kind.LOCAL;
     }
 

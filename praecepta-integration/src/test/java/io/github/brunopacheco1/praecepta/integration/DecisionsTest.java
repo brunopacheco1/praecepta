@@ -272,6 +272,19 @@ class DecisionsTest {
         // times with an offset by instant
         var latest = Decision.of("times", typed("MAX", "time", "time(\"10:00:00+02:00\")", "time(\"09:00:00Z\")")).engine();
         Assertions.assertThat(latest.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "09:00:00Z"));
+        // times with a zone id by local time in their zone (the TCK's 0068-feel-equality)
+        var paris = Decision.of("paris", typed("MAX", "time", "time(\"10:00:00@Europe/Paris\")", "@\"09:00:00@Europe/Paris\"")).engine();
+        Assertions.assertThat(paris.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "10:00:00@Europe/Paris"));
+    }
+
+    @Test
+    void min_and_max_of_times_dmn_does_not_compare_fail() {
+        // DMN 1.5 does not say how times with a zone id in two zones compare, and the TCK leaves it out
+        var zones = Decision.of("zones", typed("MIN", "time", "time(\"10:00:00@Europe/Paris\")", "time(\"09:00:00@Asia/Dhaka\")")).engine();
+        Assertions.assertThat(zones.evaluate(Map.of("zone", "mainland"))).containsExactly(Map.of("out", "10:00:00@Europe/Paris"));
+        Assertions.assertThatThrownBy(() -> zones.evaluate(Map.of("zone", "islands")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("FEEL does not define how");
     }
 
     @Test

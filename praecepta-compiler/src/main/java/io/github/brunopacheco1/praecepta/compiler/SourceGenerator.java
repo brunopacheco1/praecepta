@@ -26,7 +26,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
  * <ul>
  * <li>{@code DiscountInput}: a record with one component per input column ({@code String},
  * {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime} or {@code OffsetTime},
- * {@code LocalDateTime} or {@code ZonedDateTime} (see {@link TimeZones}), {@code Duration} or
+ * {@code LocalDateTime} or {@code ZonedDateTime} (see {@link TimeZones}; a time with a zone id is a {@code ZonedTime}), {@code Duration} or
  * {@code Period}), and one per other input the cells compare with;
  * a string column with a value list gets a nested enum,
  * bound to the engine's int-coded path, and an input that holds lists a {@code java.util.List} of its type;</li>
@@ -247,7 +247,7 @@ final class SourceGenerator {
         this.inputs = new ArrayList<>();
         for (int c = 0; c < inputColumns.size(); c++) {
             var column = inputColumns.get(c);
-            inputs.add(InputField.of(column, inputMembers.get(c), zoned.inputs().contains(column.name()),
+            inputs.add(InputField.of(column, inputMembers.get(c), zoned.input(column.name()),
                     table.listInputs().contains(column.name())));
         }
     }
@@ -321,7 +321,7 @@ final class SourceGenerator {
     }
 
     private Converter outputConverter(DecisionTable.OutputColumn column) {
-        return Converter.of(column.type(), zoned.outputs().contains(column.name()));
+        return Converter.of(column.type(), zoned.output(column.name()));
     }
 
     // ---- decision class -------------------------------------------------------------------------
@@ -482,10 +482,10 @@ final class SourceGenerator {
      * @param zoned      for a time or date-time, whether its values (a list's elements) have a time zone
      * @param list       whether it holds lists, a {@code java.util.List} component (of strings, even with a value list)
      */
-    private record InputField(InputColumn column, String member, String enumName, List<String> enumValues, boolean zoned,
+    private record InputField(InputColumn column, String member, String enumName, List<String> enumValues, TimeZones.Kind zoned,
             boolean list) {
 
-        static InputField of(InputColumn column, String member, boolean zoned, boolean list) {
+        static InputField of(InputColumn column, String member, TimeZones.Kind zoned, boolean list) {
             var values = list ? List.<String>of() : valueListOf(column);
             return new InputField(column, member, values.isEmpty() ? null : JavaNames.type(column.name()), values, zoned, list);
         }
@@ -532,12 +532,16 @@ final class SourceGenerator {
      */
     private record Converter(String javaType, String binding, String method, String parser) {
 
-        /** @param zoned for a time or date-time, whether its values have a time zone */
-        static Converter of(ColumnType type, boolean zoned) {
-            if (zoned && type == ColumnType.TIME) {
+        /** @param zoned for a time or date-time, whether its values have a time zone, or for a time a zone id */
+        static Converter of(ColumnType type, TimeZones.Kind zoned) {
+            if (zoned == TimeZones.Kind.ZONE_ID && type == ColumnType.TIME) {
+                return new Converter("io.github.brunopacheco1.praecepta.engine.feel.ZonedTime", "zonedTimeInput", "zonedTime",
+                        "io.github.brunopacheco1.praecepta.engine.feel.ZonedTime.parse");
+            }
+            if (zoned == TimeZones.Kind.ZONED && type == ColumnType.TIME) {
                 return new Converter("java.time.OffsetTime", "offsetTimeInput", "offsetTime", "java.time.OffsetTime.parse");
             }
-            if (zoned && type == ColumnType.DATE_TIME) {
+            if (zoned == TimeZones.Kind.ZONED && type == ColumnType.DATE_TIME) {
                 // FEEL writes a zone id as @Europe/Paris, which ZonedDateTime.parse does not read
                 return new Converter("java.time.ZonedDateTime", "zonedDateTimeInput", "zonedDateTime",
                         "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseZonedDateTime");

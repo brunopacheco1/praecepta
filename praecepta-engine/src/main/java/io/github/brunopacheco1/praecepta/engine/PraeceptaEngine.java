@@ -51,6 +51,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.ExpressionTypeException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
+import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
 /**
@@ -1234,6 +1235,16 @@ public final class PraeceptaEngine<I, O> {
          */
         public Builder<I, O> offsetTimeInput(String column, Function<? super I, OffsetTime> extractor) {
             return bind(column, ColumnType.TIME, extractor, null, Zoning.ZONED, false);
+        }
+
+        /**
+         * Binds a TIME column to a getter returning a time of day with a zone id ({@code 08:30@Europe/Paris}). It
+         * compares with a cell's time in the same zone by local time; DMN 1.5 does not define how it compares with
+         * a time in another zone, at an offset or without a zone, so such a test is unknown: neither it nor its
+         * {@code not(...)} matches.
+         */
+        public Builder<I, O> zonedTimeInput(String column, Function<? super I, ZonedTime> extractor) {
+            return bind(column, ColumnType.TIME, extractor, null, Zoning.ZONE_ID, false);
         }
 
         /**

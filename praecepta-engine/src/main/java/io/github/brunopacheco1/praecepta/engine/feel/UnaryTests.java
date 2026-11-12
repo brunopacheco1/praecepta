@@ -14,11 +14,12 @@ import java.util.Optional;
  * looks at a single column value, which is what lets rules be indexed with bitmasks; a test that
  * compares with another input ({@link Name}, strict FEEL only) is decided when evaluating instead.
  *
- * <p>Values are {@code String}, {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime} or
- * {@code OffsetTime}, {@code LocalDateTime} or {@code ZonedDateTime}, {@code Duration} or
+ * <p>Values are {@code String}, {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime},
+ * {@code OffsetTime} or {@link ZonedTime}, {@code LocalDateTime} or {@code ZonedDateTime}, {@code Duration} or
  * {@link YearsAndMonths}, depending on the column type, or a {@link Name}. Two times or date-times
  * with a time zone compare by instant; one with a zone and one without compare by their local time
- * ({@link FeelTemporals}), equality included.
+ * ({@link FeelTemporals}), equality included. A time with a zone id compares only with one in the same zone; any
+ * other comparison of it is unknown, as FEEL gives null for a comparison it does not define.
  *
  * <p>A missing (null) value follows FEEL's three-valued logic: {@code null} is true for it, a literal is
  * false (so {@code != x} is true), and a comparison or an interval is unknown, which is neither a match nor a

@@ -194,11 +194,11 @@ public final class TableCompiler {
                     }
                 });
         try {
-            var zoned = TimeZones.of(table).inputs();
+            var zoned = TimeZones.of(table);
             var lists = table.listInputs();
-            table.inputs().forEach(column -> bind(builder, column.name(), column.type(), zoned.contains(column.name()),
+            table.inputs().forEach(column -> bind(builder, column.name(), column.type(), zoned.input(column.name()),
                     lists.contains(column.name())));
-            table.namedInputs().forEach((name, type) -> bind(builder, name, type, zoned.contains(name), lists.contains(name)));
+            table.namedInputs().forEach((name, type) -> bind(builder, name, type, zoned.input(name), lists.contains(name)));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(e.getMessage().startsWith("Table '") ? e.getMessage()
                     : TABLE_PROBLEM.formatted(table.name(), e.getMessage()), e);
@@ -217,8 +217,8 @@ public final class TableCompiler {
      * Binds an input with a getter of the Java type generated code gives it, a {@code java.util.List} of
      * that type for an input that holds lists; validation never calls it.
      */
-    private static void bind(PraeceptaEngine.Builder<Object, PraeceptaOutput> builder, String name, ColumnType type, boolean zoned,
-            boolean list) {
+    private static void bind(PraeceptaEngine.Builder<Object, PraeceptaOutput> builder, String name, ColumnType type,
+            TimeZones.Kind zoned, boolean list) {
         if (list) {
             if (type == ColumnType.STRING) {
                 builder.listInput(name, input -> List.<String>of());
@@ -233,14 +233,14 @@ public final class TableCompiler {
             case DATE -> builder.dateInput(name, input -> null);
             case BOOLEAN -> builder.booleanInput(name, input -> null);
             case TIME -> {
-                if (zoned) {
-                    builder.offsetTimeInput(name, input -> null);
-                } else {
-                    builder.timeInput(name, input -> null);
+                switch (zoned) {
+                    case ZONED -> builder.offsetTimeInput(name, input -> null);
+                    case ZONE_ID -> builder.zonedTimeInput(name, input -> null);
+                    case LOCAL -> builder.timeInput(name, input -> null);
                 }
             }
             case DATE_TIME -> {
-                if (zoned) {
+                if (zoned == TimeZones.Kind.ZONED) {
                     builder.zonedDateTimeInput(name, input -> null);
                 } else {
                     builder.dateTimeInput(name, input -> null);

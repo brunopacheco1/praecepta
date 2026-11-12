@@ -196,7 +196,7 @@ class ColumnIndexBehaviourTest {
                 '13:00:00+01:00' (String) -> [3, 4]
                 '12:00:00.000000001Z' (String) -> [2, 3]
                 '08:00' (String) -> Input c=08:00 has no time zone, which the column's input binding requires
-                '08:00@Europe/Paris' (String) -> Input c=08:00@Europe/Paris is not a valid time
+                '08:00@Europe/Paris' (String) -> Input c=08:00:00@Europe/Paris has a zone id, which the column's input binding does not take
                 """);
     }
 
@@ -312,6 +312,50 @@ class ColumnIndexBehaviourTest {
                 '12:00' (String) -> [1, 2]
                 '11:00:00.000000001Z' (String) -> [0, 1, 2, 3]
                 '12:00:00+02:00' (String) -> [2]
+                """);
+    }
+
+    @Test
+    void times_with_a_zone_id_have_a_line_per_zone_and_compare_with_nothing_else() {
+        var column = columnTaking(ColumnType.TIME, Zoning.EITHER, null, "< time(\"10:00:00@Europe/Paris\")", "time(\"10:00:00\")",
+                "not(time(\"10:00:00@Asia/Dhaka\"))", "!= null", "-");
+        // TCK 0068-feel-equality compares two times in one zone; the rest is left open, so unknown: neither a test nor its not(...)
+        Assertions.assertThat(dump(column)).isEqualTo("""
+                0 (-inf..time("10:00:00")) rules=[3, 4] example=09:00 (LocalTime)
+                1 time("10:00:00") rules=[1, 3, 4] example=10:00 (LocalTime)
+                2 (time("10:00:00")..+inf) rules=[3, 4] example=11:00 (LocalTime)
+                3 (-inf..time("10:00:00")) with a time zone rules=[3, 4] example=09:00Z (OffsetTime)
+                4 time("10:00:00") with a time zone rules=[1, 3, 4] example=10:00Z (OffsetTime)
+                5 (time("10:00:00")..+inf) with a time zone rules=[3, 4] example=11:00Z (OffsetTime)
+                6 (-inf..time("10:00:00@Asia/Dhaka")) rules=[2, 3, 4] example=09:00:00@Asia/Dhaka (ZonedTime)
+                7 time("10:00:00@Asia/Dhaka") rules=[3, 4] example=10:00:00@Asia/Dhaka (ZonedTime)
+                8 (time("10:00:00@Asia/Dhaka")..+inf) rules=[2, 3, 4] example=11:00:00@Asia/Dhaka (ZonedTime)
+                9 (-inf..time("10:00:00@Europe/Paris")) rules=[0, 3, 4] example=09:00:00@Europe/Paris (ZonedTime)
+                10 time("10:00:00@Europe/Paris") rules=[3, 4] example=10:00:00@Europe/Paris (ZonedTime)
+                11 (time("10:00:00@Europe/Paris")..+inf) rules=[3, 4] example=11:00:00@Europe/Paris (ZonedTime)
+                12 any time with a zone id no cell names rules=[3, 4] example=12:00:00@Africa/Abidjan (ZonedTime)
+                13 null missing rules=[2, 4] example=-
+                """);
+        Assertions.assertThat(column.describe(List.of(2, 9, 10, 11, 13))).containsExactly("(time(\"10:00:00\")..+inf)",
+                "any time at Europe/Paris", "null");
+        Assertions.assertThat(column.describe(List.of(6, 7, 12))).containsExactly("(-inf..time(\"10:00:00@Asia/Dhaka\")]",
+                "any time with a zone id no cell names");
+        Assertions.assertThat(lookups(column, "09:00@Europe/Paris", "10:00@Asia/Dhaka", "10:00@America/New_York")).isEqualTo("""
+                '09:00@Europe/Paris' (String) -> [0, 3, 4]
+                '10:00@Asia/Dhaka' (String) -> [3, 4]
+                '10:00@America/New_York' (String) -> [3, 4]
+                """);
+    }
+
+    @Test
+    void a_map_input_with_a_zone_id_is_left_out_of_the_classes_when_no_cell_names_one() {
+        var column = columnTaking(ColumnType.TIME, Zoning.EITHER, null, "< time(\"12:00:00\")", "not(time(\"12:00:00\"))", "!= null",
+                "not(null)", "-");
+        Assertions.assertThat(dump(column)).doesNotContain("zone id");
+        // FEEL does not define how a time with a zone id compares with one without: < and not(...) are both unknown
+        Assertions.assertThat(lookups(column, "11:00@Europe/Paris", "11:00")).isEqualTo("""
+                '11:00@Europe/Paris' (String) -> [2, 3, 4]
+                '11:00' (String) -> [0, 1, 2, 3, 4]
                 """);
     }
 

@@ -31,6 +31,12 @@ import java.time.temporal.Temporal;
  * here, {@code <=} being defined as {@code <} or {@code =} (10.3.2.15): the two are equal exactly when
  * neither is before the other. Two values with a zone are equal by instant, as the TCK expects
  * ({@code 0068-feel-equality}), and a zone id counts by the offset it has at the value's date and time.
+ *
+ * <p>A time may also have a zone id ({@code 10:30:00@Europe/Paris}, a {@link ZonedTime}), which has no offset
+ * without a date. Two such times in the same zone compare by their local time, which is all the TCK asks
+ * ({@code 0068-feel-equality}); DMN 1.5 does not say how one compares with a time in another zone, at an offset or
+ * without a zone, and the TCK leaves those cases out, so such a pair is not {@linkplain #comparable comparable}: a
+ * comparison of it is null in FEEL's terms.
  */
 public final class FeelTemporals {
 
@@ -39,17 +45,17 @@ public final class FeelTemporals {
 
     /**
      * Parses a time: {@code hh:mm[:ss[.fffffffff]]}, optionally followed by an offset ({@code Z},
-     * {@code +01:00}).
+     * {@code +01:00}) or a zone id as FEEL writes it ({@code @Europe/Paris}).
      *
-     * @return a {@link LocalTime}, or an {@link OffsetTime} if the text has an offset
-     * @throws DateTimeParseException if the text is not such a time; a time with a zone id
-     *                                ({@code @Europe/Paris}) is not, as it has no fixed offset
+     * @return a {@link LocalTime}, an {@link OffsetTime} if the text has an offset, or a {@link ZonedTime} if it has a
+     *         zone id
+     * @throws DateTimeParseException if the text is not such a time, or names an unknown zone
      */
-    public static Temporal parseTime(String text) {
+    public static Object parseTime(String text) {
         if (text.indexOf('@') >= 0) {
-            throw new DateTimeParseException("a time with a zone id has no fixed offset", text, text.indexOf('@'));
+            return ZonedTime.parse(text);
         }
-        return (Temporal) DateTimeFormatter.ISO_TIME.parseBest(text, OffsetTime::from, LocalTime::from);
+        return DateTimeFormatter.ISO_TIME.parseBest(text, OffsetTime::from, LocalTime::from);
     }
 
     /**
@@ -86,7 +92,10 @@ public final class FeelTemporals {
         throw new DateTimeParseException("a date and time without a time zone", text, text.length());
     }
 
-    /** Whether a value is a time or date-time with a time zone: an {@link OffsetTime} or a {@link ZonedDateTime}. */
+    /**
+     * Whether a value is a time or date-time with a time zone that has an offset: an {@link OffsetTime} or a
+     * {@link ZonedDateTime}. A {@link ZonedTime} has none, as its zone id gives no offset without a date.
+     */
     public static boolean hasZone(Object value) {
         return value instanceof OffsetTime || value instanceof ZonedDateTime;
     }
@@ -107,14 +116,24 @@ public final class FeelTemporals {
     /**
      * Orders two values of one column type as FEEL does: times and date-times that both have a zone by
      * instant (so equal instants compare as 0, whatever their zones); when only one has a zone, the
-     * other takes its offset, so the two are ordered by their {@linkplain #local local} time; every
+     * other takes its offset, so the two are ordered by their {@linkplain #local local} time; two times with a
+     * zone id in the same zone by local time; every
      * string by character ({@link FeelStrings#compare}), and every other value by its natural order. Across
      * values with and without a zone this order is not
      * transitive ({@code 08:00Z} is before {@code 08:30}, which is before {@code 09:00+02:00}, the
      * instant before {@code 08:00Z}), so sort only values of one kind with it.
+     *
+     * @throws IllegalArgumentException if the two are not {@linkplain #comparable comparable}: a time with a zone id
+     *                                  and a time in another zone, or of another kind
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static int compare(Object a, Object b) {
+        if (a instanceof ZonedTime || b instanceof ZonedTime) {
+            if (!comparable(a, b)) {
+                throw new IllegalArgumentException("FEEL does not define how %s compares with %s".formatted(a, b));
+            }
+            return ((ZonedTime) a).time().compareTo(((ZonedTime) b).time());
+        }
         if (hasZone(a) != hasZone(b)) {
             return ((Comparable) local(a)).compareTo(local(b));
         }
@@ -130,6 +149,18 @@ public final class FeelTemporals {
             case String text -> FeelStrings.compare(text, (String) b);
             default -> ((Comparable) a).compareTo(b);
         };
+    }
+
+    /**
+     * Whether {@link #compare} orders two values of one column type: always, unless one is a time with a zone id
+     * ({@link ZonedTime}), which compares only with a time in the same zone. FEEL gives null for a comparison it does
+     * not define.
+     */
+    public static boolean comparable(Object a, Object b) {
+        if (a instanceof ZonedTime x) {
+            return b instanceof ZonedTime y && x.zone().equals(y.zone());
+        }
+        return !(b instanceof ZonedTime);
     }
 
     /** -1, 1 or 0 as a value is before, after or at the same instant as another. */

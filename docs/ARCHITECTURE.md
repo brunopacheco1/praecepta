@@ -80,8 +80,17 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
      many as the classes of the other. A pair is empty when no value has both coordinates: an
      instant and a local time are a whole number of seconds apart, at most 18 hours. A column has
      only the classes its input can reach (`Zoning`): `timeInput` and `dateTimeInput` give values
-     without a zone, `offsetTimeInput` and `zonedDateTimeInput` with one, and map-based inputs,
-     read from text, either; so the analysis looks for gaps among the values that can really occur.
+     without a zone, `offsetTimeInput` and `zonedDateTimeInput` with one, `zonedTimeInput` times with a
+     zone id, and map-based inputs, read from text, any of them; so the analysis looks for gaps among the
+     values that can really occur.
+   - **Times with a zone id** (`ZonedTime`, #82). Without a date a zone id has no offset, so such a time
+     compares only with a time in the same zone, by local time, which is all the DMN TCK asks; any other
+     comparison of it is one DMN 1.5 leaves open, which Praecepta takes as FEEL's null (see
+     [DMN conformance](DMN-CONFORMANCE.md)). Each zone id the cells name has a line of
+     local times of its own, and one class holds the zone ids no cell names; every test of another kind is
+     unknown on them, and theirs on every other class. A column of map-based inputs whose cells name no zone
+     id keeps that class out of the analysis, and gives such a time the mask of the rules that accept any
+     value, so that tables without zone ids keep the report they had.
    - **Lists** (`ListColumn`): an ordinary column index over the same cells, without their `null`
      tests (`? = null` tests the list, not an element), classifies one element; a missing element
      falls in its class for a missing value, where `list contains(?, null)` is true, a literal false
@@ -145,7 +154,7 @@ An engine is **immutable** once built: any number of threads may share it withou
   from none: with several outputs, defaults that are all `null` still make a default output, of nulls.
   It uses the JDK's own XML parser (`DocumentBuilderFactory.newDefaultInstance()`, never one JAXP finds
   on the class path) with DTDs and external entities disabled. Anything it does not
-  support (a time with a zone id, function calls, inputs computed by other decisions) is rejected
+  support (function calls, inputs computed by other decisions) is rejected
   with an error naming the decision, rule and column. Output entries may be expressions of
   literals and inputs with `+ - * / **` (`OutputExpression`): they are kept as written, parsed and
   type-checked when the engine is built, and evaluated only for matching rules, like outputs that
@@ -171,7 +180,8 @@ Gradle plugin's `GeneratePraecepta` task turn each configured table into a `Tabl
    bound to the engine's int-coded path), an output record, and a class that loads the DMN resource
    once and evaluates it. `JavaNames` turns table, column and value names into safe identifiers.
    `TimeZones` decides which time and date-time columns become `OffsetTime` and `ZonedDateTime`:
-   those whose written values all have a zone, together with the inputs their cells compare with.
+   those whose written values all have a zone, together with the inputs their cells compare with; a time
+   column whose written values all have a zone id becomes the engine's `ZonedTime`.
 
 At runtime, the generated code needs only `praecepta-engine`. The tool writes the result with
 `CompiledTable.write`, so every tool writes the same files.

@@ -566,6 +566,32 @@ class TableCompilerTest {
     }
 
     @Test
+    void times_written_with_a_zone_id_become_zoned_times() throws Exception {
+        var config = new TableDefinition(table("calls.dmn"), "Calls", null, null, null, List.of(), List.of());
+        var result = compile(config, PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("CallsInput"))
+                .contains("public record CallsInput(io.github.brunopacheco1.praecepta.engine.feel.ZonedTime at)");
+        Assertions.assertThat(result.sources().get("CallsOutput"))
+                .contains("public record CallsOutput(String desk, io.github.brunopacheco1.praecepta.engine.feel.ZonedTime opens)",
+                        "io.github.brunopacheco1.praecepta.engine.feel.ZonedTime.parse(value)");
+        Assertions.assertThat(result.sources().get("Calls")).contains(".zonedTimeInput(\"at\", CallsInput::at)");
+        Assertions.assertThat(result.dmn()).contains("[time(\"09:00:00@Europe/Paris\")..time(\"17:00:00@Europe/Paris\"))");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".CallsInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Calls").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            // the generated code's ZonedTime is the engine's, as the loader holds it
+            var parse = loader.loadClass("io.github.brunopacheco1.praecepta.engine.feel.ZonedTime").getMethod("parse", String.class);
+            var open = (Optional<?>) evaluate.invoke(null, constructor.newInstance(parse.invoke(null, "10:00@Europe/Paris")));
+            Assertions.assertThat(open).get().hasToString("CallsOutput[desk=Paris, opens=09:00:00@Europe/Paris]");
+            // a time in another zone does not compare with the cell's, as DMN 1.5 leaves it open
+            var dhaka = (Optional<?>) evaluate.invoke(null, constructor.newInstance(parse.invoke(null, "10:00@Asia/Dhaka")));
+            Assertions.assertThat(dhaka).get().hasToString("CallsOutput[desk=closed, opens=null]");
+        }
+    }
+
+    @Test
     void outputs_naming_a_zoned_input_and_zoned_time_outputs_keep_their_zone() throws Exception {
         var config = new TableDefinition(table("appointments.dmn"), "Appointment", null, null, null, List.of(), List.of());
         var result = compile(config, PACKAGE, Severity.ERROR);

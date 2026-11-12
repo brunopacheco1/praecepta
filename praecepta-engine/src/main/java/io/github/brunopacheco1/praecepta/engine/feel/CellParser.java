@@ -40,6 +40,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *                            functions (DMN 1.5, grammar rules 60 and 65, Table 72), in columns of their type
  *   time("08:30:00")         time literal (TIME columns; a bare 08:30:00 is accepted as well)
  *   time("08:30:00+01:00")   time with an offset (Z, +01:00), compared by instant with other such times
+ *   time("08:30:00@Europe/Paris")
+ *                            time with a zone id, compared by local time with times in the same zone only
  *   date and time("2025-01-31T08:30:00")
  *                            date-time literal (DATE_TIME columns; a bare 2025-01-31T08:30:00 too)
  *   date and time("2025-01-31T08:30:00Z"), date and time("2025-01-31T08:30:00@Europe/Paris")
@@ -59,10 +61,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  * Tests are separated by commas outside quotes and brackets. Surrounding whitespace is ignored, and so are
  * comments ({@code < 18 // minors}, {@code /* adults *&#47; >= 18}), except in a string column in Praecepta's syntax,
  * whose unquoted words keep them as text.
- * Times and date-times may have a time zone ({@link FeelTemporals}): a time an offset, a date-time an
- * offset or a zone id. A time with a zone id ({@code time("08:30:00@Europe/Paris")}) is rejected, as it
- * has no fixed offset. A value with a zone and one without compare by their local time, so an interval
- * may have one end of each kind.
+ * Times and date-times may have a time zone ({@link FeelTemporals}): an offset or a zone id. A value with an
+ * offset and one without compare by their local time, so an interval may have one end of each kind. A time with a
+ * zone id ({@code time("08:30:00@Europe/Paris")}, a {@link ZonedTime}) compares only with one in the same zone, so
+ * an interval's other end must be one.
  *
  * <p>The same syntax serves columns that hold lists, whose cells test the elements. In strict FEEL such
  * a cell is written with FEEL's list functions instead, as in {@code list contains(?, "PT")}; see
@@ -80,7 +82,7 @@ public final class CellParser {
     private static final Pattern BARE_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
     /** An offset after a bare time or date-time: Z, or a sign and hh:mm. */
     private static final String OFFSET = "([Zz]|[+-]\\d{2}:\\d{2})";
-    private static final Pattern BARE_TIME = Pattern.compile("\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?" + OFFSET + "?");
+    private static final Pattern BARE_TIME = Pattern.compile("\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(" + OFFSET + "|@[\\w+\\-/]+)?");
     private static final Pattern BARE_DATE_TIME = Pattern.compile(
             "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(" + OFFSET + "|@[\\w+\\-/]+)?");
     /** ISO 8601 durations: an optional sign, P, then digits, fractions and designators. */
@@ -432,8 +434,15 @@ public final class CellParser {
             requireComparisons("intervals");
             var low = literal(text.substring(1, dots).strip());
             var high = literal(text.substring(dots + 2, text.length() - 1).strip());
-            if (!(low instanceof UnaryTests.Name) && !(high instanceof UnaryTests.Name) && FeelTemporals.compare(low, high) > 0) {
-                throw new CellSyntaxException(cell, "interval starts after it ends");
+            if (!(low instanceof UnaryTests.Name) && !(high instanceof UnaryTests.Name)) {
+                // a time with a zone id orders only with one in its zone: other ends could never be ordered (10.3.2.7)
+                if (!FeelTemporals.comparable(low, high)) {
+                    throw new CellSyntaxException(cell, "the ends of an interval must compare; a time with a zone id compares only "
+                            + "with one in the same zone");
+                }
+                if (FeelTemporals.compare(low, high) > 0) {
+                    throw new CellSyntaxException(cell, "interval starts after it ends");
+                }
             }
             return new Range(low, text.charAt(0) == '[', high, text.charAt(text.length() - 1) == ']');
         }

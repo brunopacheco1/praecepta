@@ -148,7 +148,8 @@ class CellParserTest {
             "TIME                | time(25, 0, 0)                        | invalid time",
             "TIME                | time(8, 0, 0, duration(\"PT0.5S\"))  | invalid time",
             "TIME                | time(8, 0, 0, duration(\"PT19H\"))   | invalid time",
-            "TIME                | @\"10:00:00@Europe/Paris\"           | is a time with a zone id, which is not supported",
+            "TIME                | @\"10:00:00@Mars/Olympus\"           | invalid time '10:00:00@Mars/Olympus'",
+            "TIME                | @\"10:00:00@+01:00\"                 | invalid time",
             "DATE_TIME           | date and time(time(\"08:00:00\"))    | date and time(...) takes",
             "DATE_TIME           | date and time(date(\"2025-01-31\"), date(\"2025-01-31\")) | date and time(...) takes",
             "DATE_TIME           | @\"2025-10-26T02:30+01:00[Europe/Paris]\" | write a zone id as @Europe/Paris",
@@ -180,6 +181,24 @@ class CellParserTest {
         Assertions.assertThatThrownBy(() -> CellParser.parseFeel("1 /* open", ColumnType.NUMBER))
                 .isInstanceOf(CellSyntaxException.class)
                 .hasMessageContaining("a comment /* is not closed");
+    }
+
+    @Test
+    void times_may_have_a_zone_id() {
+        // DMN 1.5, 10.3.4.1: a time string may be a local time "followed by the character "@", followed by [...] a time
+        // zone identifier in the IANA Time Zones Database"
+        var paris = new ZonedTime(LocalTime.of(10, 30), ZoneId.of("Europe/Paris"));
+        Assertions.assertThat(CellParser.parseFeel("time(\"10:30:00@Europe/Paris\")", ColumnType.TIME)).isEqualTo(positive(new Equals(paris)));
+        Assertions.assertThat(CellParser.parseFeel("@\"10:30:00@Europe/Paris\"", ColumnType.TIME)).isEqualTo(positive(new Equals(paris)));
+        Assertions.assertThat(CellParser.parseFeel("time(date and time(\"2025-01-31T10:30:00@Europe/Paris\"))", ColumnType.TIME))
+                .isEqualTo(positive(new Equals(paris)));
+        Assertions.assertThat(CellParser.parseFeel("[time(\"08:00:00@Europe/Paris\")..@\"10:30:00@Europe/Paris\"]", ColumnType.TIME))
+                .isEqualTo(positive(new Range(new ZonedTime(LocalTime.of(8, 0), ZoneId.of("Europe/Paris")), true, paris, true)));
+        Assertions.assertThat(CellParser.parseFeel("date and time(date(\"2025-01-31\"), time(\"10:30:00@Europe/Paris\"))", ColumnType.DATE_TIME))
+                .isEqualTo(positive(new Equals(ZonedDateTime.of(2025, 1, 31, 10, 30, 0, 0, ZoneId.of("Europe/Paris")))));
+        Assertions.assertThat(FeelLiterals.literal(paris)).isEqualTo("time(\"10:30:00@Europe/Paris\")");
+        Assertions.assertThat(FeelLiterals.text(paris)).isEqualTo("10:30:00@Europe/Paris");
+        Assertions.assertThat(FeelLiterals.value("10:30@Europe/Paris", ColumnType.TIME)).isEqualTo(paris);
     }
 
     @Test
@@ -485,7 +504,9 @@ class CellParserTest {
             "BOOLEAN; yes;            is not a boolean",
             "TIME;   time(\"25:00:00\"); invalid time",
             "TIME;   8am;             is not a time",
-            "TIME;   time(\"10:00:00@Europe/Paris\"); is a time with a zone id, which is not supported",
+            "TIME;   [time(\"10:00:00@Europe/Paris\")..time(\"11:00:00@Asia/Dhaka\")]; the ends of an interval must compare",
+            "TIME;   [time(\"10:00:00@Europe/Paris\")..time(\"11:00:00\")]; the ends of an interval must compare",
+            "TIME;   [time(\"11:00:00@Europe/Paris\")..time(\"10:00:00@Europe/Paris\")]; starts after it ends",
             "TIME;   10:00:00+2;      is not a time",
             "DATE_TIME; date and time(\"2025-01-01T10:00:00@Mars/Olympus\"); invalid date and time",
             "DATE_TIME; date and time(\"2025-01-01T10:00:00-0500\"); invalid date and time",

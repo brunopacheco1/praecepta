@@ -102,6 +102,23 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   string literals, in cells, value lists, DMN entries and output expressions (`< 18 // minors`). In
   Praecepta's syntax (Excel, CSV and code), a string column keeps them as text, as it always has, since an
   unquoted word there may hold `//` (a URL). `DmnWriter` leaves them out.
+- **Times with a zone id** ([#82](https://github.com/brunopacheco1/praecepta/issues/82)): a time may name a zone
+  instead of an offset (DMN 1.5, 10.3.4.1: a local time "followed by the character "@", followed by [...] a time
+  zone identifier in the IANA Time Zones Database"), as in `time("10:30:00@Europe/Paris")`, `@"10:30:00@Europe/Paris"`
+  or, in Praecepta's syntax, `10:30:00@Europe/Paris`; cells, value lists, DMN files and map-based inputs rejected it.
+  Such a time is a `feel.ZonedTime` (a local time and a zone id: `OffsetTime` cannot hold a zone without its
+  offset, which a zone id has only on a date), bound with `PraeceptaEngine.Builder.zonedTimeInput`, written back by
+  `FeelLiterals` and `DmnWriter`, and generated as a `ZonedTime` component by the Maven and Gradle plugins and the
+  Quarkus extension when every value written for a time column has a zone id. Two such times in the same zone
+  compare by local time, which is all the TCK asks (`0068-feel-equality`: `time("10:30:00@Europe/Paris") =
+  time("10:30:00@Europe/Paris")`). Every other comparison of one, with a time in another zone, at an offset or
+  without a zone, is left open by DMN 1.5 and by the TCK ("pending RTF equality comparisons with zones
+  clarification"); Praecepta does not invent one: such a comparison is FEEL's null, so neither a test nor its
+  `not(...)` holds, an interval's ends must be in one zone, and a COLLECT MIN or MAX of such times in two zones fails
+  (`IllegalArgumentException`). This choice is recorded in [DMN conformance](docs/DMN-CONFORMANCE.md). The index gives each zone id the cells name a line of
+  local times and the other zone ids one class; a map-based column whose cells name no zone id takes such a time
+  too, matching only the cells that accept any value, and keeps the validation report it had.
+  `FeelTemporals.comparable(a, b)` says whether two values compare.
 
 ### Changed
 - **`DmnReader` uses the JDK's own XML parser** ([#96](https://github.com/brunopacheco1/praecepta/issues/96)):
@@ -145,6 +162,10 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 - **Upgrade note:** a list input holding a missing element is evaluated rather than rejected
   ([#84](https://github.com/brunopacheco1/praecepta/issues/84)); code that relied on the
   `InvalidInputException` to catch such lists must check them itself.
+- **`FeelTemporals.parseTime` returns `Object`** ([#82](https://github.com/brunopacheco1/praecepta/issues/82)),
+  where it returned `Temporal`, since a time with a zone id is a `ZonedTime`; a caller that assigned the result to
+  a `Temporal` casts it. `FeelTemporals.compare` throws an `IllegalArgumentException` for two values that are not
+  `comparable`, which only a time with a zone id makes.
 - **An unquoted string cell that starts with `=` or `!=` is now a test** ([#81](https://github.com/brunopacheco1/praecepta/issues/81)):
   in Praecepta's syntax (Excel, CSV and code), `= PT` was the string `= PT`, and is now the test `= "PT"`; `!= PT`
   now matches every value but `PT`. Before upgrading, search your string columns for cells that start with `=` or

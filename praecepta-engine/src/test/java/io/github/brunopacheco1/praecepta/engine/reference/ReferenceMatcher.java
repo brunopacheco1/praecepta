@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.Period;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -52,6 +53,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
+import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 
 /**
  * Executable specification of decision-table semantics: a deliberately naive matcher that evaluates
@@ -87,10 +89,19 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * @param defaultOutput  the output when no rule matches (DMN's default output values), or null if the table
  *                       has none: DMN 1.5, 10.3.2.10, step 2, "if no rules match, if a default output value d is
  *                       specified, DTI=FEEL(d)", before any hit policy or aggregation
+ * @param zoneIdColumns  the time columns whose inputs have a zone id ({@code 10:30@Europe/Paris}), which compare by
+ *                       local time with times in the same zone, and with no other (FEEL's null); with
+ *                       {@code bothKinds}, the static analysis visits such times in every column whose cells name one
  */
 public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
         Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
-        Set<String> lists, boolean bothKinds, PraeceptaOutput defaultOutput) {
+        Set<String> lists, boolean bothKinds, PraeceptaOutput defaultOutput, Set<String> zoneIdColumns) {
+
+    public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
+            Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
+            Set<String> lists, boolean bothKinds, PraeceptaOutput defaultOutput) {
+        this(rules, hitPolicy, outputPriority, types, allowedValues, feelCells, zonedColumns, lists, bothKinds, defaultOutput, Set.of());
+    }
 
     public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
             Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
@@ -522,11 +533,16 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             case YEAR_MONTH_DURATION -> orderedRepresentatives(type, cells, false).forEach(v -> values.add(((YearsAndMonths) v).toPeriod()));
             // a column's times take a zone or none, as its getter does, or either if read from text
             case TIME, DATE_TIME -> {
-                if (eitherKind || !zonedColumns.contains(column)) {
+                boolean zoneIds = zoneIdColumns.contains(column);
+                if (eitherKind || !zonedColumns.contains(column) && !zoneIds) {
                     values.addAll(orderedRepresentatives(type, cells, false));
                 }
                 if (eitherKind || zonedColumns.contains(column)) {
                     values.addAll(orderedRepresentatives(type, cells, true));
+                }
+                // read from text, a time with a zone id counts only where a cell names one (the engine leaves it out elsewhere)
+                if (zoneIds || bothKinds && cells.stream().anyMatch(cell -> literals(cell).stream().anyMatch(ZonedTime.class::isInstance))) {
+                    values.addAll(zoneIdRepresentatives(cells));
                 }
             }
             default -> values.addAll(orderedRepresentatives(type, cells, false));
@@ -660,7 +676,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             return zonedRepresentatives(type, cells);
         }
         var points = new TreeSet<Object>(ReferenceMatcher::compare);
-        cells.forEach(cell -> literals(cell).stream().map(ReferenceMatcher::withoutZone).forEach(points::add));
+        cells.forEach(cell -> literals(cell).stream().filter(literal -> !(literal instanceof ZonedTime))
+                .map(ReferenceMatcher::withoutZone).forEach(points::add));
         var sorted = new ArrayList<>(points);
         var around = new TreeSet<Object>(ReferenceMatcher::compare);
         around.addAll(sorted);
@@ -679,6 +696,33 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             addNeighbours(around, sorted.get(i), next);
         }
         return around;
+    }
+
+    /**
+     * Times with a zone id that visit every region the cells distinguish among them: for each zone a cell names, the
+     * local times of its literals in that zone and those around and between them; and one in a zone no cell names.
+     */
+    private static List<Object> zoneIdRepresentatives(List<UnaryTests> cells) {
+        var zones = new TreeSet<String>();
+        cells.forEach(cell -> literals(cell).stream().filter(ZonedTime.class::isInstance)
+                .forEach(time -> zones.add(((ZonedTime) time).zone().getId())));
+        var values = new ArrayList<Object>();
+        for (var zone : zones) {
+            var localTimes = new TreeSet<LocalTime>();
+            cells.forEach(cell -> literals(cell).stream()
+                    .filter(time -> time instanceof ZonedTime zoned && zoned.zone().getId().equals(zone))
+                    .forEach(time -> localTimes.add(((ZonedTime) time).time())));
+            var around = new TreeSet<Object>(ReferenceMatcher::compare);
+            around.addAll(localTimes);
+            var sorted = new ArrayList<>(localTimes);
+            for (int i = 0; i < sorted.size(); i++) {
+                addNeighbours(around, sorted.get(i), i + 1 < sorted.size() ? sorted.get(i + 1) : null);
+            }
+            around.forEach(time -> values.add(new ZonedTime((LocalTime) time, ZoneId.of(zone))));
+        }
+        var unnamed = ZoneId.of("Pacific/Kiritimati");
+        values.add(new ZonedTime(LocalTime.NOON, unnamed));
+        return values;
     }
 
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
@@ -702,6 +746,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         var localTimes = new TreeSet<Long>();
         var written = new ArrayList<Object>();
         cells.forEach(cell -> written.addAll(literals(cell)));
+        written.removeIf(ZonedTime.class::isInstance); // compared with no time with an offset
         for (var literal : written) {
             (isZoned(literal) ? instants : localTimes).add(nanos(literal));
         }
@@ -990,6 +1035,16 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         if (test instanceof Compare c && c.value() == null || test instanceof Range r && (r.low() == null || r.high() == null)) {
             return null;
         }
+        // FEEL gives null for a comparison it does not define: a time with a zone id and one in another zone, or of another kind
+        if (test instanceof Range r && (!comparable(value, r.low()) || !comparable(value, r.high()))) {
+            var low = comparable(value, r.low()) ? Boolean.valueOf(r.lowClosed() ? compare(value, r.low()) >= 0 : compare(value, r.low()) > 0) : null;
+            var high = comparable(value, r.high()) ? Boolean.valueOf(r.highClosed() ? compare(value, r.high()) <= 0 : compare(value, r.high()) < 0)
+                    : null;
+            return low == Boolean.FALSE || high == Boolean.FALSE ? Boolean.FALSE : null;
+        }
+        if (test instanceof Equals e && !comparable(value, e.value()) || test instanceof Compare c && !comparable(value, c.value())) {
+            return null;
+        }
         return switch (test) {
             case NullTest n -> false;
             case UnaryTests.NullElement n -> false;
@@ -1093,6 +1148,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static int compare(Object a, Object b) {
         return switch (a) {
+            case ZonedTime time -> time.time().compareTo(((ZonedTime) b).time());
             case OffsetTime time -> instant(time)
                     .compareTo(instant(b instanceof LocalTime local ? local.atOffset(time.getOffset()) : (OffsetTime) b));
             case LocalTime time when b instanceof OffsetTime other -> instant(time.atOffset(other.getOffset())).compareTo(instant(other));
@@ -1102,6 +1158,14 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             case String text -> Arrays.compare(text.codePoints().toArray(), ((String) b).codePoints().toArray());
             default -> ((Comparable) a).compareTo(b);
         };
+    }
+
+    /** Whether FEEL compares two values: a time with a zone id only with one in the same zone. */
+    private static boolean comparable(Object a, Object b) {
+        if (a instanceof ZonedTime x) {
+            return b instanceof ZonedTime y && x.zone().equals(y.zone());
+        }
+        return !(b instanceof ZonedTime);
     }
 
     /** A literal as a value without a time zone is compared with it: by its local time. */

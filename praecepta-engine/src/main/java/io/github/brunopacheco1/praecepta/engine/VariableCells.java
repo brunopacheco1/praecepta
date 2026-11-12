@@ -76,11 +76,11 @@ final class VariableCells {
                 if (value == null || other == null) {
                     yield value == other;
                 }
-                yield FeelTemporals.compare(value, other) == 0;
+                yield FeelTemporals.comparable(value, other) ? FeelTemporals.compare(value, other) == 0 : null;
             }
             case Compare(var operator, var literal) -> {
                 var other = resolve(literal, inputs);
-                if (value == null || other == null) {
+                if (value == null || other == null || !FeelTemporals.comparable(value, other)) {
                     yield null;
                 }
                 int cmp = FeelTemporals.compare(value, other);
@@ -97,28 +97,41 @@ final class VariableCells {
                 if (value == null || from == null || to == null) {
                     yield null;
                 }
-                int above = FeelTemporals.compare(value, from);
-                int below = FeelTemporals.compare(value, to);
-                yield (lowClosed ? above >= 0 : above > 0) && (highClosed ? below <= 0 : below < 0);
+                // e1 >= e2 and e1 <= e3 (Table 55), each unknown when FEEL does not define it (a time with a zone id)
+                var aboveLow = !FeelTemporals.comparable(value, from) ? null
+                        : Boolean.valueOf(lowClosed ? FeelTemporals.compare(value, from) >= 0 : FeelTemporals.compare(value, from) > 0);
+                var belowHigh = !FeelTemporals.comparable(value, to) ? null
+                        : Boolean.valueOf(highClosed ? FeelTemporals.compare(value, to) <= 0 : FeelTemporals.compare(value, to) < 0);
+                if (aboveLow == Boolean.FALSE || belowHigh == Boolean.FALSE) {
+                    yield Boolean.FALSE;
+                }
+                yield aboveLow == null || belowHigh == null ? null : Boolean.TRUE;
             }
         };
     }
 
     /**
      * Membership in a named list, as FEEL's {@code ? in list} tests it, which is {@code list contains(list, ?)}
-     * (DMN 1.5, Table 55): true if an element equals the value, else false. A missing value equals only a
-     * missing element, and a missing element only a missing value ({@code null = x} is false).
+     * (DMN 1.5, Table 55): true if an element equals the value, else unknown if an element cannot be compared
+     * with it (a time in another zone), else false. A missing value equals only a missing element, and a missing
+     * element only a missing value ({@code null = x} is false).
      */
     private static Boolean in(Object value, List<?> list) {
         if (value == null) {
             return list.stream().anyMatch(Objects::isNull); // List.of(...) would throw on contains(null)
         }
+        Boolean in = Boolean.FALSE;
         for (var element : list) {
-            if (element != null && FeelTemporals.compare(value, element) == 0) {
+            if (element == null) {
+                continue; // a missing element equals no value that is there
+            }
+            if (!FeelTemporals.comparable(value, element)) {
+                in = null; // an element FEEL cannot compare with the value: unknown, unless another equals it
+            } else if (FeelTemporals.compare(value, element) == 0) {
                 return Boolean.TRUE;
             }
         }
-        return Boolean.FALSE;
+        return in;
     }
 
     private static Object resolve(Comparable<?> literal, Function<String, Object> inputs) {

@@ -104,10 +104,8 @@ Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drool
   Praecepta's input entries are FEEL *simple unary tests*: in DMN they may compare with another
   input (`> limit`) or test a list's elements, but not compute. Output entries may compute with `+`,
   `-`, `*`, `/` and `**` on strings and numbers, but call no functions. Some FEEL that fits a single
-  table is not read yet either: times with a zone id
-  ([#82](https://github.com/brunopacheco1/praecepta/issues/82)) and arithmetic on dates, times and
-  durations ([#85](https://github.com/brunopacheco1/praecepta/issues/85)); see the
-  [roadmap](docs/ROADMAP.md).
+  table is not read yet either: arithmetic on dates, times and durations
+  ([#85](https://github.com/brunopacheco1/praecepta/issues/85)); see the [roadmap](docs/ROADMAP.md).
 - **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
   boxed expressions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)).
 - **A process engine, a modeller or a decision service** around the tables.
@@ -152,6 +150,7 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 | `true`, `false` | that boolean | BOOLEAN |
 | `time("08:30:00")` or `08:30:00` | that time of day | TIME |
 | `time("08:30:00+01:00")` or `08:30:00Z` | that instant of the day, at an offset | TIME |
+| `time("08:30:00@Europe/Paris")` or `08:30:00@Europe/Paris` | that time of day in that zone, which compares only with times in the same zone | TIME |
 | `date and time("2025-01-31T08:30:00")` or `2025-01-31T08:30:00` | that date and time | DATE_TIME |
 | `date and time("2025-01-31T08:30:00Z")`, `date and time("2025-01-31T08:30:00@Europe/Paris")` | that instant | DATE_TIME |
 | `duration("P1DT2H")` or `P1DT2H` | that length of time (`PT24H` equals `P1D`) | DAY_TIME_DURATION |
@@ -184,7 +183,8 @@ character by Unicode code point and case-sensitively (`"Zed" < "apple"`), so a c
 such as an emoji, comes after every other (`"🐎" > "～"`), where Java's `String.compareTo` would put it
 before U+E000 to U+FFFF. Where DMN 1.5 and its TCK leave a
 case open (`-` against a missing value, `=` between a time with a zone and one without, two times at
-different offsets), Praecepta's choice is recorded in [DMN conformance](docs/DMN-CONFORMANCE.md).
+different offsets, a time with a zone id against a time in another zone, at an offset or without a zone),
+Praecepta's choice is recorded in [DMN conformance](docs/DMN-CONFORMANCE.md).
 
 Times may have an offset (`Z`, `+01:00`) and date-times an offset or a zone id (`@Europe/Paris`).
 Two values with a time zone compare by the instant they denote, as XML Schema compares them
@@ -192,7 +192,17 @@ Two values with a time zone compare by the instant they denote, as XML Schema co
 of the two has a zone, the other takes its offset (DMN 1.5, Table 54, which says so for `<`; Praecepta
 applies it to `=` too), so they compare by local time: `time("08:00:00")` matches `08:00`, `08:00Z` and
 `08:00+05:00`, `< time("12:00:00+01:00")` matches `11:59`, and an interval may have an end of each
-kind. A time with a zone id (`time("08:00:00@Europe/Paris")`) is rejected, as it has no fixed offset.
+kind.
+
+A time may also have a zone id (`time("08:00:00@Europe/Paris")`, DMN 1.5, 10.3.4.1), which has no offset
+without a date. Two such times in the same zone compare by local time, which is all the DMN TCK asks
+(`0068-feel-equality`). How one compares with a time in another zone, at an offset or without a zone, DMN 1.5
+does not say, and the TCK leaves those cases out "pending RTF equality comparisons with zones clarification";
+Praecepta takes such a comparison as one FEEL does not define, which is null: neither the test nor its
+`not(...)` matches (`time("08:00:00@Europe/Paris")` and `not(time("08:00:00@Europe/Paris"))` both miss
+`08:00@Asia/Dhaka`, `08:00Z` and `08:00`), an interval's ends must be in one zone, and a COLLECT MIN or MAX
+over such times in two zones fails. A column whose cells name no zone id still takes such a time read from
+text: only the cells that accept any value (`-`, `!= null`) match it.
 
 ### Typed columns and input value lists
 ```java
@@ -205,6 +215,7 @@ var engine = PraeceptaEngine.<Applicant, String>builder()
         .timeInput("callTime", Applicant::callTime)    // LocalTime
         .dateTimeInput("appliedAt", Applicant::appliedAt) // LocalDateTime
         .offsetTimeInput("cutOff", Applicant::cutOff)  // OffsetTime, compared by instant
+        .zonedTimeInput("callAt", Applicant::callAt)   // ZonedTime: a time with a zone id
         .zonedDateTimeInput("signedAt", Applicant::signedAt) // ZonedDateTime (from an OffsetDateTime: toZonedDateTime())
         .durationInput("waited", Applicant::waited)    // Duration
         .periodInput("tenure", Applicant::tenure)      // Period of years and months
@@ -364,9 +375,7 @@ Supported:
   output (`[{fee=null}]`), and COUNT counts the rule.
 
 Anything else is rejected with a message naming the decision, rule and column: function calls such as
-`upper case(a)`, `if`, other FEEL literal forms
-([#81](https://github.com/brunopacheco1/praecepta/issues/81)), a time with a zone id
-([#82](https://github.com/brunopacheco1/praecepta/issues/82)), output entries that compute with dates,
+`upper case(a)`, `if`, output entries that compute with dates,
 times or durations ([#85](https://github.com/brunopacheco1/praecepta/issues/85)), and inputs computed by
 other decisions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)). `DmnReader.readAll(dmn)`
 reads every decision table of a file. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
@@ -405,8 +414,9 @@ Compiles tables at build time. For each table the `generate` goal:
 A string column with a value list becomes an enum in the input record, using the int-coded path.
 Numbers are `BigDecimal` and dates `LocalDate`. Times and date-times are `LocalTime` and
 `LocalDateTime`, or `OffsetTime` and `ZonedDateTime` when every value written for the column has a
-time zone (an input compared with such a column in a cell, as in `> limit`, takes a zone too); a
-column that mixes both kinds fails the build. An input declared with `<list>true</list>` (or typed
+time zone (an input compared with such a column in a cell, as in `> limit`, takes a zone too), and a
+time is the engine's `ZonedTime` when every value written for it has a zone id; a column that mixes
+kinds fails the build. An input declared with `<list>true</list>` (or typed
 by a collection in a DMN file) becomes a `java.util.List` of its type. At runtime the generated code
 needs only `praecepta-engine`; Apache POI stays a build-time dependency.
 

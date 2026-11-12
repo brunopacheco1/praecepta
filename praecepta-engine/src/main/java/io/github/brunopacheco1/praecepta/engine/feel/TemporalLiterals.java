@@ -79,7 +79,7 @@ final class TemporalLiterals {
      *
      * @param expected the type the literal should have, which names it in messages and tells whether a duration is
      *                 one of days and time or of years and months; null to infer it from the text
-     * @return a {@code LocalDate}, {@code LocalTime}, {@code OffsetTime}, {@code LocalDateTime}, {@code ZonedDateTime},
+     * @return a {@code LocalDate}, {@code LocalTime}, {@code OffsetTime}, {@link ZonedTime}, {@code LocalDateTime}, {@code ZonedDateTime},
      *         {@code Duration} or {@link YearsAndMonths}, and where the literal ends
      * @throws IllegalArgumentException if the literal is not valid, with a message that says why
      */
@@ -98,6 +98,7 @@ final class TemporalLiterals {
             case LocalDate d -> ColumnType.DATE;
             case LocalTime t -> ColumnType.TIME;
             case OffsetTime t -> ColumnType.TIME;
+            case ZonedTime t -> ColumnType.TIME;
             case LocalDateTime d -> ColumnType.DATE_TIME;
             case ZonedDateTime d -> ColumnType.DATE_TIME;
             case Duration d -> ColumnType.DAY_TIME_DURATION;
@@ -297,9 +298,10 @@ final class TemporalLiterals {
                 case String iso -> time(iso.strip());
                 case LocalTime time -> time;
                 case OffsetTime time -> time;
+                case ZonedTime time -> time;
                 case LocalDateTime dateTime -> dateTime.toLocalTime();
                 case ZonedDateTime dateTime when dateTime.getZone() instanceof ZoneOffset offset -> OffsetTime.of(dateTime.toLocalTime(), offset);
-                case ZonedDateTime dateTime -> throw zoneId(FeelLiterals.text(dateTime));
+                case ZonedDateTime dateTime -> new ZonedTime(dateTime.toLocalTime(), dateTime.getZone());
                 case null, default -> throw takes("time", "a time string, a time or a date and time");
             };
         }
@@ -345,6 +347,9 @@ final class TemporalLiterals {
                     case OffsetTime time -> {
                         return ZonedDateTime.of(date, time.toLocalTime(), time.getOffset());
                     }
+                    case ZonedTime time -> {
+                        return ZonedDateTime.of(date, time.time(), time.zone());
+                    }
                     case null, default -> {
                         // not a time
                     }
@@ -370,9 +375,6 @@ final class TemporalLiterals {
     }
 
     private Object time(String iso) {
-        if (iso.indexOf('@') >= 0) {
-            throw zoneId(iso);
-        }
         try {
             return FeelTemporals.parseTime(iso);
         } catch (DateTimeParseException e) {
@@ -416,10 +418,6 @@ final class TemporalLiterals {
     private IllegalArgumentException invalid(ColumnType type, String iso) {
         var name = expected == ColumnType.DAY_TIME_DURATION || expected == ColumnType.YEAR_MONTH_DURATION ? expected : type;
         return new IllegalArgumentException("invalid " + name.feelName() + " '" + iso + "'");
-    }
-
-    private static IllegalArgumentException zoneId(String iso) {
-        return new IllegalArgumentException("'" + iso + "' is a time with a zone id, which is not supported; write an offset such as +01:00");
     }
 
     private static IllegalArgumentException takes(String function, String what) {
