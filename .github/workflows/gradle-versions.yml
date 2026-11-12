@@ -51,7 +51,7 @@ jobs:
           - gradle: '8.14.7'
             java: '21'
           # the current Gradle
-          - gradle: '9.9.1'
+          - gradle: '9.8.2'
             java: '25'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
