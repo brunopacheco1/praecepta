@@ -5,7 +5,7 @@
 # ORT repository configuration (https://oss-review-toolkit.org/ort/docs/configuration/ort-yml):
 # the policy judges what is published, not tooling around it.
 analyzer:
-  # do not resolve excluded projects at all (the integration-test POMs hold @placeholders@)
+  # do not resolve excluded projects at all (the integration tests' POMs hold @placeholders@)
   skip_excluded: true
 excludes:
   paths:
@@ -18,6 +18,11 @@ excludes:
     - pattern: "praecepta-maven-plugin/src/it/**"
       reason: "TEST_OF"
       comment: "Maven plugin integration tests; their POMs are filled in by maven-invoker-plugin."
+    - pattern: "praecepta-native-tests/**"
+      reason: "TEST_OF"
+      comment: >-
+        Native-image tests of the framework integrations; never published. The applications under src/it
+        (Spring Boot, Micronaut, Quarkus) have POMs that maven-invoker-plugin fills in (@quarkus.version@...).
   scopes:
     - pattern: "test"
       reason: "TEST_DEPENDENCY_OF"
