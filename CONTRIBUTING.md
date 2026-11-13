@@ -35,6 +35,16 @@ JDK and enable the `native` profile; it takes a few minutes, and CI does it in t
 mvn -pl praecepta-maven-plugin -am verify -Pnative
 ```
 
+The Spring Boot, Micronaut and Quarkus integrations are built natively by the test applications of
+`praecepta-native-tests` (`src/it/*-app`), which are in the reactor only with the `native-frameworks`
+profile. Each takes a few minutes and GraalVM for JDK 25 (on GraalVM for JDK 21 only the Micronaut one runs:
+Spring Boot 4 and Quarkus 3.40 need 25), and CI runs them in the `Native frameworks` workflow;
+`-Dinvoker.test` picks one:
+
+```
+mvn -P native-frameworks -pl praecepta-native-tests -am verify -DskipTests -Dinvoker.test=quarkus-app
+```
+
 The Gradle plugin's functional tests build small Gradle projects with Gradle TestKit, which downloads
 a Gradle distribution, so they run only when asked for, on a Java that Gradle version runs on:
 
@@ -49,9 +59,11 @@ framework (Quarkus with `QuarkusExtensionTest` and `QuarkusDevModeTest`, dev mod
 The code targets **Java 21** (`--release 21`): newer language features or APIs fail to compile.
 CI builds and tests on Java 21, 25 and 27, runs the Maven plugin's integration tests on Maven 3.9,
 3.10 and 4.0 (on pull requests only when the plugin, the engine or a POM changes), and the Gradle
-plugin's functional tests on Gradle 8.5, 8.14 and 9 (on pull requests only when that plugin, the
-compiler, loader or engine changes), and the native-image test project with GraalVM for JDK 21 and 25
-(on pull requests only when what goes into the executable changes). A newer push to a pull request
+plugin's functional tests on Gradle 8.5, 8.14 and 9 and a check that the Plugin Portal build publishes
+Maven's files unchanged (on pull requests only when that plugin, the compiler, loader or engine changes),
+the native-image test project with GraalVM for JDK 21 and 25 (on pull requests only when what goes into
+the executable changes), and the framework applications natively (weekly, and on pull requests only when
+a framework module, the integration core or the applications change). A newer push to a pull request
 cancels the checks still running for the previous one.
 
 ## Code style
@@ -93,8 +105,11 @@ A new integration or other module needs these, and nothing else:
    commented with the issue (`<!-- Spring Boot starter (#20) -->`), and only exact, current, stable
    releases from Maven Central. A framework's BOM is imported in the module's own
    `<dependencyManagement>` (importing it in the parent would change the versions every other module
-   resolves), with its version property in the parent. The enforcer's `dependencyConvergence` applies to
-   every module.
+   resolves), with its version property in the parent. The parent's JUnit artifacts are declared one by
+   one rather than imported from `junit-bom`, since a module's `<dependencyManagement>` is published with
+   it and no consumer needs JUnit's; being declared, they also win over the JUnit a framework's BOM
+   manages. A test that needs another JUnit artifact adds it there. The enforcer's `dependencyConvergence`
+   applies to every module.
 3. **Publishing:** nothing to list. The release builds every module but the benchmarks and the TCK runner
    and publishes every one that does not opt out; the GitHub release, provenance and third-party notices
    find the published jars themselves (`.github/scripts/published_modules.py`). A module that must never
@@ -133,8 +148,10 @@ A new integration or other module needs these, and nothing else:
    allowlist in `.github/scripts/check_sbom_licenses.py`.
 5. Describe what changed and why in the pull request, and add a line to `CHANGELOG.md` under
    *Unreleased*.
-6. Commits must be signed, and `main` only changes through pull requests that pass the required
-   checks, are up to date with `main`, and are approved by a code owner (`.github/CODEOWNERS`).
+6. `main` only changes through pull requests that pass the required checks, are up to date with
+   `main`, and are approved by a code owner (`.github/CODEOWNERS`). Every commit on `main` is signed:
+   pull requests are squash-merged, so the commit GitHub creates for the merge is the signed one, and
+   the commits on your branch need not be signed.
 
 ## Licensing of contributions
 Praecepta is licensed under the [Apache License 2.0](LICENSE). Unless you state otherwise, any

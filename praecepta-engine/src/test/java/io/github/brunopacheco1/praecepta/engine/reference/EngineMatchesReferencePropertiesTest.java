@@ -6,11 +6,20 @@
 package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BinaryOperator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.assertj.core.api.Assertions;
 
@@ -19,17 +28,22 @@ import io.github.brunopacheco1.praecepta.engine.OutputStrategy;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind;
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
+import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
+import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.reference.ReferenceMatcher.Aggregator;
 import io.github.brunopacheco1.praecepta.engine.reference.ReferenceMatcher.Finding;
 import io.github.brunopacheco1.praecepta.engine.reference.ReferenceMatcher.Outcome;
 import net.jqwik.api.Arbitraries;
 import net.jqwik.api.Arbitrary;
+import net.jqwik.api.Assume;
 import net.jqwik.api.EdgeCasesMode;
 import net.jqwik.api.ForAll;
 import net.jqwik.api.Property;
@@ -52,6 +66,12 @@ class EngineMatchesReferencePropertiesTest {
     /** Tables of up to 200 rules: each try evaluates every hit policy. */
     private static final int WIDE_TRIES = 200;
     private static final int WIDE_ANALYSIS_TRIES = 50;
+    /**
+     * The most cells the reference's brute force evaluates for a wide table's analysis (its representative inputs
+     * times its rules): now and then, three columns of times and date-times with and without a zone give hundreds
+     * of thousands of inputs, which take the reference minutes, so such a try is skipped.
+     */
+    private static final long MAX_WIDE_ANALYSIS_WORK = 5_000_000L;
 
     @Provide
     Arbitrary<DecisionTableScenario> scenarios() {
@@ -119,14 +139,18 @@ class EngineMatchesReferencePropertiesTest {
         assertSameHits(s, DecisionTableScenario.outOnly(s.rules()), HitPolicy.ANY, List.of(), perColumn);
     }
 
-    /** The number output {@code n} is now and then an expression, which may give a missing value: the aggregations skip it. */
+    /**
+     * The table's one output, the number {@code n}, is now and then an expression, which may give a missing value:
+     * SUM, MIN and MAX are then missing, as FEEL's {@code sum}, {@code min} and {@code max} are null for a list
+     * that holds null; COUNT counts it.
+     */
     @Property(tries = TRIES, edgeCases = EdgeCasesMode.NONE)
     void collect_aggregations_match_dmn(@ForAll("scenarios") DecisionTableScenario s, @ForAll boolean perColumn) {
-        var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of());
+        var rules = DecisionTableScenario.numberOnly(s.rules());
+        var reference = s.reference(rules, HitPolicy.COLLECT, Map.of(), true, List.of(DecisionTableScenario.NUMBER));
         for (var aggregation : AggregationOperator.values()) {
             var builder = PraeceptaEngine.<Map<String, Object>, Optional<BigDecimal>>builder()
-                    .table(s.table(s.rules(), HitPolicy.COLLECT, List.of()))
-                    .aggregation(aggregation)
+                    .table(s.numberTable(rules, aggregation))
                     .output(numericOutput());
             configure(builder, s, perColumn);
             var engine = builder.build();
@@ -135,8 +159,8 @@ class EngineMatchesReferencePropertiesTest {
                     Assertions.assertThatThrownBy(() -> engine.evaluate(input)).isInstanceOf(InvalidInputException.class);
                     continue;
                 }
-                // no match gives the default output if there is one, else no output, whatever the aggregation; matches
-                // whose outputs are all missing give a missing total
+                // no match gives the default output if there is one, else no output, whatever the aggregation; a
+                // matching rule whose output is missing makes SUM, MIN and MAX missing
                 var expected = reference.aggregate(input, DecisionTableScenario.NUMBER, Aggregator.valueOf(aggregation.name()))
                         .map(total -> List.of(Optional.ofNullable(total.value())))
                         .orElse(List.of());
@@ -198,6 +222,13 @@ class EngineMatchesReferencePropertiesTest {
     @Property(tries = WIDE_ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
     void wide_tables_validation_report_matches_the_reference(@ForAll("wideScenarios") DecisionTableScenario s,
             @ForAll("priorities") List<String> priority, @ForAll boolean perColumn) {
+        var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of(), perColumn);
+        // counted, not listed: a list column may have more representative lists than the heap holds
+        var work = BigInteger.valueOf(s.rules().size());
+        for (var column : s.columns()) {
+            work = work.multiply(reference.representativeValueCount(column, true));
+        }
+        Assume.that(work.compareTo(BigInteger.valueOf(MAX_WIDE_ANALYSIS_WORK)) <= 0);
         assertSameFindings(s, priority, perColumn);
     }
 
@@ -219,17 +250,44 @@ class EngineMatchesReferencePropertiesTest {
         assertSameFindings(s, priority, perColumn);
     }
 
+    /** The validation report lists at most this many pairs of overlapping rules, or of rules with conflicting outputs. */
+    private static final int MAX_OVERLAPS = 100;
+
+    /**
+     * Of the reference's findings, those the report lists: every unreachable rule, and the first {@link #MAX_OVERLAPS}
+     * pairs in rule order, which a wide table of overlapping rules goes beyond.
+     */
+    private static List<Finding> reported(Collection<Finding> findings, List<Praeceptum> rules) {
+        var order = new HashMap<Integer, Integer>();
+        for (int r = 0; r < rules.size(); r++) {
+            order.put(rules.get(r).priority(), r);
+        }
+        var pairs = findings.stream().filter(finding -> finding.ruleIds().size() == 2)
+                .sorted(Comparator.<Finding>comparingInt(finding -> order.get(finding.ruleIds().get(0)))
+                        .thenComparingInt(finding -> order.get(finding.ruleIds().get(1))))
+                .limit(MAX_OVERLAPS);
+        return Stream.concat(findings.stream().filter(finding -> finding.ruleIds().size() != 2), pairs).toList();
+    }
+
     private static void assertSameFindings(DecisionTableScenario s, List<String> priority, boolean perColumn) {
         for (var policy : List.of(HitPolicy.UNIQUE, HitPolicy.ANY, HitPolicy.FIRST, HitPolicy.PRIORITY)) {
             var rules = policy == HitPolicy.ANY ? DecisionTableScenario.outOnly(s.rules()) : s.rules();
             var engine = engine(s, rules, policy, priority, perColumn);
             var reference = s.reference(rules, policy, DecisionTableScenario.outputPriority(policy, priority), perColumn);
             var actual = engine.validationReport().issues().stream()
-                    .filter(issue -> issue.kind() != Kind.GAP)
+                    .filter(issue -> issue.kind() != Kind.GAP && issue.kind() != Kind.UNREACHABLE_DEFAULT_OUTPUT)
                     .map(issue -> new Finding(issue.kind().name(), issue.ruleIds()))
                     .collect(Collectors.toSet());
             Assertions.assertThat(actual).as("policy %s", policy)
-                    .containsExactlyInAnyOrderElementsOf(reference.expectedFindings(s.columns()));
+                    .containsExactlyInAnyOrderElementsOf(reported(reference.expectedFindings(s.columns()), rules));
+            // not logging the report (as the integrations build their engines) leaves it as it is
+            var quiet = PraeceptaEngine.<Map<String, Object>, PraeceptaOutput>builder()
+                    .table(s.table(rules, policy, priority))
+                    .output(output -> output)
+                    .logValidationReport(false);
+            configure(quiet, s, perColumn);
+            Assertions.assertThat(quiet.build().validationReport()).as("policy %s, not logged", policy)
+                    .isEqualTo(engine.validationReport());
         }
     }
 
@@ -267,6 +325,172 @@ class EngineMatchesReferencePropertiesTest {
                 var noMatch = reference.defaultOutput() == null ? List.<PraeceptaOutput>of() : List.of(reference.defaultOutput());
                 Assertions.assertThat(engine.evaluate(input)).as("gap %s, input %s", gap.detail(), input).isEqualTo(noMatch);
             }
+            assertListStepsHoldNoMatch(gap.detail(), gap.example(), s, reference);
+        }
+    }
+
+    /** A list column's step of a gap's description: {@code c1 has no element in S}, {@code c1 has an element in S}, {@code c1 = []}. */
+    private static final Pattern LIST_STEP = Pattern.compile("(c\\d+) (has no element in|has an element in|=) (.*?)(?=, c\\d+ |$)");
+
+    /**
+     * Every list a gap's description names, not only its example, matches no rule (#78): for each column of strings
+     * or numbers that holds lists, lists of an element of each "has an element in" set, alone and with every other
+     * representative element outside the "has no element in" sets, with the example's other columns and any value
+     * of the columns it leaves out. A description too broad, one that leaves out a set of excluded elements or names
+     * an element some rule matches, fails here though its example passes.
+     */
+    private static void assertListStepsHoldNoMatch(String detail, Map<String, Object> example, DecisionTableScenario s,
+            ReferenceMatcher reference) {
+        var steps = new LinkedHashMap<String, List<Matcher>>();
+        var matcher = LIST_STEP.matcher(detail);
+        while (matcher.find()) {
+            if (s.lists().contains(matcher.group(1))) {
+                steps.computeIfAbsent(matcher.group(1), any -> new ArrayList<>()).add(LIST_STEP.matcher(matcher.group()));
+            }
+        }
+        for (var step : steps.entrySet()) {
+            var column = step.getKey();
+            var type = s.types().get(column);
+            if (type != ColumnType.STRING && type != ColumnType.NUMBER) {
+                continue; // runs of times with and without a zone are written in forms a cell does not read
+            }
+            var pool = reference.representativeValues(column, false).stream()
+                    .flatMap(list -> ((List<?>) list).stream()).distinct().toList();
+            var excluded = new ArrayList<UnaryTests>();
+            var groups = new ArrayList<List<UnaryTests>>();
+            boolean empty = false;
+            for (var part : step.getValue()) {
+                Assertions.assertThat(part.matches()).isTrue();
+                switch (part.group(2)) {
+                    case "has no element in" -> excluded.addAll(classes(part.group(3), type));
+                    case "has an element in" -> groups.add(classes(part.group(3), type));
+                    default -> empty = part.group(3).equals("[]");
+                }
+            }
+            var allowed = pool.stream().filter(element -> excluded.stream().noneMatch(test -> holds(test, element))).toList();
+            var lists = new ArrayList<List<Object>>();
+            if (empty) {
+                lists.add(List.of());
+            } else {
+                var oneEach = new ArrayList<Object>();
+                for (var group : groups) {
+                    var inGroup = allowed.stream().filter(element -> group.stream().anyMatch(test -> holds(test, element))).toList();
+                    Assertions.assertThat(inGroup).as("gap %s: elements of a group outside the excluded ones", detail).isNotEmpty();
+                    oneEach.add(inGroup.getLast());
+                    inGroup.forEach(element -> lists.add(List.of(element)));
+                }
+                lists.add(oneEach);
+                var everything = new ArrayList<Object>(oneEach);
+                everything.addAll(allowed);
+                lists.add(everything);
+            }
+            for (var list : lists) {
+                if (groups.size() > 1 && list.size() == 1) {
+                    continue; // one element need not be in every group
+                }
+                var partial = new HashMap<>(example);
+                partial.put(column, list);
+                for (var input : completions(partial, s, reference)) {
+                    Assertions.assertThat(reference.matches(input)).as("gap %s, input %s", detail, input).isEmpty();
+                }
+            }
+        }
+    }
+
+    /**
+     * The element classes of a set in a gap's description, as cells: {@code "PT"}, {@code {"PT", "BR"}},
+     * {@code [1..2)}; an end at infinity becomes a comparison ({@code (-inf..1)} is {@code < 1}).
+     */
+    private static List<UnaryTests> classes(String set, ColumnType type) {
+        var inner = set.startsWith("{") && set.endsWith("}") ? set.substring(1, set.length() - 1) : set;
+        var tests = new ArrayList<UnaryTests>();
+        for (var part : inner.split(", (?=[\"\\[(\\]\\d-])")) {
+            var text = part.strip();
+            if (text.equals("(-inf..+inf)")) {
+                text = "-";
+            } else if (text.startsWith("(-inf..")) {
+                text = (text.endsWith("]") ? "<= " : "< ") + text.substring("(-inf..".length(), text.length() - 1);
+            } else if (text.endsWith("..+inf)")) {
+                text = (text.startsWith("[") ? ">= " : "> ") + text.substring(1, text.length() - "..+inf)".length());
+            }
+            tests.add(CellParser.parseFeel(text, type));
+        }
+        return tests;
+    }
+
+    /** Whether a cell of single values holds for an element: one of its tests is true. */
+    private static boolean holds(UnaryTests cell, Object element) {
+        if (cell instanceof UnaryTests.Any) {
+            return true;
+        }
+        var value = element instanceof Number number && !(element instanceof BigDecimal) ? new BigDecimal(number.toString()) : element;
+        return cell.tests().stream().anyMatch(test -> switch (test) {
+            case UnaryTests.Equals(var literal, var explicit) -> FeelTemporals.compare(value, literal) == 0;
+            case UnaryTests.Compare(var operator, var literal) -> switch (operator) {
+                case LT -> FeelTemporals.compare(value, literal) < 0;
+                case LE -> FeelTemporals.compare(value, literal) <= 0;
+                case GT -> FeelTemporals.compare(value, literal) > 0;
+                case GE -> FeelTemporals.compare(value, literal) >= 0;
+            };
+            case UnaryTests.Range(var low, var lowClosed, var high, var highClosed) ->
+                    (lowClosed ? FeelTemporals.compare(value, low) >= 0 : FeelTemporals.compare(value, low) > 0)
+                    && (highClosed ? FeelTemporals.compare(value, high) <= 0 : FeelTemporals.compare(value, high) < 0);
+            default -> throw new IllegalArgumentException("not an element class: " + test);
+        });
+    }
+
+    /**
+     * DMN 1.5, 10.3.2.10: "A complete decision table SHALL NOT specify a default output value." The engine reports a
+     * default output exactly when every valid input, a missing value in any column included, matches one of the rules
+     * its analysis sees; half of the tables get a rule of {@code -} cells, which makes them complete.
+     */
+    @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void a_default_output_is_reported_unreachable_exactly_when_every_input_matches_a_rule(@ForAll("scenarios") DecisionTableScenario s,
+            @ForAll boolean catchAll, @ForAll boolean perColumn) {
+        assertUnreachableDefaultMatchesCompleteness(s, catchAll, perColumn);
+    }
+
+    @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void a_temporal_tables_default_output_is_reported_unreachable_exactly_when_it_is_complete(
+            @ForAll("temporalScenarios") DecisionTableScenario s, @ForAll boolean catchAll, @ForAll boolean perColumn) {
+        assertUnreachableDefaultMatchesCompleteness(s, catchAll, perColumn);
+    }
+
+    @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void a_default_output_over_declared_values_is_reported_unreachable_exactly_when_it_is_complete(
+            @ForAll("scenariosWithValueLists") DecisionTableScenario s, @ForAll boolean catchAll, @ForAll boolean perColumn) {
+        assertUnreachableDefaultMatchesCompleteness(s, catchAll, perColumn);
+    }
+
+    /**
+     * As {@link #a_default_output_is_reported_unreachable_exactly_when_every_input_matches_a_rule}, with three rules that
+     * split a column by a cell, its opposite and {@code null}: complete unless some value leaves the cell unknown, as a
+     * list holding a missing element does.
+     */
+    @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void a_default_output_after_a_three_way_split_is_reported_unreachable_exactly_when_it_is_complete(
+            @ForAll("scenarios") DecisionTableScenario s, @ForAll boolean perColumn) {
+        assertUnreachableDefaultMatchesCompleteness(s, s.withThreeWaySplit(s.rules()), perColumn);
+    }
+
+    @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void a_temporal_tables_default_output_after_a_three_way_split_is_reported_unreachable_exactly_when_it_is_complete(
+            @ForAll("temporalScenarios") DecisionTableScenario s, @ForAll boolean perColumn) {
+        assertUnreachableDefaultMatchesCompleteness(s, s.withThreeWaySplit(s.rules()), perColumn);
+    }
+
+    private static void assertUnreachableDefaultMatchesCompleteness(DecisionTableScenario s, boolean catchAll, boolean perColumn) {
+        assertUnreachableDefaultMatchesCompleteness(s, catchAll ? s.withCatchAll(s.rules()) : s.rules(), perColumn);
+    }
+
+    private static void assertUnreachableDefaultMatchesCompleteness(DecisionTableScenario s, List<Praeceptum> rules, boolean perColumn) {
+        var engine = engine(s, rules, HitPolicy.COLLECT, List.of(), perColumn);
+        var reference = s.reference(rules, HitPolicy.COLLECT, Map.of(), perColumn);
+        var reported = engine.validationReport().issues(Kind.UNREACHABLE_DEFAULT_OUTPUT);
+        boolean expected = reference.defaultOutput() != null && reference.everyInputMatchesAnAnalysedRule(s.columns());
+        Assertions.assertThat(!reported.isEmpty()).as("reported %s, default %s", reported, reference.defaultOutput()).isEqualTo(expected);
+        if (!reported.isEmpty()) {
+            Assertions.assertThat(reference.everyInputMatches(s.columns())).as("a reported table is complete").isTrue();
         }
     }
 
@@ -330,7 +554,10 @@ class EngineMatchesReferencePropertiesTest {
                 .toList();
     }
 
-    /** The number output, empty where it is missing (a computed output may be), which the aggregations skip. */
+    /**
+     * The number output, empty where it is missing (a computed output may be). The engine combines only outputs
+     * that are not missing, so combining an empty one fails.
+     */
     private static OutputStrategy<Optional<BigDecimal>> numericOutput() {
         return new OutputStrategy<>() {
             @Override
@@ -361,6 +588,6 @@ class EngineMatchesReferencePropertiesTest {
     }
 
     private static Optional<BigDecimal> combine(Optional<BigDecimal> a, Optional<BigDecimal> b, BinaryOperator<BigDecimal> operator) {
-        return a.isEmpty() ? b : b.isEmpty() ? a : Optional.of(operator.apply(a.get(), b.get()));
+        return Optional.of(operator.apply(a.orElseThrow(), b.orElseThrow()));
     }
 }

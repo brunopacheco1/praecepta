@@ -33,6 +33,18 @@ class ListCellsTest {
     }
 
     @Test
+    void list_contains_null_tests_the_elements_and_equals_null_the_list() {
+        Assertions.assertThat(CellParser.parseFeelList("list contains(?, null) or list contains(?,\"null\") or ? = null", ColumnType.STRING))
+                .isEqualTo(new UnaryTests.Positive(List.of(new UnaryTests.NullElement(), new Equals("null"), new NullTest())));
+        var negated = CellParser.parseFeelList("not(list contains( ? , null ))", ColumnType.NUMBER);
+        Assertions.assertThat(negated).isEqualTo(new UnaryTests.Negated(List.of(new UnaryTests.NullElement())));
+        Assertions.assertThat(DmnWriter.renderList(negated)).isEqualTo("not(list contains(?, null))");
+        Assertions.assertThatThrownBy(() -> DmnWriter.render(negated))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("list contains(?, null) only tests a list's elements");
+    }
+
+    @Test
     void not_any_and_function_literals_are_read() {
         Assertions.assertThat(CellParser.parseFeelList("not( list contains( ? , date(\"2025-01-31\") ) )", ColumnType.DATE))
                 .isEqualTo(new UnaryTests.Negated(List.of(new Equals(LocalDate.of(2025, 1, 31)))));

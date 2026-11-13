@@ -4,7 +4,9 @@
 
 # The Gradle plugin's functional tests (Gradle TestKit) on each Gradle version it supports: small projects
 # apply it by id and version, resolved through its marker from the artifacts this build installs, and run
-# with the build cache and the configuration cache. On pull requests only when the plugin, its marker, the
+# with the build cache and the configuration cache. Also checks that the Plugin Portal build
+# (praecepta-gradle-plugin/portal) publishes the files Maven builds, byte for byte. On pull requests only when
+# the plugin, its marker, the
 # compiler, loader and engine it compiles tables with, or their POMs change; always on main, and weekly so
 # a new Gradle release is noticed.
 name: Gradle versions
@@ -24,6 +26,7 @@ on:
       - 'praecepta-engine/pom.xml'
       - '.mvn/**'
       - '.github/workflows/gradle-versions.yml'
+      - '.github/scripts/install_gradle.sh'
   schedule:
     - cron: '47 3 * * 1'
   workflow_dispatch:
@@ -67,3 +70,38 @@ jobs:
           mvn -B -pl praecepta-gradle-plugin -am verify -P gradle-functional
           -Dpraecepta.gradle.version=${{ matrix.gradle }}
           -Dtest=PraeceptaPluginTest -Dsurefire.failIfNoSpecifiedTests=false
+
+  plugin-portal:
+    name: Plugin Portal publication
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - name: Install Gradle
+        run: bash .github/scripts/install_gradle.sh
+      - name: Build the plugin as a release would
+        # the release's version change and profile (sources and javadoc jars), without signing
+        run: |
+          snapshot=$(./mvnw -B -q help:evaluate -Dexpression=project.version -DforceStdout)
+          VERSION="${snapshot%-SNAPSHOT}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          ./mvnw -B -q versions:set -DnewVersion="${VERSION}" -DgenerateBackupPoms=false -DprocessAllModules \
+            -DupdateBuildOutputTimestampPolicy=never
+          ./mvnw -B -P release -pl praecepta-gradle-plugin -am package -DskipTests -Dinvoker.skip -Dgpg.skip
+      - name: Check what the Portal build publishes
+        run: |
+          gradle --no-daemon -p praecepta-gradle-plugin/portal publishAllPublicationsToLocalRepository \
+            -Ppraecepta.version="${VERSION}"
+          repo=praecepta-gradle-plugin/portal/build/repo/io/github/brunopacheco1
+          plugin="${repo}/praecepta-gradle-plugin/${VERSION}/praecepta-gradle-plugin-${VERSION}"
+          marker="${repo}/praecepta/io.github.brunopacheco1.praecepta.gradle.plugin/${VERSION}"
+          cmp praecepta-gradle-plugin/pom.xml "${plugin}.pom"
+          cmp praecepta-gradle-plugin-marker/pom.xml "${marker}/io.github.brunopacheco1.praecepta.gradle.plugin-${VERSION}.pom"
+          for suffix in .jar -sources.jar -javadoc.jar; do
+            cmp "praecepta-gradle-plugin/target/praecepta-gradle-plugin-${VERSION}${suffix}" "${plugin}${suffix}"
+          done
+          echo "The Portal build publishes Maven's jars and POMs unchanged"

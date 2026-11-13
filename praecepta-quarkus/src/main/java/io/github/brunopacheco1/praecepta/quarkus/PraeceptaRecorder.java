@@ -25,7 +25,8 @@ import io.quarkus.runtime.annotations.Recorder;
  * they compiled to) as a resource of the application, and records here where each one came from. The
  * tables are read when the application initialises its static state: at startup on the JVM, and while the
  * image is built for a native executable, whose engines then live in the image heap. They were validated
- * at build time with the configured {@code fail-on}, so nothing here fails on validation issues.
+ * at build time with the configured {@code fail-on}, and their issues were logged then, so nothing here
+ * fails on validation issues or logs them.
  */
 @Recorder
 public class PraeceptaRecorder {
@@ -53,7 +54,8 @@ public class PraeceptaRecorder {
                 return stream;
             }));
         }
-        return new RuntimeValue<>(Decisions.load(sources, null));
+        // the build step logged the validation issues: the engines do not log them again at startup
+        return new RuntimeValue<>(Decisions.load(sources, null, false));
     }
 
     /**

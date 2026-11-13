@@ -67,6 +67,9 @@ final class DecisionsRegistrar implements ImportBeanDefinitionRegistrar {
     /** JSR-330's {@code @Named}, by name, so that the starter does not need {@code jakarta.inject}. */
     private static final String NAMED = "jakarta.inject.Named";
 
+    /** The types of the qualifiers every engine bean has, each with the decision's name as its value. */
+    static final List<String> QUALIFIER_TYPES = List.of(Qualifier.class.getName(), NAMED);
+
     private final Environment environment;
     private final ResourceLoader resourceLoader;
 
@@ -88,9 +91,9 @@ final class DecisionsRegistrar implements ImportBeanDefinitionRegistrar {
             var engineBean = new RootBeanDefinition(PraeceptaEngine.class);
             engineBean.setTargetType(ENGINE_TYPE);
             engineBean.setInstanceSupplier(decision::engine);
-            engineBean.addQualifier(new AutowireCandidateQualifier(Qualifier.class, decision.name()));
-            // @Named("Discount") too, as in the Micronaut and Quarkus integrations (when jakarta.inject is present)
-            engineBean.addQualifier(new AutowireCandidateQualifier(NAMED, decision.name()));
+            // @Qualifier("Discount"), and @Named("Discount") as in the Micronaut and Quarkus integrations (when
+            // jakarta.inject is present)
+            QUALIFIER_TYPES.forEach(type -> engineBean.addQualifier(new AutowireCandidateQualifier(type, decision.name())));
             engineBean.setLazyInit(false);
             engineBean.setDependsOn(PraeceptaAutoConfiguration.DECISIONS_BEAN);
             engineBean.setAttribute(DECISION_ATTRIBUTE, decision.name());

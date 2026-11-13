@@ -30,7 +30,8 @@ Their internals are in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Every module needs Java 21 or later and is published to Maven Central with the groupId
 `io.github.brunopacheco1` and the same version (the Gradle plugin's marker, which Gradle finds by the
-plugin id, has the groupId `io.github.brunopacheco1.praecepta`). Micronaut 5 needs Java 25, so the module
+plugin id, has the groupId `io.github.brunopacheco1.praecepta`). From 0.6.0 the Gradle plugin is on the
+Gradle Plugin Portal too, with the same files. Micronaut 5 needs Java 25, so the module
 targets Micronaut 4. GraalVM native images need no module: the jars carry their own metadata.
 
 ## What they share
@@ -62,20 +63,23 @@ integrations find their tables at runtime, so their engines take maps instead:
   same name, in one file or two.
 - **Inputs** map column names to values as text, read with the column types the DMN declares, as
   `PraeceptaEngine.Builder.inputs(...)` reads them: `"42"`, `"2025-01-31"`, `"08:30Z"`, `["PT", "BR"]` for
-  a list column. A missing or blank value is a missing input.
+  a list column (`["PT", null]` for one holding a missing element). A missing or blank value is a missing
+  input.
 - **Outputs** are one map per matching rule, in the hit policy's order (an output that is missing, such as
   an expression with a missing operand, maps to null). Under a COLLECT aggregation, the one map holds the
   aggregate, as DMN 1.5 defines it over a single output (`AggregationOperator.check`): SUM adds numbers with
   FEEL's 34 digits and keeps their scale, as the build plugins' generated classes do; MIN and MAX return the
   smallest or largest output as written, of any ordered type (numbers, strings by character, dates, times,
-  durations); COUNT is the number of matches, of outputs of any type. Missing values are skipped, where
-  FEEL's `sum`, `min` and `max` would give null (10.3.4): a known deviation, shared with the build plugins'
-  generated classes. When no rule matches, a table whose outputs declare
-  default values (`defaultOutputEntry`) gives one map of them, null for an output without one, and any
-  other table no map, whatever its hit policy or aggregation (DMN 1.5, 10.3.2.10, step 2): a COUNT then
-  gives no map rather than `0`, as the generated classes give an empty `Optional`.
+  durations); COUNT is the number of matches, of outputs of any type. When a matching rule's output is
+  missing (a `null` entry, an expression with a missing operand), SUM, MIN and MAX are missing too, as FEEL's
+  `sum`, `min` and `max` are null for a list that holds null (10.3.4.4): the one map maps the output to null
+  (`[{fee=null}]`), as the build plugins' generated classes give an output whose component is null; COUNT
+  counts that rule. When no rule matches, a table whose outputs declare
+  default values (`defaultOutputEntry`, `null` included) gives one map of them, null for an output without
+  one, and any other table no map, whatever its hit policy or aggregation (DMN 1.5, 10.3.2.10, step 2): a
+  COUNT then gives no map rather than `0`, as the generated classes give an empty `Optional`.
 - **Validation** is that of the map-based engine. Times and date-times read from text may have a time zone
-  or not, so gaps are looked for among both kinds.
+  or not, so gaps are looked for among both kinds (and among times with a zone id, where the cells name one).
 - **Generated classes are not beans.** They are static and need no container; declare one as a bean
   yourself if you want it injected. The DMN resources the build plugins write are ordinary DMN files, so a
   location pattern that covers their package (`classpath*:com/acme/pricing/*.dmn`) gives them map-based
@@ -144,11 +148,16 @@ is the name a table is registered under, so the generated class is named by `cla
 | Report endpoint | Actuator endpoint `praecepta` (`/actuator/praecepta`, `/actuator/praecepta/{name}`), exposed under Actuator's usual rules | management endpoint `praecepta` (`/praecepta`, `/praecepta/{name}`) with `micronaut-management`, sensitive by default | none yet; `decisions.describe()` gives the same at runtime |
 
 Warnings are one line per issue, prefixed with the decision's name:
-`Discount: WARNING rule 3 can never be selected`. The endpoints return `Decisions.describe()`,
+`Discount: WARNING rule 3 can never be selected`. Each issue is logged once, through the framework's logging:
+the engines do not log their reports as well, and in Quarkus the application's startup does not repeat what
+the build logged. The endpoints return `Decisions.describe()`,
 `{"decisions": {"Discount": {...}}}`, or one decision's description (404 for an unknown name): `name`,
 `location`, `hitPolicy`, `aggregation`, `rules` (the number of rules), `inputs` and `outputs` (`name`,
 `type`, and `list` for inputs), and `issues` (`severity`, `kind`, `rules`, `detail`, `example`,
-`message`). They only read; nothing is evaluated through them. The descriptions show the rules'
+`message`). An issue's `kind` is one of `ValidationReport.Kind`: `OVERLAPPING_RULES`, `CONFLICTING_OUTPUTS`
+and `UNREACHABLE_DEFAULT_OUTPUT` (a default output on a table that every input matches, which DMN 1.5,
+10.3.2.10, forbids) are errors, so they fail the build or the startup at the default `fail-on`;
+`UNREACHABLE_RULE` and `GAP` are warnings. They only read; nothing is evaluated through them. The descriptions show the rules'
 conditions, so expose the endpoints as you would any other that shows configuration.
 
 In Quarkus, the application builds its engines from the DMN the build validated, so it cannot fail
@@ -168,7 +177,7 @@ List<Map<String, String>> discount = decisions.evaluate("Discount", Map.of("coun
 | `TableLocations` | Finds DMN files by pattern on the class path (directories, jars, and a native image's resources) or the file system: `find(patterns, classLoader)`, `find(location, classLoader)`, `split("a,b")`, `Location.parse(pattern).matches(path)`. `TableLocations.DEFAULT` is the default pattern. |
 | `DecisionsLoader` | What a framework does with its settings: `new DecisionsLoader("praecepta", locations, failOn).load(finder, log)` reads `locations` (null for the default) and `fail-on`, finds the files with the framework's lookup (`finder`), loads them, fails with every problem worded as above, and logs what it loaded and the issues below `fail-on`. |
 | `TableSource` | A DMN file: where it is (for messages and reports) and how to open it. `TableSource.of(Path)`, `of(URL)`, `of(location, bytes)`. |
-| `Decisions` | The decisions by name: `Decisions.load(sources, failOn)`, `get(name)`, `find(name)`, `engine(name)`, `evaluate(name, input)`, `names()`, `all()`, `describe()`; `Decisions.failOn("ERROR")` reads a severity as the settings above do. Immutable and thread-safe. |
+| `Decisions` | The decisions by name: `Decisions.load(sources, failOn)`, `get(name)`, `find(name)`, `engine(name)`, `evaluate(name, input)`, `names()`, `all()`, `describe()`; `Decisions.failOn("ERROR")` reads a severity as the settings above do. Immutable and thread-safe. Each engine logs its validation report, as `PraeceptaEngine` does by default; `Decisions.load(sources, failOn, false)` builds them without, for a caller that reports `Decision.report()` itself (as `DecisionsLoader` does). |
 | `Decision` | One decision: its `name`, `location`, `table`, `engine` and validation `report`; `describe()` as plain maps. |
 | `DecisionsException` | Everything that went wrong while loading, as `problems()` (`<location>: <what>`), all at once. |
 
@@ -190,7 +199,8 @@ What the Maven and Gradle plugins do, and another tool should too:
   the configuration or the table, and for validation issues at `failOn`; the tool reports it as its build
   failure, unchanged.
 - Every other issue of `report()` is logged as a warning, prefixed with the class name
-  (`Fees: WARNING rule 3 can never be selected`).
+  (`Fees: WARNING rule 3 can never be selected`). The compiler does not log the report itself (its engine is
+  built with `logValidationReport(false)`), so each issue appears once.
 - Two tables that generate the same class are rejected: `Two tables generate the class <X>; set <name> on
   one`, with the tool's spelling of `name`.
 - Relative sources are resolved against the project directory, and the results go to the tool's
@@ -208,7 +218,9 @@ framework's own native support (Spring's `RuntimeHints`, Micronaut's resource co
 it while the application is built (the engine beans are then those of the decisions found at that time,
 and the tables are read again at startup). The Quarkus extension registers the tables it validated
 itself. CI builds and runs a native application that uses the
-engine, the CSV loader, `praecepta-integration` and generated classes, with GraalVM for JDK 21 and 25; it
-does not build a Spring Boot, Micronaut or Quarkus application natively yet. `ExcelLoader` does not work
+engine, the CSV loader, `praecepta-integration` and generated classes, with GraalVM for JDK 21 and 25, and
+a Spring Boot, a Micronaut and a Quarkus application, each with its framework's own native build
+(`praecepta-native-tests`), which evaluate decisions through the beans they inject. A change to an
+integration must keep them passing (the `Native frameworks` workflow). `ExcelLoader` does not work
 in a native image: compile Excel tables at build time. Details are in the
 [README](../README.md#native-images).

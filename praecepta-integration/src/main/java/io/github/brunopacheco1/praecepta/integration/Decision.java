@@ -38,7 +38,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
  * {@code 2025-01-31}, times and date-times with or without a time zone, durations as {@code P1DT2H}, a
  * list column's value as a FEEL list ({@code ["PT", "BR"]}); a missing or blank value is a missing input.
  * Each output map holds one matching rule's outputs (an output that is missing, such as an expression with
- * a missing operand, maps to null); under a COLLECT aggregation, the one map holds the aggregate. When no
+ * a missing operand, maps to null); under a COLLECT aggregation, the one map holds the aggregate, null for a
+ * SUM, MIN or MAX when the output is missing in a matching rule (FEEL's {@code sum([10, null])} is null). When no
  * rule matches, the list holds the table's default output values, if it declares any, or is empty, whatever
  * the hit policy or aggregation (DMN 1.5, 10.3.2.10, step 2): a COUNT is then empty, not zero.
  *
@@ -61,13 +62,28 @@ public record Decision(String name, String location, DecisionTable table, Praece
     }
 
     /**
-     * Builds a table's map-based engine and validates it. Validation never fails here;
-     * {@link Decisions#load} decides what fails.
+     * Builds a table's map-based engine and validates it, the engine logging its validation report as
+     * {@code PraeceptaEngine} does by default. Validation never fails here; {@link Decisions#load} decides what
+     * fails.
      *
      * @throws IllegalArgumentException if the table cannot be built into an engine, such as an aggregation
      *                                  that DMN does not define for its outputs ({@link AggregationOperator#check})
      */
     public static Decision of(String location, DecisionTable table) {
+        return of(location, table, true);
+    }
+
+    /**
+     * Builds a table's map-based engine and validates it. Validation never fails here;
+     * {@link Decisions#load} decides what fails.
+     *
+     * @param logReport whether the engine logs its validation report
+     *                  ({@code PraeceptaEngine.Builder.logValidationReport}); false when the caller reports
+     *                  {@link #report()} itself, as {@link DecisionsLoader} does
+     * @throws IllegalArgumentException if the table cannot be built into an engine, such as an aggregation
+     *                                  that DMN does not define for its outputs ({@link AggregationOperator#check})
+     */
+    public static Decision of(String location, DecisionTable table, boolean logReport) {
         PraeceptaEngine<Map<String, String>, Map<String, String>> engine;
         try {
             if (table.aggregation() != null) {
@@ -77,6 +93,7 @@ public record Decision(String name, String location, DecisionTable table, Praece
                     .table(table)
                     .inputs(PraeceptaInput::new)
                     .output(new MapOutput(table.aggregation() == null ? null : table.outputs().getFirst()))
+                    .logValidationReport(logReport)
                     .build();
         } catch (RuntimeException e) {
             throw new IllegalArgumentException("Table '%s': %s".formatted(table.name(), e.getMessage()), e);
@@ -137,9 +154,13 @@ public record Decision(String name, String location, DecisionTable table, Praece
      * 10.3.2.10): SUM adds numbers with FEEL's precision (34 significant digits, 10.3.2.3.1) and keeps their
      * scale ({@code 10.50} and {@code 1.50} give {@code 12.00}), as the generated code of the build plugins
      * does; MIN and MAX keep the smallest or the largest value as written, ordered as FEEL orders values of the
-     * output's type ({@link FeelTemporals#compare}); COUNT gives the number of matches. A missing value is
-     * skipped, as the generated code skips it. None is called when no rule matches: the engine then gives the
-     * default output, or none (10.3.2.10, step 2).
+     * output's type ({@link FeelTemporals#compare}), and give the output mapped to null when two of the values do
+     * not compare (times with a zone id in two zones, which DMN 1.5 does not order: FEEL's {@code min} and
+     * {@code max} take a list of comparable items, and a built-in function is null outside its domain, 10.3.2.16);
+     * COUNT gives the number of matches. None of them sees a missing value: where the output is
+     * missing in a matching rule, the engine gives that rule's map, the output mapped to null, as FEEL's
+     * {@code sum}, {@code min} and {@code max} are null for a list that holds null (10.3.4.4). None is called when
+     * no rule matches: the engine then gives the default output, or none (10.3.2.10, step 2).
      *
      * @param aggregated the output a COLLECT aggregation aggregates, or null for none
      */
@@ -152,35 +173,33 @@ public record Decision(String name, String location, DecisionTable table, Praece
 
         @Override
         public Map<String, String> sum(Map<String, String> a, Map<String, String> b) {
-            var x = value(a);
-            var y = value(b);
-            if (x == null) {
-                return b;
-            }
-            if (y == null) {
-                return a;
-            }
-            return single(((BigDecimal) x).add((BigDecimal) y, MathContext.DECIMAL128).toPlainString());
+            return single(((BigDecimal) value(a)).add((BigDecimal) value(b), MathContext.DECIMAL128).toPlainString());
         }
 
         @Override
         public Map<String, String> min(Map<String, String> a, Map<String, String> b) {
-            var x = value(a);
-            var y = value(b);
-            if (x == null) {
-                return b;
-            }
-            return y == null || FeelTemporals.compare(x, y) <= 0 ? a : b;
+            return extreme(a, b, -1);
         }
 
         @Override
         public Map<String, String> max(Map<String, String> a, Map<String, String> b) {
+            return extreme(a, b, 1);
+        }
+
+        /**
+         * The smaller ({@code sign} -1) or the larger (1) of two outputs; the output mapped to null if they do not
+         * compare, and then for every output after, as the result is null once two values are outside FEEL's order.
+         */
+        private Map<String, String> extreme(Map<String, String> a, Map<String, String> b, int sign) {
+            if (a.get(aggregated.name()) == null) {
+                return a; // two values before did not compare
+            }
             var x = value(a);
             var y = value(b);
-            if (x == null) {
-                return b;
+            if (!FeelTemporals.comparable(x, y)) {
+                return Collections.singletonMap(aggregated.name(), null);
             }
-            return y == null || FeelTemporals.compare(x, y) >= 0 ? a : b;
+            return Integer.signum(FeelTemporals.compare(x, y)) == -sign ? b : a;
         }
 
         @Override
@@ -188,10 +207,9 @@ public record Decision(String name, String location, DecisionTable table, Praece
             return single(Integer.toString(matches));
         }
 
-        /** The aggregated output's value, of the output's type; null if it is missing. */
+        /** The aggregated output's value, of the output's type; the engine never aggregates a missing one. */
         private Object value(Map<String, String> output) {
-            var text = output.get(aggregated.name());
-            return text == null ? null : FeelLiterals.value(text, aggregated.type());
+            return FeelLiterals.value(output.get(aggregated.name()), aggregated.type());
         }
 
         private Map<String, String> single(String value) {

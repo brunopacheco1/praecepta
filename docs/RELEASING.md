@@ -16,14 +16,18 @@ which:
    (`skipPublishing`; see [CONTRIBUTING.md](../CONTRIBUTING.md#adding-a-module)) to Maven Central,
    waiting until they are live. No list of modules is kept: the build deploys every module that does not
    opt out, and the workflow finds the published jars from their signatures
-   (`.github/scripts/published_modules.py`), so a new module needs no change here. As of 0.5.0 they are
+   (`.github/scripts/published_modules.py`), so a new module needs no change here. As of 0.6.0 they are
    the parent POM (`praecepta`), `praecepta-engine`, `praecepta-loader` and `praecepta-maven-plugin`,
-   and, new in 0.5.0, `praecepta-compiler`, `praecepta-integration`, `praecepta-gradle-plugin` with its
+   and, since 0.5.0, `praecepta-compiler`, `praecepta-integration`, `praecepta-gradle-plugin` with its
    plugin marker, `praecepta-spring-boot-starter`, `praecepta-micronaut`, `praecepta-quarkus` and
    `praecepta-quarkus-deployment`;
 5. records build provenance for the jars (GitHub artifact attestations);
 6. creates a GitHub release with the changelog section, jars, signatures, SBOMs, the provenance
-   bundle (`praecepta-X.Y.Z.intoto.jsonl`) and `THIRD-PARTY-NOTICES.txt`.
+   bundle (`praecepta-X.Y.Z.intoto.jsonl`) and `THIRD-PARTY-NOTICES.txt`;
+7. in a job of its own, publishes the Gradle plugin to the Gradle Plugin Portal (since 0.6.0): it fetches
+   the plugin's jars and POM from Maven Central and uploads them unchanged with
+   `praecepta-gradle-plugin/portal`, a Gradle build that compiles nothing, so the Portal serves the files
+   Reproducible Central rebuilds. The Portal writes the plugin marker itself.
 
 ## One-time setup (owner)
 
@@ -68,11 +72,19 @@ Its groupId is a sub-namespace of `io.github.brunopacheco1`, which Maven Central
 verified namespace; check that **Namespaces** lists it as covered before the first release that
 publishes it (0.5.0).
 
-The Gradle Plugin Portal is not used: Gradle builds find the plugin on Maven Central through the
-marker (`pluginManagement { repositories { mavenCentral() } }`), so a release needs no Portal account,
-key or step.
+### 3. Gradle Plugin Portal
+Sign in at <https://plugins.gradle.org> with the GitHub account, so the Portal accepts plugin ids under
+`io.github.brunopacheco1`, then create an API key and secret under **API Keys**. The Portal reviews a
+plugin's first version by hand, which takes a few days; later versions are published at once, unless the
+plugin id or group changes. To check a publication without publishing, run, with the jars and POM in
+place (as the release job fetches them) and the key and secret in `GRADLE_PUBLISH_KEY` and
+`GRADLE_PUBLISH_SECRET`:
 
-### 3. GitHub environment and secrets
+```bash
+gradle -p praecepta-gradle-plugin/portal publishPlugins --validate-only -Ppraecepta.version=X.Y.Z
+```
+
+### 4. GitHub environment and secrets
 **Settings → Environments → New environment** `release`. Restrict it to tags matching `v*`
 (**Deployment branches and tags → Selected → Add rule → Tag `v*`**). Add these environment secrets:
 
@@ -82,6 +94,8 @@ key or step.
 | `MAVEN_CENTRAL_PASSWORD` | user token password (step 1) |
 | `RELEASE_GPG_KEY` | contents of `release-key.asc` (step 2) |
 | `RELEASE_GPG_PASSPHRASE` | the release key's passphrase |
+| `GRADLE_PUBLISH_KEY` | Plugin Portal API key (step 3) |
+| `GRADLE_PUBLISH_SECRET` | Plugin Portal API secret (step 3) |
 
 Then delete `release-key.asc`. Optionally require yourself as a reviewer on the environment, so
 every release waits for a click.
@@ -96,12 +110,13 @@ every release waits for a click.
    git push origin vX.Y.Z
    ```
 3. Watch **Actions → Release**. When it is green, the artifacts are on Maven Central (search can
-   take a few hours to show them) and the GitHub release is published.
+   take a few hours to show them), the GitHub release is published and the Gradle plugin is on the
+   Plugin Portal. If only the **Publish to the Gradle Plugin Portal** job fails, fix the cause and
+   re-run that job alone (**Re-run failed jobs**): it needs nothing from the other job but Maven
+   Central's files.
 4. Set the development version for the next release (`mvn versions:set -DnewVersion=X.Y.(Z+1)-SNAPSHOT
    -DgenerateBackupPoms=false -DprocessAllModules`) in a pull request. This also refreshes
    `project.build.outputTimestamp`, which the next release keeps (see *Rebuilding a release*).
-5. For 0.5.0 only, give Reproducible Central the new rebuild command (see
-   [Once, for 0.5.0](#once-for-050-the-new-rebuild-command)).
 
 ## Checking a release
 - Signatures: download a jar and its `.asc`, then `gpg --verify praecepta-engine-X.Y.Z.jar.asc`.
@@ -125,9 +140,9 @@ git checkout vX.Y.Z
 
 Releases up to 0.4.0 were built with `-pl praecepta-engine,praecepta-loader,praecepta-maven-plugin -am`
 instead; rebuild those with that list. From 0.5.0 the command names only the modules left out, so a new
-published module changes nothing here. Every module is a directory directly under the root (the Gradle
-plugin marker too, though its groupId differs), so the version rewrite below (`pom.xml */pom.xml`)
-reaches all of them.
+published module changes nothing here, and the rebuild covers every published module, the Gradle plugin
+marker included. Every module is a directory directly under the root (the Gradle plugin marker too,
+though its groupId differs), so the version rewrite below (`pom.xml */pom.xml`) reaches all of them.
 
 The release workflow builds with the Maven Wrapper (`./mvnw`), which pins the Maven version in
 `.mvn/wrapper/maven-wrapper.properties` (3.9.15, checked by its SHA-256). Releases before 0.4.0 used
@@ -142,25 +157,13 @@ where `${version}` is the buildspec's own `version=`. Written that way, the buil
 its release, so Reproducible Central's tooling can add the next release on its own: it notices new
 versions on Maven Central and copies the previous buildspec, changing only `version=` (and `jdk=` if
 the jars name another JDK). Nothing needs doing per release unless the rebuild command changes; a
-pull request adding `praecepta-X.Y.Z.buildspec` there only makes it sooner. 0.2.0 is the exception:
-its workflow still stamped the time of the release run, so its `.buildspec` names 0.2.0 and also sets
-`project.build.outputTimestamp` to `2026-11-08T20:08:06Z`.
-
-### Once, for 0.5.0: the new rebuild command
-The command changed in 0.5.0 (the module list above): a copy of 0.4.0's buildspec would rebuild only
-the engine, the loader, the Maven plugin and what they need, and miss the framework and Gradle
-integrations. After 0.5.0 is on Maven Central, open one pull request at
-Reproducible Central adding
-`content/io/github/brunopacheco1/praecepta/praecepta-0.5.0.buildspec`: a copy of the 0.4.0 buildspec with
-`version=0.5.0` and
-
-```
-command="mvn -Prelease clean package -pl '!praecepta-benchmarks,!praecepta-tck' -DskipTests -Dinvoker.skip -Dgpg.skip"
-```
-
-(keep `tool=`, `jdk=` and `execBefore=` as they are, unless the jars' `Build-Jdk-Spec` says another JDK).
-Its rebuild then covers every published module, the Gradle plugin marker included, and later releases
-copy it unchanged.
+pull request adding `praecepta-X.Y.Z.buildspec` there is not wanted. When the command changes, a pull
+request there must change the `command=` of the latest release's buildspec, so that the next release copies
+it. The command last changed in 0.5.0, but Reproducible Central added 0.5.0 on its own by copying 0.4.0's
+buildspec, so it rebuilds only the engine, the loader, the Maven plugin and the modules they need (22
+artifacts); its `command=` needs the one above, which rebuilds all 44 of 0.5.0's artifacts identically. 0.2.0 is
+the exception: its workflow still stamped the time of the release run, so its `.buildspec` names 0.2.0
+and also sets `project.build.outputTimestamp` to `2026-11-08T20:08:06Z`.
 
 ## If publishing fails
 If publishing fails after the tag is pushed, fix the cause, delete the tag (locally and with

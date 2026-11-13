@@ -51,10 +51,11 @@ import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.ExpressionTypeException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
+import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
 /**
- * A decision table evaluated with strict DMN 1.3 hit-policy semantics.
+ * A decision table evaluated with strict DMN 1.5 hit-policy semantics.
  *
  * <pre>{@code
  * var engine = PraeceptaEngine.<Order, Discount>builder()
@@ -65,14 +66,14 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  *         .rules(loader.getPraecepta())
  *         .build();
  *
- * List<Discount> discounts = engine.evaluate(order); // empty if no rule matches
+ * List<Discount> discounts = engine.evaluate(order); // empty if no rule matches and there is no default output
  * }</pre>
  *
  * <p>Cells are DMN FEEL unary tests, parsed per column type: {@code "PT","ES"} (or unquoted
- * {@code PT,ES}), {@code not("FR")}, {@code >= 18}, {@code [18..65)}, {@code < date("2025-01-01")},
- * {@code null}, and {@code -} or blank for any value. See {@code CellParser}. A column bound with
- * {@link Builder#listInput(String, Function)} holds lists, and its cells hold when some element passes
- * them.
+ * {@code PT,ES}), {@code not("FR")}, {@code != "FR"}, {@code >= 18}, {@code [18..65)},
+ * {@code < date("2025-01-01")}, {@code < @"2025-01-01"}, {@code null}, and {@code -} or blank for any value.
+ * See {@code CellParser}. A column bound with {@link Builder#listInput(String, Function)} holds lists, and its
+ * cells hold when some element passes them.
  *
  * <p>A whole DMN decision table (hit policy, column types, value lists and rules) can be loaded with
  * {@code DmnReader} and passed to {@link Builder#table}; inputs are then bound as usual:
@@ -138,6 +139,13 @@ public final class PraeceptaEngine<I, O> {
 
     /** The COLLECT aggregation combining outputs (SUM, MIN, MAX), or null. */
     private final BinaryOperator<O> reduce;
+    /**
+     * SUM, MIN and MAX of a table with one output: that output, whose being missing in a matching rule makes
+     * the aggregate missing (see {@link #aggregate}); null otherwise.
+     */
+    private final String aggregatedOutput;
+    /** By bit, for a rule whose output reads no input: whether its {@link #aggregatedOutput} is missing. */
+    private final boolean[] missingAggregateByBit;
     /** COUNT only: the output for each number of matching rules; null otherwise. */
     private final IntFunction<O> count;
     /** The result when no rule matches: the default output if there is one, else empty, whatever the aggregation. */
@@ -187,27 +195,15 @@ public final class PraeceptaEngine<I, O> {
         computedByBit = new ComputedOutputs[ruleCount];
         ruleOutputByBit = new PraeceptaOutput[ruleCount];
         idByBit = new Integer[ruleCount];
-        boolean anyReads = false;
-        for (int bit = 0; bit < ruleCount; bit++) {
-            var rule = rules.get(bitToRule[bit]);
-            idByBit[bit] = rule.priority();
-            ruleOutputByBit[bit] = rule.output();
-            if (!rule.output().readsInputs()) {
-                var output = outputStrategy.transform(rule.output());
-                outputByBit[bit] = output;
-                singleByBit[bit] = List.of(output);
-            } else {
-                computedByBit[bit] = computedOutputs(rule, evaluationOrder, lists, types);
-                anyReads = true;
-            }
-        }
-        readsInputs = anyReads;
+        readsInputs = fillOutputsByBit(rules, bitToRule, evaluationOrder, lists, types);
         numericOutputs = numeric;
         // with outputs that read inputs, ANY compares the outputs of each evaluation instead
         sameOutputsByBit = hitPolicy == HitPolicy.ANY && !readsInputs
                 ? sameOutputMasks(rules, bitToRule, index.words(), builder.maskForm, numericOutputs)
                 : null;
         reduce = reducer(builder.aggregation, builder.outputStrategy);
+        aggregatedOutput = reduce == null ? null : onlyOutput(builder.tableOutputTypes, rules);
+        missingAggregateByBit = missingAggregates(rules, bitToRule, aggregatedOutput, computedByBit);
         count = builder.aggregation == AggregationOperator.COUNT ? builder.outputStrategy::count : null;
         if (count != null) {
             count.apply(1); // so that a strategy without count fails here, not when a rule first matches
@@ -217,10 +213,47 @@ public final class PraeceptaEngine<I, O> {
         variableCellsByBit = variableCellsByBit(variableCells, bitToRule, evaluationOrder);
         variableRules = variableRules(variableCellsByBit, words);
         hasVariableCells = !BitsetIndex.isEmpty(variableRules);
-        // rules that test a list column match lists the index's classes cannot describe: the analysis leaves them out too
-        var unseenRules = listRules(index);
-        BitsetIndex.or(unseenRules, variableRules);
-        report = validate(index, rules, hitPolicy, unseenRules, numericOutputs, builder.failOn);
+        report = enforce(analyse(index, rules, hitPolicy, variableRules, numericOutputs, builder.defaultOutput != null), builder.failOn,
+                builder.logValidationReport);
+    }
+
+    /**
+     * Fills in, by bit, each rule's id and output, and the output transformed once if it reads no input, or how to
+     * compute it if it does.
+     *
+     * @return whether some rule's output reads inputs
+     */
+    private boolean fillOutputsByBit(List<Praeceptum> rules, int[] bitToRule, List<String> evaluationOrder, Set<String> lists,
+            Map<String, ColumnType> types) {
+        boolean anyReads = false;
+        for (int bit = 0; bit < rules.size(); bit++) {
+            var rule = rules.get(bitToRule[bit]);
+            idByBit[bit] = rule.priority();
+            ruleOutputByBit[bit] = rule.output();
+            if (rule.output().readsInputs()) {
+                computedByBit[bit] = computedOutputs(rule, evaluationOrder, lists, types);
+                anyReads = true;
+            } else {
+                var output = outputStrategy.transform(rule.output());
+                outputByBit[bit] = output;
+                singleByBit[bit] = List.of(output);
+            }
+        }
+        return anyReads;
+    }
+
+    /**
+     * By bit, for a SUM, MIN or MAX of the {@code aggregatedOutput} (null for none), whether a rule whose output reads no
+     * input leaves that output missing.
+     */
+    private static boolean[] missingAggregates(List<Praeceptum> rules, int[] bitToRule, String aggregatedOutput,
+            ComputedOutputs[] computedByBit) {
+        var missing = new boolean[rules.size()];
+        for (int bit = 0; bit < rules.size(); bit++) {
+            missing[bit] = aggregatedOutput != null && computedByBit[bit] == null
+                    && rules.get(bitToRule[bit]).output().values().get(aggregatedOutput) == null;
+        }
+        return missing;
     }
 
     /** Starts configuring an engine. */
@@ -234,12 +267,14 @@ public final class PraeceptaEngine<I, O> {
      * @return the outputs selected by the hit policy: at most one for single-hit policies (and for
      *         aggregations), several for multi-hit ones. If no rule matches: the default output alone, if
      *         there is one ({@link Builder#defaultOutput}), else empty, whatever the hit policy and
-     *         aggregation (COUNT included: DMN 1.5, 10.3.2.10, gives null, not zero)
+     *         aggregation (COUNT included: DMN 1.5, 10.3.2.10, gives null, not zero). A SUM, MIN or MAX
+     *         of a table with one output is missing when that output is missing in a matching rule: the
+     *         result is then that rule's output (see {@link OutputStrategy#transform})
      * @throws HitPolicyViolationException if the input matches several rules under UNIQUE, or rules
      *                                     with different outputs under ANY
      * @throws InvalidInputException       if a value is outside its column's declared input values, or
      *                                     not a valid value of the column's type (for a list, if an
-     *                                     element is missing or of another type)
+     *                                     element is of another type)
      */
     public List<O> evaluate(I input) {
         return inputStrategy == null
@@ -275,21 +310,45 @@ public final class PraeceptaEngine<I, O> {
                 if (count != null) {
                     yield List.of(count.apply(BitsetIndex.count(matches)));
                 }
+                if (reduce != null) {
+                    yield aggregate(matches, input, reader);
+                }
                 var selected = new Object[BitsetIndex.count(matches)];
                 int i = 0;
                 for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
                     selected[i++] = computedByBit[bit] == null ? outputByBit[bit] : outputStrategy.transform(output(bit, input, reader));
                 }
-                if (reduce != null) {
-                    var total = (O) selected[0];
-                    for (int k = 1; k < selected.length; k++) {
-                        total = reduce.apply(total, (O) selected[k]);
-                    }
-                    yield List.of(total);
-                }
                 yield (List<O>) List.of(selected);
             }
         };
+    }
+
+    /**
+     * SUM, MIN or MAX of the matching rules' outputs (one at least). FEEL's {@code sum}, {@code min} and
+     * {@code max} give null for a list that holds null (DMN 1.5, 10.3.4.4 and 10.3.2.16), so where the table's
+     * one output is missing in a matching rule, the aggregate is missing: the result is that rule's output, as
+     * converted, and the strategy combines nothing.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> List<O> aggregate(long[] matches, T input, BitsetIndex.ColumnReader<T> reader) {
+        O total = null;
+        for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
+            O output;
+            if (computedByBit[bit] == null) {
+                if (missingAggregateByBit[bit]) {
+                    return singleByBit[bit];
+                }
+                output = (O) outputByBit[bit];
+            } else {
+                var computed = output(bit, input, reader);
+                output = outputStrategy.transform(computed);
+                if (aggregatedOutput != null && computed.values().get(aggregatedOutput) == null) {
+                    return List.of(output);
+                }
+            }
+            total = total == null ? output : reduce.apply(total, output);
+        }
+        return List.of(total);
     }
 
     /** The hit policy. */
@@ -307,7 +366,10 @@ public final class PraeceptaEngine<I, O> {
         return inputs;
     }
 
-    /** Findings of the static analysis performed at build time. */
+    /**
+     * Findings of the static analysis performed at build time; {@link Builder#build()} also logs them, unless
+     * {@link Builder#logValidationReport(boolean)} turned that off.
+     */
     public ValidationReport validationReport() {
         return report;
     }
@@ -381,12 +443,13 @@ public final class PraeceptaEngine<I, O> {
     /**
      * A cell may name an input that holds a list only as a whole test, {@code Flu Symptoms} or
      * {@code not(Flu Symptoms)}, which asks whether the value is in the list: FEEL compares no value with a
-     * list, so {@code > limits} or {@code [low..limits]} would never hold.
+     * list, so {@code > limits}, {@code [low..limits]}, {@code = limits} or {@code != limits} would never hold
+     * (an equality of a value and a list is null, DMN 1.5, Tables 52 and 53).
      */
     private static void rejectComparisonsWithLists(Praeceptum rule, String column, UnaryTests cell, Set<String> lists) {
         for (var test : cell.tests()) {
-            if (test instanceof UnaryTests.Equals) {
-                continue;
+            if (test instanceof UnaryTests.Equals equals && !equals.explicit()) {
+                continue; // a bare name: list contains(Flu Symptoms, ?), DMN 1.5, Table 55
             }
             for (var name : UnaryTests.names(test)) {
                 if (lists.contains(name)) {
@@ -395,21 +458,6 @@ public final class PraeceptaEngine<I, O> {
                 }
             }
         }
-    }
-
-    /** The rules (bits) whose cell in a column that holds lists is not "any value". */
-    private static long[] listRules(BitsetIndex index) {
-        var rules = new long[index.words()];
-        var all = index.allRules();
-        for (int c = 0; c < index.columnCount(); c++) {
-            var column = index.column(c);
-            if (column.holdsLists()) {
-                var constrained = all.clone();
-                BitsetIndex.andNot(constrained, column.rulesAcceptingAnyList());
-                BitsetIndex.or(rules, constrained);
-            }
-        }
-        return rules;
     }
 
     /** The variable cells by bit, with columns as positions in the evaluation order; null for rules without any. */
@@ -736,6 +784,23 @@ public final class PraeceptaEngine<I, O> {
         return masks;
     }
 
+    /**
+     * The table's output, if it has exactly one: DMN aggregates a single output (8.2.11, "decision tables with
+     * compound outputs do not support aggregation"). The outputs are those a {@linkplain Builder#table table}
+     * declares, or else those the rules give; null if there are several, whose aggregation the strategy defines.
+     */
+    private static String onlyOutput(Map<String, ColumnType> declared, List<Praeceptum> rules) {
+        var outputs = new HashSet<>(declared.keySet());
+        if (outputs.isEmpty()) {
+            for (var rule : rules) {
+                outputs.addAll(rule.output().values().keySet());
+                outputs.addAll(rule.output().references().keySet());
+                outputs.addAll(rule.output().expressions().keySet());
+            }
+        }
+        return outputs.size() == 1 ? outputs.iterator().next() : null;
+    }
+
     private static <O> BinaryOperator<O> reducer(AggregationOperator aggregation, OutputStrategy<O> strategy) {
         if (aggregation == null) {
             return null;
@@ -879,7 +944,13 @@ public final class PraeceptaEngine<I, O> {
         try {
             var cell = rule.input().values().get(column);
             if (!feel) {
-                return CellParser.parse(cell, type);
+                var parsed = CellParser.parse(cell, type);
+                if (list && parsed.tests().stream().anyMatch(test -> test instanceof UnaryTests.NotEqual(UnaryTests.NullTest n))) {
+                    throw new InvalidDecisionTableException(("Rule %s, column '%s': '!= null' is not a test of a list column, "
+                            + "where 'null' tests the list and other tests its elements; write not(null) for a list that is there")
+                            .formatted(rule.priority(), column));
+                }
+                return parsed;
             }
             return list ? CellParser.parseFeelList(cell, type) : CellParser.parseFeel(cell, type);
         } catch (CellSyntaxException e) {
@@ -955,20 +1026,33 @@ public final class PraeceptaEngine<I, O> {
 
     // ---- validation ----------------------------------------------------------------------------
 
-    /**
-     * Runs the static analysis, most severe findings first. Fails if a finding is at least as severe
-     * as {@code failOn}; otherwise logs the findings as a warning.
-     */
-    private static ValidationReport validate(BitsetIndex index, List<Praeceptum> rules, HitPolicy hitPolicy, long[] variableRules,
-            Set<String> numericOutputs, Severity failOn) {
-        var analysed = TableAnalysis.analyse(index, rules, hitPolicy, variableRules, output -> comparable(output, numericOutputs));
-        var report = new ValidationReport(analysed.stream()
+    /** Runs the static analysis: its findings, most severe first. */
+    private static ValidationReport analyse(BitsetIndex index, List<Praeceptum> rules, HitPolicy hitPolicy, long[] variableRules,
+            Set<String> numericOutputs, boolean hasDefaultOutput) {
+        var analysed = new ArrayList<>(
+                TableAnalysis.analyse(index, rules, hitPolicy, variableRules, output -> comparable(output, numericOutputs)));
+        if (hasDefaultOutput) {
+            // DMN 1.5, 10.3.2.10: "A complete decision table SHALL NOT specify a default output value"
+            var seen = index.allRules();
+            BitsetIndex.andNot(seen, variableRules);
+            if (Completeness.isComplete(index, seen)) {
+                analysed.add(new Issue(ValidationReport.Kind.UNREACHABLE_DEFAULT_OUTPUT, List.of()));
+            }
+        }
+        return new ValidationReport(analysed.stream()
                 .sorted(Comparator.comparing(Issue::severity).reversed())
                 .toList());
+    }
+
+    /**
+     * Fails if a finding of the report is at least as severe as {@code failOn}; otherwise logs the findings as a
+     * warning, unless {@code log} is false.
+     */
+    private static ValidationReport enforce(ValidationReport report, Severity failOn, boolean log) {
         if (failOn != null && report.hasIssuesAtLeast(failOn)) {
             throw new InvalidDecisionTableException(report);
         }
-        if (!report.isEmpty()) {
+        if (log && !report.isEmpty()) {
             LOG.log(Level.WARNING, "Decision table has {0} validation issue(s):\n{1}", report.issues().size(), report);
         }
         return report;
@@ -988,6 +1072,7 @@ public final class PraeceptaEngine<I, O> {
         private AggregationOperator aggregation;
         private List<Praeceptum> rules;
         private Severity failOn;
+        private boolean logValidationReport = true;
         private Masks.Form maskForm = Masks.Form.AUTO;
         /** The output when no rule matches, or null. */
         private PraeceptaOutput defaultOutput;
@@ -1101,7 +1186,10 @@ public final class PraeceptaEngine<I, O> {
          * policy, and as the result of a COLLECT aggregation (COUNT included), not aggregated. It is converted
          * once, when the engine is built, like a rule's output. Its values are plain text, as a rule's are, and
          * null for an output without a default. {@link #table} takes it from the table's output columns
-         * ({@link DecisionTable#defaultOutput}).
+         * ({@link DecisionTable#defaultOutput}). When every input, a missing value in any column included, matches a
+         * rule, the default can never be given, and the validation report has the ERROR
+         * {@link ValidationReport.Kind#UNREACHABLE_DEFAULT_OUTPUT} ("A complete decision table SHALL NOT specify a
+         * default output value").
          *
          * @throws IllegalArgumentException if the output names an input or is an expression: a default is a value
          */
@@ -1117,7 +1205,9 @@ public final class PraeceptaEngine<I, O> {
         /**
          * Aggregates COLLECT results into a single output, using the output strategy's sum/min/max/count. When
          * no rule matches, there is nothing to aggregate: the result is the default output ({@link #defaultOutput}),
-         * or none, COUNT included (DMN 1.5, 10.3.2.10, step 2).
+         * or none, COUNT included (DMN 1.5, 10.3.2.10, step 2). SUM, MIN and MAX of a table with one output are
+         * missing when that output is missing in a matching rule, as FEEL's {@code sum}, {@code min} and {@code max}
+         * are null for a list that holds null (10.3.4.4); COUNT counts every matching rule.
          */
         public Builder<I, O> aggregation(AggregationOperator aggregation) {
             this.aggregation = Objects.requireNonNull(aggregation, "aggregation");
@@ -1160,6 +1250,19 @@ public final class PraeceptaEngine<I, O> {
          */
         public Builder<I, O> offsetTimeInput(String column, Function<? super I, OffsetTime> extractor) {
             return bind(column, ColumnType.TIME, extractor, null, Zoning.ZONED, false);
+        }
+
+        /**
+         * Binds a TIME column to a getter returning a time of day with a zone id ({@code 08:30@Europe/Paris}). It
+         * compares with a cell's time in the same zone by local time; DMN 1.5 does not define how it compares with
+         * a time in another zone, at an offset or without a zone, so such a test is unknown: neither it nor its
+         * {@code not(...)} matches. A time in a zone with one fixed offset ({@code 08:30@Etc/UTC},
+         * {@code 08:30@Etc/GMT-2}) is the time at that offset (DMN 1.5, Table 72): it matches as
+         * {@link #offsetTimeInput} matches {@code 08:30Z}, so {@code time("08:30:00Z")}, {@code <= time("09:30:00+01:00")}
+         * and {@code time("08:30:00@Etc/UTC")} all hold for it.
+         */
+        public Builder<I, O> zonedTimeInput(String column, Function<? super I, ZonedTime> extractor) {
+            return bind(column, ColumnType.TIME, extractor, null, Zoning.ZONE_ID, false);
         }
 
         /**
@@ -1218,8 +1321,13 @@ public final class PraeceptaEngine<I, O> {
          * cell holds when some element passes one of its tests: {@code "PT","ES"} matches a list holding
          * {@code "PT"} or {@code "ES"}, and {@code not("PT")} a list without {@code "PT"}. A missing (null)
          * list matches only {@code -} and {@code null}; an empty one matches no test, so every
-         * {@code not(...)}. Elements may not be null or blank. Input values, if declared, apply to the
-         * elements. A cell of another column that names this input ({@code Flu Symptoms}, in a DMN table)
+         * {@code not(...)}. An element may be missing: null, or blank text by Praecepta's convention for missing
+         * values (FEEL's {@code ""} is a string). FEEL answers for a missing element as for a missing value: a
+         * literal is false for it ({@code not("PT")} matches {@code ["BR", null]}) and a comparison unknown, so
+         * {@code >= 18} matches
+         * {@code [20, null]} but {@code not(>= 18)} does not match {@code [10, null]}; in a DMN table,
+         * {@code list contains(?, null)} asks for one. Input values, if declared, apply to the elements that are
+         * there. A cell of another column that names this input ({@code Flu Symptoms}, in a DMN table)
          * holds when that column's value is in the list.
          */
         public Builder<I, O> listInput(String column, Function<? super I, ? extends Collection<String>> extractor) {
@@ -1258,7 +1366,8 @@ public final class PraeceptaEngine<I, O> {
          * With {@link #inputs(InputStrategy)}: the column (or an input the cells compare with) holds lists
          * of {@code elementType}, matched as {@link #listInput(String, Function)} describes. Its text is a
          * FEEL list such as {@code ["PT", "BR"]} or {@code [1, 2.5]}, whose brackets may be left out
-         * ({@code PT, BR}); {@code []} is an empty list, and null or blank text a missing one.
+         * ({@code PT, BR}); {@code []} is an empty list, null or blank text a missing one, and {@code null} in
+         * a list a missing element ({@code ["PT", null]}).
          */
         public Builder<I, O> listColumnType(String column, ColumnType elementType) {
             columnType(column, elementType);
@@ -1313,6 +1422,18 @@ public final class PraeceptaEngine<I, O> {
         /** Fail {@link #build()} with an {@link InvalidDecisionTableException} if validation finds issues this severe. */
         public Builder<I, O> failOn(Severity severity) {
             this.failOn = Objects.requireNonNull(severity, "severity");
+            return this;
+        }
+
+        /**
+         * Whether {@link #build()} logs the validation report, if it has issues, as one warning through
+         * {@link System.Logger} (logger {@code io.github.brunopacheco1.praecepta.engine.PraeceptaEngine}).
+         * It does by default; turn it off when the caller reports {@link PraeceptaEngine#validationReport()}
+         * itself, as the framework integrations and the build plugins do, so that each issue is logged once.
+         * The report is the same either way, and {@link #failOn} still applies.
+         */
+        public Builder<I, O> logValidationReport(boolean log) {
+            this.logValidationReport = log;
             return this;
         }
 

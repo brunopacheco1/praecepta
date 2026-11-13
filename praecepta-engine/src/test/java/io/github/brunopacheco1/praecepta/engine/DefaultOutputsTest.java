@@ -118,11 +118,80 @@ class DefaultOutputsTest {
         Assertions.assertThat(numberEngine(withoutDefault).evaluate(Map.of("score", "650"))).as("one rule matches").hasSize(1);
     }
 
+    /**
+     * A {@code null} default is a default (#92): "if a default output value d is specified, DTI=FEEL(d)", so the one
+     * output is then null, as a matching rule whose output entry is {@code null} gives it, rather than no output.
+     */
     @Test
-    void a_null_default_is_no_default() {
+    void a_null_default_is_a_default_whose_value_is_null() {
         var table = read(FEES.formatted("SUM", "null"));
-        Assertions.assertThat(table.outputs().getFirst().defaultValue()).isNull();
-        Assertions.assertThat(numberEngine(table).evaluate(Map.of("score", "500"))).isEmpty();
+        Assertions.assertThat(table.outputs().getFirst()).isEqualTo(new OutputColumn("Fee", ColumnType.NUMBER, List.of(), null, true));
+        Assertions.assertThat(table.defaultOutput()).contains(new PraeceptaOutput(values("Fee", null)));
+        Assertions.assertThat(mapEngine(table).evaluate(Map.of("score", "500"))).containsExactly(values("Fee", null));
+        // a blank default entry is none
+        var blank = read(FEES.formatted("SUM", " "));
+        Assertions.assertThat(blank.outputs().getFirst().hasDefault()).isFalse();
+        Assertions.assertThat(mapEngine(blank).evaluate(Map.of("score", "500"))).isEmpty();
+    }
+
+    /** A {@code null} default may carry FEEL comments (#81 with #92), as any other literal may. */
+    @Test
+    void a_null_default_with_a_comment_is_a_null_default() {
+        var table = read(FEES.formatted("SUM", "null // no fee /* yet */"));
+        Assertions.assertThat(table.outputs().getFirst()).isEqualTo(new OutputColumn("Fee", ColumnType.NUMBER, List.of(), null, true));
+        Assertions.assertThat(mapEngine(table).evaluate(Map.of("score", "500"))).containsExactly(values("Fee", null));
+        Assertions.assertThat(read(FEES.formatted("SUM", "/* none */ 0")).outputs().getFirst().defaultValue()).isEqualTo("0");
+    }
+
+    /**
+     * DMN 1.5, 10.3.2.10, step 2, with several outputs: the default is a context of the outputs' defaults (Table 46),
+     * null for an output without one. When every output declares {@code null}, the result is that context, all null;
+     * when none declares a default, the result is null: no output (#92).
+     */
+    @ParameterizedTest
+    @EnumSource(HitPolicy.class)
+    void a_multi_output_table_whose_defaults_are_all_null_gives_them_but_one_without_defaults_gives_none(HitPolicy policy) {
+        var xml = APPROVAL.formatted(policy.name().replace('_', ' '));
+        var allNull = read(xml.replace("<text>\"Declined\"</text></defaultOutputEntry>", "<text>null</text></defaultOutputEntry>")
+                .replace("<outputValues><text>\"Best\", \"Standard\"</text></outputValues></output>",
+                        "<outputValues><text>\"Best\", \"Standard\"</text></outputValues>"
+                                + "<defaultOutputEntry><text>null</text></defaultOutputEntry></output>"));
+        Assertions.assertThat(allNull.outputs()).extracting(OutputColumn::hasDefault).containsExactly(true, true);
+        Assertions.assertThat(mapEngine(allNull).evaluate(Map.of("score", "500"))).containsExactly(values("Status", null, "Rate", null));
+
+        var none = read(xml.replace("<defaultOutputEntry><text>\"Declined\"</text></defaultOutputEntry>", ""));
+        Assertions.assertThat(none.defaultOutput()).isEmpty();
+        Assertions.assertThat(mapEngine(none).evaluate(Map.of("score", "500"))).isEmpty();
+    }
+
+    @Test
+    void dmn_writer_writes_a_null_default_and_reads_it_back() {
+        var table = new DecisionTable("Approval", HitPolicy.FIRST, null, List.of(new DecisionTable.InputColumn("score", ColumnType.NUMBER)),
+                List.of(new OutputColumn("Status", ColumnType.STRING, List.of("Approved", "Declined"), null, true),
+                        new OutputColumn("Rate", ColumnType.STRING, List.of(), null, false)),
+                List.of(new Praeceptum(1, new PraeceptaInput(Map.of("score", ">= 700")),
+                        new PraeceptaOutput(Map.of("Status", "Approved", "Rate", "Best")))));
+        var xml = DmnWriter.write(table);
+        Assertions.assertThat(xml).contains("""
+                      <output id="output_0" name="Status" typeRef="string">
+                        <outputValues id="output_values_0"><text>"Approved", "Declined"</text></outputValues>
+                        <defaultOutputEntry id="output_default_0"><text>null</text></defaultOutputEntry>
+                      </output>
+                      <output id="output_1" name="Rate" typeRef="string"/>
+                """);
+        var read = read(xml);
+        Assertions.assertThat(read.outputs()).isEqualTo(table.outputs());
+        Assertions.assertThat(read.defaultOutput()).contains(new PraeceptaOutput(values("Status", null, "Rate", null)));
+        Assertions.assertThat(DmnWriter.write(read)).isEqualTo(xml);
+    }
+
+    @Test
+    void an_output_column_with_a_default_value_must_say_it_has_one() {
+        Assertions.assertThatThrownBy(() -> new OutputColumn("Status", ColumnType.STRING, List.of(), "Declined", false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Output 'Status' has the default value 'Declined' but hasDefault is false");
+        Assertions.assertThat(new OutputColumn("Status", ColumnType.STRING, List.of(), "Declined").hasDefault()).isTrue();
+        Assertions.assertThat(new OutputColumn("Status", ColumnType.STRING, List.of(), null).hasDefault()).isFalse();
     }
 
     @Test
@@ -194,6 +263,15 @@ class DefaultOutputsTest {
             "dateTime                  | date and time(\"2025-01-31T08:30:00@Europe/Paris\") | 2025-01-31T08:30:00@Europe/Paris",
             "dayTimeDuration           | duration(\"P1DT2H\")                       | P1DT2H",
             "yearMonthDuration         | duration(\"P1Y2M\")                        | P1Y2M",
+            // the other literal forms (#81): at-literals, the functions' other forms, numbers as FEEL writes them
+            "date                      | @\"2025-01-31\"                             | 2025-01-31",
+            "date                      | date(2025, 1, 31)                           | 2025-01-31",
+            "time                      | time(8, 30, 0)                              | 08:30:00",
+            "time                      | @\"10:30:00@Europe/Paris\"                  | 10:30:00@Europe/Paris",
+            "dateTime                  | date and time(date(2025, 1, 31), time(8, 30, 0)) | 2025-01-31T08:30:00",
+            "dayTimeDuration           | @\"P1D\"                                   | P1D",
+            "yearMonthDuration         | @\"P1Y2M\" // a comment                     | P1Y2M",
+            "number                    | .5e1                                        | 5",
     })
     void a_default_of_every_type_is_read_written_and_read_back(String typeRef, String text, String value) {
         var table = read(typedDefault(typeRef, text));
@@ -235,6 +313,56 @@ class DefaultOutputsTest {
         var fees = FEES.formatted("MAX", "1.5").replace("<output typeRef=\"number\">",
                 "<output typeRef=\"number\"><outputValues><text>1.50, 10, 20</text></outputValues>");
         Assertions.assertThat(read(fees).outputs().getFirst().defaultValue()).isEqualTo("1.5");
+    }
+
+    /**
+     * Output entries, output value lists and defaults take the literal forms cells do (#81): at-literals, the date and
+     * time functions' other forms, numbers with an exponent. The engine gives their values, the default must be one of
+     * the output values by value (Table 46), and DmnWriter writes them as it writes any literal, which reads back the same.
+     */
+    @Test
+    void output_entries_value_lists_and_defaults_take_every_literal_form() {
+        var xml = """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="due" name="Due">
+                    <decisionTable hitPolicy="FIRST">
+                      <input><inputExpression typeRef="number"><text>score</text></inputExpression></input>
+                      <output name="Due" typeRef="date">
+                        <outputValues><text>@"2025-01-31", date(2025, 2, 28), date("2025-03-31")</text></outputValues>
+                        <defaultOutputEntry><text>date(2025, 3, 31) // the quarter's end</text></defaultOutputEntry>
+                      </output>
+                      <output name="Rate" typeRef="number">
+                        <outputValues><text>1e0, 2.5, .5</text></outputValues>
+                        <defaultOutputEntry><text>5E-1</text></defaultOutputEntry>
+                      </output>
+                      <output name="Opens" typeRef="time"/>
+                      <rule><inputEntry><text>&gt; 5</text></inputEntry><outputEntry><text>@"2025-01-31"</text></outputEntry>
+                        <outputEntry><text>1E0</text></outputEntry><outputEntry><text>@"10:30:00@Europe/Paris"</text></outputEntry></rule>
+                      <rule><inputEntry><text>&gt; 2</text></inputEntry><outputEntry><text>date(2025, 2, 28) /* February */</text></outputEntry>
+                        <outputEntry><text>.25e1</text></outputEntry><outputEntry><text>time(8, 30, 0)</text></outputEntry></rule>
+                    </decisionTable>
+                  </decision>
+                </definitions>""";
+        var table = read(xml);
+        Assertions.assertThat(table.outputs()).extracting(OutputColumn::defaultValue).containsExactly("2025-03-31", "0.5", null);
+        var engine = mapEngine(table);
+        Assertions.assertThat(engine.evaluate(Map.of("score", "6")))
+                .containsExactly(values("Due", "2025-01-31", "Rate", "1", "Opens", "10:30:00@Europe/Paris"));
+        Assertions.assertThat(engine.evaluate(Map.of("score", "3")))
+                .containsExactly(values("Due", "2025-02-28", "Rate", "2.5", "Opens", "08:30:00"));
+        Assertions.assertThat(engine.evaluate(Map.of("score", "1"))).containsExactly(values("Due", "2025-03-31", "Rate", "0.5", "Opens", null));
+
+        var written = DmnWriter.write(table);
+        var again = read(written);
+        Assertions.assertThat(again.outputs()).isEqualTo(table.outputs());
+        Assertions.assertThat(DmnWriter.write(again)).isEqualTo(written);
+        Assertions.assertThat(mapEngine(again).evaluate(Map.of("score", "3"))).isEqualTo(engine.evaluate(Map.of("score", "3")));
+
+        // a default outside the output values, in any form, is still rejected
+        var outside = xml.replace("date(2025, 3, 31) // the quarter's end", "@\"2025-04-30\"");
+        Assertions.assertThatThrownBy(() -> read(outside))
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessageContaining("is not in its output values");
     }
 
     /** A table whose one output, Out, of a type, has a default; its one rule matches scores above 5. */

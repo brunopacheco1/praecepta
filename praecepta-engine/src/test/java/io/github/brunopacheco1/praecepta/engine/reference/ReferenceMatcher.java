@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.MathContext;
 import java.time.Duration;
 import java.time.Instant;
@@ -14,15 +15,18 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.Period;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +34,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
@@ -43,10 +49,12 @@ import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NotEqual;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
+import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 
 /**
  * Executable specification of decision-table semantics: a deliberately naive matcher that evaluates
@@ -58,7 +66,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * comparisons and intervals (unknown), equals only {@code null}, and so satisfies {@code not("A")}.
  * Blank strings count as missing. Times and date-times with a time zone compare by the instant they
  * denote, and one without a zone takes the offset of the value it is compared with (DMN 1.5, Table 54),
- * equality included. The engine
+ * equality included. A time in a zone with one fixed offset ({@code 00:01:00@Etc/UTC}) is the time at that
+ * offset (DMN 1.5, Table 72), wherever it is written or given ({@link #fixed}). The engine
  * instead precomputes value classes and bitmasks.
  *
  * @param rules          rules in table order (DMN "rule order")
@@ -73,19 +82,28 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  *                       {@code list contains} and {@code some x in ? satisfies}: a positive cell holds
  *                       when some element passes one of its tests, or the list is missing and the cell
  *                       has {@code null}; {@code not(...)} holds when the list is there and every element
- *                       fails every test. A name of such a column in another
- *                       column's cell asks whether the value is in the list. A list may hold no missing
- *                       element.
+ *                       fails every test. A list may hold missing elements, for which a literal is false
+ *                       and a comparison unknown. A name of such a column in another column's cell asks
+ *                       whether the value is in the list.
  * @param bothKinds      whether the inputs of a time or date-time column may have a time zone or not, as
  *                       map-based inputs read them from text; the static analysis then visits both kinds
  *                       of values, whatever {@code zonedColumns} says
  * @param defaultOutput  the output when no rule matches (DMN's default output values), or null if the table
  *                       has none: DMN 1.5, 10.3.2.10, step 2, "if no rules match, if a default output value d is
  *                       specified, DTI=FEEL(d)", before any hit policy or aggregation
+ * @param zoneIdColumns  the time columns whose inputs have a zone id ({@code 10:30@Europe/Paris}), which compare by
+ *                       local time with times in the same zone, and with no other (FEEL's null); with
+ *                       {@code bothKinds}, the static analysis visits such times in every column whose cells name one
  */
 public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
         Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
-        Set<String> lists, boolean bothKinds, PraeceptaOutput defaultOutput) {
+        Set<String> lists, boolean bothKinds, PraeceptaOutput defaultOutput, Set<String> zoneIdColumns) {
+
+    public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
+            Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
+            Set<String> lists, boolean bothKinds, PraeceptaOutput defaultOutput) {
+        this(rules, hitPolicy, outputPriority, types, allowedValues, feelCells, zonedColumns, lists, bothKinds, defaultOutput, Set.of());
+    }
 
     public ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
             Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
@@ -147,16 +165,11 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     /**
      * The first column whose (non-missing) value is outside its declared input values, or, for a list,
-     * that holds a missing element or one outside them; null if there is none.
+     * that holds a (non-missing) element outside them; null if there is none.
      */
     public String invalidColumn(Map<String, ?> input) {
-        for (var list : lists) {
-            if (value(input, list) instanceof List<?> elements && elements.stream().anyMatch(Objects::isNull)) {
-                return list;
-            }
-        }
         for (var declared : allowedValues.entrySet()) {
-            var allowed = CellParser.parse(declared.getValue(), type(declared.getKey()));
+            var allowed = declared(declared.getKey());
             var value = value(input, declared.getKey());
             var values = value instanceof List<?> elements ? elements : Collections.singletonList(value);
             for (var element : values) {
@@ -196,10 +209,10 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * DMN COLLECT with an aggregator over a single numeric output column, as DMN 1.5, 10.3.2.10 evaluates it.
      * No match is step 2, before any aggregation: the default output's value, if the table has a default
      * output (null if that output has no default), else null, which is no result at all (empty), whatever the
-     * aggregator, COUNT included. Otherwise (step 3b) the aggregate of the matching rules' outputs, skipping
-     * missing ones (a computed output that names a missing input or divides by zero), as Praecepta does where
-     * FEEL would give null: SUM, MIN and MAX of no output that is not missing are null. COUNT counts the
-     * matching rules.
+     * aggregator, COUNT included. Otherwise (step 3b) FEEL's {@code sum}, {@code min}, {@code max} or {@code count}
+     * of the matching rules' outputs: the first three are null when an output is missing (a literal {@code null},
+     * or a computed output that names a missing input or divides by zero), since null is outside their parameters'
+     * domain (10.3.4.4, 10.3.2.16); COUNT counts the matching rules, whatever their outputs.
      */
     public Optional<Aggregate> aggregate(Map<String, ?> input, String output, Aggregator aggregator) {
         if (hitPolicy != HitPolicy.COLLECT) {
@@ -213,16 +226,19 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             var value = defaultOutput.values().get(output);
             return Optional.of(new Aggregate(value == null ? null : new BigDecimal(value)));
         }
-        var values = matched.stream()
-                .map(rule -> output(rule, input).values().get(output))
-                .filter(Objects::nonNull)
-                .map(BigDecimal::new)
-                .toList();
+        var texts = matched.stream().map(rule -> output(rule, input).values().get(output)).toList();
+        if (aggregator == Aggregator.COUNT) {
+            return Optional.of(new Aggregate(BigDecimal.valueOf(texts.size())));
+        }
+        if (texts.stream().anyMatch(Objects::isNull)) {
+            return Optional.of(new Aggregate(null));
+        }
+        var values = texts.stream().map(BigDecimal::new).toList();
         return Optional.of(new Aggregate(switch (aggregator) {
-            case COUNT -> BigDecimal.valueOf(matched.size());
-            case SUM -> values.isEmpty() ? null : values.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-            case MIN -> values.stream().min(Comparator.naturalOrder()).orElse(null);
-            case MAX -> values.stream().max(Comparator.naturalOrder()).orElse(null);
+            case SUM -> values.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+            case MIN -> values.stream().min(Comparator.naturalOrder()).orElseThrow();
+            case MAX -> values.stream().max(Comparator.naturalOrder()).orElseThrow();
+            case COUNT -> throw new IllegalStateException("counted above");
         }));
     }
 
@@ -250,7 +266,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             values.put(output, switch (value) {
                 case null -> null;
                 case BigDecimal number -> number.compareTo(BigDecimal.ZERO) == 0 ? "0" : number.stripTrailingZeros().toPlainString();
-                default -> value.toString();
+                case String text -> text;
+                default -> FeelLiterals.text(value);
             });
         });
         return new PraeceptaOutput(values);
@@ -274,15 +291,17 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     /**
      * An output expression on concrete values, as FEEL defines it: a missing operand gives null, {@code +}
      * joins strings or adds numbers, a division by zero gives null and every result has 34 digits
-     * (DMN 1.5, Tables 57, 59 and 60). Exponents are whole numbers here.
+     * (DMN 1.5, Tables 57, 59 and 60). Exponents are whole numbers here. Dates, times and durations follow
+     * {@link #temporal}; unary minus is {@code e * -1} (Table 62).
      */
     private static Object evaluate(OutputExpression expression, Function<String, Object> inputs) {
         return switch (expression) {
-            case OutputExpression.Literal literal -> literal.value();
+            case OutputExpression.Literal literal -> fixed(literal.value());
             case OutputExpression.Name name -> inputs.apply(name.name());
             case OutputExpression.Negation negation -> {
-                var operand = (BigDecimal) evaluate(negation.operand(), inputs);
-                yield operand == null ? null : BigDecimal.ZERO.subtract(operand);
+                var operand = evaluate(negation.operand(), inputs);
+                yield operand == null ? null : evaluate(new OutputExpression.Arithmetic(OutputExpression.Operator.MULTIPLY,
+                        new OutputExpression.Literal(operand), new OutputExpression.Literal(BigDecimal.ONE.negate())), inputs);
             }
             case OutputExpression.Arithmetic arithmetic -> {
                 var a = evaluate(arithmetic.left(), inputs);
@@ -292,6 +311,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                 }
                 if (a instanceof String text) {
                     yield text.concat((String) b);
+                }
+                if (!(a instanceof BigDecimal) || !(b instanceof BigDecimal)) {
+                    yield temporal(arithmetic.operator(), a, b);
                 }
                 var x = (BigDecimal) a;
                 var y = (BigDecimal) b;
@@ -304,6 +326,127 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                 };
             }
         };
+    }
+
+    /**
+     * Arithmetic with dates, times and durations, as DMN 1.5 has it (Tables 57 and 59), on the values themselves:
+     * a date moved by months keeps its day, and is null if the month does not have it; a date moved by days and
+     * time is a date and time at UTC midnight moved, then its date; two date-times subtract by instant, or by
+     * their fields when neither has a zone, and not at all when only one has one; a date counts as UTC midnight
+     * there; times subtract by instant with offsets, by local time when one has none, by local time in one zone
+     * id, and not at all otherwise; a years and months duration scales to the whole month toward zero, a days and
+     * time one to the nanosecond.
+     */
+    private static Object temporal(OutputExpression.Operator operator, Object a, Object b) {
+        try {
+            return switch (operator) {
+                case ADD -> a instanceof Duration || a instanceof YearsAndMonths && !(b instanceof YearsAndMonths) && !(b instanceof Duration)
+                        ? moved(b, a, false) : plus(a, b);
+                case SUBTRACT -> b instanceof Duration || b instanceof YearsAndMonths ? moved(a, b, true) : difference(a, b);
+                case MULTIPLY -> a instanceof BigDecimal number ? scaled(b, number, false) : scaled(a, (BigDecimal) b, false);
+                case DIVIDE -> b instanceof BigDecimal number ? scaled(a, number, true) : ratio(a, b);
+                case POWER -> throw new IllegalStateException("** of " + a);
+            };
+        } catch (java.time.DateTimeException | ArithmeticException e) {
+            return null;
+        }
+    }
+
+    /** {@code a + b} where {@code a} keeps its type: two durations of a kind, or a value moved by a duration. */
+    private static Object plus(Object a, Object b) {
+        if (a instanceof Duration x && b instanceof Duration y) {
+            return x.plus(y);
+        }
+        if (a instanceof YearsAndMonths x && b instanceof YearsAndMonths y) {
+            return new YearsAndMonths(x.months() + y.months());
+        }
+        return moved(a, b, false);
+    }
+
+    private static Object moved(Object value, Object duration, boolean back) {
+        if (value instanceof Duration x) {
+            return back ? x.minus((Duration) duration) : x.plus((Duration) duration);
+        }
+        if (value instanceof YearsAndMonths x) {
+            var months = ((YearsAndMonths) duration).months();
+            return new YearsAndMonths(back ? x.months() - months : x.months() + months);
+        }
+        if (duration instanceof YearsAndMonths months) {
+            long by = back ? -months.months() : months.months();
+            var date = switch (value) {
+                case LocalDate day -> sameDay(day, by);
+                case LocalDateTime moment -> sameDay(moment.toLocalDate(), by);
+                case ZonedDateTime moment -> sameDay(moment.toLocalDate(), by);
+                default -> throw new IllegalStateException("not a date: " + value);
+            };
+            return switch (value) {
+                case LocalDateTime moment when date != null -> LocalDateTime.of(date, moment.toLocalTime());
+                case ZonedDateTime moment when date != null -> ZonedDateTime.of(date, moment.toLocalTime(), moment.getZone());
+                case LocalDate day -> date;
+                default -> null;
+            };
+        }
+        var by = back ? ((Duration) duration).negated() : (Duration) duration;
+        return switch (value) {
+            case LocalDate date -> LocalDateTime.of(date, LocalTime.MIDNIGHT).plus(by).toLocalDate();
+            case LocalDateTime moment -> moment.plus(by);
+            case ZonedDateTime moment -> ZonedDateTime.ofInstant(moment.toInstant().plus(by), moment.getZone());
+            case LocalTime time -> LocalTime.ofNanoOfDay(Math.floorMod(time.toNanoOfDay() + by.toNanos(), 86_400_000_000_000L));
+            case OffsetTime time -> OffsetTime.of(LocalTime.ofNanoOfDay(Math.floorMod(time.toLocalTime().toNanoOfDay() + by.toNanos(),
+                    86_400_000_000_000L)), time.getOffset());
+            case ZonedTime time -> new ZonedTime(LocalTime.ofNanoOfDay(Math.floorMod(time.time().toNanoOfDay() + by.toNanos(),
+                    86_400_000_000_000L)), time.zone());
+            default -> throw new IllegalStateException("not a date or time: " + value);
+        };
+    }
+
+    /** The date {@code months} later, on the same day: null if that month does not have it. */
+    private static LocalDate sameDay(LocalDate date, long months) {
+        var moved = date.withDayOfMonth(1).plusMonths(months);
+        return date.getDayOfMonth() > moved.lengthOfMonth() ? null : moved.withDayOfMonth(date.getDayOfMonth());
+    }
+
+    /** {@code a - b} of two dates, date-times or times, as a days and time duration; null where it is not defined. */
+    private static Duration difference(Object a, Object b) {
+        var x = a instanceof LocalDate date ? date.atStartOfDay(ZoneOffset.UTC) : a;
+        var y = b instanceof LocalDate date ? date.atStartOfDay(ZoneOffset.UTC) : b;
+        return switch (x) {
+            // local date-times at one place, which subtract as they would at any one offset (10.3.2.3.5)
+            case LocalDateTime from when y instanceof LocalDateTime to -> Duration.between(to.toInstant(ZoneOffset.UTC),
+                    from.toInstant(ZoneOffset.UTC));
+            case ZonedDateTime from when y instanceof ZonedDateTime to -> Duration.between(to.toInstant(), from.toInstant());
+            case OffsetTime from when y instanceof OffsetTime to -> Duration.ofNanos(nanosAtUtc(from) - nanosAtUtc(to));
+            case OffsetTime from when y instanceof LocalTime to -> Duration.ofNanos(from.toLocalTime().toNanoOfDay() - to.toNanoOfDay());
+            case LocalTime from when y instanceof OffsetTime to -> Duration.ofNanos(from.toNanoOfDay() - to.toLocalTime().toNanoOfDay());
+            case LocalTime from when y instanceof LocalTime to -> Duration.ofNanos(from.toNanoOfDay() - to.toNanoOfDay());
+            case ZonedTime from when y instanceof ZonedTime to && from.zone().equals(to.zone()) ->
+                    Duration.ofNanos(from.time().toNanoOfDay() - to.time().toNanoOfDay());
+            default -> null;
+        };
+    }
+
+    private static long nanosAtUtc(OffsetTime time) {
+        return time.toLocalTime().toNanoOfDay() - time.getOffset().getTotalSeconds() * 1_000_000_000L;
+    }
+
+    private static Object scaled(Object duration, BigDecimal by, boolean divide) {
+        if (divide && by.signum() == 0) {
+            return null;
+        }
+        if (duration instanceof YearsAndMonths months) {
+            var value = new BigDecimal(months.months());
+            var result = divide ? value.divide(by, MathContext.DECIMAL128) : value.multiply(by);
+            return new YearsAndMonths(result.setScale(0, java.math.RoundingMode.DOWN).longValueExact());
+        }
+        var nanos = new BigDecimal(((Duration) duration).toNanos());
+        var result = divide ? nanos.divide(by, MathContext.DECIMAL128) : nanos.multiply(by);
+        return Duration.ofNanos(result.setScale(0, java.math.RoundingMode.HALF_EVEN).longValueExact());
+    }
+
+    private static BigDecimal ratio(Object a, Object b) {
+        var x = a instanceof Duration d ? new BigDecimal(d.toNanos()) : new BigDecimal(((YearsAndMonths) a).months());
+        var y = b instanceof Duration d ? new BigDecimal(d.toNanos()) : new BigDecimal(((YearsAndMonths) b).months());
+        return y.signum() == 0 ? null : x.divide(y, MathContext.DECIMAL128);
     }
 
     /**
@@ -326,19 +469,18 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     /**
      * Expected overlap and reachability findings. Every input region is visited by evaluating every
      * combination of {@link #representativeValues representative values}; invalid inputs are skipped,
-     * since evaluation rejects them before matching.
+     * since evaluation rejects them before matching. As the rules that the index sees an input match are those
+     * that every column's value is accepted by, the combinations are visited as the sets of rules they leave,
+     * column by column, each set once ({@link #staticMatchSets}).
      */
     public Set<Finding> expectedFindings(List<String> columns) {
         var findings = new LinkedHashSet<Finding>();
         var selected = new HashSet<Praeceptum>();
-        for (var input : representativeInputs(columns, true)) {
-            if (invalidColumn(input) != null) {
-                continue;
-            }
+        for (var set : staticMatchSets(columns)) {
             // rules with cells naming inputs match inputs known only when evaluating: they never overlap,
             // and never hide another rule, but they are unreachable if their other cells are covered
-            var matches = matches(input).stream().filter(rule -> !isVariable(rule)).toList();
-            var seen = rules.stream().filter(rule -> staticallyAccepts(rule, input)).toList();
+            var seen = set.stream().mapToObj(rules::get).toList();
+            var matches = seen.stream().filter(rule -> !isVariable(rule)).toList();
             switch (hitPolicy) {
                 case UNIQUE -> {
                     for (int a = 0; a < matches.size(); a++) {
@@ -395,7 +537,15 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         }
         for (var column : columns) {
             var cells = rules.stream().map(rule -> parse(rule.input().values().get(column), column)).toList();
-            boolean constrained = cells.stream().anyMatch(cell -> !(cell instanceof UnaryTests.Any));
+            // a cell such as "= null, != null" constrains nothing, as - does; a list cell other than - fails the empty
+            // list or a missing one
+            boolean constrained;
+            if (lists.contains(column)) {
+                constrained = cells.stream().anyMatch(cell -> !(cell instanceof UnaryTests.Any));
+            } else {
+                var values = representativeValues(column, true);
+                constrained = cells.stream().anyMatch(cell -> values.stream().anyMatch(value -> !accepts(cell, single(value), name -> null)));
+            }
             boolean compares = cells.stream().flatMap(cell -> tests(cell).stream())
                     .anyMatch(test -> test instanceof Compare || test instanceof Range);
             if (type(column) == ColumnType.STRING && constrained && !compares && !allowedValues.containsKey(column)) {
@@ -403,6 +553,28 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             }
         }
         return true;
+    }
+
+    /**
+     * Whether the table is complete (DMN 1.5, 8.2.4: "its rules cover all combinations of expected input values"):
+     * whether every valid input, with a missing value in any column too, since evaluation accepts one, matches some
+     * rule.
+     */
+    public boolean everyInputMatches(List<String> columns) {
+        return everyRepresentativeInput(columns).stream()
+                .filter(input -> invalidColumn(input) == null)
+                .allMatch(input -> !matches(input).isEmpty());
+    }
+
+    /**
+     * Whether the table is complete through the rules the engine's analysis sees: those without a cell that names
+     * an input or tests a list, whose matches are known only when evaluating. If so, it is complete.
+     */
+    public boolean everyInputMatchesAnAnalysedRule(List<String> columns) {
+        var analysed = rules.stream().filter(rule -> !isVariable(rule)).toList();
+        return everyRepresentativeInput(columns).stream()
+                .filter(input -> invalidColumn(input) == null)
+                .allMatch(input -> analysed.stream().anyMatch(rule -> ruleAccepts(rule, input)));
     }
 
     /** Valid, non-missing representative inputs that no rule matches. */
@@ -419,15 +591,134 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * missing value.
      */
     public List<Object> representativeValues(String column, boolean withMissing) {
-        var type = type(column);
         if (lists.contains(column)) {
-            // the analysis leaves out the rules that test lists, so to the others every list is alike
-            return withMissing ? Arrays.asList(List.of(), null) : List.of(List.of());
+            var values = new ArrayList<Object>();
+            representativeLists(column, withMissing, false, values::add);
+            return values;
         }
+        return representativeElements(column, withMissing, bothKinds, false);
+    }
+
+    /**
+     * Lists that visit every region the cells of a list column distinguish, given to {@code sink}: every list of
+     * at most {@code n + 2} distinct elements drawn from its representative values (both with and without a time
+     * zone, as a list may mix them) that its declared values allow, one per answer the cells give them, where
+     * {@code n} is the number of different sets of those elements that rule out a {@code not(...)} cell (leave
+     * its inside true or unknown); with {@code withMissing}, a missing element among them, and a missing list.
+     *
+     * <p>Lists of more elements add nothing: two elements to which every cell gives the same three-valued
+     * answer are alike in any list, since a cell joins its answers over the elements with {@code or}; and if
+     * some list matches a rule and none of a set of others (or two rules, or none at all), so does one that
+     * keeps, of its elements, one that passes that rule's positive cell, one that passes another's, and one
+     * that rules out each {@code not(...)} cell that must not match (one per set of such elements at most),
+     * for removing an element never makes a positive cell match or a {@code not(...)} cell fail.
+     */
+    private void representativeLists(String column, boolean withMissing, boolean hidden, Consumer<Object> sink) {
+        var exhaustive = EXHAUSTIVE_LISTS.get();
+        if (exhaustive != null) {
+            var allowed = allowedValues.containsKey(column) ? CellParser.parse(allowedValues.get(column), type(column)) : null;
+            var elements = representativeElements(column, withMissing, true, hidden).stream()
+                    .filter(element -> element == null || allowed == null || accepts(allowed, single(element), name -> null))
+                    .toList();
+            multisets(elements, 0, new ArrayList<>(), Math.min(exhaustive, elements.size()), sink);
+        } else {
+            var pool = listPool(column, withMissing, hidden);
+            subLists(pool.elements(), 0, new ArrayList<>(), pool.size(), sink);
+        }
+        if (withMissing) {
+            sink.accept(null);
+        }
+    }
+
+    /**
+     * When set, for the self-test of the reduction {@link #representativeLists} makes ({@code ListReductionPropertiesTest}):
+     * a list column's lists are instead every list of at most this many of its representative elements, none merged
+     * with another and each as often as wanted, the missing one included.
+     */
+    static final ThreadLocal<Integer> EXHAUSTIVE_LISTS = new ThreadLocal<>();
+
+    /** Every list of at most {@code size} elements of {@code pool}, repeats included, from {@code from} on, after {@code prefix}. */
+    private static void multisets(List<Object> pool, int from, List<Object> prefix, int size, Consumer<Object> sink) {
+        sink.accept(Collections.unmodifiableList(new ArrayList<>(prefix)));
+        if (prefix.size() == size) {
+            return;
+        }
+        for (int i = from; i < pool.size(); i++) {
+            prefix.add(pool.get(i));
+            multisets(pool, i, prefix, size, sink);
+            prefix.removeLast();
+        }
+    }
+
+    /**
+     * How many values {@link #representativeValues} gives for a column, counted without building them, since a list
+     * column may have too many lists to hold.
+     */
+    public BigInteger representativeValueCount(String column, boolean withMissing) {
+        if (!lists.contains(column)) {
+            return BigInteger.valueOf(representativeValues(column, withMissing).size());
+        }
+        var pool = listPool(column, withMissing, false);
+        int n = pool.elements().size();
+        var count = BigInteger.ZERO;
+        var choose = BigInteger.ONE; // n choose k, from k = 0
+        for (int k = 0; k <= pool.size(); k++) {
+            count = count.add(choose);
+            choose = choose.multiply(BigInteger.valueOf(n - k)).divide(BigInteger.valueOf(k + 1L));
+        }
+        return withMissing ? count.add(BigInteger.ONE) : count;
+    }
+
+    /** The elements {@link #representativeLists} draws its lists from, and how many a list holds at most. */
+    private record ListPool(List<Object> elements, int size) {
+    }
+
+    private ListPool listPool(String column, boolean withMissing, boolean hidden) {
+        var cells = rules.stream().map(rule -> parse(rule.input().values().get(column), column)).toList();
+        var allowed = allowedValues.containsKey(column) ? CellParser.parse(allowedValues.get(column), type(column)) : null;
+        var bySignature = new LinkedHashMap<List<Boolean>, Object>();
+        for (var element : representativeElements(column, withMissing, true, hidden)) {
+            if (element == null || allowed == null || accepts(allowed, single(element), name -> null)) {
+                bySignature.putIfAbsent(cells.stream().map(cell -> some(tests(cell), Collections.singletonList(single(element)))).toList(),
+                        element);
+            }
+        }
+        var pool = new ArrayList<>(bySignature.values());
+        var rulingOut = new HashSet<List<Boolean>>();
+        for (var cell : cells) {
+            if (cell instanceof UnaryTests.Negated) {
+                rulingOut.add(pool.stream().map(e -> some(tests(cell), Collections.singletonList(single(e))) != Boolean.FALSE).toList());
+            }
+        }
+        return new ListPool(pool, Math.min(rulingOut.size() + 2, pool.size()));
+    }
+
+    /** Every list of at most {@code size} elements of {@code pool} from {@code from} on, in pool order, after {@code prefix}. */
+    private static void subLists(List<Object> pool, int from, List<Object> prefix, int size, Consumer<Object> sink) {
+        sink.accept(Collections.unmodifiableList(new ArrayList<>(prefix)));
+        if (prefix.size() == size) {
+            return;
+        }
+        for (int i = from; i < pool.size(); i++) {
+            prefix.add(pool.get(i));
+            subLists(pool, i + 1, prefix, size, sink);
+            prefix.removeLast();
+        }
+    }
+
+    /**
+     * The representative single values of a column, of both kinds of time if {@code eitherKind}; with {@code hidden},
+     * also a time with a zone id where map-based inputs take one though no cell names one, which the engine's analyses
+     * leave out but its completeness search visits.
+     */
+    private List<Object> representativeElements(String column, boolean withMissing, boolean eitherKind, boolean hidden) {
+        var type = type(column);
         var cells = new ArrayList<UnaryTests>();
         rules.forEach(rule -> cells.add(parse(rule.input().values().get(column), column)));
         if (allowedValues.containsKey(column)) {
-            cells.add(parse(allowedValues.get(column), column));
+            // a list column's declared values test single elements
+            var declared = allowedValues.get(column);
+            cells.add(lists.contains(column) ? CellParser.parse(declared, type) : parse(declared, column));
         }
         var values = new ArrayList<Object>();
         switch (type) {
@@ -437,11 +728,22 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             case YEAR_MONTH_DURATION -> orderedRepresentatives(type, cells, false).forEach(v -> values.add(((YearsAndMonths) v).toPeriod()));
             // a column's times take a zone or none, as its getter does, or either if read from text
             case TIME, DATE_TIME -> {
-                if (bothKinds || !zonedColumns.contains(column)) {
+                boolean zoneIds = zoneIdColumns.contains(column);
+                if (eitherKind || !zonedColumns.contains(column) && !zoneIds) {
                     values.addAll(orderedRepresentatives(type, cells, false));
                 }
-                if (bothKinds || zonedColumns.contains(column)) {
+                if (eitherKind || zonedColumns.contains(column)) {
                     values.addAll(orderedRepresentatives(type, cells, true));
+                } else if (zoneIds) {
+                    // a getter of times with a zone id may give one in a zone with one fixed offset, the time at that offset
+                    orderedRepresentatives(type, cells, true).forEach(time -> values.add(inFixedZone((OffsetTime) time)));
+                }
+                // read from text, or as a list's element, a time with a zone id counts only where a cell names one (the
+                // engine's analyses leave it out elsewhere, but its completeness search does not)
+                if (zoneIds || eitherKind && cells.stream().anyMatch(cell -> literals(cell).stream().anyMatch(ZonedTime.class::isInstance))) {
+                    values.addAll(zoneIdRepresentatives(cells));
+                } else if (hidden && eitherKind && type == ColumnType.TIME) {
+                    values.add(new ZonedTime(LocalTime.NOON, ZoneId.of("Pacific/Kiritimati")));
                 }
             }
             default -> values.addAll(orderedRepresentatives(type, cells, false));
@@ -452,17 +754,32 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return values;
     }
 
+    /** A time at an offset as a getter of times with a zone id gives it: in the zone id that has that offset fixed. */
+    private static ZonedTime inFixedZone(OffsetTime time) {
+        return new ZonedTime(time.toLocalTime(), ZoneId.ofOffset("UTC", time.getOffset()));
+    }
+
     /**
      * Every input that extends {@code partial} with a representative value for each of {@code columns}:
      * the cartesian product of their {@link #representativeValues representative values}.
      */
     public List<Map<String, Object>> representativeInputs(Map<String, Object> partial, List<String> columns, boolean withMissing) {
+        return representativeInputs(partial, columns, withMissing, false);
+    }
+
+    /**
+     * As {@link #representativeInputs(Map, List, boolean)}; with {@code hidden}, also the times with a zone id that the
+     * engine's analyses leave out (see {@link #representativeElements}).
+     */
+    private List<Map<String, Object>> representativeInputs(Map<String, Object> partial, List<String> columns, boolean withMissing,
+            boolean hidden) {
         List<Map<String, Object>> inputs = new ArrayList<>();
         inputs.add(new HashMap<>(partial));
         for (var column : columns) {
+            var options = distinctValues(column, withMissing, hidden);
             var next = new ArrayList<Map<String, Object>>();
             for (var shorter : inputs) {
-                for (var option : representativeValues(column, withMissing)) {
+                for (var option : options) {
                     var input = new HashMap<>(shorter);
                     input.put(column, option);
                     next.add(input);
@@ -473,8 +790,82 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return inputs;
     }
 
+    /**
+     * The {@link #representativeValues representative values} of a column that its declared values allow, one
+     * for each set of rules whose cell in the column accepts it (a cell naming another input accepting any): the
+     * rules an input matches, apart from those with such cells, depend on nothing else, so two values in the same
+     * set are alike to every rule, and an input that combines them with the same values of the other columns
+     * matches the same rules. This keeps the product of several list columns small.
+     */
+    private List<Object> distinctValues(String column, boolean withMissing, boolean hidden) {
+        return new ArrayList<>(bySignature(column, withMissing, hidden).values());
+    }
+
+    /**
+     * Every set of rules that the index sees some valid representative input match (cells naming other inputs
+     * taken as any value), as rule indices: the sets each column's {@link #distinctValues} leave, intersected
+     * column by column.
+     */
+    private Set<BitSet> staticMatchSets(List<String> columns) {
+        var all = new BitSet();
+        all.set(0, rules.size());
+        Set<BitSet> sets = new LinkedHashSet<>(List.of(all));
+        for (var column : columns) {
+            var accepting = bySignature(column, true, false).keySet().stream().map(signature -> {
+                var set = new BitSet();
+                for (int r = 0; r < signature.size(); r++) {
+                    set.set(r, signature.get(r));
+                }
+                return set;
+            }).toList();
+            var next = new LinkedHashSet<BitSet>();
+            for (var set : sets) {
+                for (var accepted : accepting) {
+                    var both = (BitSet) set.clone();
+                    both.and(accepted);
+                    next.add(both);
+                }
+            }
+            sets = next;
+        }
+        return sets;
+    }
+
+    /** The {@link #distinctValues} of a column, each by the rules whose cell in the column accepts it. */
+    private Map<List<Boolean>, Object> bySignature(String column, boolean withMissing, boolean hidden) {
+        var bySignature = new LinkedHashMap<List<Boolean>, Object>();
+        Consumer<Object> keep = option -> {
+            var alone = new HashMap<String, Object>();
+            alone.put(column, option);
+            if (invalidColumn(alone) == null) {
+                bySignature.putIfAbsent(rules.stream().map(rule -> cellAccepts(rule, column, alone)).toList(), option);
+            }
+        };
+        if (lists.contains(column)) {
+            representativeLists(column, withMissing, hidden, keep); // many lists: kept one by one
+        } else {
+            representativeElements(column, withMissing, bothKinds, hidden).forEach(keep);
+        }
+        return bySignature;
+    }
+
+    /** Whether a rule's cell in a column accepts the input's value there; a cell naming another input accepts any. */
+    private boolean cellAccepts(Praeceptum rule, String column, Map<String, ?> input) {
+        var parsed = parse(rule.input().values().get(column), column);
+        if (parsed.namesInputs()) {
+            return true;
+        }
+        var value = value(input, column);
+        return lists.contains(column) ? acceptsList(parsed, (List<?>) value) : accepts(parsed, value, name -> null);
+    }
+
     private List<Map<String, Object>> representativeInputs(List<String> columns, boolean withMissing) {
         return representativeInputs(Map.of(), columns, withMissing);
+    }
+
+    /** Every input completeness asks about: missing values, and times with a zone id that no cell names, included. */
+    private List<Map<String, Object>> everyRepresentativeInput(List<String> columns) {
+        return representativeInputs(Map.of(), columns, true, true);
     }
 
     /**
@@ -505,7 +896,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             return zonedRepresentatives(type, cells);
         }
         var points = new TreeSet<Object>(ReferenceMatcher::compare);
-        cells.forEach(cell -> literals(cell).stream().map(ReferenceMatcher::withoutZone).forEach(points::add));
+        cells.forEach(cell -> literals(cell).stream().filter(literal -> !(literal instanceof ZonedTime))
+                .map(ReferenceMatcher::withoutZone).forEach(points::add));
         var sorted = new ArrayList<>(points);
         var around = new TreeSet<Object>(ReferenceMatcher::compare);
         around.addAll(sorted);
@@ -524,6 +916,33 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             addNeighbours(around, sorted.get(i), next);
         }
         return around;
+    }
+
+    /**
+     * Times with a zone id that visit every region the cells distinguish among them: for each zone a cell names, the
+     * local times of its literals in that zone and those around and between them; and one in a zone no cell names.
+     */
+    private static List<Object> zoneIdRepresentatives(List<UnaryTests> cells) {
+        var zones = new TreeSet<String>();
+        cells.forEach(cell -> literals(cell).stream().filter(ZonedTime.class::isInstance)
+                .forEach(time -> zones.add(((ZonedTime) time).zone().getId())));
+        var values = new ArrayList<Object>();
+        for (var zone : zones) {
+            var localTimes = new TreeSet<LocalTime>();
+            cells.forEach(cell -> literals(cell).stream()
+                    .filter(time -> time instanceof ZonedTime zoned && zoned.zone().getId().equals(zone))
+                    .forEach(time -> localTimes.add(((ZonedTime) time).time())));
+            var around = new TreeSet<Object>(ReferenceMatcher::compare);
+            around.addAll(localTimes);
+            var sorted = new ArrayList<>(localTimes);
+            for (int i = 0; i < sorted.size(); i++) {
+                addNeighbours(around, sorted.get(i), i + 1 < sorted.size() ? sorted.get(i + 1) : null);
+            }
+            around.forEach(time -> values.add(new ZonedTime((LocalTime) time, ZoneId.of(zone))));
+        }
+        var unnamed = ZoneId.of("Pacific/Kiritimati");
+        values.add(new ZonedTime(LocalTime.NOON, unnamed));
+        return values;
     }
 
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
@@ -547,6 +966,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         var localTimes = new TreeSet<Long>();
         var written = new ArrayList<Object>();
         cells.forEach(cell -> written.addAll(literals(cell)));
+        written.removeIf(ZonedTime.class::isInstance); // compared with no time with an offset
         for (var literal : written) {
             (isZoned(literal) ? instants : localTimes).add(nanos(literal));
         }
@@ -699,7 +1119,10 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     /**
      * A list column's cell, as FEEL evaluates {@code list contains(?, v) or some x in ? satisfies x < v or ? = null}
      * and its {@code not(...)}: on a missing list every element test is unknown, so only {@code null}
-     * holds and a negated cell is unknown.
+     * holds and a negated cell is unknown. On a list that is there, {@code ? = null} is false, and each
+     * element test is applied to every element, a missing one included: {@code list contains(?, v)} is
+     * {@code null = v} for it, false unless {@code v} is null, and {@code some x in ? satisfies x < v} is
+     * unknown for it (DMN 1.5, Tables 49, 50 and 75).
      */
     private static boolean acceptsList(UnaryTests cell, List<?> list) {
         if (cell instanceof UnaryTests.Any) {
@@ -716,13 +1139,14 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     /**
      * Whether some element of a list passes one of the tests, with FEEL's three-valued {@code or}: true if
-     * one passes; else unknown (null) if one is unknown; else false.
+     * one passes; else unknown (null) if one is unknown; else false. {@code null} ({@code ? = null}) tests
+     * the list, which is there, so it is false.
      */
     private static Boolean some(List<Test> tests, List<?> list) {
         Boolean some = Boolean.FALSE;
         for (var test : tests) {
             for (var element : list) {
-                var outcome = test(test, element);
+                var outcome = test instanceof NullTest ? Boolean.FALSE : test(test, element);
                 if (outcome == Boolean.TRUE) {
                     return Boolean.TRUE;
                 }
@@ -734,26 +1158,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return some;
     }
 
-    /**
-     * Whether the engine's index cannot see what a rule matches: a cell compares with another input
-     * ({@code > dateE}), or tests a column that holds lists.
-     */
+    /** Whether the engine's index cannot see what a rule matches: a cell compares with another input ({@code > dateE}). */
     private boolean isVariable(Praeceptum rule) {
-        return rule.input().values().entrySet().stream().anyMatch(cell -> {
-            var parsed = parse(cell.getValue(), cell.getKey());
-            return parsed.namesInputs() || lists.contains(cell.getKey()) && !(parsed instanceof UnaryTests.Any);
-        });
-    }
-
-    /** What the engine's index sees of a rule: its cells, with those naming inputs or testing lists taken as "any value". */
-    private boolean staticallyAccepts(Praeceptum rule, Map<String, ?> input) {
-        for (var cell : rule.input().values().entrySet()) {
-            var parsed = parse(cell.getValue(), cell.getKey());
-            if (!parsed.namesInputs() && !lists.contains(cell.getKey()) && !accepts(parsed, value(input, cell.getKey()), name -> null)) {
-                return false;
-            }
-        }
-        return true;
+        return rule.input().values().entrySet().stream().anyMatch(cell -> parse(cell.getValue(), cell.getKey()).namesInputs());
     }
 
     /** @param inputs the value of each input a cell names */
@@ -770,7 +1177,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         boolean unknown = false;
         for (var test : tests) {
             // a name of an input that holds a list: whether the value is in it (FEEL's ? in list)
-            var outcome = test instanceof Equals(UnaryTests.Name(var name)) && inputs.apply(name) instanceof List<?> list
+            var outcome = test instanceof Equals(UnaryTests.Name(var name), var explicit) && !explicit
+                    && inputs.apply(name) instanceof List<?> list
                     ? in(value, list)
                     : test(resolve(test, inputs), value);
             if (outcome == null) {
@@ -783,12 +1191,13 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     }
 
     /**
-     * Whether a value is in a list, as FEEL's {@code ? in list}: whether some element equals it, unknown
-     * (null) if none does but one is missing. A missing value is in no list.
+     * Whether a value is in a list, as FEEL's {@code ? in list}, which is {@code list contains(list, ?)}
+     * (DMN 1.5, Table 55): whether some element equals it. A missing value is in a list that holds a missing
+     * element, and in no other.
      */
     private static Boolean in(Object value, List<?> list) {
         if (value == null) {
-            return Boolean.FALSE;
+            return list.stream().anyMatch(Objects::isNull);
         }
         return some(list.stream().<Test>map(element -> new Equals((Comparable<?>) element)).toList(), List.of(value));
     }
@@ -797,6 +1206,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     private static Test resolve(Test test, Function<String, Object> inputs) {
         return switch (test) {
             case NullTest n -> n;
+            case UnaryTests.NullElement n -> n;
+            case NotEqual n -> new NotEqual(resolve(n.test(), inputs));
             case Equals e -> new Equals(resolve(e.value(), inputs));
             case Compare c -> new Compare(c.operator(), resolve(c.value(), inputs));
             case Range r -> new Range(resolve(r.low(), inputs), r.lowClosed(), resolve(r.high(), inputs), r.highClosed());
@@ -807,14 +1218,25 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return value instanceof UnaryTests.Name(var name) ? (Comparable<?>) inputs.apply(name) : value;
     }
 
-    /** FEEL on concrete values: a comparison with a missing value is unknown; null equals only null. */
-    private static Boolean test(Test test, Object value) {
+    /**
+     * FEEL on concrete values: a comparison with a missing value is unknown; null equals only null; {@code !=} is
+     * {@code not(=)} (DMN 1.5, 10.3.2.15), so it holds for a missing value unless it is {@code != null}.
+     */
+    private static Boolean test(Test written, Object given) {
+        var test = fixedLiterals(written);
+        var value = fixed(given);
+        if (test instanceof NotEqual(var negated)) {
+            var equal = test(negated, value);
+            return equal == null ? null : !equal;
+        }
         if (value == null) {
             return switch (test) {
                 case NullTest n -> true;
+                case UnaryTests.NullElement n -> true;
                 case Equals e -> e.value() == null;
                 case Compare c -> null;
                 case Range r -> null;
+                case NotEqual n -> throw new IllegalStateException("decided above");
             };
         }
         if (test instanceof Equals e && e.value() == null) {
@@ -823,8 +1245,20 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         if (test instanceof Compare c && c.value() == null || test instanceof Range r && (r.low() == null || r.high() == null)) {
             return null;
         }
+        // FEEL gives null for a comparison it does not define: a time with a zone id and one in another zone, or of another kind
+        if (test instanceof Range r && (!comparable(value, r.low()) || !comparable(value, r.high()))) {
+            var low = comparable(value, r.low()) ? Boolean.valueOf(r.lowClosed() ? compare(value, r.low()) >= 0 : compare(value, r.low()) > 0) : null;
+            var high = comparable(value, r.high()) ? Boolean.valueOf(r.highClosed() ? compare(value, r.high()) <= 0 : compare(value, r.high()) < 0)
+                    : null;
+            return low == Boolean.FALSE || high == Boolean.FALSE ? Boolean.FALSE : null;
+        }
+        if (test instanceof Equals e && !comparable(value, e.value()) || test instanceof Compare c && !comparable(value, c.value())) {
+            return null;
+        }
         return switch (test) {
             case NullTest n -> false;
+            case UnaryTests.NullElement n -> false;
+            case NotEqual n -> throw new IllegalStateException("decided above");
             case Equals e -> compare(value, e.value()) == 0;
             case Compare c -> switch (c.operator()) {
                 case LT -> compare(value, c.value()) < 0;
@@ -858,20 +1292,42 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                     values.add(r.low());
                     values.add(r.high());
                 }
+                case NotEqual n -> values.addAll(UnaryTests.values(n));
                 case NullTest n -> {
+                    // no value
+                }
+                case UnaryTests.NullElement n -> {
                     // no value
                 }
             }
         }
         values.removeIf(UnaryTests.Name.class::isInstance); // known only when evaluating
+        values.replaceAll(ReferenceMatcher::fixed);
         return values;
     }
 
+    /** Cells parsed before, by text, type and syntax: the brute force evaluates each many times. */
+    private static final Map<List<Object>, UnaryTests> PARSED = new ConcurrentHashMap<>();
+
+    /** A column's declared input values, which test single values (a list's elements) in Praecepta's syntax. */
+    private UnaryTests declared(String column) {
+        var type = type(column);
+        var text = allowedValues.get(column);
+        return PARSED.computeIfAbsent(Arrays.asList(text, type, "declared"), key -> CellParser.parse(text, type));
+    }
+
     private UnaryTests parse(String cell, String column) {
-        if (!feelCells) {
-            return CellParser.parse(cell, type(column));
+        if (cell == null) {
+            return new UnaryTests.Any();
         }
-        return lists.contains(column) ? CellParser.parseFeelList(cell, type(column)) : CellParser.parseFeel(cell, type(column));
+        var type = type(column);
+        boolean list = lists.contains(column);
+        return PARSED.computeIfAbsent(Arrays.asList(cell, type, feelCells, list), key -> {
+            if (!feelCells) {
+                return CellParser.parse(cell, type);
+            }
+            return list ? CellParser.parseFeelList(cell, type) : CellParser.parseFeel(cell, type);
+        });
     }
 
     private ColumnType type(String column) {
@@ -890,7 +1346,32 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return switch (value) {
             case String s when s.isBlank() -> null;
             case Period period -> YearsAndMonths.of(period);
+            case ZonedTime time -> fixed(time);
             case null, default -> value;
+        };
+    }
+
+    /**
+     * A time in a zone with one fixed offset ({@code Etc/UTC}, {@code Etc/GMT-1}) as the time at that offset, which
+     * DMN 1.5's example of {@code time(from)} takes it to be (Table 72: {@code time("23:59:00z") + duration("PT2M") =
+     * time("00:01:00@Etc/UTC")}); any other value as it is.
+     */
+    static Object fixed(Object value) {
+        if (value instanceof ZonedTime time && time.zone().getRules().isFixedOffset()) {
+            return OffsetTime.of(time.time(), time.zone().getRules().getOffset(Instant.EPOCH));
+        }
+        return value;
+    }
+
+    /** A test with each of its literals {@link #fixed}. */
+    private static Test fixedLiterals(Test test) {
+        return switch (test) {
+            case NullTest n -> n;
+            case UnaryTests.NullElement n -> n;
+            case NotEqual n -> new NotEqual(fixedLiterals(n.test()));
+            case Equals e -> new Equals((Comparable<?>) fixed(e.value()), e.explicit());
+            case Compare c -> new Compare(c.operator(), (Comparable<?>) fixed(c.value()));
+            case Range r -> new Range((Comparable<?>) fixed(r.low()), r.lowClosed(), (Comparable<?>) fixed(r.high()), r.highClosed());
         };
     }
 
@@ -901,8 +1382,11 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * UTF-16 code unit as {@link String#compareTo} does; values of the other types by their natural order.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static int compare(Object a, Object b) {
+    private static int compare(Object first, Object second) {
+        var a = fixed(first);
+        var b = fixed(second);
         return switch (a) {
+            case ZonedTime time -> time.time().compareTo(((ZonedTime) b).time());
             case OffsetTime time -> instant(time)
                     .compareTo(instant(b instanceof LocalTime local ? local.atOffset(time.getOffset()) : (OffsetTime) b));
             case LocalTime time when b instanceof OffsetTime other -> instant(time.atOffset(other.getOffset())).compareTo(instant(other));
@@ -912,6 +1396,16 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             case String text -> Arrays.compare(text.codePoints().toArray(), ((String) b).codePoints().toArray());
             default -> ((Comparable) a).compareTo(b);
         };
+    }
+
+    /** Whether FEEL compares two values: a time with a zone id only with one in the same zone. */
+    private static boolean comparable(Object first, Object second) {
+        var a = fixed(first);
+        var b = fixed(second);
+        if (a instanceof ZonedTime x) {
+            return b instanceof ZonedTime y && x.zone().equals(y.zone());
+        }
+        return !(b instanceof ZonedTime);
     }
 
     /** A literal as a value without a time zone is compared with it: by its local time. */

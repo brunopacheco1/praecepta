@@ -172,7 +172,7 @@ class DmnReaderTest {
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
             "untyped duration   | duration        | at      |                      |         | type 'duration' is not supported",
-            "time with zone id  | time            | at      | time(\"10:00:00@Europe/Paris\") | | rule 1, column 'at': Invalid cell",
+            "times of two zones | time            | at      | [time(\"10:00:00@Europe/Paris\")..time(\"11:00:00@Asia/Dhaka\")] | | rule 1, column 'at': Invalid cell",
             "computed input     | number          | age * 2 |                      |         | input expression 'age * 2' is not supported",
             "unsupported cell   | number          | age     | &gt; abs(x)          |         | rule 1, column 'age'",
             "function output    | string          | a       |                      | upper case(a) | rule 1, output 'result': 'upper case(a)' is not supported",
@@ -434,6 +434,36 @@ class DmnReaderTest {
         Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("Cannot read DMN model");
+    }
+
+    /**
+     * The reader uses the JDK's own parser, which its security settings are written for, whatever JAXP would
+     * look up: a factory named by the system property (as here, one that does not exist) or by a service file
+     * on the class path, such as Xerces' (#96).
+     */
+    @Test
+    void the_jdk_parser_reads_the_model_whatever_parser_jaxp_is_configured_with() {
+        var property = "javax.xml.parsers.DocumentBuilderFactory";
+        var configured = System.getProperty(property);
+        System.setProperty(property, "org.example.NoSuchDocumentBuilderFactory");
+        try {
+            var table = DmnReader.read(resource("camunda-modeler-discount.dmn"));
+            Assertions.assertThat(table.name()).isEqualTo("Discount");
+            var xml = """
+                    <?xml version="1.0"?>
+                    <!DOCTYPE definitions [<!ENTITY secret SYSTEM "file:///etc/passwd">]>
+                    <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" name="&secret;"/>""";
+            var dmn = stream(xml);
+            Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
+                    .isInstanceOf(InvalidDecisionTableException.class)
+                    .hasMessageContaining("Cannot read DMN model");
+        } finally {
+            if (configured == null) {
+                System.clearProperty(property);
+            } else {
+                System.setProperty(property, configured);
+            }
+        }
     }
 
     @Test

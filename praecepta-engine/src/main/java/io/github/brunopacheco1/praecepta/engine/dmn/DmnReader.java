@@ -46,23 +46,27 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
 /**
  * Reads decision tables from DMN XML (DMN 1.1 to 1.5, as written by Camunda Modeler, Drools / KIE
- * tools, Trisotech and {@link DmnWriter}). Uses only the JDK's XML parser, with DTDs and external
- * entities disabled.
+ * tools, Trisotech and {@link DmnWriter}). Uses only the JDK's own XML parser, with DTDs and external
+ * entities disabled, even when another JAXP implementation (such as Xerces) is on the class path.
  *
  * <p>Supported: decision tables whose input expressions name an input variable, with
  * {@code string}, {@code number} (or {@code integer}, {@code long}, {@code double}), {@code date},
  * {@code boolean}, {@code time}, {@code dateTime} (or {@code date and time}), {@code dayTimeDuration} and
  * {@code yearMonthDuration} (or their FEEL names) columns, times and date-times with or without a time zone
- * (but no time with a zone id, which has no fixed offset); columns typed by an item definition of one of
+ * (an offset, or a zone id, with which a time is a {@code ZonedTime}, or an {@code OffsetTime} if the zone has one
+ * fixed offset); columns typed by an item definition of one of
  * those types, whose allowed values become the input value list unless the input declares its own;
  * columns typed by a collection of those ({@code isCollection="true"}), which hold lists and whose
  * entries test the elements ({@code list contains(?, "PT")}, see {@link CellParser#parseFeelList}), and
  * named inputs whose {@code inputData} is such a collection (see {@link DecisionTable#listInputs}); input
- * entries in Praecepta's FEEL subset (lists, {@code not(...)}, {@code null}, comparisons, intervals, {@code -}); input and output value
+ * entries in Praecepta's FEEL subset (lists, {@code not(...)}, {@code null}, comparisons, {@code =} and {@code !=},
+ * intervals, {@code -}), with FEEL's literals (numbers such as {@code 1.2e3}, at-literals, every form of the date and
+ * time functions) and comments, as {@link CellParser} reads them; input and output value
  * lists; outputs' default values ({@code defaultOutputEntry}, see {@link DecisionTable#defaultOutput}) that are
- * literals; output entries that are literals or name one of the table's inputs (of the output's type, or
+ * literals, {@code null} included ({@link DecisionTable.OutputColumn#hasDefault}); output entries that are
+ * literals or name one of the table's inputs (of the output's type, or
  * any input for a string output; an input is a column or an input the cells compare with, and holds single
- * values), or that join string and number literals and the table's inputs with
+ * values), or that combine literals (strings, numbers, dates, times and durations) and the table's inputs with
  * {@code +}, {@code -}, {@code *}, {@code /} and {@code **} ({@link OutputExpression}, kept as written in
  * {@link PraeceptaOutput#expressions()}); every hit policy; SUM, MIN, MAX and COUNT aggregation. Anything else is rejected with an
  * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered
@@ -316,7 +320,10 @@ public final class DmnReader {
                     .orElseThrow(() -> new InvalidDecisionTableException(outputWhere + ": the output value list must be a list of values"))
                     .stream().map(FeelLiterals::text).toList();
         }
-        return new OutputColumn(column, type, values, defaultValue(output, type, values, outputWhere));
+        var defaultValue = defaultValue(output, type, values, outputWhere);
+        return defaultValue == null
+                ? new OutputColumn(column, type, values)
+                : new OutputColumn(column, type, values, defaultValue.text(), true);
     }
 
     /**
@@ -350,15 +357,17 @@ public final class DmnReader {
 
     /**
      * An output's default value ({@code defaultOutputEntry}), the value when no rule matches, as plain text like
-     * a literal output entry; null if it has none, or if it is {@code null}, which is what having none gives
-     * (DMN 1.5, 10.3.2.10). It must be a literal of the output's type: a default that names an input or
-     * computes a value is rejected, since the engine gives the default without evaluating anything. When the output
-     * has a value list, the default must be one of its values (DMN 1.5, Table 46: "The default output value is one of
-     * the output values").
+     * a literal output entry, whose text is null for a default of {@code null}; null if the output has none (no
+     * {@code defaultOutputEntry}, or a blank one). A {@code null} default is a default: in a table with several
+     * outputs, the default output is then a context with that output null (DMN 1.5, 10.3.2.10 and Table 46), where
+     * a table whose outputs have no default gives null. It must be a literal of the output's type: a default that
+     * names an input or computes a value is rejected, since the engine gives the default without evaluating
+     * anything. When the output has a value list, a default other than {@code null} must be one of its values (DMN
+     * 1.5, Table 46: "The default output value is one of the output values").
      *
      * @param values the output's value list, as plain text; empty if it has none
      */
-    private static String defaultValue(Element output, ColumnType type, List<String> values, String where) {
+    private static LiteralOutput defaultValue(Element output, ColumnType type, List<String> values, String where) {
         var text = nonBlankText(output, "defaultOutputEntry");
         if (text == null) {
             return null;
@@ -372,7 +381,7 @@ public final class DmnReader {
             throw new InvalidDecisionTableException("%s: default output '%s' is not in its output values %s"
                     .formatted(where, text.strip(), values));
         }
-        return literal.text();
+        return literal;
     }
 
     /** Whether two values of an output, as plain text, are the same: numbers by value ({@code 1.50} is {@code 1.5}). */
@@ -592,7 +601,7 @@ public final class DmnReader {
      */
     private static LiteralOutput literalOutput(String text, ColumnType type) {
         var literal = text.strip();
-        if (literal.isEmpty() || literal.equals("null")) {
+        if (literal.isEmpty() || literal.equals("null") || isNull(literal, type)) {
             return new LiteralOutput(null);
         }
         var types = type == ColumnType.STRING && !literal.startsWith("\"") ? UNQUOTED_OUTPUT_TYPES : List.of(type);
@@ -603,6 +612,15 @@ public final class DmnReader {
             }
         }
         return null;
+    }
+
+    /** Whether an entry is FEEL's {@code null} with comments around it, as {@code null // no fee}. */
+    private static boolean isNull(String literal, ColumnType type) {
+        try {
+            return CellParser.parseFeel(literal, type) instanceof UnaryTests.Positive(var tests) && tests.equals(List.of(new UnaryTests.NullTest()));
+        } catch (CellSyntaxException e) {
+            return false;
+        }
     }
 
     /** The value of an entry that is a single literal of the type (no list, comparison or name). */
@@ -620,10 +638,14 @@ public final class DmnReader {
 
     // ---- XML -------------------------------------------------------------------------------------
 
-    /** The model's {@code definitions} element, parsed with DTDs and external entities disabled. */
+    /**
+     * The model's {@code definitions} element, parsed with DTDs and external entities disabled. The parser is
+     * the JDK's own ({@code newDefaultInstance}), which these settings are written for, never one JAXP would
+     * look up on the class path or through the {@code javax.xml.parsers.DocumentBuilderFactory} property.
+     */
     private static Element parseModel(InputStream dmn) {
         try {
-            var factory = DocumentBuilderFactory.newInstance();
+            var factory = DocumentBuilderFactory.newDefaultInstance();
             factory.setNamespaceAware(true);
             factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);

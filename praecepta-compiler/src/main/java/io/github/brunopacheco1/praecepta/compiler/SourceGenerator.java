@@ -26,7 +26,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
  * <ul>
  * <li>{@code DiscountInput}: a record with one component per input column ({@code String},
  * {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime} or {@code OffsetTime},
- * {@code LocalDateTime} or {@code ZonedDateTime} (see {@link TimeZones}), {@code Duration} or
+ * {@code LocalDateTime} or {@code ZonedDateTime} (see {@link TimeZones}; a time with a zone id is a {@code ZonedTime}), {@code Duration} or
  * {@code Period}), and one per other input the cells compare with;
  * a string column with a value list gets a nested enum,
  * bound to the engine's int-coded path, and an input that holds lists a {@code java.util.List} of its type;</li>
@@ -168,10 +168,12 @@ final class SourceGenerator {
             """;
 
     /**
-     * The output strategy of an aggregating table, whose one NUMBER output is checked when compiling;
-     * missing values are skipped, and sums keep FEEL's 34 significant digits (DMN 1.5, 10.3.2.3.1), as the
-     * framework integrations' map-based engines do. It is pasted mid-line after {@code .output(} in the decision
-     * class, so its first line has no indentation and the others carry the generated file's own.
+     * The output strategy of an aggregating table, whose one NUMBER output is checked when compiling; sums
+     * keep FEEL's 34 significant digits (DMN 1.5, 10.3.2.3.1), as the framework integrations' map-based engines
+     * do. The engine never passes it a missing value: a matching rule whose output is missing is the result
+     * (FEEL's {@code sum}, {@code min} and {@code max} are null for a list that holds null, 10.3.4.4). It is
+     * pasted mid-line after {@code .output(} in the decision class, so its first line has no indentation and the
+     * others carry the generated file's own.
      */
     private static final String AGGREGATING_OUTPUT = """
             new io.github.brunopacheco1.praecepta.engine.OutputStrategy<${Output}>() {
@@ -182,18 +184,17 @@ final class SourceGenerator {
 
                                     @Override
                                     public ${Output} sum(${Output} a, ${Output} b) {
-                                        return a.${field}() == null ? b : b.${field}() == null ? a
-                                                : new ${Output}(a.${field}().add(b.${field}(), java.math.MathContext.DECIMAL128));
+                                        return new ${Output}(a.${field}().add(b.${field}(), java.math.MathContext.DECIMAL128));
                                     }
 
                                     @Override
                                     public ${Output} min(${Output} a, ${Output} b) {
-                                        return a.${field}() == null ? b : b.${field}() == null || a.${field}().compareTo(b.${field}()) <= 0 ? a : b;
+                                        return a.${field}().compareTo(b.${field}()) <= 0 ? a : b;
                                     }
 
                                     @Override
                                     public ${Output} max(${Output} a, ${Output} b) {
-                                        return a.${field}() == null ? b : b.${field}() == null || a.${field}().compareTo(b.${field}()) >= 0 ? a : b;
+                                        return a.${field}().compareTo(b.${field}()) >= 0 ? a : b;
                                     }
 
                                     @Override
@@ -246,7 +247,7 @@ final class SourceGenerator {
         this.inputs = new ArrayList<>();
         for (int c = 0; c < inputColumns.size(); c++) {
             var column = inputColumns.get(c);
-            inputs.add(InputField.of(column, inputMembers.get(c), zoned.inputs().contains(column.name()),
+            inputs.add(InputField.of(column, inputMembers.get(c), zoned.input(column.name()),
                     table.listInputs().contains(column.name())));
         }
     }
@@ -320,7 +321,7 @@ final class SourceGenerator {
     }
 
     private Converter outputConverter(DecisionTable.OutputColumn column) {
-        return Converter.of(column.type(), zoned.outputs().contains(column.name()));
+        return Converter.of(column.type(), zoned.output(column.name()));
     }
 
     // ---- decision class -------------------------------------------------------------------------
@@ -354,9 +355,9 @@ final class SourceGenerator {
             return "the selected output";
         }
         return switch (table.aggregation()) {
-            case SUM -> "the sum of the matching rules' outputs";
-            case MIN -> "the smallest of the matching rules' outputs";
-            case MAX -> "the largest of the matching rules' outputs";
+            case SUM -> "the sum of the matching rules' outputs (null if one of them is null)";
+            case MIN -> "the smallest of the matching rules' outputs (null if one of them is null)";
+            case MAX -> "the largest of the matching rules' outputs (null if one of them is null)";
             case COUNT -> "the number of matching rules";
         };
     }
@@ -481,10 +482,10 @@ final class SourceGenerator {
      * @param zoned      for a time or date-time, whether its values (a list's elements) have a time zone
      * @param list       whether it holds lists, a {@code java.util.List} component (of strings, even with a value list)
      */
-    private record InputField(InputColumn column, String member, String enumName, List<String> enumValues, boolean zoned,
+    private record InputField(InputColumn column, String member, String enumName, List<String> enumValues, TimeZones.Kind zoned,
             boolean list) {
 
-        static InputField of(InputColumn column, String member, boolean zoned, boolean list) {
+        static InputField of(InputColumn column, String member, TimeZones.Kind zoned, boolean list) {
             var values = list ? List.<String>of() : valueListOf(column);
             return new InputField(column, member, values.isEmpty() ? null : JavaNames.type(column.name()), values, zoned, list);
         }
@@ -531,12 +532,19 @@ final class SourceGenerator {
      */
     private record Converter(String javaType, String binding, String method, String parser) {
 
-        /** @param zoned for a time or date-time, whether its values have a time zone */
-        static Converter of(ColumnType type, boolean zoned) {
-            if (zoned && type == ColumnType.TIME) {
-                return new Converter("java.time.OffsetTime", "offsetTimeInput", "offsetTime", "java.time.OffsetTime.parse");
+        /** @param zoned for a time or date-time, whether its values have a time zone, or for a time a zone id */
+        static Converter of(ColumnType type, TimeZones.Kind zoned) {
+            if (zoned == TimeZones.Kind.ZONE_ID && type == ColumnType.TIME) {
+                // the engine writes a time in a zone with one fixed offset, or at an offset, with that offset
+                return new Converter("io.github.brunopacheco1.praecepta.engine.feel.ZonedTime", "zonedTimeInput", "zonedTime",
+                        "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseZonedTime");
             }
-            if (zoned && type == ColumnType.DATE_TIME) {
+            if (zoned == TimeZones.Kind.ZONED && type == ColumnType.TIME) {
+                // an output written as a time in a zone with one fixed offset (00:01:00@Etc/UTC) is the time at that offset
+                return new Converter("java.time.OffsetTime", "offsetTimeInput", "offsetTime",
+                        "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseOffsetTime");
+            }
+            if (zoned == TimeZones.Kind.ZONED && type == ColumnType.DATE_TIME) {
                 // FEEL writes a zone id as @Europe/Paris, which ZonedDateTime.parse does not read
                 return new Converter("java.time.ZonedDateTime", "zonedDateTimeInput", "zonedDateTime",
                         "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseZonedDateTime");

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/DMN/20151101/dmn.xsd" xmlns:feel="http://www.omg.org/spec/FEEL/20140401" id="definitions" name="Shipping" namespace="http://example.com/shipping">
+  <decision id="carrier" name="Carrier">
+    <decisionTable id="carrierTable" hitPolicy="FIRST">
+      <input id="weightInput" label="Weight">
+        <inputExpression id="weightExpression" typeRef="feel:number">
+          <text>weight</text>
+        </inputExpression>
+      </input>
+      <output id="carrierOutput" typeRef="feel:string" />
+      <rule id="light">
+        <inputEntry id="lightWeight"><text>&lt;= 2</text></inputEntry>
+        <outputEntry id="lightCarrier"><text>"post"</text></outputEntry>
+      </rule>
+      <rule id="heavy">
+        <inputEntry id="heavyWeight"><text>-</text></inputEntry>
+        <outputEntry id="heavyCarrier"><text>"freight"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="fee" name="Fee">
+    <decisionTable id="feeTable" hitPolicy="COLLECT" aggregation="SUM">
+      <input id="zoneInput" label="Zone">
+        <inputExpression id="zoneExpression" typeRef="feel:string">
+          <text>zone</text>
+        </inputExpression>
+      </input>
+      <output id="feeOutput" name="fee" typeRef="feel:number" />
+      <rule id="base">
+        <inputEntry id="baseZone"><text></text></inputEntry>
+        <outputEntry id="baseFee"><text>5</text></outputEntry>
+      </rule>
+      <rule id="remote">
+        <inputEntry id="remoteZone"><text>"islands"</text></inputEntry>
+        <outputEntry id="remoteFee"><text>12.5</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

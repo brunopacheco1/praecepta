@@ -11,33 +11,15 @@ priorities follow what users ask for, so a 👍 or a comment on an issue moves i
 are made is in [GOVERNANCE.md](../GOVERNANCE.md); past decisions are in
 [MODERNISATION.md](MODERNISATION.md).
 
-## 0.5
-Released in November 2026 (see the [changelog](../CHANGELOG.md)), with integrations, so Praecepta
-fits the build and the framework an application already uses:
-- **A Spring Boot starter** ([#20](https://github.com/brunopacheco1/praecepta/issues/20)), a
-  **Quarkus extension** ([#76](https://github.com/brunopacheco1/praecepta/issues/76)) and a
-  **Micronaut module** ([#77](https://github.com/brunopacheco1/praecepta/issues/77)): DMN tables as
-  engine beans, validated when the application builds (Quarkus) or starts, with their reports at
-  runtime.
-- **A Gradle plugin** ([#18](https://github.com/brunopacheco1/praecepta/issues/18)) that generates
-  the same classes as the Maven plugin, with Gradle's build cache and configuration cache.
-- **GraalVM native images** ([#19](https://github.com/brunopacheco1/praecepta/issues/19)), with no
-  configuration for Praecepta, built and run in CI with GraalVM for JDK 21 and 25.
-- **Fixes** that bring tables closer to DMN 1.5: an output's default value when no rule matches
-  ([#79](https://github.com/brunopacheco1/praecepta/issues/79)), FEEL's escape sequences in quoted
-  strings ([#80](https://github.com/brunopacheco1/praecepta/issues/80)), and strings ordered by
-  character ([#83](https://github.com/brunopacheco1/praecepta/issues/83)).
-
-The TCK stays at 83 of 86 checks; the other 3 need decision requirement graphs.
-
-## Next: 0.6
-The DMN 1.5 gaps that the reviews of 0.4 and 0.5 against the specification found in single tables:
+## 0.6
+Released in November 2026 (see the [changelog](../CHANGELOG.md)), with the DMN 1.5 gaps that the
+reviews of 0.4 and 0.5 against the specification found in single tables:
 - **Analysis of rules that test list columns**
   ([#78](https://github.com/brunopacheco1/praecepta/issues/78)): overlaps, unreachable rules and
   gaps for them too.
-- **FEEL literal forms and the `=` and `!=` tests** that cells reject
+- **FEEL literal forms and the `=` and `!=` tests**
   ([#81](https://github.com/brunopacheco1/praecepta/issues/81)), such as `!= "PT"`, `1.2e3`,
-  `@"2025-01-31"` and comments.
+  `@"2025-01-31"`, `date(2025, 1, 31)` and comments.
 - **Times with a zone id** ([#82](https://github.com/brunopacheco1/praecepta/issues/82)), such as
   `time("10:30:00@Europe/Paris")`.
 - **Missing elements in list inputs** ([#84](https://github.com/brunopacheco1/praecepta/issues/84)),
@@ -45,24 +27,31 @@ The DMN 1.5 gaps that the reviews of 0.4 and 0.5 against the specification found
 - **Output expressions over dates, times and durations**
   ([#85](https://github.com/brunopacheco1/praecepta/issues/85)), as in `due + duration("P14D")`.
 - **Behaviour that DMN 1.5 and the TCK leave undecided**
-  ([#86](https://github.com/brunopacheco1/praecepta/issues/86)): recorded, and settled when a later
-  DMN version or the TCK decides it.
-- **Aggregations over null outputs** ([#90](https://github.com/brunopacheco1/praecepta/issues/90)): SUM, MIN and MAX give null when a matching rule's
-  output is null, as DMN 1.5 defines them, instead of skipping it.
-- **Default outputs**: a warning for a complete table that declares one
-  ([#91](https://github.com/brunopacheco1/praecepta/issues/91)), and multi-output tables that tell a null default from no default
-  ([#92](https://github.com/brunopacheco1/praecepta/issues/92)).
+  ([#86](https://github.com/brunopacheco1/praecepta/issues/86)), recorded in
+  [DMN-CONFORMANCE.md](DMN-CONFORMANCE.md) until a later DMN version or the TCK decides it.
+- **Fixes** that follow DMN 1.5: SUM, MIN and MAX give null when a matching rule's output is null
+  ([#90](https://github.com/brunopacheco1/praecepta/issues/90)), a complete table that declares a
+  default output is an error ([#91](https://github.com/brunopacheco1/praecepta/issues/91)), and a
+  null default is told from no default ([#92](https://github.com/brunopacheco1/praecepta/issues/92)).
 
 And for the integrations shipped in 0.5:
-- **The Gradle plugin on the Gradle Plugin Portal** ([#93](https://github.com/brunopacheco1/praecepta/issues/93)), so `pluginManagement` needs no
+- **The Gradle plugin on the Gradle Plugin Portal**
+  ([#93](https://github.com/brunopacheco1/praecepta/issues/93)), so `pluginManagement` needs no
   `mavenCentral()`.
-- **Micronaut 5** ([#94](https://github.com/brunopacheco1/praecepta/issues/94)) and **native builds of Spring Boot, Micronaut and Quarkus
-  applications in CI** ([#99](https://github.com/brunopacheco1/praecepta/issues/99)).
-- Smaller fixes: validation issues logged once ([#95](https://github.com/brunopacheco1/praecepta/issues/95)), `DmnReader` pinned to the JDK's XML parser
-  ([#96](https://github.com/brunopacheco1/praecepta/issues/96)), a current Gradle API ([#97](https://github.com/brunopacheco1/praecepta/issues/97)) and published POMs without the JUnit BOM
-  ([#98](https://github.com/brunopacheco1/praecepta/issues/98)).
+- **Native builds of Spring Boot, Micronaut and Quarkus applications in CI**
+  ([#99](https://github.com/brunopacheco1/praecepta/issues/99)).
+- Smaller fixes: validation issues logged once
+  ([#95](https://github.com/brunopacheco1/praecepta/issues/95)), `DmnReader` pinned to the JDK's XML
+  parser ([#96](https://github.com/brunopacheco1/praecepta/issues/96)), and published POMs without
+  the JUnit BOM ([#98](https://github.com/brunopacheco1/praecepta/issues/98)). The Gradle plugin
+  keeps compiling against the Gradle 8.11.1 API, for reasons recorded in
+  [ARCHITECTURE.md](ARCHITECTURE.md) ([#97](https://github.com/brunopacheco1/praecepta/issues/97)).
 
-## 0.7
+The TCK stays at 83 of 86 checks; the other 3 need decision requirement graphs. Its arithmetic test
+cases now also run as output expressions: Praecepta reads 489 of their 1,101 checks, and gives the
+kit's result for all but one.
+
+## Next: 0.7
 - **Decision requirement graphs** (decisions feeding other decisions,
   [#14](https://github.com/brunopacheco1/praecepta/issues/14)), the last 3 TCK checks, if they fit
   without turning Praecepta into a full DMN engine.
@@ -70,6 +59,21 @@ And for the integrations shipped in 0.5:
 ## 0.8
 - **An online playground** ([#21](https://github.com/brunopacheco1/praecepta/issues/21)): paste a
   table, see its validation report and evaluate inputs, without installing anything.
+
+## 0.9
+Praecepta for Kotlin:
+- **A null-safe API** through [JSpecify](https://jspecify.dev)
+  ([#104](https://github.com/brunopacheco1/praecepta/issues/104)), so Kotlin, and Java tools such as
+  NullAway, see which values may be null, in the engine and in the generated classes.
+- **Kotlin code from the build plugins**
+  ([#105](https://github.com/brunopacheco1/praecepta/issues/105)): the Maven and Gradle plugins and
+  the Quarkus extension generate Kotlin data classes and objects, when asked, instead of Java.
+- **A Kotlin DSL module** ([#106](https://github.com/brunopacheco1/praecepta/issues/106)),
+  `praecepta-kotlin`, for building engines and rules in Kotlin.
+
+## Later
+- **Micronaut 5** ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25:
+  once the project's Java baseline moves past 21.
 
 ## Towards 1.0
 A stable API, once the features above have settled and the project has a second maintainer

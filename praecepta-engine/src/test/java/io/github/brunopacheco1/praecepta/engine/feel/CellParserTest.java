@@ -24,13 +24,256 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NotEqual;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Operator;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 
 class CellParserTest {
+
+    @Test
+    void equal_and_not_equal_tests_take_a_value_or_null() {
+        // DMN 1.5, grammar rule 7.a: ( "<" | "<=" | ">" | ">=" | "=" | "!=" ) , endpoint
+        Assertions.assertThat(CellParser.parseFeel("= 18", ColumnType.NUMBER)).isEqualTo(positive(new Equals(new BigDecimal(18))));
+        Assertions.assertThat(CellParser.parseFeel("!= \"PT\"", ColumnType.STRING))
+                .isEqualTo(positive(new NotEqual(new Equals("PT"))));
+        Assertions.assertThat(CellParser.parseFeel("!= other", ColumnType.STRING))
+                .isEqualTo(positive(new NotEqual(new Equals(new UnaryTests.Name("other")))));
+        // 10.3.2.15: e = null is "FEEL(e) is null", e != null "FEEL(e) is not null"
+        Assertions.assertThat(CellParser.parseFeel("= null", ColumnType.DATE)).isEqualTo(positive(new NullTest()));
+        Assertions.assertThat(CellParser.parseFeel("!= null", ColumnType.DATE)).isEqualTo(positive(new NotEqual(new NullTest())));
+        // one test among others, which not(...) around the cell cannot say
+        Assertions.assertThat(CellParser.parse("!=0, > 10", ColumnType.NUMBER))
+                .isEqualTo(positive(new NotEqual(new Equals(BigDecimal.ZERO)), new Compare(Operator.GT, BigDecimal.TEN)));
+        Assertions.assertThat(CellParser.parse("not(= true, != null)", ColumnType.BOOLEAN))
+                .isEqualTo(negated(new Equals(true), new NotEqual(new NullTest())));
+        // Praecepta's syntax: an unquoted word after = or != is a string, as elsewhere
+        Assertions.assertThat(CellParser.parse("!= PT, = ES", ColumnType.STRING))
+                .isEqualTo(positive(new NotEqual(new Equals("PT")), new Equals("ES")));
+        Assertions.assertThat(CellParser.parse("!= 2025-01-31", ColumnType.DATE))
+                .isEqualTo(positive(new NotEqual(new Equals(LocalDate.of(2025, 1, 31)))));
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = ';', value = {
+            ".5;        0.5",
+            "-.5;       -0.5",
+            "1.2e3;     1200",
+            "1E-2;      0.01",
+            "2.50E+1;   25",
+            "0e0;       0",
+    })
+    void numbers_may_start_with_their_fraction_and_have_an_exponent(String literal, BigDecimal value) {
+        // DMN 1.5, 10.3.2.3.1: "FEEL supports literal scientific notation, e.g., 1.2e3"
+        var cell = CellParser.parseFeel(literal, ColumnType.NUMBER);
+        Assertions.assertThat(cell.values().orElseThrow()).singleElement()
+                .satisfies(number -> Assertions.assertThat((BigDecimal) number).isEqualByComparingTo(value));
+        Assertions.assertThat(CellParser.parse("< " + literal + ", [" + literal + ".." + literal + "]", ColumnType.NUMBER).tests())
+                .hasSize(2);
+    }
+
+    /**
+     * FEEL's numbers are decimal128s (DMN 1.5, 10.3.2.3.1), whose exponents end at 6144 and -6176: a cell beyond
+     * them is rejected, as {@code < 1e999999999} would be written out with a billion digits by the validation report
+     * and {@code DmnWriter}. A zero's exponent counts too.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"1e999999999", "< 1e100000", "1e6145", "1e-6177", "-9.9e9999", "0e999999999", "0e-7000", "[1..1e7000]"})
+    void numbers_beyond_feels_decimal128_are_rejected(String cell) {
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel(cell, ColumnType.NUMBER))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining("is beyond FEEL's numbers (decimal128)");
+        Assertions.assertThatThrownBy(() -> CellParser.parse(cell, ColumnType.NUMBER)).isInstanceOf(CellSyntaxException.class);
+        // the date and time functions' numbers too
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel("date(1e999999999, 1, 1)", ColumnType.DATE))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining("is beyond FEEL's numbers (decimal128)");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1e6144", "9.999999999999999999999999999999999e6144", "1e-6176", "0e6144", "-1.5E+100"})
+    void numbers_within_feels_decimal128_are_read(String cell) {
+        Assertions.assertThat(CellParser.parseFeel(cell, ColumnType.NUMBER).values().orElseThrow()).singleElement()
+                .satisfies(number -> Assertions.assertThat((BigDecimal) number).isEqualByComparingTo(new BigDecimal(cell)));
+    }
+
+    /**
+     * {@code DmnWriter} writes a number in its plain form ({@code 1.2e3} as {@code 1200}), which must read back as the
+     * same test: an exponent must not leave the number with a scale its plain form does not have, as
+     * {@code BigDecimal.equals} would tell them apart (found by fuzzing {@code 5E65}).
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"5E65", "1.2e3", ".5", "-2.50E+1", "0e5", "1e-3", "< 1E2", "[1e2..5E65]", "date(2.025e3, 1, 31)"})
+    void a_number_with_an_exponent_reads_as_its_plain_form_does(String cell) {
+        var type = cell.startsWith("date") ? ColumnType.DATE : ColumnType.NUMBER;
+        var parsed = CellParser.parse(cell, type);
+        Assertions.assertThat(CellParser.parse(DmnWriter.render(parsed), type)).isEqualTo(parsed);
+    }
+
+    @Test
+    void an_exponent_leaves_no_negative_scale() {
+        Assertions.assertThat(CellParser.parseFeel("5E65", ColumnType.NUMBER).values().orElseThrow())
+                .containsExactly(new BigDecimal("5" + "0".repeat(65)));
+        Assertions.assertThat(CellParser.parseFeel("1.2e3", ColumnType.NUMBER).values().orElseThrow()).containsExactly(new BigDecimal("1200"));
+        Assertions.assertThat(CellParser.parseFeel(".5", ColumnType.NUMBER).values().orElseThrow()).containsExactly(new BigDecimal("0.5"));
+        Assertions.assertThat(CellParser.parseFeel("1E-2", ColumnType.NUMBER).values().orElseThrow()).containsExactly(new BigDecimal("0.01"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1.", ".", "1e", "1.2.3", "--1", "1e1.5", "1e9999999999", "+1"})
+    void numbers_follow_feels_numeric_literal(String literal) {
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel(literal, ColumnType.NUMBER))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining("is not a number");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            // at-literals: their string's syntax says their type (DMN 1.5, grammar rule 65, 10.3.4.1)
+            "DATE                | @\"2025-01-31\"                                         | 2025-01-31",
+            "TIME                | @\"08:30:00\"                                           | 08:30",
+            "TIME                | @\"08:30:00+01:00\"                                     | 08:30+01:00",
+            "DATE_TIME           | @\"2025-01-31T08:30:00Z\"                               | 2025-01-31T08:30Z",
+            "DATE_TIME           | @\"2025-01-31T08:30:00@Europe/Paris\"                   | 2025-01-31T08:30+01:00[Europe/Paris]",
+            "DAY_TIME_DURATION   | @\"P1DT2H\"                                             | PT26H",
+            "YEAR_MONTH_DURATION | @\"P1Y2M\"                                              | P14M",
+            // the other forms of the date and time functions (Table 72)
+            "DATE                | date(2025, 1, 31)                                       | 2025-01-31",
+            "DATE                | date(date and time(\"2025-01-31T23:59:00Z\"))            | 2025-01-31",
+            "DATE                | date( @\"2025-01-31T08:30:00\" )                         | 2025-01-31",
+            "TIME                | time(8, 30, 0)                                          | 08:30",
+            "TIME                | time(8, 30, 15.5)                                       | 08:30:15.5",
+            "TIME                | time(8, 30, 0, duration(\"PT1H\"))                       | 08:30+01:00",
+            "TIME                | time(8, 30, 0, null)                                    | 08:30",
+            "TIME                | time(date and time(\"2025-01-31T08:30:00-05:00\"))       | 08:30-05:00",
+            "TIME                | time(@\"2025-01-31T08:30:00\")                          | 08:30",
+            "DATE_TIME           | date and time(date(\"2025-01-31\"), time(\"08:30:00\"))  | 2025-01-31T08:30",
+            "DATE_TIME           | date and time(@\"2025-01-31T23:00:00\", @\"08:30:00Z\")  | 2025-01-31T08:30Z",
+            "DATE_TIME           | date  and  time ( \"2025-01-31T08:30:00\" )               | 2025-01-31T08:30",
+            // a date and time string may be a date alone (10.3.4.1), at midnight
+            "DATE_TIME           | date and time(\"2025-01-31\")                            | 2025-01-31T00:00",
+    })
+    void date_time_literals_take_every_form_of_dmn(ColumnType type, String literal, String value) {
+        var expected = switch (type) {
+            case DATE -> LocalDate.parse(value);
+            case TIME -> FeelTemporals.parseTime(value);
+            case DATE_TIME -> FeelTemporals.parseDateTime(value);
+            case DAY_TIME_DURATION -> java.time.Duration.parse(value);
+            default -> YearsAndMonths.parse(value);
+        };
+        Assertions.assertThat(CellParser.parseFeel(literal, type)).isEqualTo(positive(new Equals((Comparable<?>) expected)));
+        Assertions.assertThat(CellParser.parse("< " + literal, type)).isEqualTo(positive(new Compare(Operator.LT, (Comparable<?>) expected)));
+    }
+
+    @Test
+    void date_time_literals_mix_in_lists_and_intervals() {
+        Assertions.assertThat(CellParser.parseFeel("[@\"2025-01-01\"..date(2025, 1, 31)), date(2025,3,1), != @\"2025-02-01\"", ColumnType.DATE)
+                .tests()).hasSize(3);
+        Assertions.assertThat(CellParser.parseFeel("not([time(8, 0, 0)..@\"12:00:00\"])", ColumnType.TIME))
+                .isEqualTo(negated(new Range(LocalTime.of(8, 0), true, LocalTime.NOON, true)));
+        // the date and time functions of DMN 1.5 are not names of inputs
+        Assertions.assertThat(CellParser.parseFeel("date(2025, 1, 31)", ColumnType.DATE).namesInputs()).isFalse();
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', quoteCharacter = '~', value = {
+            "DATE                | @\"08:30:00\"                        | is a time, not a date",
+            "TIME                | @\"2025-01-31\"                      | is a date, not a time",
+            "DATE_TIME           | @\"2025-01-31\"                      | is a date, not a date and time",
+            "DAY_TIME_DURATION   | @\"P1Y\"                             | invalid days and time duration 'P1Y'",
+            "YEAR_MONTH_DURATION | @\"P1D\"                             | invalid years and months duration 'P1D'",
+            "DATE                | @2025                                 | @ must be followed by a string",
+            "DATE                | @\"2025-02-30\"                      | invalid date '2025-02-30'",
+            "DATE                | date(2025, 2, 30)                     | invalid date",
+            "DATE                | date(2025, 1.5, 3)                    | invalid date",
+            "DATE                | date(2025, 1)                         | date(...) takes",
+            "DATE                | date(\"2025-01-31\") + 1             | unexpected '+ 1' after a date",
+            "DATE                | date(\"2025-01-31\"                  | not closed",
+            "DATE                | date(x)                               | 'x' is not a string, a number or a date time literal",
+            "TIME                | time(25, 0, 0)                        | invalid time",
+            "TIME                | time(8, 0, 0, duration(\"PT0.5S\"))  | invalid time",
+            "TIME                | time(8, 0, 0, duration(\"PT19H\"))   | invalid time",
+            "TIME                | @\"10:00:00@Mars/Olympus\"           | invalid time '10:00:00@Mars/Olympus'",
+            "TIME                | @\"10:00:00@+01:00\"                 | invalid time",
+            "DATE_TIME           | date and time(time(\"08:00:00\"))    | date and time(...) takes",
+            "DATE_TIME           | date and time(date(\"2025-01-31\"), date(\"2025-01-31\")) | date and time(...) takes",
+            "DATE_TIME           | @\"2025-10-26T02:30+01:00[Europe/Paris]\" | write a zone id as @Europe/Paris",
+            "DAY_TIME_DURATION   | duration(1)                           | duration(...) takes a duration string",
+    })
+    void invalid_date_time_literals_say_why(ColumnType type, String literal, String reason) {
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel(literal, type))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining(reason);
+    }
+
+    @Test
+    void comments_are_ignored_outside_strings() {
+        // DMN 1.5, 10.3.1.2: "Java-style comments can be used, i.e., '//' to end of line and /* ... */"
+        Assertions.assertThat(CellParser.parseFeel("< 18 // minors", ColumnType.NUMBER))
+                .isEqualTo(positive(new Compare(Operator.LT, new BigDecimal(18))));
+        Assertions.assertThat(CellParser.parseFeel("/* adults */ >= 18, /* none */ null", ColumnType.NUMBER))
+                .isEqualTo(positive(new Compare(Operator.GE, new BigDecimal(18)), new NullTest()));
+        Assertions.assertThat(CellParser.parseFeel("\"a // b\", \"c /* d */\" // e\n", ColumnType.STRING))
+                .isEqualTo(positive(new Equals("a // b"), new Equals("c /* d */")));
+        Assertions.assertThat(CellParser.parseFeel("\"say \\\"//\\\"\" // quoted", ColumnType.STRING))
+                .isEqualTo(positive(new Equals("say \"//\"")));
+        Assertions.assertThat(CellParser.parse("not(1, // one\n2)", ColumnType.NUMBER))
+                .isEqualTo(negated(new Equals(BigDecimal.ONE), new Equals(new BigDecimal(2))));
+        Assertions.assertThat(CellParser.parseFeelList("list contains(?, \"PT\") // Portugal", ColumnType.STRING))
+                .isEqualTo(positive(new Equals("PT")));
+        // in Praecepta's syntax an unquoted string keeps them, as a URL does
+        Assertions.assertThat(CellParser.parse("http://example.com", ColumnType.STRING)).isEqualTo(positive(new Equals("http://example.com")));
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel("1 /* open", ColumnType.NUMBER))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining("a comment /* is not closed");
+    }
+
+    @Test
+    void times_may_have_a_zone_id() {
+        // DMN 1.5, 10.3.4.1: a time string may be a local time "followed by the character "@", followed by [...] a time
+        // zone identifier in the IANA Time Zones Database"
+        var paris = new ZonedTime(LocalTime.of(10, 30), ZoneId.of("Europe/Paris"));
+        Assertions.assertThat(CellParser.parseFeel("time(\"10:30:00@Europe/Paris\")", ColumnType.TIME)).isEqualTo(positive(new Equals(paris)));
+        Assertions.assertThat(CellParser.parseFeel("@\"10:30:00@Europe/Paris\"", ColumnType.TIME)).isEqualTo(positive(new Equals(paris)));
+        Assertions.assertThat(CellParser.parseFeel("time(date and time(\"2025-01-31T10:30:00@Europe/Paris\"))", ColumnType.TIME))
+                .isEqualTo(positive(new Equals(paris)));
+        Assertions.assertThat(CellParser.parseFeel("[time(\"08:00:00@Europe/Paris\")..@\"10:30:00@Europe/Paris\"]", ColumnType.TIME))
+                .isEqualTo(positive(new Range(new ZonedTime(LocalTime.of(8, 0), ZoneId.of("Europe/Paris")), true, paris, true)));
+        Assertions.assertThat(CellParser.parseFeel("date and time(date(\"2025-01-31\"), time(\"10:30:00@Europe/Paris\"))", ColumnType.DATE_TIME))
+                .isEqualTo(positive(new Equals(ZonedDateTime.of(2025, 1, 31, 10, 30, 0, 0, ZoneId.of("Europe/Paris")))));
+        Assertions.assertThat(FeelLiterals.literal(paris)).isEqualTo("time(\"10:30:00@Europe/Paris\")");
+        Assertions.assertThat(FeelLiterals.text(paris)).isEqualTo("10:30:00@Europe/Paris");
+        Assertions.assertThat(FeelLiterals.value("10:30@Europe/Paris", ColumnType.TIME)).isEqualTo(paris);
+    }
+
+    @Test
+    void a_list_column_reads_not_equal_on_its_elements() {
+        Assertions.assertThat(CellParser.parseFeelList("some x in ? satisfies x != \"PT\" or some x in ? satisfies x != null",
+                ColumnType.STRING)).isEqualTo(positive(new NotEqual(new Equals("PT")), new NotEqual(new NullTest())));
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = ';', value = {
+            "NUMBER;  !=;          missing value",
+            "NUMBER;  = ;          missing value",
+            "NUMBER;  != [1..2];   is not a number",
+            "BOOLEAN; = 1;         is not a boolean",
+    })
+    void equal_and_not_equal_need_a_value_of_the_column(ColumnType type, String cell, String reason) {
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel(cell, type))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining(reason);
+    }
+
+    @Test
+    void not_equal_negates_only_an_equality_or_null() {
+        var comparison = new Compare(Operator.LT, BigDecimal.ONE);
+        Assertions.assertThatThrownBy(() -> new NotEqual(comparison))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 
     @ParameterizedTest(name = "''{0}''")
     @NullAndEmptySource
@@ -310,7 +553,9 @@ class CellParserTest {
             "BOOLEAN; yes;            is not a boolean",
             "TIME;   time(\"25:00:00\"); invalid time",
             "TIME;   8am;             is not a time",
-            "TIME;   time(\"10:00:00@Europe/Paris\"); is a time with a zone id, which is not supported",
+            "TIME;   [time(\"10:00:00@Europe/Paris\")..time(\"11:00:00@Asia/Dhaka\")]; the ends of an interval must compare",
+            "TIME;   [time(\"10:00:00@Europe/Paris\")..time(\"11:00:00\")]; the ends of an interval must compare",
+            "TIME;   [time(\"11:00:00@Europe/Paris\")..time(\"10:00:00@Europe/Paris\")]; starts after it ends",
             "TIME;   10:00:00+2;      is not a time",
             "DATE_TIME; date and time(\"2025-01-01T10:00:00@Mars/Olympus\"); invalid date and time",
             "DATE_TIME; date and time(\"2025-01-01T10:00:00-0500\"); invalid date and time",
@@ -318,7 +563,7 @@ class CellParserTest {
             "TIME;   [time(\"11:00:00\")..time(\"10:00:00+05:00\")]; starts after it ends",
             "TIME;   [time(\"10:00:00Z\")..time(\"10:00:00+01:00\")]; starts after it ends",
             "DATE_TIME; 2025-01-01;   is not a date and time",
-            "DATE_TIME; date and time(\"2025-01-31\"); invalid date and time",
+            "DATE_TIME; date and time(\"2025-01-31T\"); invalid date and time",
             "TIME;   time(\"10:00:00+0200\"); invalid time",
             "DATE_TIME; [date and time(\"2025-01-02T00:00:00\")..date and time(\"2025-01-01T00:00:00\")]; starts after it ends",
             "NUMBER; abc;             is not a number",

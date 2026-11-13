@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- times with a zone id: an input whose cells name them, and an output written with one -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="calls" name="calls" namespace="https://example.com/calls">
+  <decision id="calls" name="calls">
+    <decisionTable id="table" hitPolicy="FIRST">
+      <input id="at" label="at"><inputExpression typeRef="time"><text>at</text></inputExpression></input>
+      <output id="desk" name="desk" typeRef="string"/>
+      <output id="opens" name="opens" typeRef="time"/>
+      <rule id="r1">
+        <inputEntry><text>[time("09:00:00@Europe/Paris")..@"17:00:00@Europe/Paris")</text></inputEntry>
+        <outputEntry><text>"Paris"</text></outputEntry>
+        <outputEntry><text>time("09:00:00@Europe/Paris")</text></outputEntry>
+      </rule>
+      <rule id="r2">
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"closed"</text></outputEntry>
+        <outputEntry><text>null</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

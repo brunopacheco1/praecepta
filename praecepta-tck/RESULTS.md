@@ -19,7 +19,8 @@ A *check* is one expected result in a TCK test file: a decision table evaluated 
 case's inputs. Only decisions whose logic is a decision table count; other decisions in the
 same models (literal expressions, contexts, invocations) are outside Praecepta's scope. A check
 is *not supported* when the table uses a feature Praecepta does not have (the DMN reader
-rejects it), or the inputs are of a kind it does not take.
+rejects it), or the inputs are of a kind it does not take. Where DMN 1.5 and the TCK leave a
+case open, what Praecepta does is recorded in [DMN conformance](../docs/DMN-CONFORMANCE.md).
 
 **83 of 86 checks pass (96.5 %).** Of the 83 checks Praecepta supports, 83 pass (100.0 %).
 

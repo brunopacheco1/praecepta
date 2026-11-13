@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.tck;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
 import org.w3c.dom.Element;
 
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
+import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 
 /** A value in a TCK test file: an input node, an expected result, or a result computed by Praecepta. */
 sealed interface TckValue {
@@ -116,16 +118,30 @@ sealed interface TckValue {
                 case "datetime" -> sameTemporal(FeelTemporals.parseDateTime(expected.text().strip()),
                         FeelTemporals.parseDateTime(actual.strip()));
                 case "boolean" -> expected.text().strip().equalsIgnoreCase(actual.strip());
+                case "duration" -> duration(expected.text().strip()).equals(duration(actual.strip()));
                 default -> expected.text().equals(actual);
             };
-        } catch (NumberFormatException | DateTimeParseException e) {
+        } catch (IllegalArgumentException | DateTimeParseException e) {
             return false;
         }
     }
 
-    /** Equal as FEEL compares times and date-times: with a zone by instant; never one with a zone and one without. */
+    /**
+     * Equal as FEEL compares times and date-times: with a zone by instant; never one with a zone and one without; a
+     * time with a zone id only with one in the same zone.
+     */
     private static boolean sameTemporal(Object expected, Object actual) {
-        return FeelTemporals.hasZone(expected) == FeelTemporals.hasZone(actual) && FeelTemporals.compare(expected, actual) == 0;
+        return FeelTemporals.hasZone(expected) == FeelTemporals.hasZone(actual) && FeelTemporals.comparable(expected, actual)
+                && FeelTemporals.compare(expected, actual) == 0;
+    }
+
+    /** A duration by value, of days and time ({@code P1D} is {@code PT24H}) or of years and months ({@code P0Y} is {@code P0M}). */
+    private static Object duration(String text) {
+        try {
+            return Duration.parse(text);
+        } catch (DateTimeParseException e) {
+            return YearsAndMonths.parse(text);
+        }
     }
 
     private static boolean sameItems(List<TckValue> expected, List<TckValue> actual, boolean ordered) {

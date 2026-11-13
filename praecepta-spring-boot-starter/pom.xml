@@ -24,15 +24,8 @@
 
     <dependencyManagement>
         <dependencies>
-            <!-- keeps the JUnit of the other modules; Spring Boot's BOM would otherwise choose it -->
-            <dependency>
-                <groupId>org.junit</groupId>
-                <artifactId>junit-bom</artifactId>
-                <version>${junit.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <!-- imported here, not in the parent, so that no other module resolves Spring Boot's versions -->
+            <!-- imported here, not in the parent, so that no other module resolves Spring Boot's versions;
+                 the JUnit artifacts the parent declares take precedence over the JUnit Spring Boot manages -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>

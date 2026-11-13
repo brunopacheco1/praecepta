@@ -5,11 +5,15 @@
  */
 package io.github.brunopacheco1.praecepta.engine;
 
+import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,11 +28,15 @@ import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
+import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
+import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 
 /**
  * The 0.4 features together: lists of times with a time zone (#25, #70), compact masks under list
- * columns (#17, #25), and output expressions next to list and zoned columns (#71).
+ * columns (#17, #25), and output expressions next to list and zoned columns (#71). And the 0.6 ones: missing list
+ * elements (#84) next to the new literal forms, {@code !=} and comments (#81), as DMN files hold them.
  */
 class FeatureInteractionsTest {
 
@@ -160,7 +168,7 @@ class FeatureInteractionsTest {
     }
 
     @Test
-    void output_expressions_cannot_read_a_list_or_a_time() {
+    void output_expressions_cannot_read_a_list_or_add_a_number_to_a_time() {
         var list = PraeceptaEngine.<Booking, String>builder()
                 .hitPolicy(HitPolicy.FIRST)
                 .listInput("nationalities", Booking::nationalities)
@@ -176,7 +184,53 @@ class FeatureInteractionsTest {
                 .rules(List.of(expressionRule(1, Map.of(), "at + 1")));
         Assertions.assertThatThrownBy(time::build)
                 .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessage("Rule 1, output 'total': 'at' is a time; output expressions combine strings and numbers");
+                .hasMessage("Rule 1, output 'total': + combines a time and a number, which gives null in FEEL");
+    }
+
+    /**
+     * A DMN table over a list of dates whose cells use the 0.6 forms: an at-literal and a comment (#81), a call of
+     * {@code date} with numbers and {@code !=} (#81), and {@code list contains(?, null)} (#84).
+     */
+    private static final String DUE_DATES = """
+            <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+              <itemDefinition name="tDates" isCollection="true"><typeRef>date</typeRef></itemDefinition>
+              <decision id="due" name="due"><decisionTable hitPolicy="COLLECT">
+                <input><inputExpression typeRef="tDates"><text>due dates</text></inputExpression></input>
+                <output name="id" typeRef="string"/>
+                <rule><inputEntry><text>list contains(?, @"2025-01-31") // the end of January</text></inputEntry>
+                  <outputEntry><text>"january"</text></outputEntry></rule>
+                <rule><inputEntry><text>some x in ? satisfies x != date(2025, 1, 31)</text></inputEntry>
+                  <outputEntry><text>"other"</text></outputEntry></rule>
+                <rule><inputEntry><text>list contains(?, null) /* a date nobody gave */</text></inputEntry>
+                  <outputEntry><text>"missing"</text></outputEntry></rule>
+              </decisionTable></decision>
+            </definitions>""";
+
+    record Invoices(List<LocalDate> dueDates) {
+    }
+
+    @Test
+    void list_cells_with_the_new_literal_forms_test_missing_elements_as_feel_does_and_survive_a_dmn_round_trip() {
+        var read = DmnReader.read(new ByteArrayInputStream(DUE_DATES.getBytes(StandardCharsets.UTF_8)));
+        var written = DmnReader.read(new ByteArrayInputStream(DmnWriter.write(read).getBytes(StandardCharsets.UTF_8)));
+        Assertions.assertThat(written.rules().stream().map(rule -> written.cell(rule, written.inputs().getFirst())).toList())
+                .isEqualTo(read.rules().stream().map(rule -> read.cell(rule, read.inputs().getFirst())).toList())
+                .contains(new UnaryTests.Positive(List.of(new UnaryTests.NullElement())));
+        for (var table : List.of(read, written)) {
+            var engine = PraeceptaEngine.<Invoices, String>builder()
+                    .table(table)
+                    .listInput("due dates", ColumnType.DATE, Invoices::dueDates)
+                    .output(output -> output.values().get("id"))
+                    .build();
+            var january = LocalDate.of(2025, 1, 31);
+            Assertions.assertThat(engine.evaluate(new Invoices(List.of(january)))).containsExactly("january");
+            // a missing element is not 31 January, so it differs from it (FEEL: null != x is not(null = x), which is true)
+            Assertions.assertThat(engine.evaluate(new Invoices(Arrays.asList(january, null)))).containsExactly("january", "other", "missing");
+            Assertions.assertThat(engine.evaluate(new Invoices(Arrays.asList((LocalDate) null)))).containsExactly("other", "missing");
+            Assertions.assertThat(engine.evaluate(new Invoices(List.of(LocalDate.of(2025, 2, 1))))).containsExactly("other");
+            Assertions.assertThat(engine.evaluate(new Invoices(List.of()))).isEmpty();
+            Assertions.assertThat(engine.evaluate(new Invoices(null))).isEmpty();
+        }
     }
 
     // ---- helpers -------------------------------------------------------------------------------

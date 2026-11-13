@@ -6,9 +6,11 @@
 package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -154,6 +156,41 @@ class ReferenceMatcherTest {
     }
 
     @Test
+    void the_representative_values_are_counted_as_they_are_listed() {
+        var rules = List.of(cell(1, "nat", "\"PT\""), cell(2, "nat", "not(\"BR\")"), cell(3, "nat", "not(\"ES\", \"FR\")"),
+                cell(4, "nat", "null"), cell(5, "n", "> 10"), cell(6, "n", "[1..5]"));
+        var reference = new ReferenceMatcher(rules, HitPolicy.COLLECT, Map.of(), Map.of("nat", ColumnType.STRING, "n", ColumnType.NUMBER),
+                Map.of(), false, Set.of(), Set.of("nat"));
+        for (var column : List.of("nat", "n")) {
+            for (var withMissing : List.of(true, false)) {
+                Assertions.assertThat(reference.representativeValueCount(column, withMissing))
+                        .as("%s, with a missing value: %s", column, withMissing)
+                        .isEqualTo(BigInteger.valueOf(reference.representativeValues(column, withMissing).size()));
+            }
+        }
+        // the lists are many: every subset of up to four of the pool's elements
+        Assertions.assertThat(reference.representativeValueCount("nat", false)).isGreaterThan(BigInteger.valueOf(10));
+    }
+
+    /** The table of #84, from DMN 1.5, Tables 49, 50 and 75. */
+    @Test
+    void a_missing_element_is_false_for_a_literal_and_unknown_for_a_comparison() {
+        var rules = List.of(cell(1, "nat", "list contains(?, \"PT\")"), cell(2, "nat", "not(list contains(?, \"PT\"))"),
+                cell(3, "nat", "list contains(?, null)"), cell(4, "nat", "? = null"));
+        var reference = new ReferenceMatcher(rules, HitPolicy.COLLECT, Map.of(), Map.of("nat", ColumnType.STRING), Map.of(), true,
+                Set.of(), Set.of("nat"));
+        Assertions.assertThat(ids(reference.matches(Map.of("nat", Arrays.asList("PT", null))))).containsExactly("1", "3");
+        Assertions.assertThat(ids(reference.matches(Map.of("nat", Arrays.asList("BR", null))))).containsExactly("2", "3");
+        Assertions.assertThat(reference.invalidColumn(Map.of("nat", Arrays.asList("BR", null)))).isNull();
+
+        var ages = List.of(cell(1, "ages", "some x in ? satisfies x >= 18"), cell(2, "ages", "not(some x in ? satisfies x >= 18)"));
+        var byAge = new ReferenceMatcher(ages, HitPolicy.COLLECT, Map.of(), Map.of("ages", ColumnType.NUMBER), Map.of(), true,
+                Set.of(), Set.of("ages"));
+        Assertions.assertThat(ids(byAge.matches(Map.of("ages", Arrays.asList(new BigDecimal(20), null))))).containsExactly("1");
+        Assertions.assertThat(ids(byAge.matches(Map.of("ages", Arrays.asList(BigDecimal.TEN, null))))).isEmpty();
+    }
+
+    @Test
     void an_element_with_an_offset_is_compared_with_a_literal_without_one_by_local_time() {
         // DMN 1.5, Table 54: the literal takes the element's offset, so 08:00 equals 08:00 at any offset
         var rules = List.of(cell(1, "t", "time(\"08:00:00\")"), cell(2, "t", "not(time(\"08:00:00\"))"));
@@ -225,6 +262,11 @@ class ReferenceMatcherTest {
         var missing = new HashMap<String, Object>(Map.of("slots", List.of(eight)));
         missing.put("at", null);
         Assertions.assertThat(ids(reference.matches(missing))).containsExactly("2");
+        // ? in slots is list contains(slots, ?): a missing value is in a list that holds a missing element
+        missing.put("slots", Arrays.asList(eight, null));
+        Assertions.assertThat(ids(reference.matches(missing))).containsExactly("1");
+        Assertions.assertThat(ids(reference.matches(Map.of("at", LocalTime.of(9, 0), "slots", Arrays.asList(eight, null)))))
+                .containsExactly("2");
     }
 
     @Test
@@ -241,16 +283,23 @@ class ReferenceMatcherTest {
     }
 
     @Test
-    void aggregations_skip_computed_outputs_that_are_missing() {
+    void sum_min_and_max_are_missing_when_an_output_is_but_count_counts_it() {
         var rules = List.of(
-                new Praeceptum(1, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of("n", "5"))),
-                new Praeceptum(2, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of(), Map.of(), Map.of("n", "a * 2"))),
-                new Praeceptum(3, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of(), Map.of(), Map.of("n", "a / 0"))));
-        var reference = new ReferenceMatcher(rules, HitPolicy.COLLECT, Map.of(), Map.of("a", ColumnType.NUMBER), Map.of());
+                new Praeceptum(1, new PraeceptaInput(Map.of("b", "")), new PraeceptaOutput(Map.of("n", "5"))),
+                new Praeceptum(2, new PraeceptaInput(Map.of("b", "")), new PraeceptaOutput(Map.of(), Map.of(), Map.of("n", "a * 2"))),
+                new Praeceptum(3, new PraeceptaInput(Map.of("b", "1")), new PraeceptaOutput(Map.of(), Map.of(), Map.of("n", "a / 0"))));
+        var reference = new ReferenceMatcher(rules, HitPolicy.COLLECT, Map.of(), Map.of("a", ColumnType.NUMBER, "b", ColumnType.NUMBER), Map.of());
         Assertions.assertThat(total(reference, Map.of("a", new BigDecimal("1.5")), "n", Aggregator.SUM)).isEqualByComparingTo("8");
-        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.SUM)).isEqualByComparingTo("5");
-        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.MAX)).isEqualByComparingTo("5");
-        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.COUNT)).isEqualByComparingTo("3");
+        Assertions.assertThat(total(reference, Map.of("a", new BigDecimal("1.5")), "n", Aggregator.MIN)).isEqualByComparingTo("3");
+        // a / 0 is null, and so is every aggregate but the count (FEEL: sum([5, 3, null]) = null)
+        var dividing = Map.of("a", new BigDecimal("1.5"), "b", BigDecimal.ONE);
+        Assertions.assertThat(total(reference, dividing, "n", Aggregator.SUM)).isNull();
+        Assertions.assertThat(total(reference, dividing, "n", Aggregator.MAX)).isNull();
+        Assertions.assertThat(total(reference, dividing, "n", Aggregator.COUNT)).isEqualByComparingTo("3");
+        // without a: a * 2 is null
+        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.SUM)).isNull();
+        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.MIN)).isNull();
+        Assertions.assertThat(total(reference, nullValued("a"), "n", Aggregator.COUNT)).isEqualByComparingTo("2");
     }
 
     /** The value of an aggregation that has a result: null when it is missing. */

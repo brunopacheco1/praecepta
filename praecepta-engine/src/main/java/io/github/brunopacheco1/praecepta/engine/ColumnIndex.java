@@ -9,17 +9,24 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.OffsetTime;
 import java.time.Period;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.IntFunction;
 import java.util.function.IntPredicate;
@@ -33,10 +40,12 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NotEqual;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
+import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 
 /**
  * One column of the {@link BitsetIndex}. The column's values are partitioned into <em>classes</em>
@@ -64,10 +73,19 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * the coordinate of its literal's kind. A pair is empty when no value has both coordinates: a local time
  * and an instant are a whole number of seconds apart, from -18:00 to +18:00. The classes of values
  * without a zone come first, then the pairs, instant by instant.</li>
+ * <li>TIME columns also take times with a zone id ({@link ZonedTime}), which compare only with a time in the same
+ * zone, by local time; any other comparison of them is one FEEL does not define, so unknown. Each zone id the
+ * cells name has a line of local times, split by its boundaries; after those come a class for every other zone
+ * id, then the missing class. A column whose inputs may have a zone id (map-based inputs) but whose cells name
+ * none keeps that last class out of the analysis: such a time matches only the rules that accept any value, and
+ * every table that names no zone id keeps the report it had. A time in a zone with one fixed offset
+ * ({@code Etc/UTC}) is no such time: it is the time at that offset (DMN 1.5, Table 72), in cells as in inputs
+ * ({@link FeelTemporals#withFixedOffset}), so a column bound with {@code zonedTimeInput} also takes times with a zone
+ * that has an offset.</li>
  * </ul>
  *
  * Membership is decided per class with FEEL's three-valued logic: a missing value fails comparisons
- * and intervals (unknown), equals only {@code null}, and so satisfies {@code not("A")}.
+ * and intervals (unknown), equals only {@code null}, and so satisfies {@code not("A")} and {@code != "A"}.
  *
  * <p>A STRING column bound to an enum precomputes one mask per constant, so its lookup is an array
  * access by ordinal instead of a hash lookup (the int-coded input path).
@@ -76,8 +94,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * masks {@link #maskFor} returns are in either form.
  *
  * <p>A column that holds lists ({@link #ofLists}) delegates its lookup to a {@link ListColumn}, which
- * classifies each element with an index of the kinds above; to the static analysis it is a single
- * class, "any list". The masks it returns are dense.
+ * classifies each element with an index of the kinds above; the static analysis reads its lists as sets
+ * of those element classes ({@link ListAnalysis}). The masks it returns are dense.
  */
 final class ColumnIndex {
 
@@ -107,6 +125,25 @@ final class ColumnIndex {
     private final Line wallLine;
     /** The number of the first class of values with a time zone: the classes of {@link #localLine} come before. */
     private final int zonedBase;
+    /** TIME columns that take times with a zone id: the line of local times of each zone id the cells name; else empty. */
+    private final Map<ZoneId, Line> zoneLines;
+    /** The number of the first class of each zone id's line. */
+    private final Map<ZoneId, Integer> zoneBases;
+    /** The number of the first class of times with a zone id; the missing class's when there is none. */
+    private final int zoneIdBase;
+    /** The class of times with a zone id that no cell names, or -1 if it is not a class (see {@link #hiddenZoneIdMask}). */
+    private final int otherZoneIdClass;
+    /**
+     * A column whose inputs may have a zone id though its cells name none: the mask of such a time, which is no class;
+     * null for other columns.
+     */
+    private final long[] hiddenZoneIdMask;
+    /** With {@link #hiddenZoneIdMask}: whether the declared input values allow such a time. */
+    private final boolean hiddenZoneIdAllowed;
+    /** Whether the column's input binding takes times with a zone id. */
+    private final boolean takesZoneIds;
+    /** Whether the column's getter gives times with a zone id only ({@code zonedTimeInput}): its examples are such times. */
+    private final boolean bindsZoneIds;
     /** The value classes, by class number. */
     private final List<ValueClass> classes;
     final int nullClass;
@@ -157,6 +194,12 @@ final class ColumnIndex {
         zonedBase = localLine == null ? 0 : localLine.classCount();
         classes = partition.classes();
         nullClass = classes.size() - 1;
+        zoneLines = partition.zoneLines();
+        zoneBases = partition.zoneBases();
+        zoneIdBase = partition.zoneIdBase();
+        otherZoneIdClass = partition.otherZoneIdClass();
+        takesZoneIds = type == ColumnType.TIME && zoning.takesZoneIds();
+        bindsZoneIds = type == ColumnType.TIME && zoning == Zoning.ZONE_ID;
 
         this.words = cells.words();
         masks = new long[classes.size()][];
@@ -170,18 +213,29 @@ final class ColumnIndex {
         nullMask = masks[nullClass];
         ordinalMasks = enumValues == null ? null : masksByOrdinal(enumValues);
         this.enumValues = enumValues == null ? null : enumValues.clone();
+        if (takesZoneIds && otherZoneIdClass < 0) {
+            var mask = new long[words];
+            markAcceptingRules(mask, cells.byBit(), new ValueClass.OtherZoneId());
+            hiddenZoneIdMask = Masks.compact(mask, cells.form());
+            hiddenZoneIdAllowed = allowedValues == null || accepts(allowedValues, new ValueClass.OtherZoneId());
+        } else {
+            hiddenZoneIdMask = null;
+            hiddenZoneIdAllowed = false;
+        }
     }
 
     /**
      * A column whose values are lists of {@code type} (see {@link ListColumn}); {@code allowedValues}
      * apply to the elements. Its cells test elements, so the classes of single values say nothing about
-     * which lists a rule matches: to the static analysis the column has one class, "any list", accepted
-     * by every rule, and the engine leaves the rules that constrain it out of the analysis.
+     * which lists a rule matches: its own classes are "any list", accepted by every rule, and a missing
+     * list, and the static analysis reads the lists from the classes of the elements instead
+     * ({@link ListAnalysis}).
      *
      * @param cells the column's cells; the class masks of single elements are stored in their form, the list masks are dense
      */
     static ColumnIndex ofLists(String name, ColumnType type, Cells cells, UnaryTests allowedValues, Zoning zoning) {
-        var elements = new ColumnIndex(name, type, cells, allowedValues, zoning, null);
+        var elementCells = new Cells(ListColumn.elementCells(cells.byBit()), cells.words(), cells.form());
+        var elements = new ColumnIndex(name, type, elementCells, allowedValues, zoning, null);
         var lists = new ListColumn(name, type, elements, cells.byBit(), cells.words());
         return new ColumnIndex(name, type, lists, cells.byBit().size(), cells.words());
     }
@@ -192,7 +246,7 @@ final class ColumnIndex {
         this.lists = lists;
         isString = false;
         temporal = false;
-        hasAllowedValues = false;
+        hasAllowedValues = lists.elements().hasAllowedValues; // they apply to the elements
         stringMasks = null;
         otherMask = null;
         disallowedStrings = null;
@@ -202,6 +256,14 @@ final class ColumnIndex {
         zonedBase = 0;
         classes = List.of(new ValueClass.AnyList(), new ValueClass.Missing());
         nullClass = 1;
+        zoneLines = Map.of();
+        zoneBases = Map.of();
+        zoneIdBase = nullClass;
+        otherZoneIdClass = -1;
+        hiddenZoneIdMask = null;
+        hiddenZoneIdAllowed = false;
+        takesZoneIds = false;
+        bindsZoneIds = false;
         var all = new long[words];
         for (int bit = 0; bit < rules; bit++) {
             BitsetIndex.set(all, bit);
@@ -223,6 +285,11 @@ final class ColumnIndex {
     /** A column that holds lists: the rules whose cell is {@code -}, which accept every list. */
     long[] rulesAcceptingAnyList() {
         return lists.anyRules();
+    }
+
+    /** A column that holds lists: how its lists match, for the static analysis ({@link ListAnalysis}). */
+    ListColumn lists() {
+        return lists;
     }
 
     /**
@@ -247,9 +314,14 @@ final class ColumnIndex {
      * @param wallLine      with {@code zonedLine}: the line of their local times; else null
      * @param stringClasses STRING: the class of each written, allowed or boundary value; else null
      * @param otherClass    an unordered STRING column: the class of every other value; else -1
+     * @param zoneLines     TIME: the line of local times of each zone id the cells name, if the column takes them
+     * @param zoneBases     the number of the first class of each of those lines
+     * @param zoneIdBase    the number of the first class of times with a zone id (the missing class's if none)
+     * @param otherZoneIdClass the class of times in zone ids no cell names, or -1
      */
     private record Partition(Line localLine, Line zonedLine, Line wallLine, List<ValueClass> classes,
-            Map<String, Integer> stringClasses, int otherClass) {
+            Map<String, Integer> stringClasses, int otherClass, Map<ZoneId, Line> zoneLines, Map<ZoneId, Integer> zoneBases,
+            int zoneIdBase, int otherZoneIdClass) {
 
         static Partition of(ColumnType type, List<UnaryTests> cellsByBit, UnaryTests allowedValues, Zoning zoning) {
             var classes = new ArrayList<ValueClass>();
@@ -258,7 +330,8 @@ final class ColumnIndex {
                 int otherClass = classes.size();
                 classes.add(new ValueClass.OtherString());
                 classes.add(new ValueClass.Missing());
-                return new Partition(null, null, null, List.copyOf(classes), stringClasses, otherClass);
+                return new Partition(null, null, null, List.copyOf(classes), stringClasses, otherClass, Map.of(), Map.of(),
+                        classes.size() - 1, -1);
             }
             boolean temporal = isTemporal(type);
             Line localLine = null;
@@ -273,9 +346,41 @@ final class ColumnIndex {
                 wallLine = new Line(sortedBoundaries(type, cellsByBit, allowedValues, Boundaries.WITHOUT_ZONE), type);
                 addZonedClasses(zonedLine.boundaries, wallLine.boundaries, classes);
             }
+            int zoneIdBase = classes.size();
+            var zoneLines = new LinkedHashMap<ZoneId, Line>();
+            var zoneBases = new LinkedHashMap<ZoneId, Integer>();
+            int otherZoneIdClass = -1;
+            if (type == ColumnType.TIME && zoning.takesZoneIds()) {
+                zoneIdBoundaries(cellsByBit, allowedValues).forEach((zone, times) -> {
+                    zoneLines.put(zone, new Line(times.stream().map(ZonedTime::time).toArray(Comparable<?>[]::new), type));
+                    zoneBases.put(zone, classes.size());
+                    orderedClasses(times.toArray(Comparable<?>[]::new), false).forEach(part -> classes.add(new ValueClass.InZone(zone, part)));
+                });
+                // without a zone id in the cells, such times are left out of the analysis, unless they are all the column takes
+                if (zoning == Zoning.ZONE_ID || !zoneLines.isEmpty()) {
+                    otherZoneIdClass = classes.size();
+                    classes.add(new ValueClass.OtherZoneId());
+                }
+            }
             classes.add(new ValueClass.Missing());
             var stringClasses = type == ColumnType.STRING ? boundaryClasses(localLine.boundaries) : null;
-            return new Partition(localLine, zonedLine, wallLine, List.copyOf(classes), stringClasses, -1);
+            return new Partition(localLine, zonedLine, wallLine, List.copyOf(classes), stringClasses, -1, Collections.unmodifiableMap(zoneLines),
+                    Collections.unmodifiableMap(zoneBases), zoneIdBase, otherZoneIdClass);
+        }
+
+        /** The times with a zone id the cells and the allowed values name, by zone id (in the order of their ids), sorted. */
+        private static Map<ZoneId, TreeSet<ZonedTime>> zoneIdBoundaries(List<UnaryTests> cellsByBit, UnaryTests allowedValues) {
+            var values = new ArrayList<Comparable<?>>();
+            cellsByBit.forEach(cell -> collectBoundaries(cell, values));
+            if (allowedValues != null) {
+                collectBoundaries(allowedValues, values);
+            }
+            var byZone = new TreeMap<String, TreeSet<ZonedTime>>();
+            values.stream().filter(ZonedTime.class::isInstance).map(ZonedTime.class::cast)
+                    .forEach(time -> byZone.computeIfAbsent(time.zone().getId(), any -> new TreeSet<>()).add(time));
+            var ordered = new LinkedHashMap<ZoneId, TreeSet<ZonedTime>>();
+            byZone.values().forEach(times -> ordered.put(times.first().zone(), times));
+            return ordered;
         }
 
         /**
@@ -320,8 +425,11 @@ final class ColumnIndex {
             /** The values without a time zone: the local times a value with a zone is compared with. */
             WITHOUT_ZONE;
 
-            /** The boundary a value is on this line, or null if it is none. */
+            /** The boundary a value is on this line, or null if it is none; a time with a zone id is on a line of its zone. */
             Object of(Comparable<?> value) {
+                if (value instanceof ZonedTime) {
+                    return null;
+                }
                 return switch (this) {
                     case LOCAL_TIMES -> FeelTemporals.local(value);
                     case WITH_ZONE -> FeelTemporals.hasZone(value) ? value : null;
@@ -350,7 +458,8 @@ final class ColumnIndex {
 
         private static void collectStrings(UnaryTests cell, Set<String> into) {
             for (var test : cell.tests()) {
-                if (test instanceof Equals(var value)) {
+                var equality = test instanceof NotEqual(var negated) ? negated : test;
+                if (equality instanceof Equals(var value, var explicit)) {
                     into.add((String) value);
                 }
             }
@@ -407,8 +516,15 @@ final class ColumnIndex {
         return switch (valueClass) {
             case ValueClass.Between(var low, var high, var zoned) -> OpenIntervals.isEmpty(type, low, high, zoned);
             case ValueClass.Zoned(var instant, var wall) -> OpenIntervals.isEmpty(type, span(instant), span(wall));
+            case ValueClass.InZone(var zone, ValueClass.Between(var low, var high, var zoned)) ->
+                    OpenIntervals.isEmpty(type, localTime(low), localTime(high), false);
             default -> false;
         };
+    }
+
+    /** The local time of a boundary of a zone id's line, a {@link ZonedTime}; null for an unbounded end. */
+    private static LocalTime localTime(Comparable<?> boundary) {
+        return boundary == null ? null : ((ZonedTime) boundary).time();
     }
 
     /** A class of one line as the values it spans: a boundary alone, or the open interval between two. */
@@ -525,6 +641,12 @@ final class ColumnIndex {
 
     /** The mask of a converted value of an ordered column (null if missing), checked against the declared values. */
     private long[] maskOf(Object value) {
+        if (value instanceof ZonedTime && hiddenZoneIdMask != null) { // a column whose cells name no zone id
+            if (hasAllowedValues && !hiddenZoneIdAllowed) {
+                throw new InvalidInputException(name, value);
+            }
+            return hiddenZoneIdMask;
+        }
         int valueClass = classOf(value);
         if (hasAllowedValues && !allowed[valueClass]) {
             throw new InvalidInputException(name, value);
@@ -540,6 +662,9 @@ final class ColumnIndex {
         if (!temporal) {
             return localLine.classOf(value);
         }
+        if (value instanceof ZonedTime time) {
+            return zoneIdClassOf(time);
+        }
         boolean zoned = FeelTemporals.hasZone(value);
         if ((zoned ? zonedLine : localLine) == null) { // only a getter that breaks its declared type can get here
             throw new InvalidInputException(name, value, zoned
@@ -552,6 +677,15 @@ final class ColumnIndex {
         // a boundary with a zone is compared with the value's instant, one without with its local time
         int wall = wallLine.boundaries.length == 0 ? 0 : wallLine.classOf(FeelTemporals.local(value));
         return zonedBase + zonedLine.classOf(value) * wallLine.classCount() + wall;
+    }
+
+    /** The class of a time with a zone id: on its zone's line, or the class of the zones no cell names. */
+    private int zoneIdClassOf(ZonedTime time) {
+        if (!takesZoneIds) { // only a getter that breaks its declared type can get here
+            throw new InvalidInputException(name, time, "has a zone id, which the column's input binding does not take");
+        }
+        var line = zoneLines.get(time.zone());
+        return line == null ? otherZoneIdClass : zoneBases.get(time.zone()) + line.classOf(time.time());
     }
 
     /**
@@ -608,9 +742,11 @@ final class ColumnIndex {
             }
         }
         // typed getters already return the column's Java type (LocalDate, LocalTime, OffsetTime, ...); numbers vary,
-        // and a years and months duration is bound as a Period
+        // a years and months duration is bound as a Period, and a time in a zone with one fixed offset is the time at
+        // that offset (DMN 1.5, Table 72)
         return switch (type) {
             case NUMBER -> number((Number) raw);
+            case TIME -> FeelTemporals.withFixedOffset(raw);
             // a list's elements read from text are already years and months
             case YEAR_MONTH_DURATION -> raw instanceof YearsAndMonths duration ? duration : yearsAndMonths((Period) raw);
             default -> raw;
@@ -669,10 +805,20 @@ final class ColumnIndex {
 
     /**
      * Whether one class stands for every value the rules do not mention: a STRING column whose cells
-     * do not compare. Every such value is then a gap unless the column declares its input values.
+     * do not compare. Every such value is then a gap unless the column declares its input values. For a
+     * column that holds lists, whether its elements' index has such a class.
      */
     boolean groupsOtherValues() {
-        return otherMask != null;
+        return lists != null ? lists.elements().groupsOtherValues() : otherMask != null;
+    }
+
+    /**
+     * The mask of a valid time with a zone id in a column whose inputs may have one though its cells name none, which
+     * is no class (the other analyses leave such times out, so that tables without zone ids keep their reports); null
+     * if the column has no such inputs, or its declared input values do not allow them. {@link Completeness} visits it.
+     */
+    long[] hiddenZoneIdMask() {
+        return hiddenZoneIdMask != null && (!hasAllowedValues || hiddenZoneIdAllowed) ? hiddenZoneIdMask : null;
     }
 
     /** Whether a valid input can fall in the class: it holds some value and the declared input values allow it. */
@@ -696,9 +842,34 @@ final class ColumnIndex {
      * without a zone (the zone then makes no difference); else instant by instant, with the local times.
      */
     List<String> describe(List<Integer> valueClasses) {
+        if (valueClasses.stream().anyMatch(this::hasZoneId)) {
+            return describeWithZoneIds(valueClasses);
+        }
         if (localLine == null && zonedLine == null || !type.supportsComparisons()) { // no intervals to merge
             return valueClasses.stream().map(k -> plain(classes.get(k))).toList();
         }
+        return describeAsIntervals(valueClasses);
+    }
+
+    /** Classes some of which are of times with a zone id: the others first, then those zone id by zone id, then null. */
+    private List<String> describeWithZoneIds(List<Integer> valueClasses) {
+        var parts = new ArrayList<String>();
+        var others = valueClasses.stream().filter(k -> !hasZoneId(k) && k != nullClass).toList();
+        if (!others.isEmpty()) {
+            parts.addAll(describe(others));
+        }
+        parts.addAll(zoneIdRuns(valueClasses.stream().filter(this::hasZoneId).sorted().toList()));
+        if (valueClasses.contains(nullClass)) {
+            parts.add(plain(classes.get(nullClass)));
+        }
+        return parts;
+    }
+
+    /**
+     * Classes of an ordered column, adjacent ones merged into intervals: those of values without a zone, then those
+     * with one (unless they mirror the others), then null.
+     */
+    private List<String> describeAsIntervals(List<Integer> valueClasses) {
         var sorted = valueClasses.stream().sorted().toList();
         var local = sorted.stream().filter(k -> k != nullClass && !hasZone(k)).toList();
         var zoned = sorted.stream().filter(this::hasZone).map(k -> k - zonedBase).toList(); // numbered from the first class with a zone
@@ -706,7 +877,8 @@ final class ColumnIndex {
         // without boundaries with a zone, the classes with a zone mirror those without: same local times, same rules
         boolean mirrored = bothKinds && zonedLine.boundaries.length == 0 && zoned.equals(local);
         var localWhole = bothKinds && !mirrored ? whole(false) : null;
-        var zonedWhole = bothKinds ? whole(true) : null;
+        // in a column that also takes times with a zone id (zonedTimeInput), "any time with a time zone" too
+        var zonedWhole = bothKinds || zonedLine != null && takesZoneIds ? whole(true) : null;
         var parts = new ArrayList<String>();
         if (!local.isEmpty()) {
             parts.addAll(runs(local, classes::get, k -> empty[k], localLine.classCount(), localWhole));
@@ -720,9 +892,32 @@ final class ColumnIndex {
         return parts;
     }
 
-    /** Whether a class is one of values with a time zone. */
+    /** Whether a class is one of values with a time zone that has an offset. */
     private boolean hasZone(int valueClass) {
-        return zonedLine != null && valueClass >= zonedBase && valueClass != nullClass;
+        return zonedLine != null && valueClass >= zonedBase && valueClass < zoneIdBase;
+    }
+
+    /** Whether a class is one of times with a zone id. */
+    private boolean hasZoneId(int valueClass) {
+        return valueClass >= zoneIdBase && valueClass != nullClass;
+    }
+
+    /** Sorted classes of times with a zone id, as runs: zone id by zone id, then the zone ids no cell names. */
+    private List<String> zoneIdRuns(List<Integer> zoneIdClasses) {
+        var runs = new ArrayList<String>();
+        for (var zone : zoneBases.entrySet()) {
+            int base = zone.getValue();
+            int count = zoneLines.get(zone.getKey()).classCount();
+            var inZone = zoneIdClasses.stream().filter(k -> k >= base && k < base + count).map(k -> k - base).toList();
+            if (!inZone.isEmpty()) {
+                runs.addAll(runs(inZone, i -> ((ValueClass.InZone) classes.get(base + i)).part(), i -> empty[base + i], count,
+                        "any time at " + zone.getKey().getId()));
+            }
+        }
+        if (zoneIdClasses.contains(otherZoneIdClass)) {
+            runs.add(plain(classes.get(otherZoneIdClass)));
+        }
+        return runs;
     }
 
     /** How every value of one kind is described in a column that takes both: {@code any time with a time zone}. */
@@ -739,6 +934,8 @@ final class ColumnIndex {
             case ValueClass.Missing missing -> "null";
             case ValueClass.Between between -> run(between, between);
             case ValueClass.Zoned zoned -> throw new IllegalStateException("classes with a time zone are described as runs");
+            case ValueClass.InZone(var zone, var part) -> plain(part);
+            case ValueClass.OtherZoneId other -> "any time with a zone id no cell names";
         };
     }
 
@@ -875,11 +1072,38 @@ final class ColumnIndex {
         return switch (classes.get(valueClass)) {
             case ValueClass.Point(var value) -> bindable(value);
             case ValueClass.Between(var low, var high, var zoned) -> bindable(OpenIntervals.valueInside(type, low, high, zoned));
-            case ValueClass.Zoned(var instant, var wall) -> OpenIntervals.valueInside(type, span(instant), span(wall));
+            case ValueClass.Zoned(var instant, var wall) -> zonedBindable(OpenIntervals.valueInside(type, span(instant), span(wall)));
+            case ValueClass.InZone(var zone, ValueClass.Point(var value)) -> value;
+            case ValueClass.InZone(var zone, ValueClass.Between(var low, var high, var zoned)) ->
+                    new ZonedTime((LocalTime) OpenIntervals.valueInside(type, localTime(low), localTime(high), false), zone);
+            case ValueClass.InZone other -> throw new IllegalStateException("not a class of a zone id's line: " + other);
+            case ValueClass.OtherZoneId other -> new ZonedTime(LocalTime.NOON, unnamedZone());
             case ValueClass.OtherString other -> null;
             case ValueClass.AnyList list -> List.of();
             case ValueClass.Missing missing -> null;
         };
+    }
+
+    /**
+     * A zone id no cell names: the first, by id, of those the JDK knows whose offset changes (one with a fixed offset
+     * is a time at that offset, DMN 1.5, Table 72).
+     */
+    private ZoneId unnamedZone() {
+        return ZoneId.getAvailableZoneIds().stream().sorted().map(ZoneId::of)
+                .filter(zone -> !zone.getRules().isFixedOffset() && !zoneLines.containsKey(zone))
+                .findFirst().orElseThrow();
+    }
+
+    /**
+     * A time with a time zone as a getter of the column returns it: a {@code zonedTimeInput} getter gives a
+     * {@link ZonedTime}, so a time at an offset is given in the zone id that has that offset fixed, which the engine
+     * reads back as the time at that offset; any other value as it is.
+     */
+    private Object zonedBindable(Object value) {
+        if (bindsZoneIds && value instanceof OffsetTime time) {
+            return new ZonedTime(time.toLocalTime(), ZoneId.ofOffset("UTC", time.getOffset()));
+        }
+        return value;
     }
 
     /** A value as a getter returns it: a years and months duration as the Period {@code periodInput} binds. */
@@ -893,49 +1117,90 @@ final class ColumnIndex {
     private static boolean accepts(UnaryTests cell, ValueClass valueClass) {
         return switch (cell) {
             case UnaryTests.Any any -> true;
-            case UnaryTests.Positive(var tests) -> disjunction(tests, valueClass) == Boolean.TRUE;
+            case UnaryTests.Positive(var tests) -> disjunction(tests, valueClass) == Truth.TRUE;
             // not(unknown) is unknown: no match
-            case UnaryTests.Negated(var tests) -> disjunction(tests, valueClass) == Boolean.FALSE;
+            case UnaryTests.Negated(var tests) -> disjunction(tests, valueClass) == Truth.FALSE;
         };
     }
 
-    /** FEEL disjunction: true if any test is true, else unknown (null) if any is unknown, else false. */
-    private static Boolean disjunction(List<Test> tests, ValueClass valueClass) {
-        Boolean result = Boolean.FALSE;
+    /** FEEL disjunction: true if any test is true, else unknown if any is unknown, else false. */
+    private static Truth disjunction(List<Test> tests, ValueClass valueClass) {
+        var result = Truth.FALSE;
         for (var test : tests) {
             var outcome = test(test, valueClass);
-            if (outcome == Boolean.TRUE) {
-                return Boolean.TRUE;
+            if (outcome == Truth.TRUE) {
+                return Truth.TRUE;
             }
-            if (outcome == null) {
-                result = null;
+            if (outcome == Truth.UNKNOWN) {
+                result = Truth.UNKNOWN;
             }
         }
         return result;
     }
 
-    private static Boolean test(Test test, ValueClass valueClass) {
+    private static Truth test(Test test, ValueClass valueClass) {
+        if (test instanceof NotEqual(var negated)) { // != is not(=), so unknown stays unknown
+            return test(negated, valueClass).not();
+        }
         if (valueClass instanceof ValueClass.Missing) {
             return switch (test) {
-                case NullTest n -> true;
-                case Equals e -> false;       // null = x is false
-                case Compare c -> null;       // null < x is unknown
-                case Range r -> null;
+                case NullTest n -> Truth.TRUE;
+                case UnaryTests.NullElement n -> Truth.TRUE; // an element index's cell: the element is missing
+                case Equals e -> Truth.FALSE;       // null = x is false
+                case Compare c -> Truth.UNKNOWN;    // null < x is unknown
+                case Range r -> Truth.UNKNOWN;
+                case NotEqual n -> throw new IllegalStateException("decided above");
             };
         }
+        if (!comparable(valueClass, test)) {
+            return Truth.UNKNOWN; // FEEL gives null for a comparison it does not define, of a time with a zone id
+        }
         return switch (test) {
-            case NullTest n -> false;
+            case NotEqual n -> throw new IllegalStateException("decided above");
+            case NullTest n -> Truth.FALSE;
+            case UnaryTests.NullElement n -> Truth.FALSE;
             // literals are boundaries / written values, never inside other classes
-            case Equals(var literal) -> coordinate(valueClass, literal) instanceof ValueClass.Point(var value) && compare(value, literal) == 0;
-            case Compare(var operator, var literal) -> switch (operator) {
+            case Equals(var literal, var explicit) -> Truth.of(
+                    coordinate(valueClass, literal) instanceof ValueClass.Point(var value) && compare(value, literal) == 0);
+            case Compare(var operator, var literal) -> Truth.of(switch (operator) {
                 case LT -> below(coordinate(valueClass, literal), literal, false);
                 case LE -> below(coordinate(valueClass, literal), literal, true);
                 case GT -> above(coordinate(valueClass, literal), literal, false);
                 case GE -> above(coordinate(valueClass, literal), literal, true);
-            };
-            case Range(var low, var lowClosed, var high, var highClosed) -> above(coordinate(valueClass, low), low, lowClosed)
-                    && below(coordinate(valueClass, high), high, highClosed);
+            });
+            case Range(var low, var lowClosed, var high, var highClosed) -> Truth.of(above(coordinate(valueClass, low), low, lowClosed)
+                    && below(coordinate(valueClass, high), high, highClosed));
         };
+    }
+
+    /**
+     * Whether FEEL compares the values of a class with a test's literals: a time with a zone id only with times in its
+     * zone, and any other value with anything but such a time ({@link FeelTemporals#comparable}).
+     */
+    private static boolean comparable(ValueClass valueClass, Test test) {
+        // run for every class and test while the masks are built: no list, and no zone unless a value has one
+        ZoneId zone = switch (valueClass) {
+            case ValueClass.InZone(var inZone, var part) -> inZone;
+            case ValueClass.OtherZoneId other -> OTHER_ZONE;
+            default -> null;
+        };
+        return switch (test) {
+            case Equals(var literal, var explicit) -> inZone(literal, zone);
+            case Compare(var operator, var literal) -> inZone(literal, zone);
+            case Range(var low, var lowClosed, var high, var highClosed) -> inZone(low, zone) && inZone(high, zone);
+            default -> true; // null, a missing element: no literal ({@code !=} is decided before)
+        };
+    }
+
+    /** Stands for the zone ids no cell names, which no literal is in. */
+    private static final ZoneId OTHER_ZONE = ZoneOffset.UTC;
+
+    /** Whether a literal is a time with a zone id in {@code zone}, or, for a null zone, is not a time with a zone id. */
+    private static boolean inZone(Comparable<?> literal, ZoneId zone) {
+        if (literal instanceof ZonedTime time) {
+            return time.zone().equals(zone);
+        }
+        return zone == null;
     }
 
     /**
@@ -947,6 +1212,9 @@ final class ColumnIndex {
     private static ValueClass coordinate(ValueClass valueClass, Comparable<?> literal) {
         if (valueClass instanceof ValueClass.Zoned(var instant, var wall)) {
             return FeelTemporals.hasZone(literal) ? instant : wall;
+        }
+        if (valueClass instanceof ValueClass.InZone(var zone, var part)) {
+            return part;
         }
         return valueClass;
     }
@@ -994,6 +1262,14 @@ final class ColumnIndex {
          * and whose local time is in one class of the line of local times (each a {@link Point} or a {@link Between}).
          */
         record Zoned(ValueClass instant, ValueClass wall) implements ValueClass {
+        }
+
+        /** Times with a zone id in one zone: a class of the line of that zone's local times, its ends {@link ZonedTime}s. */
+        record InZone(ZoneId zone, ValueClass part) implements ValueClass {
+        }
+
+        /** Times with a zone id in the zones no cell names. */
+        record OtherZoneId() implements ValueClass {
         }
 
         /** STRING: every value not written in the rules or declared. */

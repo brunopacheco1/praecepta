@@ -40,8 +40,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  *                    them. A list column's cell holds when some element passes one of its tests
  *                    ({@code "PT","ES"}: the list holds {@code "PT"} or {@code "ES"}), and its
  *                    {@code not(...)} when no element does; a missing list passes only {@code -} and
- *                    {@code null}, and an empty one fails every test. In strict FEEL such a cell
- *                    is written with {@code list contains(?, "PT")} (see {@code CellParser#parseFeelList}).
+ *                    {@code null}, and an empty one fails every test. An element may be missing, for
+ *                    which a literal is false and a comparison unknown, as in FEEL. In strict FEEL such a
+ *                    cell is written with {@code list contains(?, "PT")} (see {@code CellParser#parseFeelList}),
+ *                    and {@code list contains(?, null)} asks for a missing element.
  *                    A cell that names a list input, as {@code Flu Symptoms} in a string column, holds
  *                    when the column's value is in that list, as in DMN.
  */
@@ -139,11 +141,14 @@ public record DecisionTable(
     /**
      * The output when no rule matches, built from the columns' {@linkplain OutputColumn#defaultValue default
      * values} (DMN's {@code defaultOutputEntry}): DMN 1.5, 10.3.2.10, "if no rules match, if a default output
-     * value d is specified, DTI=FEEL(d)". It holds every output column, null for a column without a default;
-     * a table with no default at all has none, and then gives no output when no rule matches.
+     * value d is specified, DTI=FEEL(d)". When some column {@linkplain OutputColumn#hasDefault has a default}, it
+     * holds every output column, null for a column without one and for one whose default is {@code null} (with
+     * several outputs, DMN's default is "a context with entries composed of output component names and output
+     * values", Table 46); a table where no column has a default has none, and then gives no output when no rule
+     * matches ("else DTI=null").
      */
     public Optional<PraeceptaOutput> defaultOutput() {
-        if (outputs.stream().allMatch(output -> output.defaultValue() == null)) {
+        if (outputs.stream().noneMatch(OutputColumn::hasDefault)) {
             return Optional.empty();
         }
         var values = new LinkedHashMap<String, String>();
@@ -156,14 +161,29 @@ public record DecisionTable(
      * @param type         the type of its values
      * @param values       DMN output value list, highest priority first (used by PRIORITY and OUTPUT_ORDER); may be empty
      * @param defaultValue the value when no rule matches (DMN's {@code defaultOutputEntry}), as plain text like the
-     *                     rules' outputs ({@code Declined}, {@code 0}); null if the column has none (see
-     *                     {@link DecisionTable#defaultOutput})
+     *                     rules' outputs ({@code Declined}, {@code 0}); null if the column has none, or if its
+     *                     default is {@code null} (see {@link DecisionTable#defaultOutput})
+     * @param hasDefault   whether the column declares a default value: true for a default of {@code null}, which
+     *                     {@code defaultValue} cannot tell from none
      */
-    public record OutputColumn(String name, ColumnType type, List<String> values, String defaultValue) {
+    public record OutputColumn(String name, ColumnType type, List<String> values, String defaultValue, boolean hasDefault) {
+        /**
+         * A column of the given name, type, output value list and default.
+         *
+         * @throws IllegalArgumentException if {@code defaultValue} is not null but {@code hasDefault} is false
+         */
         public OutputColumn {
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(type, "type");
             values = List.copyOf(values);
+            if (defaultValue != null && !hasDefault) {
+                throw new IllegalArgumentException("Output '%s' has the default value '%s' but hasDefault is false".formatted(name, defaultValue));
+            }
+        }
+
+        /** A column with a default value, or none if {@code defaultValue} is null. */
+        public OutputColumn(String name, ColumnType type, List<String> values, String defaultValue) {
+            this(name, type, values, defaultValue, defaultValue != null);
         }
 
         /** A column without a default value. */

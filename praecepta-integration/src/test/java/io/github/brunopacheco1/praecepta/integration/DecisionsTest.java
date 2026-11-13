@@ -9,6 +9,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -95,7 +96,7 @@ class DecisionsTest {
     }
 
     @Test
-    void sums_keep_feel_precision_and_skip_missing_values() {
+    void sums_keep_feel_precision_and_are_missing_where_an_output_is() {
         var table = DmnReader.readAll(stream("""
                 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
                   <decision id="total" name="Total"><decisionTable hitPolicy="COLLECT" aggregation="SUM">
@@ -112,9 +113,40 @@ class DecisionsTest {
                 </definitions>""")).getFirst();
         var engine = Decision.of("total", table).engine();
         // 1234567890123456789012345678901234.1 has 35 digits: rounded to 34, ties to even
-        Assertions.assertThat(engine.evaluate(Map.of("zone", "x"))).containsExactly(Map.of("total", "1234567890123456789012345678901234"));
+        Assertions.assertThat(engine.evaluate(Map.of("zone", "x", "extra", "0")))
+                .containsExactly(Map.of("total", "1234567890123456789012345678901234"));
         Assertions.assertThat(engine.evaluate(Map.of("zone", "x", "extra", "0.9")))
                 .containsExactly(Map.of("total", "1234567890123456789012345678901235"));
+        // without extra, the second rule's output is missing, and so is the sum (FEEL: sum([0.1, null, ...]) is null, #90)
+        var missing = new HashMap<String, String>();
+        missing.put("total", null);
+        Assertions.assertThat(engine.evaluate(Map.of("zone", "x"))).containsExactly(missing);
+    }
+
+    /** FEEL's min and max are null for a list that holds null, as sum is; count counts every item (#90). */
+    @ParameterizedTest
+    @CsvSource(nullValues = "null", value = {
+            "SUM,   null",
+            "MIN,   null",
+            "MAX,   null",
+            "COUNT, 2",
+    })
+    void a_literal_null_output_makes_sum_min_and_max_missing_but_is_counted(String aggregation, String expected) {
+        var table = DmnReader.readAll(stream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="fee" name="Fee"><decisionTable hitPolicy="COLLECT" aggregation="%s">
+                    <input><inputExpression typeRef="string"><text>zone</text></inputExpression></input>
+                    <output name="fee" typeRef="number"/>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>10</text></outputEntry></rule>
+                    <rule><inputEntry><text>"islands"</text></inputEntry><outputEntry><text>null</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""".formatted(aggregation))).getFirst();
+        var engine = Decision.of("fee", table).engine();
+        var result = new HashMap<String, String>();
+        result.put("fee", expected);
+        Assertions.assertThat(engine.evaluate(Map.of("zone", "islands"))).containsExactly(result);
+        Assertions.assertThat(engine.evaluate(Map.of("zone", "mainland")))
+                .containsExactly(Map.of("fee", aggregation.equals("COUNT") ? "1" : "10"));
     }
 
     /** DMN 1.5, 10.3.2.10: a table's default output values are its result when no rule matches (#79). */
@@ -132,6 +164,39 @@ class DecisionsTest {
         var engine = Decision.of("fee", table).engine();
         Assertions.assertThat(engine.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("fee", "17.5"));
         Assertions.assertThat(engine.evaluate(Map.of("zone", "mainland"))).containsExactly(Map.of("fee", "9.90"));
+    }
+
+    /** A list column whose cells test the elements; FEEL's answers for a missing element (#84). */
+    private static final String NATIONALITIES = """
+            <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+              <itemDefinition name="tCountries" isCollection="true"><typeRef>string</typeRef></itemDefinition>
+              <decision id="offer" name="Offer"><decisionTable hitPolicy="%s">
+                <input><inputExpression typeRef="tCountries"><text>nationalities</text></inputExpression></input>
+                <output name="offer" typeRef="string"/>
+                <rule><inputEntry><text>list contains(?, "PT")</text></inputEntry><outputEntry><text>"pt"</text></outputEntry></rule>
+                <rule><inputEntry><text>%s</text></inputEntry><outputEntry><text>"other"</text></outputEntry></rule>
+              </decisionTable></decision>
+            </definitions>""";
+
+    @Test
+    void a_list_input_may_hold_missing_elements() {
+        var table = DmnReader.readAll(stream(NATIONALITIES.formatted("COLLECT", "list contains(?, null)"))).getFirst();
+        var engine = Decision.of("offer", table).engine();
+        Assertions.assertThat(engine.evaluate(Map.of("nationalities", "[\"PT\", null]")))
+                .containsExactly(Map.of("offer", "pt"), Map.of("offer", "other"));
+        Assertions.assertThat(engine.evaluate(Map.of("nationalities", "[\"BR\"]"))).isEmpty();
+    }
+
+    /** Rules that test different values of a list overlap on a list holding both (#78): an ERROR that stops loading. */
+    @Test
+    void rules_that_test_a_list_column_are_validated() {
+        var dmn = NATIONALITIES.formatted("UNIQUE", "list contains(?, \"BR\")");
+        var sources = List.of(TableSource.of("offer.dmn", dmn.getBytes(StandardCharsets.UTF_8)));
+        Assertions.assertThatThrownBy(() -> Decisions.load(sources, Severity.ERROR))
+                .isInstanceOf(DecisionsException.class)
+                .hasMessageContaining("rules [1, 2] both match some inputs (UNIQUE)");
+        var table = DmnReader.readAll(stream(dmn)).getFirst();
+        Assertions.assertThat(Decision.of("offer", table).report().issues()).hasSize(1);
     }
 
     @Test
@@ -209,6 +274,72 @@ class DecisionsTest {
         // times with an offset by instant
         var latest = Decision.of("times", typed("MAX", "time", "time(\"10:00:00+02:00\")", "time(\"09:00:00Z\")")).engine();
         Assertions.assertThat(latest.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "09:00:00Z"));
+        // times with a zone id by local time in their zone (the TCK's 0068-feel-equality)
+        var paris = Decision.of("paris", typed("MAX", "time", "time(\"10:00:00@Europe/Paris\")", "@\"09:00:00@Europe/Paris\"")).engine();
+        Assertions.assertThat(paris.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "10:00:00@Europe/Paris"));
+    }
+
+    /**
+     * A time in a zone with one fixed offset is the time at that offset (DMN 1.5, Table 72: {@code time("23:59:00z") +
+     * duration("PT2M") = time("00:01:00@Etc/UTC")}), so min and max order it with times at an offset.
+     */
+    @Test
+    void min_and_max_take_a_time_in_a_zone_with_one_fixed_offset_as_the_time_at_that_offset() {
+        // 10:00@Etc/GMT-2 is 08:00Z, before 09:00Z
+        var latest = Decision.of("latest", typed("MAX", "time", "time(\"10:00:00@Etc/GMT-2\")", "time(\"09:00:00Z\")")).engine();
+        Assertions.assertThat(latest.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "09:00:00Z"));
+        var earliest = Decision.of("earliest", typed("MIN", "time", "time(\"10:00:00@Etc/GMT-2\")", "time(\"09:00:00Z\")")).engine();
+        Assertions.assertThat(earliest.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "10:00:00+02:00"));
+        // outputs given as text keep it, and order the same way, as do outputs that compute such a time
+        var rules = List.of(output(1, "-", "10:00:00@Etc/GMT-2", null), output(2, "islands", "09:00:00@Etc/UTC", null),
+                output(3, "islands", null, "time(\"23:59:00@Etc/UTC\") + duration(\"PT2M\")"));
+        for (var operator : List.of(AggregationOperator.MIN, AggregationOperator.MAX)) {
+            var table = new DecisionTable("Out", HitPolicy.COLLECT, operator, List.of(new InputColumn("zone", ColumnType.STRING)),
+                    List.of(new OutputColumn("out", ColumnType.TIME)), rules);
+            var engine = Decision.of("text", table).engine();
+            Assertions.assertThat(engine.evaluate(Map.of("zone", "islands"))).as("%s", operator)
+                    .containsExactly(Map.of("out", operator == AggregationOperator.MIN ? "00:01:00Z" : "09:00:00@Etc/UTC"));
+            Assertions.assertThat(engine.evaluate(Map.of("zone", "mainland"))).as("%s", operator)
+                    .containsExactly(Map.of("out", "10:00:00@Etc/GMT-2"));
+        }
+        // with a time in a zone whose offset changes, it does not compare
+        var nothing = Collections.singletonMap("out", (String) null);
+        var paris = Decision.of("paris", typed("MAX", "time", "time(\"10:00:00@Etc/UTC\")", "time(\"10:00:00@Europe/Paris\")")).engine();
+        Assertions.assertThat(paris.evaluate(Map.of("zone", "islands"))).containsExactly(nothing);
+    }
+
+    private static Praeceptum output(int id, String zone, String value, String expression) {
+        var values = new HashMap<String, String>();
+        if (value != null) {
+            values.put("out", value);
+        }
+        return new Praeceptum(id, new PraeceptaInput(Map.of("zone", zone)),
+                new PraeceptaOutput(values, Map.of(), expression == null ? Map.of() : Map.of("out", expression)));
+    }
+
+    @Test
+    void min_and_max_of_times_that_do_not_compare_are_null() {
+        // DMN 1.5 does not say how times with a zone id in two zones compare, and the TCK leaves it out; min and max
+        // take "comparable items" (Table 75), and a built-in function is null outside its domain (10.3.2.16)
+        var nothing = Collections.singletonMap("out", (String) null);
+        for (var operator : List.of("MIN", "MAX")) {
+            var zones = Decision.of("zones", typed(operator, "time", "time(\"10:00:00@Europe/Paris\")", "time(\"09:00:00@Asia/Dhaka\")"))
+                    .engine();
+            Assertions.assertThat(zones.evaluate(Map.of("zone", "mainland"))).containsExactly(Map.of("out", "10:00:00@Europe/Paris"));
+            Assertions.assertThat(zones.evaluate(Map.of("zone", "islands"))).containsExactly(nothing);
+        }
+        // null once two values do not compare, whatever comes after: the third time is in the first one's zone
+        var three = DmnReader.readAll(stream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="out" name="Out"><decisionTable hitPolicy="COLLECT" aggregation="MAX">
+                    <input><inputExpression typeRef="string"><text>zone</text></inputExpression></input>
+                    <output name="out" typeRef="time"/>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>@"10:00:00@Europe/Paris"</text></outputEntry></rule>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>@"09:00:00@Asia/Dhaka"</text></outputEntry></rule>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>@"11:00:00@Europe/Paris"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""")).getFirst();
+        Assertions.assertThat(Decision.of("three", three).engine().evaluate(Map.of("zone", "any"))).containsExactly(nothing);
     }
 
     @Test
@@ -327,6 +458,37 @@ class DecisionsTest {
         Assertions.assertThat(decisions).hasToString("Decisions[Grade]");
     }
 
+    /**
+     * DMN 1.5, 10.3.2.10: "A complete decision table SHALL NOT specify a default output value" (#91). A table that every
+     * input matches, a missing score included, and that declares a default fails to load at ERROR, the default
+     * fail-on, and describes the issue for the management endpoints.
+     */
+    @Test
+    void a_default_output_on_a_complete_table_fails_loading_and_is_described() {
+        var complete = TableSource.of("grade.dmn", """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="grade" name="Grade"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="number"><text>score</text></inputExpression></input>
+                    <output name="grade" typeRef="string"><defaultOutputEntry><text>"C"</text></defaultOutputEntry></output>
+                    <rule><inputEntry><text>&gt;= 5</text></inputEntry><outputEntry><text>"A"</text></outputEntry></rule>
+                    <rule><inputEntry><text>&lt; 5, null</text></inputEntry><outputEntry><text>"B"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""".getBytes(StandardCharsets.UTF_8));
+        var message = "ERROR every input matches a rule, so the default output is never given "
+                + "(a complete table declares no default output: DMN 1.5, 10.3.2.10)";
+        var sources = List.of(complete);
+        Assertions.assertThatThrownBy(() -> Decisions.load(sources, Severity.ERROR))
+                .isInstanceOf(DecisionsException.class)
+                .hasMessageStartingWith("Cannot load decision tables: grade.dmn: decision 'Grade' has validation issues at ERROR")
+                .hasMessageContaining(message);
+
+        var lenient = Decisions.load(sources, null);
+        Assertions.assertThat(lenient.get("Grade").describe())
+                .containsEntry("issues", List.of(issue("ERROR", "UNREACHABLE_DEFAULT_OUTPUT", List.of(), message)));
+        // the default is never given
+        Assertions.assertThat(lenient.evaluate("Grade", Map.of())).containsExactly(Map.of("grade", "B"));
+    }
+
     @Test
     void fail_on_settings_are_parsed_strictly() {
         Assertions.assertThat(Decisions.failOn("ERROR")).isEqualTo(Severity.ERROR);
@@ -377,6 +539,85 @@ class DecisionsTest {
 
     private static String xml(String text) {
         return text.replace("&", "&amp;").replace("<", "&lt;");
+    }
+
+    /**
+     * The 0.6 features together in the map-based engine: an output expression over a date (#85), whose missing
+     * result makes the MIN missing (#90), a {@code null} default output (#92), and cells with at-literals and
+     * comments (#81).
+     */
+    static final String DUE = """
+            <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+              <decision id="due" name="Due"><decisionTable hitPolicy="COLLECT" aggregation="MIN">
+                <input><inputExpression typeRef="date"><text>sent</text></inputExpression></input>
+                <input><inputExpression typeRef="string"><text>service</text></inputExpression></input>
+                <output name="due" typeRef="date"><defaultOutputEntry><text>null</text></defaultOutputEntry></output>
+                <rule><inputEntry><text>&gt;= @"2025-01-01" // this year</text></inputEntry>
+                  <inputEntry><text>"express", "standard"</text></inputEntry>
+                  <outputEntry><text>sent + duration("P14D")</text></outputEntry></rule>
+                <rule><inputEntry><text>-</text></inputEntry><inputEntry><text>"express"</text></inputEntry>
+                  <outputEntry><text>sent + @"P1M" /* a month later, if that day exists */</text></outputEntry></rule>
+              </decisionTable></decision>
+            </definitions>""";
+
+    @ParameterizedTest
+    @CsvSource(nullValues = "null", value = {
+            // sent, service: the rules' dates -> the earliest
+            "2025-01-10, standard, 2025-01-24",
+            "2025-01-10, express,  2025-01-24",        // 2025-01-24 and 2025-02-10
+            "2025-01-20, express,  2025-02-03",        // 2025-02-03 and 2025-02-20
+            "2025-01-31, express,  null",              // 2025-02-14 and no 31 February: FEEL's min([..., null]) is null
+            "2024-12-31, standard, null",              // no rule: the default, null
+            "2024-12-31, express,  2025-01-31",        // the second rule alone
+            "null,       express,  null",              // a missing date: both outputs missing
+    })
+    void temporal_output_expressions_aggregate_with_missing_results_and_a_null_default(String sent, String service, String due) {
+        var engine = Decision.of("due", DmnReader.read(stream(DUE))).engine();
+        var input = new HashMap<String, String>();
+        input.put("sent", sent);
+        input.put("service", service);
+        var expected = new HashMap<String, String>();
+        expected.put("due", due);
+        Assertions.assertThat(engine.evaluate(input)).containsExactly(expected);
+    }
+
+    /** A list of dates whose rules test it with the new literal forms (#81), and one asks for a missing element (#84). */
+    @Test
+    void list_cells_with_the_new_literal_forms_and_a_missing_element_test_text_lists() {
+        var engine = Decision.of("due", DmnReader.read(stream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <itemDefinition name="tDates" isCollection="true"><typeRef>date</typeRef></itemDefinition>
+                  <decision id="due" name="Due"><decisionTable hitPolicy="COLLECT">
+                    <input><inputExpression typeRef="tDates"><text>due dates</text></inputExpression></input>
+                    <output name="id" typeRef="string"/>
+                    <rule><inputEntry><text>list contains(?, @"2025-01-31")</text></inputEntry>
+                      <outputEntry><text>"january"</text></outputEntry></rule>
+                    <rule><inputEntry><text>some x in ? satisfies x != date(2025, 1, 31) // any other</text></inputEntry>
+                      <outputEntry><text>"other"</text></outputEntry></rule>
+                    <rule><inputEntry><text>list contains(?, null)</text></inputEntry><outputEntry><text>"missing"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>"""))).engine();
+        Assertions.assertThat(engine.evaluate(Map.of("due dates", "[2025-01-31]"))).containsExactly(Map.of("id", "january"));
+        Assertions.assertThat(engine.evaluate(Map.of("due dates", "[2025-01-31, null]")))
+                .containsExactly(Map.of("id", "january"), Map.of("id", "other"), Map.of("id", "missing"));
+        Assertions.assertThat(engine.evaluate(Map.of("due dates", "[]"))).isEmpty();
+    }
+
+    /** The completeness search of #91 sees list columns (#78): a list table that every list matches has no use for a default. */
+    @Test
+    void a_list_table_that_every_list_matches_reports_its_default_output() {
+        var table = DmnReader.read(stream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <itemDefinition name="tStrings" isCollection="true"><typeRef>string</typeRef></itemDefinition>
+                  <decision id="offer" name="Offer"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="tStrings"><text>nationalities</text></inputExpression></input>
+                    <output name="offer" typeRef="string"><defaultOutputEntry><text>"none"</text></defaultOutputEntry></output>
+                    <rule><inputEntry><text>list contains(?, "PT")</text></inputEntry><outputEntry><text>"local"</text></outputEntry></rule>
+                    <rule><inputEntry><text>not(list contains(?, "PT"))</text></inputEntry><outputEntry><text>"abroad"</text></outputEntry></rule>
+                    <rule><inputEntry><text>? = null</text></inputEntry><outputEntry><text>"unknown"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>"""));
+        Assertions.assertThat(Decision.of("offer", table).describe().get("issues").toString()).contains("UNREACHABLE_DEFAULT_OUTPUT");
     }
 
     private static InputStream stream(String dmn) {

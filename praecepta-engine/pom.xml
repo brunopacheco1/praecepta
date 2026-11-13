@@ -20,6 +20,12 @@
         DMN decision tables for Java with strict hit policies, bitset matching and validation.
         No dependencies; a JPMS module (io.github.brunopacheco1.praecepta.engine).
     </description>
+    <properties>
+        <!-- JaCoCo adds its agent here; empty when it is skipped (see the surefire argLine) -->
+        <argLine/>
+        <!-- the tests capture the engine's System.Logger output through java.util.logging, which the module does not read -->
+        <praecepta.test.reads>io.github.brunopacheco1.praecepta.engine=java.logging</praecepta.test.reads>
+    </properties>
     <dependencies>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -42,4 +48,33 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-testCompile</id>
+                        <configuration>
+                            <compilerArgs combine.children="append">
+                                <arg>--add-modules</arg>
+                                <arg>java.logging</arg>
+                                <arg>--add-reads</arg>
+                                <arg>${praecepta.test.reads}</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- @{argLine} keeps JaCoCo's agent -->
+                    <argLine>@{argLine} --add-modules java.logging --add-reads ${praecepta.test.reads}</argLine>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

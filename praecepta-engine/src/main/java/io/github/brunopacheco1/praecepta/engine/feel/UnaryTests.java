@@ -14,14 +14,16 @@ import java.util.Optional;
  * looks at a single column value, which is what lets rules be indexed with bitmasks; a test that
  * compares with another input ({@link Name}, strict FEEL only) is decided when evaluating instead.
  *
- * <p>Values are {@code String}, {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime} or
- * {@code OffsetTime}, {@code LocalDateTime} or {@code ZonedDateTime}, {@code Duration} or
+ * <p>Values are {@code String}, {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime},
+ * {@code OffsetTime} or {@link ZonedTime}, {@code LocalDateTime} or {@code ZonedDateTime}, {@code Duration} or
  * {@link YearsAndMonths}, depending on the column type, or a {@link Name}. Two times or date-times
  * with a time zone compare by instant; one with a zone and one without compare by their local time
- * ({@link FeelTemporals}), equality included.
+ * ({@link FeelTemporals}), equality included. A time with a zone id compares only with one in the same zone; any
+ * other comparison of it is unknown, as FEEL gives null for a comparison it does not define.
  *
  * <p>A missing (null) value follows FEEL's three-valued logic: {@code null} is true for it, a literal is
- * false, and a comparison or an interval is unknown, which is neither a match nor a mismatch.
+ * false (so {@code != x} is true), and a comparison or an interval is unknown, which is neither a match nor a
+ * mismatch.
  */
 public sealed interface UnaryTests {
 
@@ -32,7 +34,7 @@ public sealed interface UnaryTests {
      */
     default Optional<List<Comparable<?>>> values() {
         if (!(this instanceof Positive(var tests))
-                || !tests.stream().allMatch(test -> test instanceof Equals(var value) && !(value instanceof Name))) {
+                || !tests.stream().allMatch(test -> test instanceof Equals(var value, var explicit) && !(value instanceof Name))) {
             return Optional.empty();
         }
         return Optional.of(tests.stream().<Comparable<?>>map(test -> ((Equals) test).value()).toList());
@@ -63,12 +65,60 @@ public sealed interface UnaryTests {
     sealed interface Test {
     }
 
-    /** {@code null}: true only when the value is missing. */
+    /**
+     * {@code null}: true only when the value is missing. In a list column's cell it tests the list, not its
+     * elements: {@code ? = null} as a DMN file writes it.
+     */
     record NullTest() implements Test {
     }
 
-    /** A literal such as {@code "PT"}, {@code 18} or {@code date("2025-01-31")}: true when the value equals it. */
-    record Equals(Comparable<?> value) implements Test {
+    /**
+     * In a list column's cell, {@code list contains(?, null)}: true for an element that is missing, so the
+     * cell holds when the list holds a missing (null) element. Only {@link CellParser#parseFeelList} reads it,
+     * as Praecepta's syntax has no form for it ({@code null} there asks whether the list itself is missing,
+     * as {@link NullTest} does). Applied to a single value, it is true when the value is missing.
+     */
+    record NullElement() implements Test {
+    }
+
+    /**
+     * A literal such as {@code "PT"}, {@code 18} or {@code date("2025-01-31")}, or {@code = 18}: true when the value
+     * equals it. In strict FEEL it may be a {@link Name} instead, {@code home} or {@code = home}: true when the value
+     * equals that input's.
+     *
+     * @param value    the literal, or the name of the input compared with
+     * @param explicit whether a name is written after {@code =} ({@code = home}), which FEEL reads as the equality
+     *                 {@code ? = home}, null when that input holds a list (DMN 1.5, Tables 52 and 53), while a bare
+     *                 name of such an input asks whether the value is in it ({@code list contains(home, ?)}, Table 55);
+     *                 so the engine rejects {@code = home} of a list input when it is built. Always false for a
+     *                 literal, for which {@code = x} and {@code x} are the same test
+     */
+    record Equals(Comparable<?> value, boolean explicit) implements Test {
+        public Equals {
+            explicit = explicit && value instanceof Name;
+        }
+
+        /** A literal, or a bare name ({@code home}). */
+        public Equals(Comparable<?> value) {
+            this(value, false);
+        }
+    }
+
+    /**
+     * {@code != x} or {@code != null}: the opposite of the {@link Equals} or {@link NullTest} it holds, and unknown
+     * when that is unknown, as DMN 1.5 defines {@code !=} (10.3.2.15: "FEEL(e1 != e2) is FEEL(not(e1 = e2))"). So
+     * {@code != "PT"} holds for a missing value, which does not equal {@code "PT"}, and {@code != null} holds for any
+     * value that is not missing. Unlike {@code not(...)}, which only goes around a whole cell, it is one test among
+     * others: {@code != 0, > 10}.
+     *
+     * @param test the test it negates: an {@link Equals} or a {@link NullTest}
+     */
+    record NotEqual(Test test) implements Test {
+        public NotEqual {
+            if (!(test instanceof Equals || test instanceof NullTest)) {
+                throw new IllegalArgumentException("!= negates an equality or null, not " + test);
+            }
+        }
     }
 
     /** {@code < x}, {@code <= x}, {@code > x} or {@code >= x}: true when the value compares to {@code x} that way. */
@@ -112,13 +162,15 @@ public sealed interface UnaryTests {
     }
 
     /**
-     * The values a test compares with, literals or {@link Name}s: an equality's or comparison's value, an
-     * interval's two ends; none for {@code null}.
+     * The values a test compares with, literals or {@link Name}s: an equality's, inequality's or comparison's
+     * value, an interval's two ends; none for {@code null} and {@code != null}.
      */
     static List<Comparable<?>> values(Test test) {
         return switch (test) {
             case NullTest n -> List.of();
-            case Equals(var value) -> List.of(value);
+            case NullElement n -> List.of();
+            case Equals(var value, var explicit) -> List.of(value);
+            case NotEqual(var negated) -> values(negated);
             case Compare(var operator, var value) -> List.of(value);
             case Range(var low, var lowClosed, var high, var highClosed) -> List.of(low, high);
         };
@@ -132,7 +184,9 @@ public sealed interface UnaryTests {
         for (var test : tests()) {
             boolean names = switch (test) {
                 case NullTest n -> false;
-                case Equals(var value) -> value instanceof Name;
+                case NullElement n -> false;
+                case Equals(var value, var explicit) -> value instanceof Name;
+                case NotEqual(var negated) -> negated instanceof Equals(var value, var explicit) && value instanceof Name;
                 case Compare(var operator, var value) -> value instanceof Name;
                 case Range(var low, var lowClosed, var high, var highClosed) -> low instanceof Name || high instanceof Name;
             };

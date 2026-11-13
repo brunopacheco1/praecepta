@@ -19,13 +19,14 @@ builds an engine once and calls it.
 | `praecepta-integration` | engine | The runtime core of the framework integrations: finds DMN files by location pattern and builds a map-based engine per decision, with its validation report (`Decisions`). Independent of any framework. |
 | `praecepta-maven-plugin` | compiler, Maven API | The `generate` goal: runs the compiler on the configured tables and adds the results to the Maven build. |
 | `praecepta-gradle-plugin` | compiler, Gradle API | The plugin `io.github.brunopacheco1.praecepta`: the `generatePraecepta` task runs the compiler on the tables of the `praecepta` extension and adds the results to the `main` source set. Built by Maven against the Gradle API. |
-| `praecepta-gradle-plugin-marker` | gradle plugin | The Gradle plugin marker (a POM), so that Gradle resolves the plugin by id from Maven Central. |
+| `praecepta-gradle-plugin-marker` | gradle plugin | The Gradle plugin marker (a POM), so that Gradle resolves the plugin by id from Maven Central. On the Gradle Plugin Portal the Portal writes its own. |
 | `praecepta-spring-boot-starter` | integration, Spring Boot (`provided`) | Spring Boot auto-configuration: loads the tables at `praecepta.locations` at startup, registers a `Decisions` bean and an engine bean per decision, and reports them through the Actuator endpoint `praecepta`. |
 | `praecepta-micronaut` | integration, Micronaut 4 (`provided`) | The Micronaut module: loads the DMN files at startup into a `Decisions` bean and one engine bean per decision, named after it, and reports through the `praecepta` management endpoint. |
 | `praecepta-quarkus` | integration, Quarkus ArC | Quarkus extension, runtime: builds the `Decisions` bean and one engine bean per decision (`@Identifier("Discount")`) from the DMN the build step validated (`PraeceptaRecorder`). |
 | `praecepta-quarkus-deployment` | runtime, compiler, Quarkus ArC deployment | Quarkus extension, build time: finds DMN files, compiles declared Excel and CSV tables, validates them and fails the build on the configured issues; reloads changed tables in dev mode (`PraeceptaProcessor`). |
 | `praecepta-benchmarks` | engine, Camunda 8, Drools, JMH | Compares Praecepta with other engines; not published. |
 | `praecepta-tck` | engine | Runs the DMN TCK's decision-table cases; not published. |
+| `praecepta-native-tests` | the framework modules | A Spring Boot, a Micronaut and a Quarkus application, built as GraalVM native executables and run; in the reactor only with the `native-frameworks` profile; not published. |
 
 The build-tool and framework integrations build on `praecepta-compiler` and `praecepta-integration`, so
 that they behave alike; what they share (settings, bean names, reports, failures) is in
@@ -48,7 +49,7 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
    values. `CellParser` parses each cell, according to its column's type (`ColumnType`: STRING,
    NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION, YEAR_MONTH_DURATION; times and
    date-times with or without a time zone), into `UnaryTests`: the subset of DMN FEEL *simple unary
-   tests* that looks at one column value (lists, `not(...)`, comparisons, intervals, `null`,
+   tests* that looks at one column value (lists, `not(...)`, comparisons, `=` and `!=`, intervals, `null`,
    "any"). In a DMN table (strict FEEL) a cell may also compare with another input (`> limit`); the
    index sees such a cell as "any value", and the engine checks it on the rules the index leaves,
    with the inputs' values. The analysis then never counts those rules as overlapping or hiding
@@ -80,13 +81,30 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
      many as the classes of the other. A pair is empty when no value has both coordinates: an
      instant and a local time are a whole number of seconds apart, at most 18 hours. A column has
      only the classes its input can reach (`Zoning`): `timeInput` and `dateTimeInput` give values
-     without a zone, `offsetTimeInput` and `zonedDateTimeInput` with one, and map-based inputs,
-     read from text, either; so the analysis looks for gaps among the values that can really occur.
-   - **Lists** (`ListColumn`): an ordinary column index over the same cells classifies one element.
-     For each element, its class mask gives the positive cells it passes and the `not(...)` cells it
-     breaks; ORing those over the elements gives "some element passes", and the list's mask is the
-     `-` rules, the positive rules some element passes, and the negated rules none passes. A missing
-     and an empty list have fixed masks. Two nationalities cost one more OR per mask word. The
+     without a zone, `offsetTimeInput` and `zonedDateTimeInput` with one, `zonedTimeInput` times with a
+     zone id or, in a zone with one fixed offset, at an offset, and map-based inputs, read from text, any of
+     them; so the analysis looks for gaps among the values that can really occur.
+   - **Times with a zone id** (`ZonedTime`, #82). Without a date a zone id has no offset, so such a time
+     compares only with a time in the same zone, by local time, which is all the DMN TCK asks; any other
+     comparison of it is one DMN 1.5 leaves open, which Praecepta takes as FEEL's null (see
+     [DMN conformance](DMN-CONFORMANCE.md)). Each zone id the cells name has a line of
+     local times of its own, and one class holds the zone ids no cell names; every test of another kind is
+     unknown on them, and theirs on every other class. A column of map-based inputs whose cells name no zone
+     id keeps that class out of the analysis, and gives such a time the mask of the rules that accept any
+     value, so that tables without zone ids keep the report they had. A zone with one fixed offset
+     (`Etc/UTC`) is no such zone: DMN 1.5's example of `time(from)` (Table 72) has
+     `time("00:01:00@Etc/UTC")` equal `time("00:01:00Z")`, so the engine reads a time in such a zone as the
+     `OffsetTime` at that offset at its edges (`FeelTemporals.parseTime` for text, cells and output entries,
+     `time(date and time(...))`, `ColumnIndex.convert` for what a getter gives), and the index, the analyses
+     and the arithmetic only ever see an offset time.
+   - **Lists** (`ListColumn`): an ordinary column index over the same cells, without their `null`
+     tests (`? = null` tests the list, not an element), classifies one element; a missing element
+     falls in its class for a missing value, where `list contains(?, null)` is true, a literal false
+     and a comparison unknown. For each element, its class mask gives the positive cells it passes
+     and the `not(...)` cells whose inside it does not make false (true, or unknown); ORing those over
+     the elements, and the list's mask is the `-` rules, the positive rules some element passes, and
+     the negated rules no element leaves true or unknown, which is FEEL's three-valued `or` over the
+     elements (DMN 1.5, Table 49). A missing and an empty list have fixed masks. Two nationalities cost one more OR per mask word. The
      element index stores its masks in either form (see below), and the list masks it gives are
      dense. Elements of a time or date-time list may have a zone or not: the element index takes
      both kinds, and classifies each element as it does a single value.
@@ -107,13 +125,33 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
    only those, so a lookup by code touches a word or two instead of the whole table. The hit policy
    then reads the result: FIRST and PRIORITY take the lowest set bit (bits are numbered in rule or
    priority order), UNIQUE and ANY check their constraint, RULE ORDER, OUTPUT ORDER and COLLECT walk
-   the set bits, and COLLECT aggregates with SUM, MIN, MAX or COUNT (`OutputStrategy`).
+   the set bits, and COLLECT aggregates with SUM, MIN, MAX or COUNT (`OutputStrategy`). The engine, not the
+   strategy, applies FEEL's null semantics to SUM, MIN and MAX over a table's one output: a matching rule whose
+   output is missing is the result, and the strategy combines only outputs that are present, so the generated
+   classes, the framework integrations' map-based engine and any other strategy agree.
 4. **Validation** (`TableAnalysis`, `ValidationReport`), when the engine is built: overlapping rules
    (UNIQUE), conflicting outputs (ANY), rules that can never fire (FIRST, PRIORITY), and gaps
-   (declared inputs that no rule covers, with an example). The analysis is exact, because it searches
-   the same column classes the index uses. The classes of single values cannot say which lists a rule
-   matches (rules `"PT"` and `"BR"` overlap on `["PT","BR"]`), so a list column shows the analysis
-   one class, and the rules that constrain it are left out like rules that compare with other inputs.
+   (declared inputs that no rule covers, with an example), and, for a table with a default output, whether
+   it is complete (`Completeness`): whether every input, a missing value in any column and a string no rule
+   mentions included, matches a rule, so that the default can never be given (an ERROR,
+   `UNREACHABLE_DEFAULT_OUTPUT`). It searches a list column as the minimal sets of rules every list it takes
+   can match (`ListAnalysis.everyOutcome`: missing lists and missing elements included), and it also visits
+   the time with a zone id that a column takes though no cell names one, which the other analyses leave out
+   (`ColumnIndex.hiddenZoneIdMask`). The analysis is exact, because it searches
+   the same column classes the index uses. A list column is searched as the sets of its element
+   classes (`ListAnalysis`): rules `"PT"` and `"BR"` overlap on `["PT","BR"]`. Which rules a list
+   matches depends only on which element classes it holds, and adding an element only adds positive
+   rules and removes `not(...)` ones, so overlaps are decided pairwise and the last list column of a
+   search directly: a list matches none of some rules exactly when it holds no element that passes
+   their positive cells and, for each of their `not(...)` cells, one that rules it out. That is also
+   how a gap there is described (`nationalities has no element in "PT", nationalities has an element
+   in "ES"`). The searches fix list columns after the others; any list column before the last
+   branches on the minimal sets of rules its lists leave, at most `ListAnalysis.MAX_OUTCOMES` of them.
+   Which earlier rules cover a rule on the last list column, by themselves, is found for all of them at once
+   with a few mask operations per element class (`ListAnalysis.covering`), so the cost grows with rules times
+   classes, not with pairs of rules. Overlapping pairs (UNIQUE) and pairs with conflicting outputs (ANY)
+   are listed up to `TableAnalysis.MAX_OVERLAPS` (100), the first in rule order, as gaps are up to 100: a
+   list column with a value per rule makes almost every pair of rules overlap.
 
 An engine is **immutable** once built: any number of threads may share it without locks.
 
@@ -125,11 +163,14 @@ An engine is **immutable** once built: any number of threads may share it withou
   decision variable's, whose item type for a multi-hit table, and none for COUNT. A table's default output (`DecisionTable.defaultOutput`, from each output's
   `defaultOutputEntry`) is converted once when the engine is built and returned when no rule matches,
   before the hit policy or the aggregation is applied (DMN 1.5, 10.3.2.10), so it costs nothing at
-  evaluation; without one, no match gives no output under every aggregation, COUNT included.
-  It uses the JDK's XML parser with DTDs and external entities disabled. Anything it does not
-  support (a time with a zone id, function calls, inputs computed by other decisions) is rejected
+  evaluation; without one, no match gives no output under every aggregation, COUNT included. Each
+  `OutputColumn` says whether it declares a default (`hasDefault`), since a default of `null` must be told
+  from none: with several outputs, defaults that are all `null` still make a default output, of nulls.
+  It uses the JDK's own XML parser (`DocumentBuilderFactory.newDefaultInstance()`, never one JAXP finds
+  on the class path) with DTDs and external entities disabled. Anything it does not
+  support (function calls, inputs computed by other decisions) is rejected
   with an error naming the decision, rule and column. Output entries may be expressions of
-  literals and inputs with `+ - * / **` (`OutputExpression`): they are kept as written, parsed and
+  literals (dates, times and durations included) and inputs with `+ - * / **` (`OutputExpression`): they are kept as written, parsed and
   type-checked when the engine is built, and evaluated only for matching rules, like outputs that
   name an input; `DmnWriter` writes them back unchanged. Strict FEEL compares a list with a unary test
   as a whole, so a list column's entries are written with FEEL's list functions
@@ -153,7 +194,13 @@ Gradle plugin's `GeneratePraecepta` task turn each configured table into a `Tabl
    bound to the engine's int-coded path), an output record, and a class that loads the DMN resource
    once and evaluates it. `JavaNames` turns table, column and value names into safe identifiers.
    `TimeZones` decides which time and date-time columns become `OffsetTime` and `ZonedDateTime`:
-   those whose written values all have a zone, together with the inputs their cells compare with.
+   those whose written values all have a zone, together with the inputs their cells compare with; a time
+   column whose written values have zone ids becomes the engine's `ZonedTime`, even if some have an offset
+   (a zone id with one fixed offset counts as one, so a column of only such zone ids is an `OffsetTime`),
+   and the generated code reads such outputs back with `FeelTemporals.parseZonedTime` or `parseOffsetTime`,
+   which take a time written either way. An output expression
+   counts by its operands of the output's type, the inputs it reads and its literals, since adding a
+   duration keeps a time's or a date and time's zone.
 
 At runtime, the generated code needs only `praecepta-engine`. The tool writes the result with
 `CompiledTable.write`, so every tool writes the same files.
@@ -167,6 +214,22 @@ two generated directories as outputs, so Gradle's build cache can reuse it acros
 are managed properties and nested beans with no reference to the project, so it works with the
 configuration cache. Its unit tests run the plugin in an in-process project (`ProjectBuilder`); its
 functional tests (Gradle TestKit) build real projects on several Gradle versions in their own workflow.
+Releases also go to the Gradle Plugin Portal, through `praecepta-gradle-plugin/portal`: a Gradle build
+that compiles nothing and publishes the jars and POM that Maven built (fetched from Maven Central), so
+both repositories serve the same files. The same workflow checks on every change that this build
+publishes Maven's files byte for byte.
+
+The plugin compiles against the Gradle 8.11.1 API on purpose, although Gradle 9 is current
+([#97](https://github.com/brunopacheco1/praecepta/issues/97), closed). `dev.gradleplugins:gradle-api` is the
+only Gradle API on Maven Central, and its last release is 8.11.1; but an older API is what the plugin
+needs: compiling against it keeps the plugin to API that Gradle 8.5, the oldest version it supports,
+already has, and the plugin uses nothing newer. That it works on current Gradle is shown by the
+functional tests, which the `Gradle versions` workflow runs on Gradle 8.5, the last 8.x and the current
+9.x. The two ways to a newer API would cost the release its reproducibility: taking the API from
+Gradle's own repository would add a repository other than Maven Central to the release build and to
+Reproducible Central's rebuild of it, and building the plugin with Gradle would take it out of the single
+Maven reactor that builds and rebuilds every module the same way. Should the plugin ever need API newer
+than 8.11, that decision is to be made again.
 
 ## Framework integrations
 `praecepta-integration` turns DMN files into named engines for the Spring Boot, Micronaut and Quarkus
@@ -178,7 +241,11 @@ tables, duplicate names, and validation issues at the configured severity. Maps 
 because a container finds its tables at runtime; typed records remain the build plugins' job. What each
 framework does with its settings, from `locations` and `fail-on` to the log lines, is one class,
 `DecisionsLoader`, given the framework's resource lookup and logger, so the three word their problems
-alike. Aggregations follow `AggregationOperator.check`, the engine's statement of where DMN defines them,
+alike. It logs each validation issue once, through the framework's logger, so the engines it builds do not
+log their reports themselves (`Decisions.load(sources, failOn, false)`, which builds them with
+`logValidationReport(false)`); nor does the engine `TableCompiler` validates with, as the build tools log
+its report. At startup, Quarkus builds its engines without logging either, since its build logged the
+issues. Aggregations follow `AggregationOperator.check`, the engine's statement of where DMN defines them,
 and compare values of the output's type (`FeelLiterals.value`, `FeelTemporals.compare`).
 
 The Spring Boot starter loads the tables while the context registers its bean definitions (an
@@ -219,9 +286,9 @@ Praecepta needs no reflection, so GraalVM's `native-image` builds applications t
 reads from every jar on its class path, whichever build tool or framework runs it:
 - **`praecepta-engine`** registers the message bundle of the JDK's XML parser
   (`com.sun.org.apache.xerces.internal.impl.msg.XMLMessages`), without which `DmnReader` fails on a
-  malformed file with a `MissingResourceException` instead of its `InvalidDecisionTableException`, and the
-  `javax.xml.parsers.DocumentBuilderFactory` service file that JAXP looks up, which only
-  `--exact-reachability-metadata` requires.
+  malformed file with a `MissingResourceException` instead of its `InvalidDecisionTableException`. It
+  needs nothing for the parser itself: `DmnReader` takes the JDK's own
+  (`DocumentBuilderFactory.newDefaultInstance()`), so JAXP looks up no service file or system property.
 - **`praecepta-integration`** registers `rules` and `rules/**/*.dmn`, the files `TableLocations.DEFAULT`
   finds, so the default location works in a native image; `TableLocations` lists them through the image's
   `resource:` file system.
@@ -238,16 +305,24 @@ releases. `praecepta-maven-plugin/src/it/native-app` is an application that uses
 runs its checks on the JVM, and the `Native image` workflow (`-Pnative`) builds it with GraalVM for JDK 21
 and 25 and runs the executable, with `--exact-reachability-metadata` on 25, so a resource no metadata
 registers fails the run instead of reading as absent. The framework modules use no reflection and rely
-on the integration core's metadata for the default location (the Quarkus extension registers the tables
-it validated, which its tests check at build-step level, and the Spring Boot starter's tests run Spring
-AOT and start an application from the generated code), but no CI job builds a Spring Boot, Micronaut or
-Quarkus application natively yet ([#99](https://github.com/brunopacheco1/praecepta/issues/99)).
+on the integration core's metadata for the default location; the Quarkus extension registers the tables
+it validated, and the Spring Boot starter's AOT processor (`DecisionsAotProcessor`) writes the engine
+beans' definitions, with both their qualifiers, as code. `praecepta-native-tests` holds an application per
+framework (`src/it/spring-boot-app`, `micronaut-app`, `quarkus-app`), each a user project built by
+`maven-invoker-plugin` with the framework's own native build (Spring Boot's `native` profile, Micronaut's
+`native-image` packaging, Quarkus' `-Dnative`), then run; it evaluates decisions through the beans it
+injects and exits with 1 on a wrong answer. The module is in the reactor only with the `native-frameworks`
+profile, so the default build does not need GraalVM; the `Native frameworks` workflow builds each
+application with GraalVM for JDK 25, and Micronaut's with JDK 21 too (Spring Boot 4 and Quarkus 3.40 need
+GraalVM 25; the invoker skips them on an older one). Each takes its framework's defaults, the
+`native-maven-plugin` version included, as its users would.
 
 ## Design decisions
 The main decisions and their reasons (strict DMN semantics, bitsets instead of a trie or generated
 code, the Java baseline, DMN as the exchange format, the licence) are recorded in
 [MODERNISATION.md](MODERNISATION.md). Security design is described in
-[SECURITY-ASSURANCE.md](SECURITY-ASSURANCE.md).
+[SECURITY-ASSURANCE.md](SECURITY-ASSURANCE.md). Semantics follow DMN 1.5 and its TCK only; where both leave
+a case open, what Praecepta does is recorded in [DMN-CONFORMANCE.md](DMN-CONFORMANCE.md).
 
 ### List inputs (#25)
 - **Declared beside the type, not as new types.** A list column keeps its element type
@@ -260,19 +335,35 @@ code, the Java baseline, DMN as the exchange format, the licence) are recorded i
   nearly every list. "Every element passes" is not offered: no DMN form needs it yet.
 - **Missing and empty lists follow FEEL**, not the "an empty list is a missing value" first
   sketched in the issue: `list contains(null, x)` is null, so a missing list matches only `-` and
-  `null`; `list contains([], x)` is false, so an empty list matches every `not(...)`. Elements may
-  not be missing, since `list contains` and `some` would make a null element unknown.
+  `null`; `list contains([], x)` is false, so an empty list matches every `not(...)`.
+- **Missing elements follow FEEL too** (#84; 0.4 rejected them): `list contains` takes "any element of
+  the semantic domain including null" (DMN 1.5, Table 75) and `some` is a three-valued `or` over the
+  elements (Table 49), so a null element is false for a literal (`null = "PT"`) and unknown for a
+  comparison. One accumulator per list suffices: a positive rule needs one element that passes, and a
+  `not(...)` rule needs every element to make its inside false, so "unknown" and "true" may share the
+  bits that rule a negated cell out. `? = null` stays a test of the list, and
+  `list contains(?, null)` (`UnaryTests.NullElement`) is the test of an element.
 - **DMN keeps strict semantics.** A plain `"PT"` against a list column would compare the whole list
   in other engines, so list entries are written with `list contains` and `some ... satisfies`, and
   only those forms are read back for a list column.
-- **The analysis leaves out rules that test lists**, as it does for cells that compare with another
-  input: the classes of single values cannot describe sets of values, and an analysis over sets of
-  classes would grow exponentially. Findings stay sound (nothing false is reported); some overlaps
-  and gaps go unreported.
+- **The analysis reads lists as sets of element classes** (#78; 0.4 and 0.5 left out the rules that
+  test lists). The sets are exponentially many, so none of the questions lists them: two rules
+  overlap when one element (or two, or none) makes a list both match; a list escapes some rules when
+  every element avoids their positive cells and their `not(...)` cells are each ruled out by one
+  element, which is a test per rule and element class. The gap search therefore needs neither a
+  bound on the length of lists nor one on the number of classes, and describes a gap symbolically
+  ("no element in ..., an element in ...") with an example list, rather than listing lists. Only a
+  table with several list columns needs more: every list column but the last branches on the
+  minimal sets of rules its lists leave (minimal, since fewer rules left only makes a gap or a
+  witness easier), found by adding one element class at a time and dropping the sets that hold
+  another. Their number is bounded (`ListAnalysis.MAX_OUTCOMES`, 1024); beyond it the rule in
+  question, or the table's gaps, go unreported, so findings stay sound. Gaps are looked for among
+  lists of values, as missing values are not searched for single values either; overlaps and
+  unreachable rules count missing lists and missing elements too.
 
 ### Output expressions (#71)
-- **A small subset, not a FEEL interpreter**: string and number literals, input names, `+ - * / **`,
-  unary minus and parentheses (FEEL's arithmetic expressions, DMN 1.5 grammar rule 4, on numbers). That covers string building and arithmetic (and the TCK's case) while
+- **A small subset, not a FEEL interpreter**: string, number and date time literals, input names, `+ - * / **`,
+  unary minus and parentheses (FEEL's arithmetic expressions, DMN 1.5 grammar rule 4). That covers string building and arithmetic (and the TCK's case) while
   keeping the engine dependency-free; anything else is rejected by name, so a table never evaluates
   differently from other engines in silence.
 - **Parsed and type-checked when the engine is built**, so a table that adds a string to a number
@@ -287,6 +378,16 @@ code, the Java baseline, DMN as the exchange format, the licence) are recorded i
   numbers are written without trailing zeros, since a FEEL
   number is a value, not a scale. Literal outputs and outputs that name an input keep the text they
   were given (`1.50`), so the output strategy sees what the table says.
+- **Dates, times and durations (#85)** combine as Tables 57, 59 and 62 list them (`FeelArithmetic`): `type`
+  checks the pair of operand types against those tables, so a table that adds two dates fails when it is
+  built, and `evaluate` gives null where FEEL defines no value for the values themselves (a date-time with a
+  zone minus one without, a month without the date's day, a result out of range). Their literals are read
+  by `TemporalLiterals`, the reader cells use, so a cell and an output entry take the same forms. Two
+  readings come from the DMN TCK's `0100-arithmetic`, which `praecepta-tck` evaluates in full
+  (`OutputExpressionsTckTest`): a years and months duration scaled by a number keeps whole months, toward
+  zero, and a date counts as UTC midnight with a zone when it meets a date-time. Times subtract as they
+  compare: by instant with offsets (a zone with one fixed offset being one, #82), by local time when one has
+  none, by local time in one zone id, and not at all otherwise, the cases DMN 1.5 leaves open (#86).
 - **ANY compares evaluated outputs**, and compares number outputs by value, as FEEL's `=` does
   (those a table declares as numbers, or that a rule computes as one), so `1.50`, `1.5` and
   `price * 1` agree, at build time as at evaluation; output priority lists find number outputs by

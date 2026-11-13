@@ -31,16 +31,23 @@ Quarkus or Micronaut.
 - All DMN hit policies: UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER and COLLECT
   (with SUM / MIN / MAX / COUNT aggregation)
 - DMN FEEL cells on STRING, NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION and
-  YEAR_MONTH_DURATION columns: lists, `not(...)`, comparisons, intervals, `null`; unquoted `PT,ES`
-  cells from earlier versions keep working
-- Times and date-times with or without a time zone; two with one compare by instant, and one with
-  a zone compares with one without by local time, as in FEEL
-- List inputs, such as a customer's nationalities: a cell holds when some element passes it
-- DMN output entries that name an input or compute with `+`, `-`, `*`, `/` and `**`
-  (`(price - discount) * 1.2`, `Symptom + " is listed"`), evaluated only for the rules that match
+  YEAR_MONTH_DURATION columns: lists, `not(...)`, comparisons, `=` and `!=`, intervals, `null`, every
+  FEEL literal form (`1.2e3`, `@"2025-01-31"`, `date(2025, 1, 31)`) and comments; unquoted `PT,ES` cells
+  from earlier versions keep working
+- Times and date-times with or without a time zone (an offset, or a zone id such as `@Europe/Paris`):
+  two with a zone compare by instant, and one with a zone and one without by local time (DMN 1.5,
+  Table 54); a time with a zone id compares only with times in its zone, unless the zone has one fixed
+  offset (`@Etc/UTC`), which makes it the time at that offset (DMN 1.5, Table 72; see
+  [DMN conformance](docs/DMN-CONFORMANCE.md) for the cases DMN 1.5 leaves open)
+- List inputs, such as a customer's nationalities, whose elements may be missing: a cell holds when
+  some element passes it
+- DMN output entries that name an input or compute with `+`, `-`, `*`, `/` and `**` on strings,
+  numbers, dates, times and durations (`(price - discount) * 1.2`, `Symptom + " is listed"`,
+  `due + duration("P14D")`, `returned - sent`), evaluated only for the rules that match
 - Optional DMN input value lists: values outside them are rejected
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
-  rules that can never be selected (FIRST, PRIORITY), and gaps (declared inputs no rule matches)
+  rules that can never be selected (FIRST, PRIORITY), gaps (declared inputs no rule matches), and
+  default outputs no input can reach (a complete table), list columns included
 - Bitset matching: memory grows linearly with the table (10,000 rules take 1.5 to 5 MB of heap,
   against about 90 to 130 MB for Camunda and Drools) and most engines build in milliseconds; the
   mask of a value only a few rules accept, such as a product code, is stored compactly, so even a
@@ -65,14 +72,14 @@ Java 21 or later (tested on 21, 25 and 27). Pick the modules you need:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-engine</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 
 <!-- optional: load rules from Excel or CSV at runtime (brings Apache POI) -->
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-loader</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 ```
 
@@ -81,15 +88,16 @@ Or let your build or framework do it:
 | You use | Add | What it does |
 |---|---|---|
 | Maven | [`praecepta-maven-plugin`](#praecepta-maven-plugin) | Validates tables at build time and generates typed classes; only `praecepta-engine` is needed at runtime. |
-| Gradle | [plugin `io.github.brunopacheco1.praecepta`](#praecepta-gradle-plugin) | The same, for Gradle 8.5 and later. |
+| Gradle | [plugin `io.github.brunopacheco1.praecepta`](#praecepta-gradle-plugin) | The same, for Gradle 8.5 and later, from the Gradle Plugin Portal. |
 | Spring Boot 4 | [`praecepta-spring-boot-starter`](#praecepta-spring-boot-starter) | Loads the DMN files under `rules/` at startup and injects one engine per decision. |
 | Micronaut 4 | [`praecepta-micronaut`](#praecepta-micronaut) | The same, for Micronaut. |
 | Quarkus 3.40+ | [`praecepta-quarkus`](#praecepta-quarkus-extension) | Validates the tables while Quarkus builds the application, and injects one engine per decision. |
 | Another framework, or none | [`praecepta-integration`](#praecepta-integration) | Loads DMN files into named engines, as the framework integrations do. |
 | GraalVM | nothing | [Native images](#native-images) need no configuration for Praecepta. |
 
-Every module is published to Maven Central under the same version. How the integrations fit together,
-and what they share, is in [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+Every module is published to Maven Central under the same version, and the Gradle plugin to the Gradle
+Plugin Portal too. How the integrations fit together, and what they share, is in
+[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 Every release is signed and has an SBOM, SLSA Build Level 2 provenance (`gh attestation verify`) and
 third-party notices on its [GitHub release](https://github.com/brunopacheco1/praecepta/releases), and
@@ -101,12 +109,9 @@ Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drool
 - **Full FEEL**: functions, contexts, `if`, and tests that compute (e.g. `income > 2 * rent`).
   Praecepta's input entries are FEEL *simple unary tests*: in DMN they may compare with another
   input (`> limit`) or test a list's elements, but not compute. Output entries may compute with `+`,
-  `-`, `*`, `/` and `**` on strings and numbers, but call no functions. Some FEEL that fits a single
-  table is not read yet either: `=` and `!=` tests, at-literals such as `@"2025-01-31"`
-  ([#81](https://github.com/brunopacheco1/praecepta/issues/81)), times with a zone id
-  ([#82](https://github.com/brunopacheco1/praecepta/issues/82)) and arithmetic on dates, times and
-  durations ([#85](https://github.com/brunopacheco1/praecepta/issues/85)); see the
-  [roadmap](docs/ROADMAP.md).
+  `-`, `*`, `/` and `**` on strings, numbers, dates, times and durations, but call no functions
+  (other than the date and time literals `date(...)`, `time(...)`, `date and time(...)` and
+  `duration(...)`) and hold no comparison or `if`.
 - **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
   boxed expressions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)).
 - **A process engine, a modeller or a decision service** around the tables.
@@ -146,19 +151,28 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 |---|---|---|
 | blank or `-` | any value, including a missing one | all |
 | `"PT","ES"` or `PT,ES` | one of the values (unquoted words are string literals) | STRING |
-| `18`, `2.5` | that number (`1.0` equals `1`) | NUMBER |
+| `18`, `2.5`, `.5`, `1.2e3` | that number (`1.0` equals `1`), within FEEL's decimal128 (exponents up to 6144) | NUMBER |
 | `date("2025-01-31")` or `2025-01-31` | that date | DATE |
 | `true`, `false` | that boolean | BOOLEAN |
 | `time("08:30:00")` or `08:30:00` | that time of day | TIME |
 | `time("08:30:00+01:00")` or `08:30:00Z` | that instant of the day, at an offset | TIME |
+| `time("08:30:00@Europe/Paris")` or `08:30:00@Europe/Paris` | that time of day in that zone, which compares only with times in the same zone | TIME |
 | `date and time("2025-01-31T08:30:00")` or `2025-01-31T08:30:00` | that date and time | DATE_TIME |
 | `date and time("2025-01-31T08:30:00Z")`, `date and time("2025-01-31T08:30:00@Europe/Paris")` | that instant | DATE_TIME |
 | `duration("P1DT2H")` or `P1DT2H` | that length of time (`PT24H` equals `P1D`) | DAY_TIME_DURATION |
 | `duration("P1Y2M")` or `P1Y2M` | that number of months (`P12M` equals `P1Y`) | YEAR_MONTH_DURATION |
+| `@"2025-01-31"`, `@"08:30:00Z"`, `@"P1D"` | at-literals: a date, time, date and time or duration, as the string's form says | its type |
+| `date(2025, 1, 31)`, `time(8, 30, 0)`, `time(8, 30, 0, duration("PT1H"))`, `date and time(date("2025-01-31"), time("08:30:00"))`, `date and time("2025-01-31")` | the other forms of the date and time functions (DMN 1.5, Table 72); a date and time without a time is at midnight | its type |
 | `< 18`, `<= 18`, `> 18`, `>= 18`, `< "N"` | comparisons | all but BOOLEAN |
 | `[18..65)`, `(0..1]`, `]a..b[`, `["A".."M"]` | intervals: `[`/`]` closed, `(`/`)` or outward brackets open | all but BOOLEAN |
-| `null` | only a missing value | all |
+| `= 18`, `= "PT"` | the same as `18`, `"PT"` (in a DMN file, `= home` of an input that holds a list is rejected: unlike `home`, which asks whether the value is in the list, it compares the value with the list) | all |
+| `!= "PT"`, `!= 18` | any value but that one, a missing one included (`!=` is `not(=)`, DMN 1.5, 10.3.2.15) | all |
+| `null`, `= null` | only a missing value | all |
+| `!= null` | any value that is not missing (not on a list column, where `null` tests the list: write `not(null)` for a list that is there) | all |
 | `not(...)` | anything the list inside does not match | all |
+
+FEEL's comments are ignored: `< 18 // minors`, `/* adults */ >= 18` (DMN 1.5, 10.3.1.2), in cells and in
+output entries; in Praecepta's syntax a string column keeps them as text, as an unquoted URL holds `//`.
 
 Quoted strings take FEEL's escape sequences (DMN 1.5, grammar rule 64): `\"`, `\\`, `\'`, `\n` (a line
 feed), `\r`, `\t` (a tab), and a character by its code point, `\u00e9` or `\U01F40E`. A backslash before
@@ -169,19 +183,39 @@ backslashes. In strict FEEL (DMN files), a quoted string may not hold a line bre
 33): write `\n` or `\r`. `DmnWriter` writes line breaks and tabs back as `\n`, `\r` and `\t`.
 
 Missing values follow FEEL: they fail comparisons and intervals, equal only `null`, and so satisfy
-`not("FR")`. Blank text counts as missing. Strings compare as FEEL orders them, character by
+`not("FR")` and `!= "FR"`. Unlike `not(...)`, which goes around a whole cell, `!=` is one test among
+the others: `!= 0, > 10` holds for every value but 0, and for a missing one. Blank text counts as missing. Strings compare as FEEL orders them, character by
 character by Unicode code point and case-sensitively (`"Zed" < "apple"`), so a character beyond U+FFFF,
 such as an emoji, comes after every other (`"🐎" > "～"`), where Java's `String.compareTo` would put it
 before U+E000 to U+FFFF. Where DMN 1.5 and its TCK leave a
-case open (`-` against a missing value, `=` between a time with a zone and one without), Praecepta's
-choice is recorded in [#86](https://github.com/brunopacheco1/praecepta/issues/86).
+case open (`-` against a missing value, `=` between a time with a zone and one without, two times at
+different offsets, a time with a zone id against a time in another zone, at an offset or without a zone, and
+the difference of two times that are not both without a zone), Praecepta's choice is recorded in
+[DMN conformance](docs/DMN-CONFORMANCE.md).
 
 Times may have an offset (`Z`, `+01:00`) and date-times an offset or a zone id (`@Europe/Paris`).
-As in FEEL, two values with a time zone compare by the instant they denote (`time("09:00:00+01:00")`
-equals `time("08:00:00Z")`). When only one of the two has a zone, the other takes its offset (DMN 1.5,
-Table 54), so they compare by local time: `time("08:00:00")` matches `08:00`, `08:00Z` and
+Two values with a time zone compare by the instant they denote, as XML Schema compares them
+(`time("09:00:00+01:00")` equals `time("08:00:00Z")`; for times DMN 1.5 leaves this open). When only one
+of the two has a zone, the other takes its offset (DMN 1.5, Table 54, which says so for `<`; Praecepta
+applies it to `=` too), so they compare by local time: `time("08:00:00")` matches `08:00`, `08:00Z` and
 `08:00+05:00`, `< time("12:00:00+01:00")` matches `11:59`, and an interval may have an end of each
-kind. A time with a zone id (`time("08:00:00@Europe/Paris")`) is rejected, as it has no fixed offset.
+kind.
+
+A time may also have a zone id (`time("08:00:00@Europe/Paris")`, DMN 1.5, 10.3.4.1), which has no offset
+without a date. Two such times in the same zone compare by local time, which is all the DMN TCK asks
+(`0068-feel-equality`). How one compares with a time in another zone, at an offset or without a zone, DMN 1.5
+does not say, and the TCK leaves those cases out "pending RTF equality comparisons with zones clarification";
+Praecepta takes such a comparison as one FEEL does not define, which is null: neither the test nor its
+`not(...)` matches (`time("08:00:00@Europe/Paris")` and `not(time("08:00:00@Europe/Paris"))` both miss
+`08:00@Asia/Dhaka`, `08:00Z` and `08:00`), an interval's ends must be in one zone, and a COLLECT MIN or MAX
+over such times in two zones is null, as FEEL's `min` and `max` take comparable items (Table 75) and a
+built-in function is null outside its domain (10.3.2.16). A zone with one fixed offset (`Etc/UTC`,
+`Etc/GMT-2`, `UTC`) is the exception, as DMN 1.5's own example of `time(from)` has it (Table 72:
+`time("23:59:00z") + duration("PT2M") = time("00:01:00@Etc/UTC")` is true): such a time is the time at that
+offset, an `OffsetTime`, wherever it is written or given, so `time("00:01:00@Etc/UTC")` matches `00:01Z` and
+`02:01+02:00`, and a `ZonedTime` in `Etc/UTC` that `zonedTimeInput` binds matches `time("00:01:00Z")`.
+Praecepta writes it at its offset (`00:01:00Z`). A column whose cells name no zone id still takes a time in
+another zone read from text: only the cells that accept any value (`-`, `!= null`) match it.
 
 ### Typed columns and input value lists
 ```java
@@ -194,6 +228,7 @@ var engine = PraeceptaEngine.<Applicant, String>builder()
         .timeInput("callTime", Applicant::callTime)    // LocalTime
         .dateTimeInput("appliedAt", Applicant::appliedAt) // LocalDateTime
         .offsetTimeInput("cutOff", Applicant::cutOff)  // OffsetTime, compared by instant
+        .zonedTimeInput("callAt", Applicant::callAt)   // ZonedTime: a time with a zone id (Etc/UTC: at offset zero)
         .zonedDateTimeInput("signedAt", Applicant::signedAt) // ZonedDateTime (from an OffsetDateTime: toZonedDateTime())
         .durationInput("waited", Applicant::waited)    // Duration
         .periodInput("tenure", Applicant::tenure)      // Period of years and months
@@ -224,6 +259,10 @@ Notes:
 - An input matching several rules under `UNIQUE` (or rules with different outputs under `ANY`)
   throws `HitPolicyViolationException`.
 - `.failOn(Severity.ERROR)` makes `build()` reject tables whose validation report has errors.
+- `build()` logs a table's validation issues as one warning through `System.Logger` (by default
+  `java.util.logging`, logger `io.github.brunopacheco1.praecepta.engine.PraeceptaEngine`).
+  `.logValidationReport(false)` turns that off when you report `validationReport()` yourself, as the
+  framework integrations and the build plugins do.
 - `.inputs(order -> new PraeceptaInput(...))` binds all columns from a map instead of per column.
 - `.enumInput("country", Country.class, Order::country)` binds a column to an enum. Lookups then
   index an array by ordinal instead of hashing, and the enum's constants become the column's
@@ -253,14 +292,40 @@ var engine = PraeceptaEngine.<Customer, String>builder()
 | `-` | yes | yes | yes | yes |
 
 These are the semantics of FEEL's `list contains`: a missing list makes every test unknown, while an
-empty one passes none. Elements may not be missing, must be values of the element type (as its
-single-value getter returns them, or text), and declared input values apply to each element.
+empty one passes none. Elements must be values of the element type (as its single-value getter
+returns them, or text), and declared input values apply to each element. An element may also be
+missing (null, or by Praecepta's convention blank text, as for single values; FEEL's `""` is a string), with
+FEEL's answers for a missing one (DMN 1.5, Tables 49, 50 and 75): a literal is
+false, a comparison or an interval unknown, and a cell's tests are joined over the elements with FEEL's
+three-valued `or`. So a cell holds when some element passes, whatever the others, and its `not(...)`
+only when every element fails every test:
+
+| Cell (DMN form) | List | Matches |
+|---|---|---|
+| `list contains(?, "PT")` | `["PT", null]` | yes |
+| `not(list contains(?, "PT"))` | `["BR", null]` | yes (`null = "PT"` is false) |
+| `some x in ? satisfies x >= 18` | `[20, null]` | yes (`true or null`) |
+| `not(some x in ? satisfies x >= 18)` | `[10, null]` | no (`false or null` is null) |
+| `list contains(?, null)` | `["PT", null]` | yes |
+
+`list contains(?, null)` (DMN files only: in Praecepta's syntax `null` asks whether the list itself is
+missing, as `? = null` does) holds when the list holds a missing element.
 The elements of a list of times or date-times may have a time zone or not; each is compared as a
 single value is (by instant when the element and the cell both have a zone, else by local time).
 With map-based inputs, declare the column with `.listColumnType("nationalities", ColumnType.STRING)`
-and give a FEEL list as text: `["PT", "BR"]` (or `PT, BR`), `[]` for an empty list. Rules that test a
-list column are left out of the static analysis (overlaps, unreachable rules, gaps), since a list
-can match rules whose values never meet in a single value.
+and give a FEEL list as text: `["PT", "BR"]` (or `PT, BR`), `[]` for an empty list, `["PT", null]` for
+a list holding a missing element.
+
+The static analysis treats a list as the set of its elements' kinds, so it sees what a list can match
+that a single value cannot: rules `"PT"` and `"BR"` overlap (on `["PT", "BR"]`), `[20..30]` after
+`>= 18` can never be selected under FIRST, and two rules `"PT"` and `"BR"` with declared values
+`"PT","BR"` leave a gap, `nationalities = []`. Overlaps and unreachable rules count every list,
+missing ones and ones holding missing elements included; gaps are looked for among lists of declared
+values and described by the elements such lists hold, as in
+`nationalities has no element in "PT", nationalities has an element in "ES"` (lists without `"PT"`
+that hold `"ES"`), with an example list. Under UNIQUE or ANY, rules that each name another value of a
+list column all overlap, so the report lists the first 100 pairs of overlapping rules, in rule order, as
+it lists the first 100 gaps.
 
 ### DMN
 `DmnReader` loads a decision table from a DMN file (DMN 1.1 to 1.5), including its hit policy,
@@ -285,26 +350,45 @@ Supported:
   `customer.age`, `Credit Score`), of type `string`, `number` (`integer`, `long`, `double`), `date`,
   `boolean`, `time`, `dateTime`, `dayTimeDuration` or `yearMonthDuration`, or an item definition of one
   of them (such as a `string` with allowed values, which become the input value list); times and
-  date-times with or without a time zone.
+  date-times with or without a time zone, which may be an offset or a zone id
+  (`time("10:30:00@Europe/Paris")`).
 - **Input entries** in the cell syntax above, as strict FEEL: strings quoted (an unquoted word is a
-  reference to another variable), with FEEL's escape sequences, and dates and times written with
-  `date(...)`, `time(...)` and `date and time(...)`.
+  reference to another variable), with FEEL's escape sequences, numbers as FEEL writes them (`.5`,
+  `1.2e3`), `=` and `!=` tests, comments, and dates, times and durations written with `date(...)`,
+  `time(...)`, `date and time(...)` and `duration(...)`, in any of their forms, or as at-literals
+  (`@"2025-01-31"`).
 - **Entries that compare with another input** (`> limit`, `[floor..limit]`, `not(home)`), which then
   becomes an input of the engine, bound like a column (with map-based inputs it is read with the type of
   the column that names it).
 - **List columns**, typed by a collection (`isCollection="true"`, with allowed values on the item type),
   whose entries test the elements with FEEL's list functions (`list contains(?, "PT")`,
-  `some x in ? satisfies x >= 18`, `? = null`, joined with `or`, and `not(...)`); and entries that name a
-  list input (`Flu Symptoms`, typed by its `inputData`), which hold when the value is in the list.
+  `list contains(?, null)`, `some x in ? satisfies x >= 18`, `? = null`, joined with `or`, and `not(...)`);
+  and entries that name a list input (`Flu Symptoms`, typed by its `inputData`), which hold when the value
+  is in the list (`list contains(Flu Symptoms, Symptom)`: a missing value is in a list that holds a missing
+  element).
 - **Output entries** that are literals, name one of the table's inputs (`a` returns the input `a`), or
   compute their value from literals and inputs with `+`, `-`, `*`, `/`, `**` and parentheses
   (`Symptom + " is listed"`, `(price - discount) * 1.2`, `amount * (1 + rate) ** years`): `+` joins
   strings or adds numbers, results have FEEL's 34 digits, and a missing operand gives a missing output.
+  Dates, times, date-times and durations combine as DMN 1.5 has it (Tables 57, 59 and 62):
+  `due + duration("P14D")` is a date, `returned - sent` (two date-times, or two times, or two dates) a days
+  and time duration, `start + @"P1Y"` keeps the type of `start`, `duration("PT8H") * days` and
+  `-elapsed` are durations, and `elapsed / duration("PT1H")` is a number. Where FEEL gives null, so does
+  the output: a date-time with a zone minus one without, a date plus a month that has not its day
+  (`date("2025-01-31") + duration("P1M")`), a division by zero; a years and months duration scaled by a
+  number keeps whole months (`duration("P1Y11M") * -2.5` is `-P4Y9M`, as the DMN TCK has it). Types FEEL
+  does not combine (`due + 1`, `elapsed + tenure`) are rejected when the engine is built.
   The inputs they name are columns, or inputs the cells compare with, that hold single values.
 - **Default output values** (`defaultOutputEntry`, literals of the output's type, and one of its output
   values when it lists them), which are the result when no rule matches, whatever the hit policy or
   aggregation (`[{Status=Declined, Rate=null}]` rather than `[]`; an output without a default is null in
-  it). `Builder.defaultOutput(...)` gives a table built in code the same.
+  it). A default of `null` is a default too: a table whose outputs all default to `null` gives
+  `[{Status=null, Rate=null}]`, and one whose outputs declare no default gives `[]` (DMN 1.5, 10.3.2.10).
+  `Builder.defaultOutput(...)` gives a table built in code the same. "A complete decision table SHALL NOT
+  specify a default output value" (10.3.2.10): when every input matches a rule, a missing value in any
+  column, a missing list and a list holding a missing element included, the validation report has the ERROR
+  `UNREACHABLE_DEFAULT_OUTPUT`, so the build plugins and the framework integrations reject the table by
+  default.
 - **A single output typed by its decision**: DMN 1.5 says the output clause of a single-output table has
   no `typeRef` of its own (Table 34), so its type is the decision table's `typeRef`, or else the decision
   variable's (the item type of a list for a multi-hit table; nothing for COUNT, whose result is a number).
@@ -312,15 +396,13 @@ Supported:
   output strategy; `AggregationOperator.check(outputs)` says where DMN defines them: on a single output,
   SUM over numbers, MIN and MAX over any ordered type, COUNT over any. They apply only when a rule
   matches: when none does, the result is the default output, or none (`[]`), whatever the aggregation,
-  so COUNT gives no output rather than 0 (DMN 1.5, 10.3.2.10, step 2). As in Praecepta's generated classes
-  and framework integrations, an aggregation skips missing outputs, where FEEL's `sum`, `min` and `max`
-  would give null (10.3.4): a known deviation.
+  so COUNT gives no output rather than 0 (DMN 1.5, 10.3.2.10, step 2). When a matching rule's output is
+  missing (a `null` entry, or an expression with a missing operand), SUM, MIN and MAX are missing too, as
+  FEEL's `sum`, `min` and `max` are null for a list that holds null (10.3.4.4): the engine gives that rule's
+  output (`[{fee=null}]`), and COUNT counts the rule.
 
 Anything else is rejected with a message naming the decision, rule and column: function calls such as
-`upper case(a)`, `if`, `=` and `!=` tests and other FEEL literal forms
-([#81](https://github.com/brunopacheco1/praecepta/issues/81)), a time with a zone id
-([#82](https://github.com/brunopacheco1/praecepta/issues/82)), output entries that compute with dates,
-times or durations ([#85](https://github.com/brunopacheco1/praecepta/issues/85)), and inputs computed by
+`upper case(a)`, `if`, comparisons in output entries, and inputs computed by
 other decisions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)). `DmnReader.readAll(dmn)`
 reads every decision table of a file. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
 evaluate identically, which is how the benchmarks feed them.
@@ -358,8 +440,12 @@ Compiles tables at build time. For each table the `generate` goal:
 A string column with a value list becomes an enum in the input record, using the int-coded path.
 Numbers are `BigDecimal` and dates `LocalDate`. Times and date-times are `LocalTime` and
 `LocalDateTime`, or `OffsetTime` and `ZonedDateTime` when every value written for the column has a
-time zone (an input compared with such a column in a cell, as in `> limit`, takes a zone too); a
-column that mixes both kinds fails the build. An input declared with `<list>true</list>` (or typed
+time zone (an input compared with such a column in a cell, as in `> limit`, takes a zone too), and a
+time is the engine's `ZonedTime` when the values written for it have zone ids, some of them perhaps
+offsets (a zone id with one fixed offset, `@Etc/UTC`, counts as its offset: a column of only such zone ids is
+an `OffsetTime`); an output whose entry
+is an expression counts by its operands of the output's type (`start + duration("PT8H")` has the kind of
+`start`); a column that mixes kinds fails the build. An input declared with `<list>true</list>` (or typed
 by a collection in a DMN file) becomes a `java.util.List` of its type. At runtime the generated code
 needs only `praecepta-engine`; Apache POI stays a build-time dependency.
 
@@ -367,7 +453,7 @@ needs only `praecepta-engine`; Apache POI stays a build-time dependency.
 <plugin>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-maven-plugin</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
   <executions><execution><goals><goal>generate</goal></goals></execution></executions>
   <configuration>
     <packageName>com.acme.pricing</packageName>
@@ -398,36 +484,29 @@ Optional<DiscountOutput> discount = Discount.evaluate(new DiscountInput(Discount
 
 Single-hit tables (and aggregations) return an `Optional`; multi-hit tables return a `List`. When no
 rule matches, these are empty (a COUNT too, rather than 0), unless the DMN table declares default output
-values: then they hold the default output.
+values: then they hold the default output. A SUM, MIN or MAX over a matching rule whose output is missing
+is an output whose value is null (`TotalOutput[total=null]`), as in FEEL.
 Generated code belongs to your project, so it carries no Praecepta licence header. Set
 `<fileHeader>` to prepend your own, such as your project's SPDX lines.
 `Discount.validationReport()` gives the build-time findings, and `Discount.engine()` the engine.
 
 ## Praecepta Gradle Plugin
 Does for Gradle what the Maven plugin does, with the same settings and the same generated files.
-Runs on Gradle 8.5 and later (CI tests 8.5, the last 8.x and the current 9.x) on Java 21+. It is
-published to Maven Central only, with its plugin marker, so Gradle finds it there (the Gradle Plugin
-Portal is [#93](https://github.com/brunopacheco1/praecepta/issues/93)):
-
-```kotlin
-// settings.gradle.kts
-pluginManagement {
-    repositories {
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-```
+Runs on Gradle 8.5 and later (CI tests 8.5, the last 8.x and the current 9.x) on Java 21+. It is on the
+[Gradle Plugin Portal](https://plugins.gradle.org/plugin/io.github.brunopacheco1.praecepta), where Gradle
+looks for plugins by default, so applying it needs no `pluginManagement` repository (it is on Maven Central
+too, with its plugin marker). Version 0.5.0 is on Maven Central only: for it, add `mavenCentral()` to
+`pluginManagement { repositories { ... } }` in `settings.gradle.kts`, next to `gradlePluginPortal()`.
 
 ```kotlin
 // build.gradle.kts
 plugins {
     java
-    id("io.github.brunopacheco1.praecepta") version "0.5.0"
+    id("io.github.brunopacheco1.praecepta") version "0.6.0"
 }
 
 dependencies {
-    implementation("io.github.brunopacheco1:praecepta-engine:0.5.0")
+    implementation("io.github.brunopacheco1:praecepta-engine:0.6.0")
 }
 
 praecepta {
@@ -473,7 +552,7 @@ registers them as beans:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-spring-boot-starter</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 ```
 
@@ -540,7 +619,7 @@ For Micronaut 4 applications on Java 21+. At startup, the module:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-micronaut</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 ```
 
@@ -590,7 +669,9 @@ Micronaut endpoints it is sensitive by default, since the reports show the rules
 `endpoints.praecepta.sensitive: false`, or secure it with Micronaut Security.
 
 Micronaut builds the module's beans and binds its settings at compile time, so it needs no reflection
-and no annotation processing in your build. In a native image, include the DMN files as resources.
+and no annotation processing in your build. Micronaut's native build (`-Dpackaging=native-image`) needs
+nothing more for DMN files under `rules/`; register files elsewhere as resources (see
+[Native images](#native-images)).
 
 ## Praecepta Quarkus Extension
 Runs on Quarkus 3.40 and later with Java 21+. Add the extension to a Quarkus application:
@@ -599,7 +680,7 @@ Runs on Quarkus 3.40 and later with Java 21+. Add the extension to a Quarkus app
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-quarkus</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 ```
 
@@ -663,8 +744,8 @@ manual restart (press `s`), since Quarkus watches files, not directories. Like a
 it depends on `quarkus-arc`, and its deployment module on `quarkus-arc-deployment`, so Quarkus' tools
 check that the application's Quarkus version matches the one the extension was built for. The
 deployment module only runs inside the Quarkus build. It uses no reflection; the tables
-are read while the application initialises, and in a native executable while the image is built, but
-the native-image workflow does not build a Quarkus application yet (see [Native images](#native-images)).
+are read while the application initialises, and in a native executable while the image is built
+(`mvn package -Dnative` needs nothing more; see [Native images](#native-images)).
 
 ## Praecepta Integration
 What the Spring Boot, Micronaut and Quarkus integrations share, for another framework or none: it finds
@@ -674,7 +755,7 @@ DMN files, builds one engine per decision table, and evaluates them by name. It 
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-integration</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 ```
 
@@ -764,12 +845,16 @@ in module `java.logging`): register those for your locale, or limit exact handli
 (`--exact-reachability-metadata=com.acme`).
 
 The framework integrations use no reflection either, and with the default `praecepta.locations` the
-integration core's metadata covers their files. The Spring Boot starter works with Spring AOT, which a
-Spring native image needs, and its tests run the AOT processing and start an application from the
-generated code; Quarkus' tests check that the validated tables become resources registered for the image.
-CI does not yet build a Spring Boot, Micronaut or Quarkus application natively, though
-([#99](https://github.com/brunopacheco1/praecepta/issues/99)), so those native executables are untested;
-files at other locations must be registered through the framework's own native support.
+integration core's metadata covers their files; files at other locations must be registered through the
+framework's own native support. CI builds an application of each framework as a native executable with
+the framework's own native build, starts it, and checks the answers of the engines and the `Decisions`
+bean it injects (`praecepta-native-tests`, weekly and when an integration changes):
+
+| Framework | Native build | GraalVM for JDK | The application |
+|---|---|---|---|
+| Spring Boot | Spring Boot's `native` profile (`spring-boot-starter-parent`): Spring AOT, then `native-maven-plugin` | 25 (Spring Boot 4 needs it) | DMN files under `src/main/resources/rules/`, one in a subdirectory; engines injected with `@Qualifier` and `@Named` |
+| Micronaut | `mvn package -Dpackaging=native-image` (`micronaut-parent`) | 21 and 25 | The same DMN files; engines injected with `@Named` |
+| Quarkus | `mvn package -Dnative` | 25 (Quarkus 3.40 needs it) | A DMN file under `src/main/resources/rules/` and a CSV table declared in `application.properties`; engines injected with `@Identifier` and `@Named` |
 
 # Building and Testing
 Building Praecepta needs **Java 21** or later and Maven 3.9+; CI builds on Java 21, 25 and 27. From the repository root:
@@ -787,7 +872,13 @@ engine against a naive reference implementation of DMN decision-table semantics 
 table Praecepta can read passes (83 of 86); the other three need inputs computed by other decisions
 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)), which Praecepta does not have yet.
 The pass rate, the results per test case and what each unsupported check needs are in
-[praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md).
+[praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md). The literal expressions of the TCK's arithmetic test
+cases run as output expressions too: of their 1,101 checks, Praecepta reads 489, of which 276 give the kit's
+result, 212 are rejected when the engine is built where the kit expects null (operands of types FEEL does not
+combine), and one differs (see [praecepta-tck/README.md](praecepta-tck/README.md#output-expressions)). Semantics are judged by DMN 1.5 and the TCK alone;
+where both leave a case open, what Praecepta does is recorded in
+[docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md), to be settled when a later DMN version or the TCK
+decides.
 
 # Benchmarks
 `praecepta-benchmarks` compares Praecepta in-process with Camunda 8's DMN engine (dmn-scala, as
@@ -843,7 +934,8 @@ Drools' experimental alpha-network compilation is not part of the default compar
 `-p engine=drools-alphanetwork`.
 
 # Dependencies
-Praecepta Engine has no runtime dependencies; it reads DMN with the JDK's XML parser.
+Praecepta Engine has no runtime dependencies; it reads DMN with the JDK's own XML parser, even when
+another one, such as Xerces, is on the class path.
 
 Praecepta Loader depends on Apache POI. The Maven and Gradle plugins use it at build time only, through
 `praecepta-compiler`, so an application that compiles its tables needs only the engine at runtime. The
@@ -862,6 +954,8 @@ Quarkus' build uses, brings `praecepta-compiler` and Apache POI; neither reaches
   framework integrations.
 - [Integrations](docs/INTEGRATIONS.md): what the build-tool and framework integrations share, and how
   they differ.
+- [DMN conformance](docs/DMN-CONFORMANCE.md): the cases DMN 1.5 and its TCK leave open, and what
+  Praecepta does in them.
 - [Security assurance case](docs/SECURITY-ASSURANCE.md): what to expect, threats, and how they are countered.
 - [Governance](GOVERNANCE.md): roles, decisions and continuity.
 - [Contributing](CONTRIBUTING.md), [code of conduct](CODE_OF_CONDUCT.md) and [security policy](SECURITY.md).

@@ -1,11 +1,4 @@
 {
-  "resources": {
-    "includes": [
-      {
-        "pattern": "\\QMETA-INF/services/javax.xml.parsers.DocumentBuilderFactory\\E"
-      }
-    ]
-  },
   "bundles": [
     {
       "name": "com.sun.org.apache.xerces.internal.impl.msg.XMLMessages"

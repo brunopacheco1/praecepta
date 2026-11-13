@@ -22,15 +22,8 @@
     </description>
     <dependencyManagement>
         <dependencies>
-            <!-- the project's JUnit, ahead of the older one the Micronaut platform manages -->
-            <dependency>
-                <groupId>org.junit</groupId>
-                <artifactId>junit-bom</artifactId>
-                <version>${junit.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <!-- here, not in the parent, so that no other module resolves Micronaut's versions -->
+            <!-- here, not in the parent, so that no other module resolves Micronaut's versions; the JUnit
+                 artifacts the parent declares take precedence over the older JUnit the platform manages -->
             <dependency>
                 <groupId>io.micronaut.platform</groupId>
                 <artifactId>micronaut-platform</artifactId>

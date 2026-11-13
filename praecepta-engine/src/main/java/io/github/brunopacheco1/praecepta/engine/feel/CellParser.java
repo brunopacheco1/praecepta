@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NotEqual;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Operator;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
@@ -32,10 +33,15 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   "PT", "ES"               string literals (STRING columns)
  *   PT, ES                   unquoted words are string literals too (Praecepta's original syntax)
  *   "a\tb", "\U01F40E"       escape sequences in quoted strings: \" \\ \' \n \r \t and code points (FEEL rule 64)
- *   18, 2.5                  number literals (NUMBER columns)
+ *   18, 2.5, .5, 1.2e3       number literals, with an optional exponent (NUMBER columns)
  *   date("2025-01-31")       date literal (DATE columns; a bare 2025-01-31 is accepted as well)
+ *   &#64;"2025-01-31", date(2025, 1, 31), time(8, 30, 0), date and time(date("2025-01-31"), time("08:30:00"))
+ *                            the other date time literals: at-literals and the forms of the date and time
+ *                            functions (DMN 1.5, grammar rules 60 and 65, Table 72), in columns of their type
  *   time("08:30:00")         time literal (TIME columns; a bare 08:30:00 is accepted as well)
  *   time("08:30:00+01:00")   time with an offset (Z, +01:00), compared by instant with other such times
+ *   time("08:30:00@Europe/Paris")
+ *                            time with a zone id, compared by local time with times in the same zone only
  *   date and time("2025-01-31T08:30:00")
  *                            date-time literal (DATE_TIME columns; a bare 2025-01-31T08:30:00 too)
  *   date and time("2025-01-31T08:30:00Z"), date and time("2025-01-31T08:30:00@Europe/Paris")
@@ -44,17 +50,22 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  *   duration("P1Y2M")        years and months duration (YEAR_MONTH_DURATION columns; a bare P1Y2M too)
  *   true, false              boolean literals (BOOLEAN columns)
  *   &lt; 18, &gt;= 2.5, &lt; "N"      comparisons (all but BOOLEAN columns; strings compare by code point, {@link FeelStrings#compare})
+ *   = 18, = null             the same as 18 and null
+ *   != "PT", != null         anything but that value, or anything but a missing value ({@link UnaryTests.NotEqual})
  *   [18..65), (0..1], ]a..b[  intervals; [ and ] include their end, ( ) and outward-facing brackets exclude it
  *   null                     only a missing value
  *   not(t1, t2)              anything but these tests
  *   numB, &gt; dateE, [lo..hi]  strict FEEL only: a name compares with that input ({@link UnaryTests.Name})
  * </pre>
  *
- * Tests are separated by commas outside quotes and brackets. Surrounding whitespace is ignored.
- * Times and date-times may have a time zone ({@link FeelTemporals}): a time an offset, a date-time an
- * offset or a zone id. A time with a zone id ({@code time("08:30:00@Europe/Paris")}) is rejected, as it
- * has no fixed offset. A value with a zone and one without compare by their local time, so an interval
- * may have one end of each kind.
+ * Tests are separated by commas outside quotes and brackets. Surrounding whitespace is ignored, and so are
+ * comments ({@code < 18 // minors}, {@code /* adults *&#47; >= 18}), except in a string column in Praecepta's syntax,
+ * whose unquoted words keep them as text.
+ * Times and date-times may have a time zone ({@link FeelTemporals}): an offset or a zone id. A value with an
+ * offset and one without compare by their local time, so an interval may have one end of each kind. A time with a
+ * zone id ({@code time("08:30:00@Europe/Paris")}, a {@link ZonedTime}) compares only with one in the same zone, so
+ * an interval's other end must be one; one in a zone with one fixed offset ({@code time("08:30:00@Etc/UTC")}) is the
+ * time at that offset (DMN 1.5, Table 72), an {@code OffsetTime}.
  *
  * <p>The same syntax serves columns that hold lists, whose cells test the elements. In strict FEEL such
  * a cell is written with FEEL's list functions instead, as in {@code list contains(?, "PT")}; see
@@ -64,17 +75,17 @@ public final class CellParser {
 
     /** Two-character operators come first, so that {@code <= 5} is not read as {@code <} and {@code = 5}. */
     private static final List<Operator> OPERATORS = List.of(Operator.LE, Operator.GE, Operator.LT, Operator.GT);
-    private static final Pattern NUMBER = Pattern.compile("-?\\d+(\\.\\d+)?");
-    private static final Pattern DATE_CALL = Pattern.compile("date\\(\\s*\"([^\"]*)\"\\s*\\)");
+    /**
+     * FEEL's numeric literal (DMN 1.5, grammar rule 35, and 10.3.2.3.1: "an optional decimal point, and an optional
+     * exponent"): digits with an optional fraction, or a fraction alone, then an optional exponent.
+     */
+    private static final Pattern NUMBER = Pattern.compile("-?(\\d+(\\.\\d+)?|\\.\\d+)([eE][+-]?\\d+)?");
     private static final Pattern BARE_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
-    private static final Pattern TIME_CALL = Pattern.compile("time\\(\\s*\"([^\"]*)\"\\s*\\)");
     /** An offset after a bare time or date-time: Z, or a sign and hh:mm. */
     private static final String OFFSET = "([Zz]|[+-]\\d{2}:\\d{2})";
-    private static final Pattern BARE_TIME = Pattern.compile("\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?" + OFFSET + "?");
-    private static final Pattern DATE_TIME_CALL = Pattern.compile("date\\s+and\\s+time\\(\\s*\"([^\"]*)\"\\s*\\)");
+    private static final Pattern BARE_TIME = Pattern.compile("\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(" + OFFSET + "|@[\\w+\\-/]+)?");
     private static final Pattern BARE_DATE_TIME = Pattern.compile(
             "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(" + OFFSET + "|@[\\w+\\-/]+)?");
-    private static final Pattern DURATION_CALL = Pattern.compile("duration\\(\\s*\"([^\"]*)\"\\s*\\)");
     /** ISO 8601 durations: an optional sign, P, then digits, fractions and designators. */
     private static final Pattern BARE_DURATION = Pattern.compile("-?P[0-9YMWDTHS.]+");
     /** Names FEEL reserves for literals, which never name an input. */
@@ -141,6 +152,7 @@ public final class CellParser {
      *
      * <pre>
      *   list contains(?, "PT")                  some element is "PT"
+     *   list contains(?, null)                  some element is missing
      *   some x in ? satisfies x &gt;= 18          some element compares that way
      *   some x in ? satisfies x in [18..65)     some element lies in the interval
      *   ? = null                                the list is missing
@@ -150,8 +162,9 @@ public final class CellParser {
      *
      * The result holds the tests that Praecepta's syntax writes {@code "PT", >= 18, [18..65), null},
      * which a list column reads the same way: some element passes one of the tests (see
-     * {@code DecisionTable#listInputs}). A list column's cells test its elements against literals, never
-     * against another input.
+     * {@code DecisionTable#listInputs}), and {@code null} asks whether the list is missing.
+     * {@code list contains(?, null)} becomes a {@link UnaryTests.NullElement}, for which Praecepta's syntax has
+     * no form. A list column's cells test its elements against literals, never against another input.
      *
      * @param type the type of the list's elements
      * @throws CellSyntaxException if a part of the cell is none of these forms, or a value is not valid for the type
@@ -169,7 +182,7 @@ public final class CellParser {
     private record Parser(ColumnType type, String cell, boolean strictFeel) {
 
         UnaryTests parse() {
-            var text = cell == null ? "" : cell.strip();
+            var text = text();
             if (text.isEmpty() || text.equals("-")) {
                 return new UnaryTests.Any();
             }
@@ -181,11 +194,30 @@ public final class CellParser {
             return new UnaryTests.Positive(tests(text));
         }
 
+        /**
+         * The cell without its comments ({@code //} to the end of the line, {@code /* ... *&#47;}), as FEEL allows them,
+         * and stripped. In Praecepta's syntax a string column keeps them: an unquoted word is text there, and may hold
+         * {@code //}, as a URL does.
+         */
+        private String text() {
+            if (cell == null) {
+                return "";
+            }
+            if (!strictFeel && type == ColumnType.STRING) {
+                return cell.strip();
+            }
+            try {
+                return FeelStrings.withoutComments(cell).strip();
+            } catch (IllegalArgumentException e) {
+                throw new CellSyntaxException(cell, e.getMessage());
+            }
+        }
+
         // ---- list columns ------------------------------------------------------------------------
 
         /** A list column's cell: {@code list contains(?, v)} and the other forms of {@link #parseFeelList}. */
         UnaryTests parseList() {
-            var text = cell == null ? "" : cell.strip();
+            var text = text();
             if (text.isEmpty() || text.equals("-")) {
                 return new UnaryTests.Any();
             }
@@ -223,17 +255,24 @@ public final class CellParser {
                 return some;
             }
             throw new CellSyntaxException(cell, "'" + text + "' does not test a list's elements; write list contains(?, value), "
-                    + "some x in ? satisfies x < value, some x in ? satisfies x in [low..high] or ? = null");
+                    + "list contains(?, null), some x in ? satisfies x < value, some x in ? satisfies x in [low..high] or ? = null");
         }
 
-        /** {@code list contains(?, value)}: an element equals the value; null if the text is not that. */
+        /**
+         * {@code list contains(?, value)}: an element equals the value, or with {@code null}, an element is
+         * missing (DMN 1.5, Table 75: the element is "any element of the semantic domain including null");
+         * null if the text is not that.
+         */
         private Test containsTest(String text) {
             var contains = after(text, "list contains(");
             if (contains == null || !contains.endsWith(")")) {
                 return null;
             }
             var argument = after(after(contains.substring(0, contains.length() - 1), "?"), ",");
-            return argument == null || argument.isEmpty() ? null : new Equals(literal(argument));
+            if (argument == null || argument.isEmpty()) {
+                return null;
+            }
+            return "null".equals(argument) ? new UnaryTests.NullElement() : new Equals(literal(argument));
         }
 
         /**
@@ -254,7 +293,8 @@ public final class CellParser {
             if (interval != null && !interval.isEmpty() && isBracketed(interval) && topLevelDots(interval) > 0) {
                 return interval(interval, topLevelDots(interval));
             }
-            if (OPERATORS.stream().anyMatch(operator -> test.startsWith(operator.symbol()))) {
+            if (OPERATORS.stream().anyMatch(operator -> test.startsWith(operator.symbol())) || test.startsWith("=")
+                    || test.startsWith("!=")) {
                 return test(test);
             }
             return null;
@@ -358,6 +398,12 @@ public final class CellParser {
                     return new Compare(operator, literal(text.substring(operator.symbol().length()).strip()));
                 }
             }
+            if (text.startsWith("!=")) {
+                return new NotEqual(equality(text.substring("!=".length()).strip(), false));
+            }
+            if (text.startsWith("=")) {
+                return equality(text.substring("=".length()).strip(), true);
+            }
             if (isBracketed(text)) {
                 int dots = topLevelDots(text);
                 if (dots > 0) {
@@ -365,6 +411,16 @@ public final class CellParser {
                 }
             }
             return new Equals(literal(text));
+        }
+
+        /**
+         * The value after {@code =} or {@code !=}: {@code null}, which {@code = null} tests as the cell {@code null}
+         * does (DMN 1.5, 10.3.2.15: "e = null" is "FEEL(e) is null"), or a value, which {@code = x} tests as the cell
+         * {@code x} does; a name after {@code =} is kept {@linkplain Equals#explicit explicit}, as a bare name of a list
+         * input is not an equality.
+         */
+        private Test equality(String text, boolean afterEquals) {
+            return text.equals("null") ? new NullTest() : new Equals(literal(text), afterEquals);
         }
 
         /** Whether a test opens with {@code [}, {@code (} or {@code ]} and closes with {@code ]}, {@code )} or {@code [}. */
@@ -380,8 +436,15 @@ public final class CellParser {
             requireComparisons("intervals");
             var low = literal(text.substring(1, dots).strip());
             var high = literal(text.substring(dots + 2, text.length() - 1).strip());
-            if (!(low instanceof UnaryTests.Name) && !(high instanceof UnaryTests.Name) && FeelTemporals.compare(low, high) > 0) {
-                throw new CellSyntaxException(cell, "interval starts after it ends");
+            if (!(low instanceof UnaryTests.Name) && !(high instanceof UnaryTests.Name)) {
+                // a time with a zone id orders only with one in its zone: other ends could never be ordered (10.3.2.7)
+                if (!FeelTemporals.comparable(low, high)) {
+                    throw new CellSyntaxException(cell, "the ends of an interval must compare; a time with a zone id compares only "
+                            + "with one in the same zone");
+                }
+                if (FeelTemporals.compare(low, high) > 0) {
+                    throw new CellSyntaxException(cell, "interval starts after it ends");
+                }
             }
             return new Range(low, text.charAt(0) == '[', high, text.charAt(text.length() - 1) == ']');
         }
@@ -404,12 +467,12 @@ public final class CellParser {
                 case STRING -> string(text);
                 case NUMBER -> number(text);
                 case BOOLEAN -> bool(text);
-                case DATE -> temporal(text, DATE_CALL, BARE_DATE, LocalDate::parse, "date(\"yyyy-mm-dd\")");
-                case TIME -> temporal(text, TIME_CALL, BARE_TIME, iso -> (Comparable<?>) FeelTemporals.parseTime(iso), "time(\"hh:mm:ss\")");
-                case DATE_TIME -> temporal(text, DATE_TIME_CALL, BARE_DATE_TIME, iso -> (Comparable<?>) FeelTemporals.parseDateTime(iso),
+                case DATE -> temporal(text, BARE_DATE, LocalDate::parse, "date(\"yyyy-mm-dd\")");
+                case TIME -> temporal(text, BARE_TIME, iso -> (Comparable<?>) FeelTemporals.parseTime(iso), "time(\"hh:mm:ss\")");
+                case DATE_TIME -> temporal(text, BARE_DATE_TIME, iso -> (Comparable<?>) FeelTemporals.parseDateTime(iso),
                         "date and time(\"yyyy-mm-ddThh:mm:ss\")");
-                case DAY_TIME_DURATION -> temporal(text, DURATION_CALL, BARE_DURATION, Duration::parse, "duration(\"P1DT2H\")");
-                case YEAR_MONTH_DURATION -> temporal(text, DURATION_CALL, BARE_DURATION, Parser::yearsAndMonths, "duration(\"P1Y2M\")");
+                case DAY_TIME_DURATION -> temporal(text, BARE_DURATION, Duration::parse, "duration(\"P1DT2H\")");
+                case YEAR_MONTH_DURATION -> temporal(text, BARE_DURATION, Parser::yearsAndMonths, "duration(\"P1Y2M\")");
             };
         }
 
@@ -484,10 +547,19 @@ public final class CellParser {
         }
 
         private BigDecimal number(String text) {
-            if (!NUMBER.matcher(text).matches()) {
-                throw new CellSyntaxException(cell, "'" + text + "' is not a number");
+            if (NUMBER.matcher(text).matches()) {
+                BigDecimal number;
+                try {
+                    number = new BigDecimal(text);
+                } catch (NumberFormatException e) {
+                    throw new CellSyntaxException(cell, "'" + text + "' is not a number"); // beyond what a BigDecimal holds
+                }
+                if (!FeelNumbers.isDecimal128(number)) {
+                    throw new CellSyntaxException(cell, "'" + text + "' is beyond FEEL's numbers (decimal128)");
+                }
+                return FeelNumbers.plain(number);
             }
-            return new BigDecimal(text);
+            throw new CellSyntaxException(cell, "'" + text + "' is not a number");
         }
 
         private Boolean bool(String text) {
@@ -499,32 +571,40 @@ public final class CellParser {
         }
 
         /**
-         * A date, time, date-time or duration: its FEEL function call, or, outside strict FEEL, the bare ISO text.
+         * A date, time, date-time or duration: a date time literal ({@link TemporalLiterals}: an at-literal, or an
+         * invocation of the date and time functions) of the column's type, or, outside strict FEEL, the bare ISO text.
          * Strict FEEL cannot take the bare form, as it reads {@code 2025-01-31} as {@code 2025 - 1 - 31}.
          */
-        private Comparable<?> temporal(String text, Pattern call, Pattern bare, Function<String, Comparable<?>> parse, String hint) {
-            var matcher = call.matcher(text);
-            String iso;
-            if (matcher.matches()) {
-                iso = matcher.group(1).strip();
-            } else if (!strictFeel && bare.matcher(text).matches()) {
-                iso = text;
-            } else {
+        private Comparable<?> temporal(String text, Pattern bare, Function<String, Comparable<?>> parse, String hint) {
+            if (TemporalLiterals.startsAt(text, 0)) {
+                return dateTimeLiteral(text);
+            }
+            if (strictFeel || !bare.matcher(text).matches()) {
                 throw new CellSyntaxException(cell, "'" + text + "' is not a " + type.feelName() + "; write " + hint);
             }
-            if (type == ColumnType.TIME && iso.indexOf('@') >= 0) {
-                throw new CellSyntaxException(cell, "'" + iso + "' is a time with a zone id, which is not supported; "
-                        + "write an offset such as +01:00");
-            }
-            // FEEL writes a zone id as @Europe/Paris only; Java's [Europe/Paris] could carry an offset FEEL cannot write back
-            if (iso.indexOf('[') >= 0) {
-                throw new CellSyntaxException(cell, "invalid " + type.feelName() + " '" + iso + "'; write a zone id as @Europe/Paris");
-            }
             try {
-                return parse.apply(iso);
+                return parse.apply(text);
             } catch (DateTimeParseException e) {
-                throw new CellSyntaxException(cell, "invalid " + type.feelName() + " '" + iso + "'");
+                throw new CellSyntaxException(cell, "invalid " + type.feelName() + " '" + text + "'");
             }
+        }
+
+        /** A date time literal that is the whole text, of the column's type. */
+        private Comparable<?> dateTimeLiteral(String text) {
+            TemporalLiterals.Read read;
+            try {
+                read = TemporalLiterals.read(text, 0, type);
+            } catch (IllegalArgumentException e) {
+                throw new CellSyntaxException(cell, e.getMessage());
+            }
+            if (read.end() < text.length()) {
+                throw new CellSyntaxException(cell, "unexpected '" + text.substring(read.end()).strip() + "' after a " + type.feelName());
+            }
+            var literalType = TemporalLiterals.typeOf(read.value());
+            if (literalType != type) {
+                throw new CellSyntaxException(cell, "'" + text + "' is a " + literalType.feelName() + ", not a " + type.feelName());
+            }
+            return (Comparable<?>) read.value();
         }
 
         // ---- scanners: where tests, strings and intervals end ------------------------------------

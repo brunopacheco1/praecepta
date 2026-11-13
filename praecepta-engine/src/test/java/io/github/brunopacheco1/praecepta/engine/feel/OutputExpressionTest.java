@@ -8,6 +8,7 @@ package io.github.brunopacheco1.praecepta.engine.feel;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -143,6 +144,11 @@ class OutputExpressionTest {
         Assertions.assertThat(number("1.2e3")).isEqualByComparingTo("1200");
         Assertions.assertThat(number("1.2E+3 + .5e-1")).isEqualByComparingTo("1200.05");
         Assertions.assertThat(number("5e-1 * 4")).isEqualByComparingTo("2");
+        // as its plain form reads, with no negative scale (BigDecimal.equals compares scales)
+        Assertions.assertThat(OutputExpression.parse("5E65")).isEqualTo(OutputExpression.parse("5" + "0".repeat(65)));
+        Assertions.assertThat(OutputExpression.parse("1.2e3")).isEqualTo(new Literal(new BigDecimal("1200")));
+        Assertions.assertThat(OutputExpression.parse(".5")).isEqualTo(new Literal(new BigDecimal("0.5")));
+        Assertions.assertThat(OutputExpression.parse("time(1.2e1, 0, 0)")).isEqualTo(OutputExpression.parse("time(12, 0, 0)"));
         // not an exponent: a name cannot follow a number
         Assertions.assertThatThrownBy(() -> OutputExpression.parse("2e")).isInstanceOf(ExpressionSyntaxException.class);
         Assertions.assertThatThrownBy(() -> OutputExpression.parse("2e+")).isInstanceOf(ExpressionSyntaxException.class);
@@ -178,13 +184,14 @@ class OutputExpressionTest {
                 .hasMessage("* combines a string and a number, which gives null in FEEL");
         var stringMinusString = OutputExpression.parse("s - s");
         Assertions.assertThatThrownBy(() -> stringMinusString.type(types::get))
-                .hasMessage("- applies to numbers, not strings");
+                .hasMessage("- combines a string and a string, which gives null in FEEL");
         var negatedString = OutputExpression.parse("-s");
         Assertions.assertThatThrownBy(() -> negatedString.type(types::get))
-                .hasMessage("- applies to numbers, not strings");
+                .hasMessage("- applies to numbers and durations, not to a string");
+        // DMN 1.5, Table 57: a date takes durations, not numbers
         var datePlusNumber = OutputExpression.parse("d + 1");
         Assertions.assertThatThrownBy(() -> datePlusNumber.type(types::get))
-                .hasMessage("'d' is a date; output expressions combine strings and numbers");
+                .hasMessage("+ combines a date and a number, which gives null in FEEL");
     }
 
     @Test
@@ -208,6 +215,8 @@ class OutputExpressionTest {
             "a dangling operator  | a +                  | a value is missing at the end",
             "an open string       | \"abc                | a string is not terminated",
             "two dots             | 1.2.3                | '1.2.3' is not a number",
+            "a huge exponent      | a * 1e999999999      | '1e999999999' is beyond FEEL's numbers (decimal128)",
+            "a tiny exponent      | a + 1e-7000          | '1e-7000' is beyond FEEL's numbers (decimal128)",
             "nothing              | `   `                | it is empty",
     })
     void other_feel_is_not_supported(String description, String text, String problem) {
@@ -224,5 +233,30 @@ class OutputExpressionTest {
                 .hasMessageContaining("more than 1000 operators and parentheses");
         var longSum = "1" + " + 1".repeat(1000);
         Assertions.assertThat(OutputExpression.parse(longSum).evaluate(name -> null)).isEqualTo(new BigDecimal(1001));
+    }
+
+    @Test
+    void deep_nesting_is_rejected_on_a_thread_with_a_small_stack() throws InterruptedException {
+        var deep = "-(".repeat(5_000) + "1" + ")".repeat(5_000);
+        var thrown = new AtomicReference<Throwable>();
+        var thread = new Thread(null, () -> thrown.set(Assertions.catchThrowable(() -> OutputExpression.parse(deep))),
+                "small stack", 128 * 1024);
+        thread.start();
+        thread.join();
+        Assertions.assertThat(thrown.get())
+                .isInstanceOf(ExpressionSyntaxException.class)
+                .hasMessageContaining("more than 1000 operators and parentheses");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        "-(1 + 2) ** 2 * 3     | 27",
+        "((2)) ** -(1) ** 2    | 0.25",
+        "- - 3 - -(-(4))       | -1",
+        "(1 - (2 - (3 - 4)))   | -2",
+        "2 * (3 + 4) / (1 + 1) | 7",
+    })
+    void parentheses_and_unary_minus_nest_in_any_order(String expression, BigDecimal value) {
+        Assertions.assertThat((BigDecimal) OutputExpression.parse(expression).evaluate(name -> null)).isEqualByComparingTo(value);
     }
 }

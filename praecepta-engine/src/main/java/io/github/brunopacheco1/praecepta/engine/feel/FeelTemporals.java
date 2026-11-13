@@ -6,10 +6,12 @@
 package io.github.brunopacheco1.praecepta.engine.feel;
 
 import java.time.DateTimeException;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -31,6 +33,16 @@ import java.time.temporal.Temporal;
  * here, {@code <=} being defined as {@code <} or {@code =} (10.3.2.15): the two are equal exactly when
  * neither is before the other. Two values with a zone are equal by instant, as the TCK expects
  * ({@code 0068-feel-equality}), and a zone id counts by the offset it has at the value's date and time.
+ *
+ * <p>A time may also have a zone id ({@code 10:30:00@Europe/Paris}, a {@link ZonedTime}), which has no offset
+ * without a date. Two such times in the same zone compare by their local time, which is all the TCK asks
+ * ({@code 0068-feel-equality}); DMN 1.5 does not say how one compares with a time in another zone, at an offset or
+ * without a zone, and the TCK leaves those cases out, so such a pair is not {@linkplain #comparable comparable}: a
+ * comparison of it is null in FEEL's terms. A zone id with one fixed offset ({@code Etc/UTC}, {@code Etc/GMT-2},
+ * {@code UTC}) is the exception: DMN 1.5's example of {@code time(from)} (Table 72) has
+ * {@code time("23:59:00z") + duration("PT2M") = time("00:01:00@Etc/UTC")} true, so such a time is the time at that
+ * offset, an {@link OffsetTime} ({@link #timeIn}, {@link #withFixedOffset}): {@link #parseTime} reads it as one, and
+ * every comparison here takes a {@link ZonedTime} in such a zone as one.
  */
 public final class FeelTemporals {
 
@@ -39,17 +51,85 @@ public final class FeelTemporals {
 
     /**
      * Parses a time: {@code hh:mm[:ss[.fffffffff]]}, optionally followed by an offset ({@code Z},
-     * {@code +01:00}).
+     * {@code +01:00}) or a zone id as FEEL writes it ({@code @Europe/Paris}).
      *
-     * @return a {@link LocalTime}, or an {@link OffsetTime} if the text has an offset
-     * @throws DateTimeParseException if the text is not such a time; a time with a zone id
-     *                                ({@code @Europe/Paris}) is not, as it has no fixed offset
+     * @return a {@link LocalTime}, an {@link OffsetTime} if the text has an offset or a zone id with one fixed offset
+     *         ({@code 00:01:00@Etc/UTC} is {@code 00:01Z}, DMN 1.5, Table 72), or a {@link ZonedTime} if it has another
+     *         zone id
+     * @throws DateTimeParseException if the text is not such a time, or names an unknown zone
      */
-    public static Temporal parseTime(String text) {
+    public static Object parseTime(String text) {
         if (text.indexOf('@') >= 0) {
-            throw new DateTimeParseException("a time with a zone id has no fixed offset", text, text.indexOf('@'));
+            return withFixedOffset(ZonedTime.parse(text));
         }
-        return (Temporal) DateTimeFormatter.ISO_TIME.parseBest(text, OffsetTime::from, LocalTime::from);
+        return DateTimeFormatter.ISO_TIME.parseBest(text, OffsetTime::from, LocalTime::from);
+    }
+
+    /**
+     * A local time in a zone, as FEEL has it: the {@link OffsetTime} at the zone's offset when the zone has one fixed
+     * offset (a {@link ZoneOffset}, or a zone id such as {@code Etc/UTC} or {@code Etc/GMT-2}), as DMN 1.5's example of
+     * {@code time(from)} has {@code time("00:01:00@Etc/UTC")} equal {@code 00:01:00Z} (Table 72); else the
+     * {@link ZonedTime}, whose zone id gives no offset without a date.
+     */
+    public static Object timeIn(LocalTime time, ZoneId zone) {
+        var offset = fixedOffset(zone);
+        return offset != null ? OffsetTime.of(time, offset) : new ZonedTime(time, zone);
+    }
+
+    /**
+     * A {@link ZonedTime} in a zone with one fixed offset as the {@link OffsetTime} at that offset, which FEEL takes it
+     * to be (DMN 1.5, Table 72; see {@link #timeIn}); any other value as it is. The engine reads every time it is given
+     * through it, so that a time bound as {@code ZonedTime(00:01, Etc/UTC)} matches as {@code 00:01Z}.
+     */
+    public static Object withFixedOffset(Object value) {
+        if (value instanceof ZonedTime time) {
+            var offset = fixedOffset(time.zone());
+            return offset != null ? OffsetTime.of(time.time(), offset) : time;
+        }
+        return value;
+    }
+
+    /** The offset of a zone that has one fixed offset, whatever the date; null for a zone whose offset changes. */
+    private static ZoneOffset fixedOffset(ZoneId zone) {
+        if (zone instanceof ZoneOffset offset) {
+            return offset;
+        }
+        var rules = zone.getRules();
+        return rules.isFixedOffset() ? rules.getOffset(Instant.EPOCH) : null;
+    }
+
+    /**
+     * Parses a time with an offset, or a zone id with one fixed offset, as {@link #parseTime} reads it. Generated
+     * code uses it to read the outputs of a time column whose values have a time zone, which may be written either
+     * way ({@code 00:01:00Z}, {@code 00:01:00@Etc/UTC}).
+     *
+     * @throws DateTimeParseException if the text is not such a time
+     */
+    public static OffsetTime parseOffsetTime(String text) {
+        if (parseTime(text) instanceof OffsetTime time) {
+            return time;
+        }
+        throw new DateTimeParseException("a time without a time zone, or in a zone whose offset changes", text, text.length());
+    }
+
+    /**
+     * Parses a time with a zone id ({@code 10:30:00@Europe/Paris}) or an offset ({@code 10:30:00+01:00}) as a
+     * {@link ZonedTime}: an offset becomes the zone id that has it fixed ({@code UTC+01:00}, {@code UTC} for
+     * {@code Z}), which the engine reads back as the time at that offset. Generated code uses it to read the outputs
+     * of a time column whose values have zone ids, which may also be at a fixed offset (DMN 1.5, Table 72), and
+     * which the engine may write with that offset ({@code 00:01:00Z} for an input bound as
+     * {@code 00:01:00@Etc/UTC}).
+     *
+     * @throws DateTimeParseException if the text is not such a time
+     */
+    public static ZonedTime parseZonedTime(String text) {
+        if (text.indexOf('@') >= 0) {
+            return ZonedTime.parse(text);
+        }
+        if (parseTime(text) instanceof OffsetTime time) {
+            return new ZonedTime(time.toLocalTime(), ZoneId.ofOffset("UTC", time.getOffset()));
+        }
+        throw new DateTimeParseException("a time without a time zone", text, text.length());
     }
 
     /**
@@ -86,9 +166,14 @@ public final class FeelTemporals {
         throw new DateTimeParseException("a date and time without a time zone", text, text.length());
     }
 
-    /** Whether a value is a time or date-time with a time zone: an {@link OffsetTime} or a {@link ZonedDateTime}. */
+    /**
+     * Whether a value is a time or date-time with a time zone that has an offset: an {@link OffsetTime} or a
+     * {@link ZonedDateTime}, or a {@link ZonedTime} in a zone with one fixed offset ({@link #withFixedOffset}). Any
+     * other {@link ZonedTime} has none, as its zone id gives no offset without a date.
+     */
     public static boolean hasZone(Object value) {
-        return value instanceof OffsetTime || value instanceof ZonedDateTime;
+        var fixed = withFixedOffset(value);
+        return fixed instanceof OffsetTime || fixed instanceof ZonedDateTime;
     }
 
     /**
@@ -97,7 +182,7 @@ public final class FeelTemporals {
      * compared by it when the other value has none.
      */
     public static Object local(Object value) {
-        return switch (value) {
+        return switch (withFixedOffset(value)) {
             case OffsetTime time -> time.toLocalTime();
             case ZonedDateTime dateTime -> dateTime.toLocalDateTime();
             default -> value;
@@ -107,14 +192,27 @@ public final class FeelTemporals {
     /**
      * Orders two values of one column type as FEEL does: times and date-times that both have a zone by
      * instant (so equal instants compare as 0, whatever their zones); when only one has a zone, the
-     * other takes its offset, so the two are ordered by their {@linkplain #local local} time; every
+     * other takes its offset, so the two are ordered by their {@linkplain #local local} time; two times with a
+     * zone id in the same zone by local time, a time in a zone with one fixed offset being the time at that offset
+     * ({@link #withFixedOffset}); every
      * string by character ({@link FeelStrings#compare}), and every other value by its natural order. Across
      * values with and without a zone this order is not
      * transitive ({@code 08:00Z} is before {@code 08:30}, which is before {@code 09:00+02:00}, the
      * instant before {@code 08:00Z}), so sort only values of one kind with it.
+     *
+     * @throws IllegalArgumentException if the two are not {@linkplain #comparable comparable}: a time with a zone id
+     *                                  and a time in another zone, or of another kind
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public static int compare(Object a, Object b) {
+    public static int compare(Object first, Object second) {
+        var a = withFixedOffset(first);
+        var b = withFixedOffset(second);
+        if (a instanceof ZonedTime || b instanceof ZonedTime) {
+            if (!comparable(a, b)) {
+                throw new IllegalArgumentException("FEEL does not define how %s compares with %s".formatted(a, b));
+            }
+            return ((ZonedTime) a).time().compareTo(((ZonedTime) b).time());
+        }
         if (hasZone(a) != hasZone(b)) {
             return ((Comparable) local(a)).compareTo(local(b));
         }
@@ -130,6 +228,21 @@ public final class FeelTemporals {
             case String text -> FeelStrings.compare(text, (String) b);
             default -> ((Comparable) a).compareTo(b);
         };
+    }
+
+    /**
+     * Whether {@link #compare} orders two values of one column type: always, unless one is a time with a zone id
+     * ({@link ZonedTime}) in a zone whose offset changes, which compares only with a time in the same zone. FEEL gives
+     * null for a comparison it does not define. A time in a zone with one fixed offset is the time at that offset
+     * ({@link #withFixedOffset}), which compares with every time.
+     */
+    public static boolean comparable(Object first, Object second) {
+        var a = withFixedOffset(first);
+        var b = withFixedOffset(second);
+        if (a instanceof ZonedTime x) {
+            return b instanceof ZonedTime y && x.zone().equals(y.zone());
+        }
+        return !(b instanceof ZonedTime);
     }
 
     /** -1, 1 or 0 as a value is before, after or at the same instant as another. */

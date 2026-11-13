@@ -47,7 +47,7 @@ public final class Decisions {
 
     /**
      * Reads every decision table of every source (a DMN file may hold several, each its own decision) and
-     * builds their engines.
+     * builds their engines, which log their validation reports as {@code PraeceptaEngine} does by default.
      *
      * @param failOn the validation severity that fails loading: ERROR, WARNING, or null for none (unreadable
      *               or invalid tables always fail)
@@ -56,10 +56,27 @@ public final class Decisions {
      *                            the same name, and validation issues at least as severe as {@code failOn}
      */
     public static Decisions load(Collection<TableSource> sources, Severity failOn) {
+        return load(sources, failOn, true);
+    }
+
+    /**
+     * Reads every decision table of every source (a DMN file may hold several, each its own decision) and
+     * builds their engines.
+     *
+     * @param failOn     the validation severity that fails loading: ERROR, WARNING, or null for none
+     *                   (unreadable or invalid tables always fail)
+     * @param logReports whether each engine logs its validation report
+     *                   ({@code PraeceptaEngine.Builder.logValidationReport}); false when the caller reports
+     *                   the decisions' {@link Decision#report() reports} itself, as {@link DecisionsLoader} does
+     * @throws DecisionsException listing every problem: a source that cannot be read or holds no decision
+     *                            table, a table that is not valid DMN or cannot be built, two decisions with
+     *                            the same name, and validation issues at least as severe as {@code failOn}
+     */
+    public static Decisions load(Collection<TableSource> sources, Severity failOn, boolean logReports) {
         var problems = new ArrayList<String>();
         var byName = new TreeMap<String, Decision>();
         for (var source : sources) {
-            for (var decision : read(source, problems)) {
+            for (var decision : read(source, logReports, problems)) {
                 var other = byName.putIfAbsent(decision.name(), decision);
                 if (other != null) {
                     problems.add("%s: decision '%s' is also defined in %s".formatted(source.location(), decision.name(), other.location()));
@@ -75,7 +92,7 @@ public final class Decisions {
         return new Decisions(byName);
     }
 
-    private static List<Decision> read(TableSource source, List<String> problems) {
+    private static List<Decision> read(TableSource source, boolean logReports, List<String> problems) {
         try (var dmn = source.opener().open()) {
             var tables = DmnReader.readAll(dmn);
             if (tables.isEmpty()) {
@@ -84,7 +101,7 @@ public final class Decisions {
             }
             var decisions = new ArrayList<Decision>();
             for (var table : tables) {
-                decision(source, table, problems).ifPresent(decisions::add);
+                decision(source, table, logReports, problems).ifPresent(decisions::add);
             }
             return decisions;
         } catch (IOException e) {
@@ -95,9 +112,9 @@ public final class Decisions {
         return List.of();
     }
 
-    private static Optional<Decision> decision(TableSource source, DecisionTable table, List<String> problems) {
+    private static Optional<Decision> decision(TableSource source, DecisionTable table, boolean logReports, List<String> problems) {
         try {
-            return Optional.of(Decision.of(source.location(), table));
+            return Optional.of(Decision.of(source.location(), table, logReports));
         } catch (IllegalArgumentException e) {
             problems.add(source.location() + ": " + e.getMessage());
             return Optional.empty();

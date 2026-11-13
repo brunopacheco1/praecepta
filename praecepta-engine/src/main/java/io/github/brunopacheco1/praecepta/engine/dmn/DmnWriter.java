@@ -29,6 +29,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NotEqual;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
@@ -42,7 +43,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * compare with, also gets an {@code inputData} element, which Drools needs to bind input values. An
  * input that holds lists is typed by a collection item definition (of an item type with its input
  * values, if it declares any), and a list column's cells are written with FEEL's list functions
- * ({@link #renderList}). An output's default value is written as its {@code defaultOutputEntry}.
+ * ({@link #renderList}). An output's default value is written as its {@code defaultOutputEntry}, {@code null}
+ * for an output whose default is {@code null} ({@link OutputColumn#hasDefault}).
  *
  * <p>The result is read back unchanged by {@link DmnReader}, and is evaluated identically by
  * Camunda 8 and Drools (checked by the benchmark module).
@@ -82,7 +84,12 @@ public final class DmnWriter {
         return xml.toString();
     }
 
-    /** Standard FEEL text for parsed unary tests. */
+    /**
+     * Standard FEEL text for parsed unary tests.
+     *
+     * @throws IllegalArgumentException if a test is a {@link UnaryTests.NullElement}, which only a list column's
+     *                                  cell holds ({@link #renderList})
+     */
     public static String render(UnaryTests tests) {
         return switch (tests) {
             case UnaryTests.Any() -> "-";
@@ -95,7 +102,7 @@ public final class DmnWriter {
      * Standard FEEL text for the cell of a column that holds lists, which tests the list's elements:
      * {@code "PT", >= 18, null} becomes
      * {@code list contains(?, "PT") or some x in ? satisfies x >= 18 or ? = null}, read back by
-     * {@code CellParser#parseFeelList}.
+     * {@code CellParser#parseFeelList}; a {@link UnaryTests.NullElement} is written {@code list contains(?, null)}.
      */
     public static String renderList(UnaryTests tests) {
         return switch (tests) {
@@ -200,7 +207,7 @@ public final class DmnWriter {
     /** An output, with its value list and its default value ({@code defaultOutputEntry}), if it has them, in that order. */
     private static void output(StringBuilder xml, int c, OutputColumn output) {
         xml.append("      <output").append(idAndName("output_" + c, output.name())).append(typed(output.type()));
-        if (output.values().isEmpty() && output.defaultValue() == null) {
+        if (output.values().isEmpty() && !output.hasDefault()) {
             xml.append("/>\n");
             return;
         }
@@ -211,7 +218,7 @@ public final class DmnWriter {
                     .collect(Collectors.joining(", "));
             expression(xml, "outputValues", id("output_values_" + c), values);
         }
-        if (output.defaultValue() != null) {
+        if (output.hasDefault()) {
             var value = outputLiteral(output.defaultValue(), output.type(), "default output of '" + output.name() + "'");
             expression(xml, "defaultOutputEntry", id("output_default_" + c), value);
         }
@@ -311,8 +318,10 @@ public final class DmnWriter {
     private static String listTest(Test test) {
         return switch (test) {
             case NullTest() -> "? = null";
-            case Equals(var value) -> "list contains(?, " + literal(value) + ")";
+            case UnaryTests.NullElement() -> "list contains(?, null)";
+            case Equals(var value, var explicit) -> "list contains(?, " + literal(value) + ")";
             case Compare c -> "some x in ? satisfies x " + test(c);
+            case NotEqual n -> "some x in ? satisfies x " + test(n);
             case Range r -> "some x in ? satisfies x in " + test(r);
         };
     }
@@ -320,7 +329,10 @@ public final class DmnWriter {
     private static String test(Test test) {
         return switch (test) {
             case NullTest() -> "null";
-            case Equals(var value) -> literal(value);
+            // only CellParser.parseFeelList reads it, for a list column, whose cells renderList writes
+            case UnaryTests.NullElement() -> throw new IllegalArgumentException("list contains(?, null) only tests a list's elements");
+            case Equals(var value, var explicit) -> (explicit ? "= " : "") + literal(value); // = home is not home of a list
+            case NotEqual(var negated) -> "!= " + test(negated);
             case Compare(var operator, var value) -> operator.symbol() + " " + literal(value);
             case Range(var low, var lowClosed, var high, var highClosed) -> (lowClosed ? "[" : "(") + literal(low) + ".."
                     + literal(high) + (highClosed ? "]" : ")");

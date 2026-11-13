@@ -11,6 +11,341 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-13
+
+DMN 1.5 in single tables: Praecepta now reads the FEEL that 0.5 rejected in cells and output entries, and
+analyses the rules it skipped. Cells take `=` and `!=` tests, numbers such as `.5` and `1.2e3`, at-literals
+(`@"2025-01-31"`) and every form of the date and time functions, comments, and times with a zone id
+(`time("10:30:00@Europe/Paris")`); output entries compute with dates, times and durations
+(`due + duration("P14D")`); list inputs may hold missing elements; and the validation report covers rules
+that test list columns and reports a default output that no input can reach. What DMN 1.5 and its TCK leave
+open, and what Praecepta does there, is recorded in [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md). Two
+fixes follow DMN 1.5 where 0.5 did not: SUM, MIN and MAX are null when a matching rule's output is missing,
+and a `null` default output value is a default; and the integrations log each validation issue once. The
+Gradle plugin is now on the Gradle Plugin Portal, so applying it needs no `pluginManagement` repository, and
+CI builds a Spring Boot, a Micronaut and a Quarkus application as native executables, which found a bug, now
+fixed, with `@Named` engines under Spring AOT. The DMN conformance kit (TCK) still passes 83 of its 86
+decision-table checks; the other three need decision requirement graphs
+([#14](https://github.com/brunopacheco1/praecepta/issues/14)). Its arithmetic test cases are now run as
+output expressions too: of their 1,101 checks Praecepta reads 489, of which 276 give the kit's result, 212
+are rejected when the engine is built where the kit expects null, and one differs. Read *Changed* and *Fixed* before upgrading if your tables have unquoted string cells that start with
+`=` or `!=` (now tests, not text), declare a default output although every input matches a rule (now an
+ERROR, which fails builds and startups), test list columns (their overlaps are now found, and are errors
+under UNIQUE and ANY), receive lists holding null elements (now evaluated, not rejected), declare `null`
+default output values (no match now gives an output of nulls instead of none), or aggregate with SUM, MIN or
+MAX over rules whose output may be missing (now null, not the aggregate of the others); and if another XML
+parser on the class path read your DMN files (`DmnReader` now always uses the JDK's), or your code
+deconstructs `DecisionTable.OutputColumn` or `UnaryTests.Equals`, switches over `UnaryTests.Test` or
+`ValidationReport.Kind`, or assigns `FeelTemporals.parseTime` to a `Temporal`.
+
+### Added
+- **`=` and `!=` tests in cells** ([#81](https://github.com/brunopacheco1/praecepta/issues/81)): DMN 1.5
+  lets a unary test start with `=` or `!=` (grammar rule 7.a), which cells, value lists and DMN files
+  rejected (`'= 18' is not a number`). `= 18` is the test `18`, `= null` the test `null`. `!= x` is
+  `not(= x)` for one value (10.3.2.15: "FEEL(e1 != e2) is FEEL(not(e1 = e2))"), so it holds for a missing
+  value, which does not equal `x`, and `!= null` holds for any value that is not missing; unlike `not(...)`,
+  which goes around a whole cell, it is one test among others (`!= 0, > 10`), and it may name another input
+  in a DMN file (`!= home`). On a list column it holds when some element differs; `!= null` is rejected
+  there in Praecepta's syntax, where `null` tests the list itself and the other tests its elements (write
+  `not(null)` for a list that is there; a DMN file writes the elements' test
+  `some x in ? satisfies x != null`). In a DMN file, `= home` of an input that holds a list is rejected when
+  the engine is built, as `!= home` is: it is FEEL's `? = home`, an equality of a value and a list, which is
+  null (Tables 52 and 53), while the bare `home` asks whether the value is in the list
+  (`list contains(home, ?)`, Table 55); `UnaryTests.Equals.explicit` tells the two apart (see *Changed*), and
+  `DmnWriter` writes `= home` back as written. `UnaryTests.NotEqual`
+  holds it; `DmnWriter` writes it back as `!= x` (on a list column, `some x in ? satisfies x != "PT"`, which
+  `DmnReader` reads), and the index, the validation report and every integration treat it as the engine
+  does.
+- **Date time literals in every form DMN 1.5 has**
+  ([#81](https://github.com/brunopacheco1/praecepta/issues/81)): at-literals (grammar rule 65;
+  `>= @"2019-03-31"`, `< @"08:30:00"`, `@"P1D"`), whose string's syntax says whether they are a date, a
+  time, a date and time or a duration, and the other forms of the date and time functions (rule 60, Table
+  72): `date(2025, 1, 31)`, `date(date and time(...))`, `time(8, 30, 0)`,
+  `time(8, 30, 0, duration("PT1H"))`, `time(date and time(...))`, `date and time(date(...), time(...))`, and
+  `date and time("2025-01-31")`, a date and time string without a time, which is that date at midnight
+  (10.3.4.1; the TCK's `0068-feel-equality` has it equal `date and time("2025-01-31T00:00:00")`). Cells,
+  value lists and DMN entries read them in columns of their type, and reject one of another type by name
+  (`'@"08:30:00"' is a time, not a date`); `DmnWriter` writes them as `date("...")`, `time("...")`,
+  `date and time("...")` and `duration("...")`. Input values read from text are unchanged: a date-time input
+  is still written with its time.
+- **Numbers that start with their fraction or have an exponent**
+  ([#81](https://github.com/brunopacheco1/praecepta/issues/81)): a number in a cell, a value list or a DMN
+  entry may be written `.5` or `1.2e3` (`1E-2`, `2.5E+1`), as FEEL's numeric literal allows (grammar rule
+  35; 10.3.2.3.1: "FEEL supports literal scientific notation, e.g., 1.2e3"), as output expressions already
+  read them. `DmnWriter` writes such a number as plain digits (`1200`). A number beyond FEEL's decimal128
+  (an exponent past 6144 or -6176, 10.3.2.3.1) has no FEEL value and is rejected, in cells, value lists, DMN
+  entries, the arguments of the date and time functions and output expressions alike
+  (`'1e999999999' is beyond FEEL's numbers (decimal128)`): written out digit by digit, as the validation
+  report and `DmnWriter` write numbers, `< 1e999999999` would exhaust the heap.
+- **Comments** ([#81](https://github.com/brunopacheco1/praecepta/issues/81)): `//` to the end of the line
+  and `/* ... */`, which DMN 1.5 allows in FEEL (10.3.1.2: "Java-style comments can be used"), are ignored
+  outside string literals, in cells, value lists, DMN entries, default output values (`null // no fee` is a
+  `null` default, [#92](https://github.com/brunopacheco1/praecepta/issues/92)) and output expressions
+  (`< 18 // minors`). In Praecepta's syntax (Excel, CSV and code), a string column keeps them as text, as it
+  always has, since an unquoted word there may hold `//` (a URL). `DmnWriter` leaves them out.
+- **Times with a zone id** ([#82](https://github.com/brunopacheco1/praecepta/issues/82)): a time may name a
+  zone instead of an offset (DMN 1.5, 10.3.4.1: a local time "followed by the character "@", followed by
+  [...] a time zone identifier in the IANA Time Zones Database"), as in `time("10:30:00@Europe/Paris")`,
+  `@"10:30:00@Europe/Paris"` or, in Praecepta's syntax, `10:30:00@Europe/Paris`; cells, value lists, DMN
+  files and map-based inputs rejected it. Such a time is a `feel.ZonedTime` (a local time and a zone id:
+  `OffsetTime` cannot hold a zone without its offset, which a zone id has only on a date), bound with
+  `PraeceptaEngine.Builder.zonedTimeInput`, written back by `FeelLiterals` and `DmnWriter`, and generated as
+  a `ZonedTime` component by the Maven and Gradle plugins and the Quarkus extension when the values written
+  for a time column have zone ids (some of them may instead have an offset, or a zone with one fixed offset).
+  Two such times in the same zone compare by local time, which is all the TCK asks (`0068-feel-equality`:
+  `time("10:30:00@Europe/Paris") = time("10:30:00@Europe/Paris")`). A time in a zone with one fixed offset
+  (`Etc/UTC`, `Etc/GMT-2`, `UTC`) is the time at that offset, as DMN 1.5's example of `time(from)` has it
+  (Table 72: `time("23:59:00z") + duration("PT2M") = time("00:01:00@Etc/UTC")` is true), and as the TCK has it
+  for date-times (`0068-feel-equality`: `date and time("2018-12-08T00:00:00+00:00") = date and
+  time("2018-12-08T00:00:00@Etc/UTC")`): read from text, a cell, an output entry or a date and time, it is an
+  `OffsetTime` (`FeelTemporals.parseTime("00:01:00@Etc/UTC")` is `00:01Z`), and a `ZonedTime` in such a zone
+  that a getter gives is matched, compared and subtracted as one, so a `zonedTimeInput` column also takes
+  times at an offset, among which the validation report looks for overlaps and gaps. Such a time is written at
+  its offset (`DmnWriter` writes `time("00:01:00Z")`, which reads back equal, and an output that names or
+  computes it gives `00:01:00Z`), and the generated component of a time column whose zone ids all have a fixed
+  offset is an `OffsetTime`. `FeelTemporals.timeIn` and `withFixedOffset` make such a time, and generated code
+  reads time outputs back with `FeelTemporals.parseOffsetTime` and `parseZonedTime`, which take either form.
+  Every other comparison of a time with a zone id whose offset changes, with a time in another zone, at an
+  offset or without a zone, is left open by DMN 1.5 and by the TCK ("pending RTF equality comparisons with
+  zones clarification"); Praecepta does not invent one: such a comparison is FEEL's null, so neither a test
+  nor its `not(...)` holds, an interval's ends must be in one zone, and a COLLECT MIN or MAX of such times in
+  two zones is null (FEEL's `min` and `max` take comparable items, Table 75, and a built-in function is null
+  outside its domain, 10.3.2.16). This choice is recorded in [DMN conformance](docs/DMN-CONFORMANCE.md). The
+  index gives each zone id the cells name a line of local times and the other zone ids one class; a
+  map-based column whose cells name no zone id takes such a time too, matching only the cells that accept
+  any value, and keeps the validation report it had. `FeelTemporals.comparable(a, b)` says whether two
+  values compare.
+- **Output expressions over dates, times and durations**
+  ([#85](https://github.com/brunopacheco1/praecepta/issues/85)): output entries combine dates, times,
+  date-times and durations as DMN 1.5 defines it (Tables 57, 59 and 62), where they took strings and numbers
+  only and rejected the table when the engine was built
+  (`'due' is a date; output expressions combine strings and numbers`). `due + duration("P14D")` is a date,
+  `returned - sent` a days and time duration (as are two times or two dates subtracted), `start + @"P1Y"`
+  keeps the type of `start`, durations of a kind add, subtract and divide to a number, a duration scales by
+  a number, and `-elapsed` is `elapsed * -1`. Their literals are those cells read, at-literals and the date
+  and time functions in every form, through one reader. The output is null where FEEL defines no value: a
+  date and time with a zone minus one without (Table 57), a date plus a month that does not have its day
+  (`date("2025-01-31") + duration("P1M")`, as `date(2025, 2, 31)` is null), a division by zero, a result out
+  of range. A years and months duration scaled by a number keeps whole months, toward zero, and a date
+  meeting a date and time counts as UTC midnight (10.3.2.3.5), as the DMN TCK's `0100-arithmetic` expects.
+  Times subtract as they compare: by instant when both have an offset, by local time when one has none or
+  both have a zone id in one zone, and not at all for a time with a zone id and any other (so two times at
+  offsets far apart can be more than a day apart; a time in a zone with one fixed offset is a time at that
+  offset, [#82](https://github.com/brunopacheco1/praecepta/issues/82)), and a date and time with a zone id moved by months onto a
+  local time its zone skips moves forward by the gap; DMN 1.5 leaves those cases open, so they are recorded
+  in [DMN conformance](docs/DMN-CONFORMANCE.md). Types FEEL does not
+  combine (`due + 1`, `elapsed + tenure`) are still rejected when the engine is built, now naming both types
+  (`+ combines a date and a number, which gives null in FEEL`). The engine, the classes the build plugins
+  generate (which evaluate through it, with a component that has the zone of the expression's operands:
+  `start + duration("PT8H")` of a `ZonedDateTime` input is a `ZonedDateTime`), `praecepta-integration`'s map
+  engines and `DmnWriter`, which writes the entries back as read, agree. `praecepta-tck` now also evaluates the TCK's `0099-arithmetic-negation`
+  and `0100-arithmetic` literal expressions as output expressions (`OutputExpressionsTckTest`): of their
+  1,101 checks, Praecepta reads 489: 276 give the kit's result, 212 are rejected when the engine is built
+  where the kit expects null (operands of types FEEL does not combine, counted apart, as they give no result),
+  and one differs, a power that is not whole, which the kit gives to 13 digits where FEEL's numbers have 34; the other 612 use functions, lists,
+  contexts, booleans, `null` operands or hour 24. The decision-table results in `RESULTS.md` are unchanged.
+- **Missing elements in list inputs** ([#84](https://github.com/brunopacheco1/praecepta/issues/84)): a list
+  may hold missing (null) elements, as FEEL lists may, where 0.4 and 0.5 threw `InvalidInputException`
+  ("holds a missing value"). They get FEEL's three-valued answers (DMN 1.5, Tables 49, 50 and 75): a literal
+  is false for a missing element and a comparison or an interval unknown, and a cell's tests are joined over
+  the elements with FEEL's `or`, so `list contains(?, "PT")` matches `["PT", null]`,
+  `not(list contains(?, "PT"))` matches `["BR", null]`, `some x in ? satisfies x >= 18` matches
+  `[20, null]`, and `not(some x in ? satisfies x >= 18)` does not match `[10, null]` (`false or null` is
+  null). A DMN cell may ask for a missing element with `list contains(?, null)`, read by
+  `CellParser.parseFeelList` as the new test `UnaryTests.NullElement` and written back by `DmnWriter`;
+  Praecepta's syntax has no form for it, as `null` there asks whether the list itself is missing
+  (`? = null`), which it still does. A null element of a `Collection`, a blank one (by Praecepta's convention
+  that blank text is missing, as for single values, though FEEL's `""` is a string), and `null` in a list's
+  text (`["PT", null]`, `BR, null`), is a missing element; the text `null` alone is still no list. Declared input
+  values apply to the elements that are there. A cell naming a list input (`Flu Symptoms`) is
+  `list contains(Flu Symptoms, Symptom)` (Table 55), so a missing value is in a list that holds a missing
+  element. The engine, the classes the Maven and Gradle plugins generate and the framework integrations' map
+  engines all evaluate them alike.
+- **Analysis of rules that test list columns**
+  ([#78](https://github.com/brunopacheco1/praecepta/issues/78)): the validation report, and so the Maven and
+  Gradle plugins' build-time check, the Quarkus build and the Spring Boot and Micronaut startup checks, now
+  look at rules whose cell in a list column is not `-`, which 0.4 and 0.5 left out. A list counts as the set
+  of its elements' classes in the column's index, so rules `"PT"` and `"BR"` overlap under UNIQUE (on
+  `["PT", "BR"]`), `[20..30]` after `>= 18` can never be selected under FIRST, and two rules `"PT"` and
+  `"BR"` with declared values `"PT","BR"` leave the gap `nationalities = []`. Overlaps and unreachable rules
+  count every list, missing lists and lists holding missing elements included; gaps are searched among lists
+  of values (as for single values, missing ones are not) and described by the elements such lists hold,
+  `nationalities has no element in "PT", nationalities has an element in "ES"`, with an example list
+  (`{nationalities=[ES]}`). No bound on the length of lists is needed: each question is decided per rule and
+  element class. A table with several list columns branches on the minimal sets of rules the lists of each
+  but the last can leave; past 1024 of them a rule is not reported unreachable, or the table's gaps are not
+  reported, rather than reported wrongly. The report lists the first 100 overlapping pairs, in rule order,
+  as it lists the first 100 gaps: rules that each name another value of a list column all overlap, so a UNIQUE
+  table of 2,000 such rules has nearly 2,000,000 pairs. Which earlier rules cover a rule on the last list
+  column is found with a few mask operations per rule and element class, so a list column with a value per
+  rule builds as quickly as a string column. Tables without list columns get the same report as before, but
+  for the cap on overlapping pairs (see *Changed*).
+- **A default output on a complete table is reported**
+  ([#91](https://github.com/brunopacheco1/praecepta/issues/91)): DMN 1.5, 10.3.2.10, "A complete decision
+  table SHALL NOT specify a default output value", since no input could reach it. The validation report has
+  a new issue kind, `ValidationReport.Kind.UNREACHABLE_DEFAULT_OUTPUT`, an ERROR, when a table declares a
+  default output (`defaultOutputEntry`, or `Builder.defaultOutput`) and every input matches a rule: a search
+  over the index's classes, like the other analyses, that unlike the gap search also visits a missing value
+  in every column (which the engine accepts, and `-` matches) and the strings no rule mentions in a column
+  without declared values. So a table whose rules cover every declared value but not a missing one is not
+  reported: its default is what a missing input gives. A list column is searched as every list it takes, a
+  missing one, the empty one and lists holding missing elements included (with the list analysis of
+  [#78](https://github.com/brunopacheco1/praecepta/issues/78)), and a time column of map-based inputs, or of
+  lists, whose cells name no zone id as every time it takes, one with a zone id
+  ([#82](https://github.com/brunopacheco1/praecepta/issues/82)) included, which only the cells that accept
+  any value match. Rules that compare with another input are left out, as from the other analyses, so a
+  table complete only through them is not reported. Its message is
+  `ERROR every input matches a rule, so the default output is never given (a complete table declares no default output: DMN 1.5, 10.3.2.10)`,
+  and `Decisions.describe()` shows it with the kind `UNREACHABLE_DEFAULT_OUTPUT`. The TCK's tables with
+  default outputs are not complete, so its results are unchanged.
+- **The Gradle plugin on the Gradle Plugin Portal**
+  ([#93](https://github.com/brunopacheco1/praecepta/issues/93)), where Gradle looks for plugins by default,
+  so `plugins { id("io.github.brunopacheco1.praecepta") version "..." }` needs no `pluginManagement`
+  repository. The Portal serves the same jars and POM as Maven Central: the release uploads the files Maven
+  built, fetched from Maven Central, and does not rebuild them with Gradle.
+- **[docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md)**
+  ([#86](https://github.com/brunopacheco1/praecepta/issues/86)): the cases DMN 1.5 and the TCK leave open,
+  with what each says and what Praecepta does, kept in the repository rather than in an issue, and linked
+  from the README and `praecepta-tck/RESULTS.md`: `-` and a missing input, values outside the declared input
+  values, intervals whose ends are missing or out of order, `=` between a time with a zone and one without,
+  times at different offsets, and, new in 0.6, a `null` default beside output values, whether a missing
+  input counts towards a complete table, how a time with a zone id compares with other times, and how two
+  times in different zones subtract. COUNT with no match is marked settled (0.5.0). It also says how
+  Praecepta returns DMN's null result: no output, or an output whose value is null. The README no longer
+  calls those choices FEEL's.
+- `PraeceptaEngine.Builder.logValidationReport(boolean)`: whether `build()` logs the validation report as a
+  warning through `System.Logger`, as it always did and still does by default. Turn it off when you report
+  `validationReport()` yourself ([#95](https://github.com/brunopacheco1/praecepta/issues/95)).
+  `praecepta-integration` gains `Decisions.load(sources, failOn, logReports)` and
+  `Decision.of(location, table, logReport)` to build its engines so; `Decisions.load(sources, failOn)` and
+  `Decision.of(location, table)` keep the engine's logging.
+- **The framework integrations built as native executables in CI**
+  ([#99](https://github.com/brunopacheco1/praecepta/issues/99)): `praecepta-native-tests` (not published; in
+  the reactor only with the `native-frameworks` profile) holds a small Spring Boot, Micronaut and Quarkus
+  application. Each is built as a GraalVM native executable with its framework's own native build (Spring
+  Boot's `native` profile, with Spring AOT; Micronaut's `-Dpackaging=native-image`; Quarkus' `-Dnative`,
+  with a DMN file under `src/main/resources/rules/` and a CSV table declared in `application.properties`),
+  started, and made to evaluate decisions through the engines and the `Decisions` bean it injects, whose
+  answers it checks. The `Native frameworks` workflow runs them on main, weekly, and on pull requests that
+  change a framework module, the integration core, the compiler or the loader (with which the Quarkus build
+  compiles its CSV table), the engine's native-image metadata or the applications, with GraalVM for JDK 25, and the Micronaut one
+  with JDK 21 too (Spring Boot 4 and Quarkus 3.40 need GraalVM for JDK 25).
+
+### Changed
+- **An unquoted string cell that starts with `=` or `!=` is now a test**
+  ([#81](https://github.com/brunopacheco1/praecepta/issues/81)): in Praecepta's syntax (Excel, CSV and
+  code), `= PT` was the string `= PT`, and is now the test `= "PT"`; `!= PT` now matches every value but
+  `PT`. **Upgrade note:** this changes results silently; before upgrading, search your string columns for
+  cells that start with `=` or `!=` and quote them (`"= PT"`) if they mean the text.
+- **Builds and startups fail on a default output that no input can reach**
+  ([#91](https://github.com/brunopacheco1/praecepta/issues/91)): the new issue is an ERROR, the default
+  `failOn` of the Maven and Gradle plugins and the default `fail-on` of the Spring Boot, Micronaut and
+  Quarkus integrations, so a complete table with a default output that built or started in 0.5 now fails,
+  naming the decision. Remove the default output (it is never given), or set `failOn`/`fail-on` to `NONE`
+  until the table is fixed. Engines built directly fail only with `failOn(Severity.ERROR)`, as before.
+  `ValidationReport.Kind` has a fifth constant, so an exhaustive `switch` over it needs a case for it.
+- **Upgrade note:** tables with list columns may now get validation findings they did not get before
+  ([#78](https://github.com/brunopacheco1/praecepta/issues/78)): overlaps under UNIQUE are errors, so an
+  engine built with `failOn(Severity.ERROR)`, a Maven or Gradle build, a Quarkus build or a Spring Boot or
+  Micronaut application at the default `fail-on` stops on such a table where it did not; the rules involved
+  are named in the report.
+- **The report lists at most 100 pairs of overlapping rules (UNIQUE) or of rules with conflicting outputs
+  (ANY)** ([#78](https://github.com/brunopacheco1/praecepta/issues/78)), the first in rule order, as it lists at
+  most 100 gaps; 0.5 listed every pair. The report's severity, and so whether a build or a startup fails, is
+  unchanged; code that counts these issues sees at most 100.
+- `UnaryTests.Equals` has a second component, `explicit`
+  ([#81](https://github.com/brunopacheco1/praecepta/issues/81)): whether a name is written after `=`
+  (`= home`), which FEEL reads as an equality rather than as the bare name's membership test of a list. It
+  is false for literals, for which `= x` and `x` are the same test, and the constructor with one argument
+  remains; a record pattern that deconstructs `Equals` needs the new component.
+- **Upgrade note:** a list input holding a missing element is evaluated rather than rejected
+  ([#84](https://github.com/brunopacheco1/praecepta/issues/84)); code that relied on the
+  `InvalidInputException` to catch such lists must check them itself.
+- **`DmnReader` uses the JDK's own XML parser**
+  ([#96](https://github.com/brunopacheco1/praecepta/issues/96)): it created its parser with
+  `DocumentBuilderFactory.newInstance()`, which JAXP looks up through the
+  `javax.xml.parsers.DocumentBuilderFactory` system property and the class path's service files, and now
+  with `newDefaultInstance()`, the JDK's built-in parser, which its security settings (no DTDs, no external
+  entities) are written for. **Upgrade note:** an application with another DOM parser on the class path,
+  such as Xerces, or with that system property set, used to read DMN files with that parser and now reads
+  them with the JDK's, with its security settings applied as intended; a malformed file's message is the JDK
+  parser's. The engine's native-image metadata no longer registers JAXP's service file
+  (`META-INF/services/javax.xml.parsers.DocumentBuilderFactory`), which only that lookup needed; it still
+  keeps the parser's messages.
+- `DecisionTable.OutputColumn` has a fifth component, `hasDefault`
+  ([#92](https://github.com/brunopacheco1/praecepta/issues/92)): whether the output declares a default
+  value, which tells a default of `null` from none. The constructor with four arguments remains and sets it
+  when the default value is not null; the canonical one rejects a default value without `hasDefault`. A
+  record pattern that deconstructs `OutputColumn` needs the new component.
+- `UnaryTests.Test` permits a fifth record, `NullElement`
+  ([#84](https://github.com/brunopacheco1/praecepta/issues/84)): an exhaustive `switch` over a cell's tests
+  needs a case for it. `DmnWriter.render` (of a single-value cell) rejects it with an
+  `IllegalArgumentException`; `renderList` writes it.
+- **`FeelTemporals.parseTime` returns `Object`**
+  ([#82](https://github.com/brunopacheco1/praecepta/issues/82)), where it returned `Temporal`, since a time
+  with a zone id is a `ZonedTime` (one in a zone with one fixed offset, such as `Etc/UTC`, is the `OffsetTime`
+  at that offset); a caller that assigned the result to a `Temporal` casts it. `FeelTemporals.compare` throws an
+  `IllegalArgumentException` for two values that are not `comparable`, which only a time with a zone id whose
+  offset changes makes.
+- **The published POMs no longer import the JUnit BOM**
+  ([#98](https://github.com/brunopacheco1/praecepta/issues/98)): the parent POM, which every published
+  module inherits, imported `org.junit:junit-bom` in its `dependencyManagement`, as did the Spring Boot
+  starter and the Micronaut module, so every build that read a Praecepta POM (Maven and Gradle alike, the
+  Gradle plugin's marker included) resolved the JUnit BOM, although no published module depends on JUnit.
+  The parent now declares the JUnit artifacts the build uses (`junit-jupiter`, its `-api`, `-engine` and
+  `-params`, and `junit-platform-commons`, `-engine` and `-launcher`) each at `junit.version`. Every module
+  resolves the same JUnit as before.
+
+### Fixed
+- **A `null` default output value is a default**
+  ([#92](https://github.com/brunopacheco1/praecepta/issues/92)): `DmnReader` read
+  `<defaultOutputEntry><text>null</text></defaultOutputEntry>` as no default, so a table with several
+  outputs whose declared defaults were all `null` gave no output when no rule matched. DMN 1.5 builds the
+  default output from the outputs' defaults, a context with an entry per output (10.3.2.10, step 2; Table
+  46), and gives null only when no default is specified. `DmnReader` now keeps a `null` default
+  (`OutputColumn.hasDefault`, see *Changed*), `DmnWriter` writes it back, and
+  `DecisionTable.defaultOutput()` is present when any output declares a default; the engine, the generated
+  classes and the framework integrations' map-based engine all take it from there. **This changes results**
+  for tables that declare a `null` default: where no rule matches, they now give an output whose values are
+  null (`[{Status=null, Rate=null}]` in the integrations, an output record with null components in a
+  generated class, a present `Optional` for a single-hit table or an aggregation, COUNT included) instead of
+  none. A blank `defaultOutputEntry` is still no default.
+- **SUM, MIN and MAX of a missing output are missing**
+  ([#90](https://github.com/brunopacheco1/praecepta/issues/90)): a COLLECT aggregation skipped the matching
+  rules whose output was missing (a `null` output entry, an output that names a missing input, an expression
+  with a missing operand or a division by zero), so outputs of `10` and null summed to `10`. DMN 1.5
+  aggregates with FEEL's `sum`, `min` and `max` (8.2.11; 10.3.2.10, step 3b), which give null for a list
+  that holds null, as null is outside their parameters' domain (10.3.4.4, 10.3.2.16). The engine now applies
+  this itself, before the output strategy: under SUM, MIN or MAX, a table with one output whose output is
+  missing in a matching rule gives that rule's output, converted by the strategy, and `sum`, `min` and `max`
+  of an `OutputStrategy` only ever see outputs that are present. COUNT counts every matching rule, as
+  before, and no rule matching still gives the default output or none. **This changes results silently**:
+  where some matching rules have an output and others have none, a framework integration's engine now gives
+  `[{fee=null}]` where it gave the sum, minimum or maximum of the others, a generated class an output whose
+  component is null (`Optional[FeesOutput[fee=null]]`), and the engine the missing rule's output; a table
+  that wants the old behaviour can give such rules an output of `0` (for SUM) or split them out. Engines
+  built in code with several outputs, which DMN does not aggregate, still leave a missing output to their
+  strategy. The generated aggregation strategy no longer checks for null, and its `evaluate` says
+  `(null if one of them is null)`, so the generated class of a COLLECT table with SUM, MIN or MAX changes in
+  those lines.
+- **Validation issues were logged twice in the integrations**
+  ([#95](https://github.com/brunopacheco1/praecepta/issues/95)): the Spring Boot starter and the Micronaut
+  module logged each issue as a warning, one line per issue, and the engine logged the whole report again
+  through `System.Logger` (which Spring Boot routes to its own logging); the Quarkus extension logged the
+  issues at build time and its engines logged them again when the application started. `DecisionsLoader`,
+  which the three use, now builds the engines without their own logging, and Quarkus' runtime does too, so
+  each issue is logged once, by the framework's logger (in Quarkus, by the build). The engine that
+  `praecepta-compiler` validates a table with no longer logs either, since the Maven and Gradle plugins (and
+  Quarkus, for the tables it compiles) log `CompiledTable.report()` themselves; another build tool using
+  `TableCompiler` logs the report as [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) describes. The classes the
+  build plugins generate are unchanged: their engines still log the report when the application loads them.
+- **Spring Boot starter: `@Named` engines under Spring AOT** (found by the native build of
+  [#99](https://github.com/brunopacheco1/praecepta/issues/99)): an application processed ahead of time
+  (every Spring native image, and the JVM's AOT mode) did not start when a bean injected an engine with
+  `@Named("<decision name>")`; `@Qualifier` worked. Spring writes a bean definition's qualifiers from a set
+  in which two qualifiers with the same value are one, so only the `@Qualifier` one reached the generated
+  code. The starter's AOT processor now writes both.
+
 ## [0.5.0] - 2026-11-12
 
 Integrations: Praecepta now fits the build and the framework an application already uses. A Spring
@@ -566,7 +901,8 @@ Code written against the prototype needs the changes listed under *Changed*.
 - **`MissingOutputException`** (no match now yields an empty result), **`InvalidPraeceptaException`**
   and the trie visitor API.
 
-[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/brunopacheco1/praecepta/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/brunopacheco1/praecepta/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/brunopacheco1/praecepta/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/brunopacheco1/praecepta/compare/v0.2.0...v0.3.0

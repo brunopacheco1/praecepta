@@ -22,6 +22,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
+import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 
 /**
  * The matching of a column whose values are lists, such as a customer's nationalities. A cell holds
@@ -29,15 +30,24 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
  * {@code "ES"}; {@code >= 18}: some element is at least 18), as FEEL's {@code list contains(?, "PT")}
  * and {@code some x in ? satisfies x >= 18} do, and its {@code not(...)} when no element does. A
  * missing list makes every test unknown, as FEEL's list functions return null for it: it passes only
- * {@code -} and {@code null}. An empty list passes no test, so it matches every {@code not(...)}.
+ * {@code -} and {@code null} ({@code ? = null}, a test of the list). An empty list passes no test, so it
+ * matches every {@code not(...)}.
  *
- * <p>The elements are looked up in an ordinary {@link ColumnIndex} over the same cells, whose masks hold,
- * for an element, the rules with a positive cell that one of its tests accepts and the rules with a
- * {@code not(...)} cell that none of its tests accepts. An element is never missing, so each of its
- * tests is true or false. One pass over the
- * elements ORs, per rule, "some element passes a test"; the list's mask is then the rules with
- * {@code -}, the positive rules some element passes, and the negated rules none passes: a few word
- * operations per element. The element masks may be dense or sparse ({@link Masks});
+ * <p>An element may be missing (null). FEEL answers for it as for a missing single value: a literal is
+ * false ({@code null = "PT"}), {@code list contains(?, null)} ({@link UnaryTests.NullElement}) true, and a
+ * comparison or an interval unknown. A cell's tests are joined with FEEL's three-valued {@code or} over
+ * every element (DMN 1.5, Table 49: {@code some} is "false or FEEL(e, s') or FEEL(e, s'') or ..."), so a
+ * positive cell holds when some element passes a test, whatever the others, and its {@code not(...)} only
+ * when every test is false for every element: one unknown element makes the cell unknown, and so not a
+ * match ({@code not(some x in ? satisfies x >= 18)} does not match {@code [10, null]}).
+ *
+ * <p>The elements are looked up in an ordinary {@link ColumnIndex} over the same cells without their
+ * {@code null} tests ({@link #elementCells}), whose masks hold, for an element, the rules with a positive
+ * cell that one of its tests accepts and the rules with a {@code not(...)} cell whose tests are all false
+ * for it. One pass over the elements ORs, per rule, "some element passes a test" for the positive rules
+ * and "some test is not false for some element" for the negated rules; the list's mask is then the rules
+ * with {@code -}, the positive rules some element passes, and the negated rules no element leaves true or
+ * unknown: a few word operations per element. The element masks may be dense or sparse ({@link Masks});
  * the list masks are dense.
  */
 final class ListColumn {
@@ -65,33 +75,60 @@ final class ListColumn {
         anyRules = new long[words];
         positiveRules = new long[words];
         negatedRules = new long[words];
+        missingMask = new long[words];
         for (int bit = 0; bit < cellsByBit.size(); bit++) {
-            BitsetIndex.set(switch (cellsByBit.get(bit)) {
+            var cell = cellsByBit.get(bit);
+            BitsetIndex.set(switch (cell) {
                 case UnaryTests.Any any -> anyRules;
                 case UnaryTests.Positive positive -> positiveRules;
                 case UnaryTests.Negated negated -> negatedRules;
             }, bit);
+            // a missing list: ? = null is true, every test of its elements unknown, so a positive cell holds only
+            // with null (!= x holds for a missing value, but not for a missing list), and a not(...) never (its
+            // inside is true or unknown)
+            if (cell instanceof UnaryTests.Any || cell instanceof UnaryTests.Positive && testsTheList(cell)) {
+                BitsetIndex.set(missingMask, bit);
+            }
         }
-        // a missing element's class: positive cells with null pass, comparisons are unknown; not(...) of an
-        // unknown list is unknown, so no negated rule matches
         hasNegatedRules = !BitsetIndex.isEmpty(negatedRules);
-        missingMask = Masks.dense(elements.masks[elements.nullClass], words).clone();
-        BitsetIndex.andNot(missingMask, negatedRules);
         emptyMask = anyRules.clone();
         BitsetIndex.or(emptyMask, negatedRules);
+    }
+
+    /**
+     * The cells as the index of a single element sees them: without their {@code null} tests, which ask
+     * whether the list itself is missing ({@code ? = null}) and so are false for every list that is there. A
+     * cell left without tests is false for every element ({@code not(null)}: true for every list there).
+     */
+    static List<UnaryTests> elementCells(List<UnaryTests> cellsByBit) {
+        return cellsByBit.stream().map(cell -> switch (cell) {
+            case UnaryTests.Any any -> cell;
+            case UnaryTests.Positive(var tests) -> testsTheList(cell) ? new UnaryTests.Positive(elementTests(tests)) : cell;
+            case UnaryTests.Negated(var tests) -> testsTheList(cell) ? new UnaryTests.Negated(elementTests(tests)) : cell;
+        }).toList();
+    }
+
+    /** Whether a cell asks whether the list is missing: {@code null}, written {@code ? = null} in a DMN file. */
+    static boolean testsTheList(UnaryTests cell) {
+        return cell.tests().stream().anyMatch(UnaryTests.NullTest.class::isInstance);
+    }
+
+    private static List<UnaryTests.Test> elementTests(List<UnaryTests.Test> tests) {
+        return tests.stream().filter(test -> !(test instanceof UnaryTests.NullTest)).toList();
     }
 
     /**
      * The mask of the rules accepting a raw list: a {@code Collection} of the element type's values (as a
      * getter of a single value returns them), or text holding a FEEL list such as {@code ["PT", "BR"]}
      * (the brackets may be left out, and the elements follow Praecepta's cell syntax, so {@code PT, BR}
-     * works too). Null or blank text is a missing list, and {@code []} an empty one.
+     * works too). Null or blank text is a missing list, and {@code []} an empty one. An element may be
+     * missing: null or blank text in a collection, {@code null} in text ({@code ["PT", null]}).
      *
      * @return the list's mask, dense; a fresh one for a list with elements, and for a missing or an empty
      *         list a shared one, so never to be changed (as {@link ColumnIndex#maskFor} says of its masks)
-     * @throws InvalidInputException if an element is missing, of another Java type than the column's
-     *                               values, outside the declared input values or not a valid value of the
-     *                               type, or the text is not a list
+     * @throws InvalidInputException if an element is of another Java type than the column's values,
+     *                               outside the declared input values or not a valid value of the type, or
+     *                               the text is not a list
      */
     long[] maskFor(Object raw) {
         if (isMissing(raw)) {
@@ -118,7 +155,10 @@ final class ListColumn {
         return passed;
     }
 
-    /** Adds the rules an element's dense mask passes: the positive rules accepting it, the negated rules rejecting it. */
+    /**
+     * Adds the rules an element's dense mask passes: the positive rules accepting it, and the negated rules
+     * whose inside is not false for it (true, or unknown for a missing element), which no list holding it matches.
+     */
     private void passDense(long[] passed, long[] mask) {
         for (int w = 0; w < words; w++) {
             passed[w] |= mask[w] & positiveRules[w] | ~mask[w] & negatedRules[w];
@@ -154,6 +194,26 @@ final class ListColumn {
         return anyRules.clone();
     }
 
+    /** The rules whose cell holds when some element passes a test (neither {@code -} nor {@code not(...)}). */
+    long[] positiveRules() {
+        return positiveRules.clone();
+    }
+
+    /** The rules whose cell is a {@code not(...)}. */
+    long[] negatedRules() {
+        return negatedRules.clone();
+    }
+
+    /** The rules a missing list matches. */
+    long[] missingRules() {
+        return missingMask.clone();
+    }
+
+    /** The index of a single element, whose classes the static analysis builds lists from ({@link ListAnalysis}). */
+    ColumnIndex elements() {
+        return elements;
+    }
+
     /** Whether a raw list is missing: null or blank text. */
     static boolean isMissing(Object raw) {
         return raw == null || raw instanceof String text && text.isBlank();
@@ -176,24 +236,35 @@ final class ListColumn {
         };
     }
 
-    /** A list as text: {@code ["PT", "BR"]}, {@code PT, BR} or {@code []}. */
+    /**
+     * A list as text: {@code ["PT", "BR"]}, {@code PT, BR} or {@code []}; {@code null} is a missing element
+     * ({@code ["PT", null]}), though the text {@code null} alone is no list: a missing list is null or blank.
+     */
     private List<Comparable<?>> parse(String text) {
         var elementsText = text.strip();
-        if (elementsText.startsWith("[") && elementsText.endsWith("]")) {
+        boolean bracketed = elementsText.startsWith("[") && elementsText.endsWith("]");
+        if (bracketed) {
             elementsText = elementsText.substring(1, elementsText.length() - 1);
             if (elementsText.isBlank()) {
                 return List.of();
             }
         }
         try {
-            var values = CellParser.parse(elementsText, type).values();
-            if (values.isPresent()) {
-                return values.get();
+            if (CellParser.parse(elementsText, type) instanceof UnaryTests.Positive(var tests)
+                    && (bracketed || tests.stream().anyMatch(ListColumn::isLiteral))
+                    && tests.stream().allMatch(test -> test instanceof UnaryTests.NullTest || isLiteral(test))) {
+                var values = new ArrayList<Comparable<?>>(tests.size()); // null for a missing element
+                tests.forEach(test -> values.add(test instanceof UnaryTests.Equals(var value, var explicit) ? value : null));
+                return values;
             }
         } catch (CellSyntaxException e) {
             // reported below
         }
         throw new InvalidInputException(name, text, "is not a list of %s values, such as [%s]".formatted(type.feelName(), example()));
+    }
+
+    private static boolean isLiteral(UnaryTests.Test test) {
+        return test instanceof UnaryTests.Equals(var value, var explicit) && !(value instanceof UnaryTests.Name);
     }
 
     private String example() {
@@ -210,12 +281,12 @@ final class ListColumn {
     }
 
     /**
-     * An element, which may not be missing (a list holds values) and must be of a Java type the column
-     * takes: what a getter of a single value of its type returns, or text, which the element index parses.
+     * An element, null if missing (null or blank text), else of a Java type the column takes: what a getter
+     * of a single value of its type returns, or text, which the element index parses.
      */
     private Object element(Object value, Object list) {
         if (value == null || value instanceof String text && text.isBlank()) {
-            throw new InvalidInputException(name, list, "holds a missing value; the elements of a list must be values");
+            return null;
         }
         if (!(value instanceof String) && !takes(value)) {
             throw new InvalidInputException(name, list, "holds a %s, not a %s".formatted(value.getClass().getName(), type.feelName()));
@@ -230,7 +301,7 @@ final class ListColumn {
             case NUMBER -> value instanceof Number;
             case DATE -> value instanceof LocalDate;
             case BOOLEAN -> value instanceof Boolean;
-            case TIME -> value instanceof LocalTime || value instanceof OffsetTime;
+            case TIME -> value instanceof LocalTime || value instanceof OffsetTime || value instanceof ZonedTime;
             case DATE_TIME -> value instanceof LocalDateTime || value instanceof ZonedDateTime;
             case DAY_TIME_DURATION -> value instanceof Duration;
             case YEAR_MONTH_DURATION -> value instanceof Period || value instanceof YearsAndMonths;
