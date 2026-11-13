@@ -17,7 +17,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
  * table} and a {@linkplain LiteralExpression literal expression} in its expression subset; the other kinds DMN has
  * (boxed contexts, invocations, function definitions, relations, lists, conditionals, iterators, filters) are planned
  * for 0.10 (<a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>), and will be further
- * implementations of this interface.
+ * implementations of this interface, so a {@code switch} over a {@code DecisionLogic} should keep a {@code default}
+ * branch.
  */
 public sealed interface DecisionLogic {
 
@@ -26,11 +27,23 @@ public sealed interface DecisionLogic {
      * several, and a list of those under a hit policy that returns several results (RULE ORDER, OUTPUT ORDER, COLLECT
      * without an aggregation); null when no rule matches and it declares no default output (DMN 1.5, 10.3.2.10).
      *
+     * <p>Its value is bound to the type its decision declares as a literal expression's is (DMN 1.5, 10.3.2.9.4): a
+     * single result to a list as a list of one, a list of one result to a single value as that result, a date to a date
+     * and time at UTC midnight, and a value of a type that does not conform to the declared type as null.
+     *
      * @param table the table, named after its decision
+     * @param type  the type the model declares for the decision's value (its variable's {@code typeRef}), or
+     *              {@link FeelType#ANY} if it declares none
      */
-    record Table(DecisionTable table) implements DecisionLogic {
+    record Table(DecisionTable table, FeelType type) implements DecisionLogic {
         public Table {
             Objects.requireNonNull(table, "table");
+            Objects.requireNonNull(type, "type");
+        }
+
+        /** A decision table whose decision's type the model does not declare: its value is of the type its outputs give. */
+        public Table(DecisionTable table) {
+            this(table, FeelType.ANY);
         }
     }
 
@@ -47,8 +60,8 @@ public sealed interface DecisionLogic {
      * @param type the type the model declares for the decision's value (its variable's {@code typeRef}), or
      *             {@link FeelType#ANY} if it declares none. The value is bound to it as DMN 1.5, 10.3.2.9.4, binds a
      *             decision's value to its variable: a date to a date and time as UTC midnight, a single value to a list
-     *             as a list of one, and a value of any other type as null, which {@code DecisionGraph} also reports as a
-     *             type mismatch
+     *             as a list of one, a list of one value to a single value as that value, and a value of a type that does
+     *             not conform as null
      */
     record LiteralExpression(String text, FeelType type) implements DecisionLogic {
 
@@ -69,7 +82,9 @@ public sealed interface DecisionLogic {
         }
 
         /**
-         * The parsed expression.
+         * The parsed expression, parsed again on each call. Its form is that of Praecepta's expression subset, which
+         * the full FEEL language replaces in 0.8 (#116): this method is meant for Praecepta's own modules, and its
+         * return type will change then.
          *
          * @throws IllegalArgumentException never, as the text was checked when the expression was made
          */

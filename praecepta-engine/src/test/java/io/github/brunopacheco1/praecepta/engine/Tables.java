@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
@@ -79,6 +80,12 @@ final class Tables {
         var output = table.outputs().getFirst();
         var outputs = List.of(new DecisionTable.OutputColumn(output.name(), output.type(), output.values(), value));
         return new DecisionTable(table.name(), table.hitPolicy(), table.aggregation(), table.inputs(), outputs, table.rules(), table.feelCells(),
+                table.listInputs());
+    }
+
+    /** The table, aggregating its one output under COLLECT. */
+    static DecisionTable withAggregation(DecisionTable table, AggregationOperator aggregation) {
+        return new DecisionTable(table.name(), HitPolicy.COLLECT, aggregation, table.inputs(), table.outputs(), table.rules(), table.feelCells(),
                 table.listInputs());
     }
 

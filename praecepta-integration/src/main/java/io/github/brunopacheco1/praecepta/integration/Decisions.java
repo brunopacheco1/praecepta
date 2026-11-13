@@ -16,13 +16,13 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.regex.Pattern;
 
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
+import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException;
 
 /**
  * The decisions an application loaded at startup, by name: what the Spring Boot starter, the Micronaut
@@ -37,13 +37,6 @@ import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
  * }</pre>
  */
 public final class Decisions {
-
-    /**
-     * What {@code DmnReader.readModel} names when it rejects a model for a feature a later release plans: the issue that
-     * plans it, #116 to #119 (the full FEEL language, its built-in functions, business knowledge models and boxed
-     * expressions, decision services and imports).
-     */
-    private static final Pattern LATER_RELEASE = Pattern.compile("\\(#11[6-9]\\)");
 
     private final Map<String, Decision> byName;
     private final List<GraphModel> models;
@@ -154,7 +147,7 @@ public final class Decisions {
         }
         var tableProblems = new ArrayList<String>();
         var tables = tables(source, logReports, tableProblems);
-        if (rejected != null && tables.isEmpty() && LATER_RELEASE.matcher(String.valueOf(rejected.getMessage())).find()) {
+        if (rejected instanceof UnsupportedFeatureException && tables.isEmpty()) {
             problems.add(source.location() + ": " + rejected.getMessage());
         } else {
             problems.addAll(tableProblems);

@@ -32,6 +32,7 @@ import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
@@ -106,7 +107,7 @@ final class GraphEvaluator implements ModelEvaluator {
         if (value == null && check.expectsError() && logic instanceof DecisionLogic.LiteralExpression) {
             return new Evaluation.Unsupported(LiteralExpressionEvaluator.EXPRESSION_ERRORS);
         }
-        boolean ordered = !(logic instanceof DecisionLogic.Table(var table) && table.hitPolicy() == HitPolicy.COLLECT);
+        boolean ordered = !(logic instanceof DecisionLogic.Table(var table, var type) && table.hitPolicy() == HitPolicy.COLLECT);
         return new Evaluation.Value(value(value), ordered);
     }
 
@@ -117,7 +118,7 @@ final class GraphEvaluator implements ModelEvaluator {
                 var decisionModel = DmnReader.readModel(dmn);
                 return new Read(decisionModel, build(decisionModel), null);
             } catch (InvalidDecisionTableException e) {
-                return new Read(null, null, rejected(e.getMessage()));
+                return new Read(null, null, rejected(e));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -270,31 +271,23 @@ final class GraphEvaluator implements ModelEvaluator {
     }
 
     /**
-     * What {@link DmnReader#readModel} rejected in a model, by the issue of the release its message names: what the
-     * node does not use itself, since its own needs were none.
+     * What {@link DmnReader#readModel} rejected in a model: what the node does not use itself, since its own needs were
+     * none. A feature a later release plans is told by the issue its {@link UnsupportedFeatureException} names, and the
+     * kind of element the reader names at the start of its message; anything else is a model Praecepta does not read.
      */
-    static Feature rejected(String message) {
-        if (message.contains("decision service")) {
-            return Feature.DECISION_SERVICES;
+    static Feature rejected(InvalidDecisionTableException rejection) {
+        var message = String.valueOf(rejection.getMessage());
+        if (!(rejection instanceof UnsupportedFeatureException unsupported)) {
+            return message.contains("item definition")
+                    ? Feature.decisionTable("item definitions Praecepta does not read, elsewhere in the model")
+                    : Feature.decisionTable("models Praecepta does not read as a whole");
         }
-        if (message.contains("import")) {
-            return Feature.IMPORTS;
-        }
-        if (message.contains("business knowledge model") || message.contains("knowledge requirement")) {
-            return Feature.KNOWLEDGE_MODELS;
-        }
-        if (message.contains("(#117)") && message.contains("function call")) {
-            return new Feature(Feature.Area.BUILT_IN_FUNCTIONS, "function calls elsewhere in the model");
-        }
-        if (message.contains("(#116)")) {
-            return Feature.feel("FEEL beyond the expression subset elsewhere in the model");
-        }
-        if (message.contains("(#118)")) {
-            return Feature.boxed("boxed expressions elsewhere in the model");
-        }
-        if (message.contains("item definition")) {
-            return Feature.decisionTable("item definitions Praecepta does not read, elsewhere in the model");
-        }
-        return Feature.decisionTable("models Praecepta does not read as a whole");
+        return switch (unsupported.issue()) {
+            case 119 -> message.startsWith("DMN model has the decision service") ? Feature.DECISION_SERVICES : Feature.IMPORTS;
+            case 118 -> message.startsWith("DMN model has the business knowledge model") || message.contains("requires business knowledge")
+                    ? Feature.KNOWLEDGE_MODELS : Feature.boxed("boxed expressions elsewhere in the model");
+            case 117 -> new Feature(Feature.Area.BUILT_IN_FUNCTIONS, "function calls elsewhere in the model");
+            default -> Feature.feel("FEEL beyond the expression subset elsewhere in the model");
+        };
     }
 }

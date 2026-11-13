@@ -7,7 +7,7 @@
     <variable id="input_data_1_variable" name="Income" typeRef="number"/>
   </inputData>
   <decision id="decision_0" name="Risk Category">
-    <variable id="decision_0_variable" name="Risk Category"/>
+    <variable id="decision_0_variable" name="Risk Category" typeRef="string"/>
     <informationRequirement id="decision_0_requirement_0"><requiredInput href="#input_data_0"/></informationRequirement>
     <decisionTable id="decision_0_table" hitPolicy="UNIQUE">
       <input id="decision_0_input_0" label="Applicant Age">
@@ -25,7 +25,7 @@
     </decisionTable>
   </decision>
   <decision id="decision_1" name="Credit Limit">
-    <variable id="decision_1_variable" name="Credit Limit"/>
+    <variable id="decision_1_variable" name="Credit Limit" typeRef="number"/>
     <informationRequirement id="decision_1_requirement_0"><requiredDecision href="#decision_0"/></informationRequirement>
     <informationRequirement id="decision_1_requirement_1"><requiredInput href="#input_data_1"/></informationRequirement>
     <decisionTable id="decision_1_table" hitPolicy="UNIQUE">

@@ -16,18 +16,22 @@ import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Test;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
+import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
@@ -64,6 +68,20 @@ class DecisionGraphTest {
         assertThat(graph.evaluate("Monthly Limit", Map.of("Applicant Age", 30, "Income", 1200))).isEqualTo(new BigDecimal("200"));
         assertThat(graph.evaluate("Credit Limit", Map.of("Applicant Age", 30, "Income", 1200))).isEqualTo(new BigDecimal("2400"));
         assertThat(graph.evaluate("Risk Category", Map.of("Applicant Age", 30))).isEqualTo("Low");
+    }
+
+    @Test
+    void decisions_listed_before_the_decisions_they_require_are_evaluated_after_them() {
+        // the same chain, each decision listed before the one it requires: the model's order is not the evaluation order
+        var graph = graph("chain-reversed.dmn");
+
+        assertThat(graph.validationReport().isEmpty()).as("%s", graph.validationReport()).isTrue();
+        assertThat(graph.decisions()).containsExactly("Monthly Limit", "Credit Limit", "Risk Category");
+        assertThat(graph.evaluate("Monthly Limit", Map.of("Applicant Age", 20, "Income", 1200))).isEqualTo(new BigDecimal("50"));
+        assertThat(graph.evaluate("Monthly Limit", Map.of("Applicant Age", 30, "Income", 1200))).isEqualTo(new BigDecimal("200"));
+        assertThat(graph.evaluate(List.of("Monthly Limit", "Risk Category"), Map.of("Applicant Age", 30, "Income", 1200)))
+                .containsExactly(Map.entry("Monthly Limit", new BigDecimal("200")), Map.entry("Risk Category", "Low"));
+        assertThat(graph.requiredInputData("Monthly Limit")).containsExactly("Income", "Applicant Age");
     }
 
     @Test
@@ -178,6 +196,60 @@ class DecisionGraphTest {
     }
 
     @Test
+    void sum_min_and_max_aggregate_in_a_graph_as_feel_does() {
+        var rows = List.of(List.of("> 0", "5"), List.of("> 10", "7"), List.of("> 20", "3"));
+        var graph = DecisionGraph.builder()
+                .logValidationReport(false)
+                .inputData("Age", ColumnType.NUMBER)
+                .decision(Tables.withAggregation(Tables.table("Sum", "COLLECT", List.of("Age:number"), List.of("Sum:number"), rows),
+                        AggregationOperator.SUM))
+                .decision(Tables.withAggregation(Tables.table("Min", "COLLECT", List.of("Age:number"), List.of("Min:number"), rows),
+                        AggregationOperator.MIN))
+                .decision(Tables.withAggregation(Tables.table("Max", "COLLECT", List.of("Age:number"), List.of("Max:number"), rows),
+                        AggregationOperator.MAX))
+                .literalDecision("Spread", "Max - Min + Sum")
+                .build();
+
+        assertThat(graph.validationReport().isEmpty()).as("%s", graph.validationReport()).isTrue();
+        assertThat(graph.evaluate(List.of("Sum", "Min", "Max"), Map.of("Age", 30))).containsExactly(Map.entry("Sum", new BigDecimal("15")),
+                Map.entry("Min", new BigDecimal("3")), Map.entry("Max", new BigDecimal("7")));
+        assertThat(graph.evaluate(List.of("Sum", "Min", "Max"), Map.of("Age", 15))).containsExactly(Map.entry("Sum", new BigDecimal("12")),
+                Map.entry("Min", new BigDecimal("5")), Map.entry("Max", new BigDecimal("7")));
+        assertThat(graph.evaluate("Spread", Map.of("Age", 30))).isEqualTo(new BigDecimal("19"));
+        assertThat(graph.evaluate("Sum", Map.of("Age", 0))).isNull();
+    }
+
+    @Test
+    void min_and_max_over_times_that_do_not_compare_are_null() {
+        // times with zone ids in two zones are not ordered by FEEL: min and max are null outside their domain (10.3.2.16)
+        var rows = List.of(List.of("> 0", "-", "-", "Paris"), List.of("> 10", "-", "-", "Tokyo"), List.of("> 20", "-", "-", "Paris"));
+        var columns = List.of("Age:number", "Paris:time", "Tokyo:time");
+        var graph = DecisionGraph.builder()
+                .logValidationReport(false)
+                .inputData("Age", ColumnType.NUMBER)
+                .inputData("Paris", ColumnType.TIME)
+                .inputData("Tokyo", ColumnType.TIME)
+                .decision(Tables.withAggregation(Tables.table("Earliest", "COLLECT", columns, List.of("Earliest:time"), rows),
+                        AggregationOperator.MIN))
+                .decision(Tables.withAggregation(Tables.table("Latest", "COLLECT", columns, List.of("Latest:time"), rows),
+                        AggregationOperator.MAX))
+                .build();
+        var paris = new ZonedTime(LocalTime.of(10, 0), ZoneId.of("Europe/Paris"));
+        var tokyo = new ZonedTime(LocalTime.of(9, 0), ZoneId.of("Asia/Tokyo"));
+        var inputs = Map.<String, Object>of("Paris", paris, "Tokyo", tokyo);
+
+        assertThat(graph.evaluate("Earliest", with(inputs, "Age", 5))).isEqualTo(paris);
+        assertThat(graph.evaluate("Earliest", with(inputs, "Age", 15))).isNull();
+        assertThat(graph.evaluate("Latest", with(inputs, "Age", 30))).as("null for good once two values do not compare").isNull();
+    }
+
+    private static Map<String, Object> with(Map<String, Object> values, String name, Object value) {
+        var all = new HashMap<>(values);
+        all.put(name, value);
+        return all;
+    }
+
+    @Test
     void an_aggregated_table_gives_a_single_value() {
         var graph = graph("multiple-results.dmn");
 
@@ -245,8 +317,13 @@ class DecisionGraphTest {
         assertThat(graph.validationReport().issues()).extracting(ValidationReport.Issue::toString).containsExactly(
                 "ERROR decision 'A' requires decision 'nowhere', which is not in the model",
                 "ERROR decision 'B' reads 'Y', which none of its information requirements provides (DMN 1.5, 7.3.4)",
-                "ERROR decision 'C' requires input data 'D', which is a decision, not input data");
-        assertThat(List.of("A", "B", "C", "D", "E")).map(graph::canEvaluate).containsExactly(false, false, false, true, false);
+                "ERROR decision 'C' requires input data 'D', which is a decision, not input data",
+                "ERROR decision 'F' requires decision 'X', which is input data, not a decision");
+        assertThat(List.of("A", "B", "C", "D", "E", "F", "G")).map(graph::canEvaluate)
+                .containsExactly(false, false, false, true, false, false, false);
+        assertThatThrownBy(() -> graph.evaluate("G", Map.of("X", 1))).isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Decision 'G' cannot be evaluated: it requires decision 'F', which cannot be evaluated: "
+                        + "decision 'F' requires decision 'X', which is input data, not a decision");
         assertThatThrownBy(() -> graph.evaluate("E", Map.of())).isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessage("Decision 'E' cannot be evaluated: it requires decision 'B', which cannot be evaluated: "
                         + "decision 'B' reads 'Y', which none of its information requirements provides (DMN 1.5, 7.3.4)");
@@ -257,28 +334,158 @@ class DecisionGraphTest {
     void values_that_do_not_fit_where_they_go_are_type_mismatches() {
         var graph = graph("type-mismatch.dmn");
 
-        assertThat(graph.validationReport().issues()).extracting(ValidationReport.Issue::kind).containsOnly(Kind.TYPE_MISMATCH);
-        assertThat(graph.validationReport().issues()).extracting(ValidationReport.Issue::detail).containsExactlyInAnyOrder(
+        assertThat(graph.validationReport().issues(Kind.TYPE_MISMATCH)).extracting(ValidationReport.Issue::detail).containsExactlyInAnyOrder(
                 "decision 'Size' reads 'Name', a string, into its input 'Name', a number",
-                "decision 'Twice': literal expression 'Name * 2' * combines a string and a number, which gives null in FEEL",
                 "decision 'First' reads 'Name.first', but 'Name' is a string, which has no component 'first'",
-                "decision 'Declared' declares a number, but its literal expression 'Name + \"!\"' gives a string, so its value is null "
-                        + "(DMN 1.5, 10.3.2.9.4)",
-                "decision 'Single' reads 'Names', a list<string>, into its input 'Names', a string");
-        assertThat(List.of("Size", "Twice", "First", "Single", "Downstream")).map(graph::canEvaluate).containsOnly(false);
+                "decision 'Single' reads 'Names', a list<string>, into its input 'Names', a string",
+                "decision 'Path' reads 'Name.first', but 'Name' is a string, which has no component 'first'",
+                "decision 'Compare' reads 'Name', a string, into its cells' comparisons with 'Name', a number");
+        assertThat(List.of("Size", "First", "Single", "Path", "Compare", "Downstream")).map(graph::canEvaluate).containsOnly(false);
         assertThatThrownBy(() -> graph.evaluate("Downstream", Map.of("Name", "x"))).isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("it requires decision 'Size'");
+        assertThatThrownBy(() -> graph.evaluate("Compare", Map.of("Name", "x", "Count", 1))).isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessageContaining("cells' comparisons with 'Name'");
     }
 
     @Test
-    void a_literal_expression_bound_to_a_type_it_does_not_conform_to_is_null() {
-        // DMN 1.5, 10.3.2.9.4: "If after applying the implicit conversions the converted value and the target type do not
-        // conform, the conforms to conversion is applied", which gives null; the mismatch is reported all the same
+    void a_path_to_a_property_of_a_date_is_not_supported_yet_and_names_the_release_that_plans_it() {
+        // DMN 1.5, Table 65 defines Birth.year; it is the full FEEL language's, planned for 0.8, not a mistake of the model
         var graph = graph("type-mismatch.dmn");
 
-        assertThat(graph.canEvaluate("Declared")).isTrue();
+        assertThat(graph.validationReport().issues(Kind.UNSUPPORTED_FEATURE)).extracting(ValidationReport.Issue::toString).containsExactly(
+                "ERROR decision 'Year' reads 'Birth.year', but 'Birth' is a date, whose property 'year' Praecepta does not read yet: "
+                        + "the full FEEL language is planned for 0.8 (#116)");
+        assertThat(List.of("Year", "After Year")).map(graph::canEvaluate).containsOnly(false);
+        assertThatThrownBy(() -> graph.evaluate("After Year", Map.of("Birth", LocalDate.of(2000, 1, 1))))
+                .isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("it requires decision 'Year'");
+    }
+
+    @Test
+    void a_decision_whose_value_dmn_defines_as_null_is_a_warning_and_is_evaluated_to_null() {
+        // DMN 1.5, 10.3.2.15: arithmetic on operands not of the listed types is null (Tables 56 to 59); and 10.3.2.9.4:
+        // "If after applying the implicit conversions the converted value and the target type do not conform, the
+        // conforms to conversion is applied", which gives null
+        var graph = graph("type-mismatch.dmn");
+
+        assertThat(graph.validationReport().issues(Kind.ALWAYS_NULL)).extracting(ValidationReport.Issue::toString).containsExactlyInAnyOrder(
+                "WARNING decision 'Twice': in literal expression 'Name * 2', * combines a string and a number, which gives null in FEEL; "
+                        + "its value is null (DMN 1.5, 10.3.2.15, Tables 56 to 59)",
+                "WARNING decision 'Declared' declares a number, but its literal expression 'Name + \"!\"' gives a string, so its value is "
+                        + "null (DMN 1.5, 10.3.2.9.4)",
+                "WARNING decision 'Listed': in literal expression 'Names + 1', 'Names' is a list<string>, which FEEL's arithmetic does "
+                        + "not combine; its value is null (DMN 1.5, 10.3.2.15, Tables 56 to 59)");
+        assertThat(List.of("Twice", "Declared", "Listed")).map(graph::canEvaluate).containsOnly(true);
         assertThat(graph.type("Declared")).isEqualTo(FeelType.of(ColumnType.NUMBER));
-        assertThat(graph.evaluate("Declared", Map.of("Name", "x"))).isNull();
+        assertThat(graph.evaluate(List.of("Twice", "Declared", "Listed"), Map.of("Name", "x", "Names", List.of("a"))))
+                .containsOnlyKeys("Twice", "Declared", "Listed").containsEntry("Twice", null).containsEntry("Declared", null)
+                .containsEntry("Listed", null);
+        var failing = DecisionGraph.builder().logValidationReport(false).failOn(Severity.ERROR);
+        try (InputStream dmn = getClass().getResourceAsStream("/dmn/graph/literals.dmn")) {
+            failing.model(DmnReader.readModel(dmn)).literalDecision("Odd", "\"a\" + 1");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        assertThat(failing.build().canEvaluate("Odd")).as("a WARNING does not fail a graph at ERROR").isTrue();
+    }
+
+    // ---- untyped outputs and the decision's variable -----------------------------------------------------
+
+    @Test
+    void an_output_without_a_type_is_typed_by_its_literal_entries_so_numbers_pass_on_as_numbers() {
+        // DMN 1.5, 10.3.2.10, step 3c: DTI = FEEL(o), and the output entry 10 is the number 10, a numeric literal
+        var graph = graph("untyped.dmn");
+
+        assertThat(graph.validationReport().issues(Kind.ALWAYS_NULL)).hasSize(1);
+        assertThat(graph.type("Base")).isEqualTo(FeelType.of(ColumnType.NUMBER));
+        assertThat(graph.evaluate("Base", Map.of("X", 5))).isEqualTo(new BigDecimal("10"));
+        assertThat(graph.evaluate("Next", Map.of("X", 5))).isEqualTo(new BigDecimal("11"));
+        assertThat(graph.evaluate("Next", Map.of("X", -5))).isEqualTo(new BigDecimal("21"));
+        assertThat(graph.type("Positive")).isEqualTo(FeelType.of(ColumnType.BOOLEAN));
+        assertThat(graph.evaluate("Positive", Map.of("X", 5))).isEqualTo(true);
+        assertThat(graph.evaluate("Positive", Map.of("X", "-5"))).isEqualTo(false);
+    }
+
+    @Test
+    void outputs_without_a_type_take_the_types_of_the_components_of_the_variables_structure() {
+        var graph = graph("untyped.dmn");
+
+        assertThat(graph.type("Offer").feelName()).isEqualTo("context<rate: number, label: string>");
+        assertThat(graph.evaluate("Offer", Map.of("X", 200))).isEqualTo(Map.of("rate", new BigDecimal("0.1"), "label", "big"));
+        assertThat(graph.evaluate("Discounted", Map.of("X", 200))).isEqualTo(new BigDecimal("180"));
+    }
+
+    @Test
+    void a_decision_tables_value_is_bound_to_the_type_its_variable_declares() {
+        // DMN 1.5, 10.3.2.9.4: the result of a DRG element's logic is bound to its variable, "to singleton list" and
+        // "from singleton list" applied, then "conforms to"
+        var graph = graph("untyped.dmn");
+
+        assertThat(graph.type("Listed")).isEqualTo(FeelType.listOf(ColumnType.NUMBER));
+        assertThat(graph.evaluate("Listed", Map.of("X", 1))).isEqualTo(List.of(new BigDecimal("1")));
+        assertThat(graph.type("Single")).isEqualTo(FeelType.of(ColumnType.NUMBER));
+        assertThat(graph.evaluate("Single", Map.of("X", 5))).isEqualTo(new BigDecimal("1"));
+        assertThat(graph.evaluate("Single", Map.of("X", 50))).as("two results are no single number").isNull();
+        assertThat(graph.evaluate("Single", Map.of("X", -5))).isNull();
+        assertThat(graph.validationReport().issues(Kind.ALWAYS_NULL)).extracting(ValidationReport.Issue::detail).containsExactly(
+                "decision 'Wrong' declares a date, but its decision table gives a string, so its value is null (DMN 1.5, 10.3.2.9.4)");
+        assertThat(graph.canEvaluate("Wrong")).isTrue();
+        assertThat(graph.evaluate("Wrong", Map.of("X", 1))).isNull();
+    }
+
+    @Test
+    void a_table_assembled_in_code_is_bound_to_the_type_given_for_its_decision() {
+        var table = Tables.table("Codes", "UNIQUE", List.of("Age:number"), List.of("Codes:string"), List.of(List.of("-", "\"a\"")));
+        var graph = DecisionGraph.builder()
+                .logValidationReport(false)
+                .inputData("Age", ColumnType.NUMBER)
+                .decision(table, FeelType.listOf(ColumnType.STRING))
+                .build();
+
+        assertThat(graph.type("Codes")).isEqualTo(FeelType.listOf(ColumnType.STRING));
+        assertThat(graph.evaluate("Codes", Map.of("Age", 1))).isEqualTo(List.of("a"));
+    }
+
+    // ---- values of undeclared type -----------------------------------------------------------------
+
+    @Test
+    void a_literal_expression_reading_input_data_of_undeclared_type_is_typed_when_it_is_evaluated() {
+        // DMN 1.5, 6.3.11: an input data's variable may have no typeRef; FEEL types the value it is given, and arithmetic on
+        // operands it does not combine is null (10.3.2.15)
+        var graph = DecisionGraph.builder()
+                .logValidationReport(false)
+                .inputData("X", FeelType.ANY)
+                .literalDecision("Next", "X + 1")
+                .literalDecision("Number", FeelType.of(ColumnType.NUMBER), "X + X")
+                .literalDecision("Same", "X")
+                .build();
+
+        assertThat(graph.validationReport().isEmpty()).as("%s", graph.validationReport()).isTrue();
+        assertThat(graph.type("Next")).isEqualTo(FeelType.ANY);
+        assertThat(graph.evaluate("Next", Map.of("X", 5))).isEqualTo(new BigDecimal("6"));
+        assertThat(graph.evaluate("Next", Map.of("X", "5"))).as("text is a string, which does not add to a number").isNull();
+        assertThat(graph.evaluate("Next", Map.of("X", List.of(1)))).isNull();
+        assertThat(graph.evaluate("Next", new HashMap<>())).isNull();
+        assertThat(graph.evaluate("Number", Map.of("X", 2))).isEqualTo(new BigDecimal("4"));
+        assertThat(graph.evaluate("Number", Map.of("X", "a"))).as("\"aa\" does not conform to number").isNull();
+        assertThat(graph.evaluate("Same", Map.of("X", List.of(1, 2)))).isEqualTo(List.of(BigDecimal.ONE, BigDecimal.TWO));
+    }
+
+    @Test
+    void a_literal_expression_that_is_a_name_alone_gives_the_value_it_reads_of_any_type() {
+        var graph = DecisionGraph.builder()
+                .logValidationReport(false)
+                .inputData("Age", ColumnType.NUMBER)
+                .decision(Tables.table("Flags", "COLLECT", List.of("Age:number"), List.of("Flags:string"), List.of(
+                        List.of("> 10", "\"a\""), List.of("> 20", "\"b\""))))
+                .literalDecision("Copy", "Flags")
+                .literalDecision("Adult", FeelType.of(ColumnType.BOOLEAN), "Grown")
+                .inputData("Grown", ColumnType.BOOLEAN)
+                .build();
+
+        assertThat(graph.validationReport().isEmpty()).as("%s", graph.validationReport()).isTrue();
+        assertThat(graph.type("Copy")).isEqualTo(FeelType.listOf(ColumnType.STRING));
+        assertThat(graph.evaluate("Copy", Map.of("Age", 30))).isEqualTo(List.of("a", "b"));
+        assertThat(graph.evaluate("Adult", Map.of("Grown", true))).isEqualTo(true);
     }
 
     @Test
@@ -409,8 +616,35 @@ class DecisionGraphTest {
 
         assertThat(graph.validationReport().isEmpty()).isTrue();
         assertThat(graph.evaluate("Adult", Map.of("Applicant", Map.of("age", 30)))).isEqualTo(true);
+        // taken as a declared number input data takes it: as text too
+        assertThat(graph.evaluate("Adult", Map.of("Applicant", Map.of("age", "30")))).isEqualTo(true);
+        assertThat(graph.evaluate("Adult", Map.of("Applicant", Map.of("age", 3L)))).isNull();
         assertThatThrownBy(() -> graph.evaluate("Adult", Map.of("Applicant", Map.of("age", "thirty"))))
-                .isInstanceOf(InvalidInputException.class).hasMessageContaining("Applicant.age=thirty is not a number");
+                .isInstanceOf(InvalidInputException.class).hasMessageContaining("Applicant.age=thirty is not a valid number");
+        assertThatThrownBy(() -> graph.evaluate("Adult", Map.of("Applicant", Map.of("age", LocalDate.of(2000, 1, 1)))))
+                .isInstanceOf(InvalidInputException.class).hasMessageContaining("is not a number");
+    }
+
+    @Test
+    void a_value_of_undeclared_type_takes_every_form_a_declared_one_takes_and_is_copied() {
+        var graph = DecisionGraph.builder()
+                .logValidationReport(false)
+                .inputData("Event", FeelType.ANY)
+                .decision(Tables.table("Late", "FIRST", List.of("Event.at:datetime"), List.of("Late:boolean"),
+                        List.of(List.of("> date and time(\"2025-01-01T00:00:00Z\")", "true"), List.of("-", "false"))))
+                .literalDecision("Copy", "Event")
+                .build();
+        var at = OffsetDateTime.of(2025, 6, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+        var tags = new ArrayList<Object>(List.of("x"));
+        var event = new HashMap<String, Object>(Map.of("at", at, "tags", tags));
+
+        assertThat(graph.evaluate("Late", Map.of("Event", event))).isEqualTo(true);
+        assertThat(graph.evaluate("Late", Map.of("Event", Map.of("at", "2024-06-01T00:00:00Z")))).isEqualTo(false);
+        var copy = graph.evaluate("Copy", Map.of("Event", event));
+        tags.add("y");
+        event.put("at", null);
+        assertThat(copy).isEqualTo(Map.of("at", at, "tags", List.of("x")));
+        assertThatThrownBy(() -> ((Map<?, ?>) copy).clear()).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
@@ -511,28 +745,53 @@ class DecisionGraphTest {
     }
 
     @Test
-    void a_long_chain_of_decisions_is_built_and_evaluated_without_recursion() {
-        var builder = DecisionGraph.builder().logValidationReport(false).inputData("X", ColumnType.NUMBER).literalDecision("D0", "X + 1");
-        int length = 5_000;
-        for (int i = 1; i < length; i++) {
-            builder.literalDecision("D" + i, "D" + (i - 1) + " + 1");
-        }
-        var graph = builder.build();
+    void a_long_chain_of_decisions_is_built_and_evaluated_without_recursion() throws InterruptedException {
+        // on a thread whose stack holds far fewer frames than the chain is long, as Linux's smaller default thread stack may
+        onSmallStack(() -> {
+            var builder = DecisionGraph.builder().logValidationReport(false).inputData("X", ColumnType.NUMBER).literalDecision("D0", "X + 1");
+            int length = 20_000;
+            for (int i = 1; i < length; i++) {
+                builder.literalDecision("D" + i, "D" + (i - 1) + " + 1");
+            }
+            var graph = builder.build();
 
-        assertThat(graph.evaluate("D" + (length - 1), Map.of("X", 0))).isEqualTo(BigDecimal.valueOf(length));
-        assertThat(graph.requiredInputData("D" + (length - 1))).containsExactly("X");
+            assertThat(graph.evaluate("D" + (length - 1), Map.of("X", 0))).isEqualTo(BigDecimal.valueOf(length));
+            assertThat(graph.requiredInputData("D" + (length - 1))).containsExactly("X");
+        });
     }
 
     @Test
-    void a_long_cycle_is_reported_without_recursion() {
-        var builder = DecisionGraph.builder().logValidationReport(false);
-        int length = 5_000;
-        for (int i = 0; i < length; i++) {
-            builder.literalDecision("D" + i, "D" + ((i + 1) % length) + " + 1");
-        }
-        var graph = builder.build();
+    void a_long_cycle_is_reported_without_recursion() throws InterruptedException {
+        onSmallStack(() -> {
+            var builder = DecisionGraph.builder().logValidationReport(false);
+            int length = 20_000;
+            for (int i = 0; i < length; i++) {
+                builder.literalDecision("D" + i, "D" + ((i + 1) % length) + " + 1");
+            }
+            var graph = builder.build();
 
-        assertThat(graph.validationReport().issues(Kind.DECISION_CYCLE)).hasSize(1);
-        assertThat(Arrays.asList(graph.validationReport().issues(Kind.DECISION_CYCLE).getFirst().detail().split(" -> "))).hasSize(length + 1);
+            assertThat(graph.validationReport().issues(Kind.DECISION_CYCLE)).hasSize(1);
+            assertThat(Arrays.asList(graph.validationReport().issues(Kind.DECISION_CYCLE).getFirst().detail().split(" -> "))).hasSize(length + 1);
+        });
+    }
+
+    /** Runs the body on a thread with a 256 KiB stack, rethrowing what it throws: recursion as deep as a long chain overflows it. */
+    private static void onSmallStack(Runnable body) throws InterruptedException {
+        var failure = new AtomicReference<Throwable>();
+        var thread = new Thread(null, () -> {
+            try {
+                body.run();
+            } catch (Throwable e) {
+                failure.set(e);
+            }
+        }, "small-stack", 256 * 1024);
+        thread.start();
+        thread.join();
+        if (failure.get() instanceof Error error) {
+            throw error;
+        }
+        if (failure.get() instanceof RuntimeException e) {
+            throw e;
+        }
     }
 }

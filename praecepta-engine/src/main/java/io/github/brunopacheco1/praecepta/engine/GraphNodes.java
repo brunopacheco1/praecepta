@@ -19,11 +19,12 @@ import java.util.function.Function;
 
 import io.github.brunopacheco1.praecepta.engine.GraphAnalysis.ColumnRead;
 import io.github.brunopacheco1.praecepta.engine.GraphAnalysis.Resolution;
+import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
-import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
+import io.github.brunopacheco1.praecepta.engine.feel.ExpressionTypeException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
@@ -68,16 +69,23 @@ final class GraphNodes {
         private final PraeceptaEngine<Object[], Object> engine;
         /** Whether the table's value is a list: a hit policy with several results, and no aggregation. */
         private final boolean listResult;
+        private final GraphValues.Binding binding;
+        private final FeelType declared;
 
         /**
-         * @param reads  what the table reads, columns and the inputs its cells compare with
-         * @param names  where each name it reads is, among the graph's slots; a name it cannot read is missing
-         * @param listed the inputs its cells compare with whose values are lists, though the table reads single values
-         * @param log    whether the engine logs its validation report
+         * @param reads    what the table reads, columns and the inputs its cells compare with
+         * @param names    where each name it reads is, among the graph's slots; a name it cannot read is missing
+         * @param listed   the inputs its cells compare with whose values are lists, though the table reads single values
+         * @param binding  how its value is bound to its decision
+         * @param declared the type its decision declares
+         * @param log      whether the engine logs its validation report
          * @throws InvalidDecisionTableException if the table cannot be built into an engine
          */
-        TableNode(DecisionTable table, List<ColumnRead> reads, Map<String, Resolution> names, Set<String> listed, boolean log) {
+        TableNode(DecisionTable table, List<ColumnRead> reads, Map<String, Resolution> names, Set<String> listed,
+                GraphValues.Binding binding, FeelType declared, boolean log) {
             listResult = !table.hitPolicy().isSingleHit() && table.aggregation() == null;
+            this.binding = binding;
+            this.declared = declared;
             var lists = new HashSet<>(table.listInputs());
             lists.addAll(listed);
             var read = lists.equals(table.listInputs()) ? table : new DecisionTable(table.name(), table.hitPolicy(), table.aggregation(),
@@ -102,8 +110,9 @@ final class GraphNodes {
 
         /**
          * The getter of a column: the value at its path, which a column of lists takes as a list of one when it is a
-         * single value (DMN 1.5, 10.3.2.9.4, "to singleton list"), and whose type is checked if the model does not
-         * declare it.
+         * single value (DMN 1.5, 10.3.2.9.4, "to singleton list"), and which, if the model does not declare its type, is
+         * made a value of the column's type as a declared input data's is ({@link GraphValues#normalise}: text, an
+         * {@code Integer}, an {@code OffsetDateTime}...), or rejected.
          */
         private static Function<Object[], Object> getter(Resolution resolution, ColumnRead column, boolean list) {
             if (resolution == null) {
@@ -123,7 +132,9 @@ final class GraphNodes {
             }
             if (value instanceof List<?> list) {
                 if (check) {
-                    list.forEach(element -> checked(element, column));
+                    var elements = new ArrayList<>(list.size());
+                    list.forEach(element -> elements.add(checked(element, column)));
+                    return Collections.unmodifiableList(elements);
                 }
                 return list;
             }
@@ -131,10 +142,7 @@ final class GraphNodes {
         }
 
         private static Object checked(Object value, ColumnRead column) {
-            if (value == null || GraphValues.isValueOf(value, column.type())) {
-                return value;
-            }
-            throw new InvalidInputException(column.name(), value, "is not a " + column.type().feelName());
+            return GraphValues.normalise(value, FeelType.of(column.type()), column.name());
         }
 
         @Override
@@ -144,13 +152,14 @@ final class GraphNodes {
                 return null; // DMN 1.5, 10.3.2.10, step 2: no rule matches and no default output
             }
             if (listResult) {
-                // a default output, under a hit policy with several results, is bound to the decision's list type as a
-                // list of one (10.3.2.9.4, "to singleton list"), as the DMN TCK's 0109-ruleOrder-hitpolicy has it
+                // a default output, under a hit policy with several results, is given as a list of one, which binds as
+                // 10.3.2.9.4 has it to a decision typed by a list (as the DMN TCK's 0109-ruleOrder-hitpolicy has it); to
+                // an untyped decision, DMN 1.5 gives the single value (docs/DMN-CONFORMANCE.md, case 14)
                 var list = new ArrayList<>(results.size());
                 results.forEach(result -> list.add(value(result)));
-                return Collections.unmodifiableList(list);
+                return GraphValues.bind(Collections.unmodifiableList(list), binding, declared);
             }
-            return value(results.getFirst());
+            return GraphValues.bind(value(results.getFirst()), binding, declared);
         }
 
         private static Object value(Object result) {
@@ -237,23 +246,51 @@ final class GraphNodes {
         private final OutputExpression expression;
         private final Map<String, Function<Object[], Object>> readers = new HashMap<>();
         private final GraphValues.Binding binding;
+        private final FeelType declared;
+        private final boolean dynamic;
 
         /**
-         * @param names   where each name it reads is, among the graph's slots
-         * @param binding how its value is bound to its decision
+         * @param names    where each name it reads is, among the graph's slots
+         * @param binding  how its value is bound to its decision
+         * @param declared the type its decision declares
+         * @param dynamic  whether a name it reads has a type known only when it is evaluated, so its operands are typed then
          */
-        LiteralNode(OutputExpression expression, Map<String, Resolution> names, GraphValues.Binding binding) {
+        LiteralNode(OutputExpression expression, Map<String, Resolution> names, GraphValues.Binding binding, FeelType declared, boolean dynamic) {
             this.expression = expression;
             names.forEach((name, resolution) -> readers.put(name, reader(resolution)));
             this.binding = binding;
+            this.declared = declared;
+            this.dynamic = dynamic;
         }
 
         @Override
         public Object evaluate(Object[] values) {
             if (binding == GraphValues.Binding.NULL) {
-                return null; // a value of a type that does not conform to the decision's (DMN 1.5, 10.3.2.9.4)
+                return null; // DMN 1.5 defines its value as null whatever its inputs
             }
-            return GraphValues.literalResult(expression.evaluate(name -> readers.get(name).apply(values)), binding);
+            Function<String, Object> inputs = name -> readers.get(name).apply(values);
+            if (dynamic && !combines(inputs)) {
+                return null; // operands FEEL's arithmetic does not combine, or a missing one (DMN 1.5, 10.3.2.15)
+            }
+            return GraphValues.bind(GraphValues.literalValue(expression.evaluate(inputs)), binding, declared);
+        }
+
+        /** Whether the values the expression reads combine as FEEL's arithmetic has them, typed as they are now. */
+        private boolean combines(Function<String, Object> inputs) {
+            var types = new HashMap<String, ColumnType>();
+            for (var name : readers.keySet()) {
+                var type = GraphValues.arithmeticType(inputs.apply(name));
+                if (type == null) {
+                    return false;
+                }
+                types.put(name, type);
+            }
+            try {
+                expression.type(types::get);
+                return true;
+            } catch (ExpressionTypeException e) {
+                return false;
+            }
         }
 
         @Override

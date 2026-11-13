@@ -10,15 +10,14 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 import io.github.brunopacheco1.praecepta.engine.DecisionGraph;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport;
-import io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException;
 
 /**
  * Compiles a DMN source whose decisions require other decisions, or are literal expressions, as a decision requirements
@@ -28,13 +27,6 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableE
  * before.
  */
 final class GraphCompiler {
-
-    /**
-     * What {@code DmnReader.readModel} names when it rejects a model for a feature a later release plans: the issue that
-     * plans it (the full FEEL language, its built-in functions, business knowledge models and boxed expressions,
-     * decision services and imports).
-     */
-    private static final Pattern LATER_RELEASE = Pattern.compile("\\(#11[6-9]\\)");
 
     private GraphCompiler() {
     }
@@ -51,16 +43,18 @@ final class GraphCompiler {
         DecisionModel model;
         try {
             model = DmnReader.readModel(new ByteArrayInputStream(dmn));
-        } catch (InvalidDecisionTableException e) {
-            if (LATER_RELEASE.matcher(String.valueOf(e.getMessage())).find() && !readsAlone(dmn, decision)) {
+        } catch (UnsupportedFeatureException e) {
+            if (!readsAlone(dmn, decision)) {
                 throw e;
             }
             return null;
+        } catch (InvalidDecisionTableException e) {
+            return null;
         }
         if (decision == null) {
-            return model.decisions().stream().anyMatch(GraphCompiler::needsGraph) ? model : null;
+            return model.needsGraph() ? model : null;
         }
-        return model.decision(decision).filter(GraphCompiler::needsGraph).isPresent() ? model : null;
+        return model.decision(decision).filter(DecisionModel.Decision::needsGraph).isPresent() ? model : null;
     }
 
     /** Whether the source has the decision table to compile, as {@code DmnReader.read} reads it alone. */
@@ -71,10 +65,6 @@ final class GraphCompiler {
         } catch (RuntimeException e) {
             return false;
         }
-    }
-
-    private static boolean needsGraph(DecisionModel.Decision decision) {
-        return !decision.requiredDecisions().isEmpty() || !(decision.logic() instanceof DecisionLogic.Table);
     }
 
     /**

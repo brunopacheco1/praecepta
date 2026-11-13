@@ -55,11 +55,16 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * by name ({@code Map<String, Object>}, in output order), whose components a decision reads by path
  * ({@code Pricing.discount}); under a hit policy with several results (RULE ORDER, OUTPUT ORDER, COLLECT without an
  * aggregation), a list of those, which a decision table input of lists takes; null when no rule matches and the table
- * declares no default output (DMN 1.5, 10.3.2.10). A literal expression gives the value of its expression. Values are
+ * declares no default output (DMN 1.5, 10.3.2.10). A literal expression gives the value of its expression. Either is
+ * bound to the type its decision's variable declares, as DMN 1.5 binds it (10.3.2.9.4): a single value to a list as a
+ * list of one, a list of one to a single value as its element, a date to a date and time at UTC midnight, and a value
+ * that does not conform to the declared type as null. Values are
  * FEEL's, as {@link FeelType} lists them: {@code String}, {@code BigDecimal}, {@code Boolean}, {@code LocalDate},
  * times, date-times, durations, {@code List} and {@code Map}, all immutable. Input data are given as such values, or
  * in any form a table's typed input bindings take ({@code Integer}, {@code Period}, {@code OffsetDateTime}...), or, for
- * a simple type, as text ({@code "42"}, {@code "2025-01-31"}); an input data the map does not hold is missing (null).
+ * a simple type, as text ({@code "42"}, {@code "2025-01-31"}); an input data the map does not hold is missing (null). A
+ * value of an input data whose type the model does not declare is taken as it is (its lists and maps copied), and a
+ * decision table column that reads it, or a path into it, takes it as an input data of the column's type would.
  *
  * <p><b>Building.</b> {@link #read} reads a DMN file ({@link DmnReader#readModel}); {@link #builder()} assembles a graph
  * from tables and literal expressions in code. Building checks the model, as DMN 1.5 requires it to be well formed:
@@ -67,15 +72,18 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * information requirements provides ({@link ValidationReport.Kind#MISSING_REQUIREMENT}), decisions that require one
  * another in a cycle ({@link ValidationReport.Kind#DECISION_CYCLE}), and a value that cannot fit where it goes, such as
  * a string into a number column ({@link ValidationReport.Kind#TYPE_MISMATCH}), are ERRORs of
- * {@link #validationReport()}. Such a decision, and every decision that requires it, cannot be evaluated; the others
- * can. A literal expression whose value does not conform to the type its decision declares is reported too, but DMN
- * 1.5 defines its value, null (10.3.2.9.4), so it is evaluated. Each decision table keeps its own analysis
+ * {@link #validationReport()}, and so is logic Praecepta does not evaluate yet, naming the release that plans it
+ * ({@link ValidationReport.Kind#UNSUPPORTED_FEATURE}). Such a decision, and every decision that requires it, cannot be
+ * evaluated; the others can. A decision whose value DMN 1.5 defines as null whatever its inputs (operands FEEL's
+ * arithmetic does not combine, a value that does not conform to the declared type) is a WARNING
+ * ({@link ValidationReport.Kind#ALWAYS_NULL}), and is evaluated. Each decision table keeps its own analysis
  * ({@link #validationReport(String)}), exactly as a {@link PraeceptaEngine} built from it alone, with map-based inputs,
  * reports it.
  *
  * <p><b>Evaluating.</b> {@link #evaluate(String, Map)} evaluates a decision and the decisions it requires, directly or
  * indirectly, each once, in dependency order, and nothing else; every table, expression and name was parsed and
- * resolved when the graph was built. A graph is immutable and thread-safe.
+ * resolved when the graph was built, and only a computed output entry's value is converted from its text when it is
+ * evaluated. A graph is immutable and thread-safe.
  *
  * <p>Business knowledge models, invocations and boxed expressions are planned for 0.10
  * (<a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>), the full FEEL language for 0.8
@@ -98,6 +106,8 @@ public final class DecisionGraph {
     private final GraphNodes.Node[] nodes;
     /** The type of each input data and decision, by name. */
     private final Map<String, FeelType> types;
+    /** The type of each input data, by name, in the model's order. */
+    private final Map<String, FeelType> inputData;
     /** Each decision's index in the model, by name. */
     private final Map<String, Integer> decisionIndexes = new HashMap<>();
     /** By decision: the indexes of the decisions it requires, and the slots of the input data it requires. */
@@ -136,6 +146,7 @@ public final class DecisionGraph {
             inputTypes[i] = analysis.types[i];
             allTypes.put(inputNames[i], inputTypes[i]);
         }
+        inputData = Collections.unmodifiableMap(new LinkedHashMap<>(allTypes));
         nodes = new GraphNodes.Node[decisionCount];
         requiredDecisions = new int[decisionCount][];
         requiredInputs = new int[decisionCount][];
@@ -168,9 +179,10 @@ public final class DecisionGraph {
         var decision = analysis.model.decisions().get(d);
         var reads = analysis.reads.get(d);
         return switch (decision.logic()) {
-            case DecisionLogic.Table(var table) ->
-                    new GraphNodes.TableNode(table, analysis.tableReads(d), reads, analysis.listedNamedInputs.get(d), log);
-            case DecisionLogic.LiteralExpression literal -> new GraphNodes.LiteralNode(literal.expression(), reads, analysis.bindings[d]);
+            case DecisionLogic.Table(var table, var type) -> new GraphNodes.TableNode(table, analysis.tableReads(d), reads,
+                    analysis.listedNamedInputs.get(d), analysis.bindings[d], type, log);
+            case DecisionLogic.LiteralExpression literal -> new GraphNodes.LiteralNode(analysis.expressions[d], reads, analysis.bindings[d],
+                    literal.type(), analysis.dynamic[d]);
         };
     }
 
@@ -234,9 +246,11 @@ public final class DecisionGraph {
      * @return the decision's value (see the class description), null for FEEL's null
      * @throws NoSuchElementException        if the graph has no decision of that name
      * @throws InvalidDecisionTableException if the decision cannot be evaluated: its validation report, or that of a
-     *                                       decision it requires, has a {@link ValidationReport.Kind#MISSING_REQUIREMENT},
-     *                                       {@link ValidationReport.Kind#DECISION_CYCLE} or
-     *                                       {@link ValidationReport.Kind#TYPE_MISMATCH} issue, which the message names
+     *                                       decision it requires, has an ERROR
+     *                                       ({@link ValidationReport.Kind#MISSING_REQUIREMENT},
+     *                                       {@link ValidationReport.Kind#DECISION_CYCLE},
+     *                                       {@link ValidationReport.Kind#TYPE_MISMATCH} or
+     *                                       {@link ValidationReport.Kind#UNSUPPORTED_FEATURE}), which the message names
      * @throws InvalidInputException         if an input data's value is not one of its type, or a decision table
      *                                       rejects a value (one outside its column's input values)
      * @throws HitPolicyViolationException   if a decision table's hit policy is violated (UNIQUE, ANY)
@@ -314,16 +328,13 @@ public final class DecisionGraph {
      * read it read it; {@link FeelType#ANY} if none does.
      */
     public Map<String, FeelType> inputData() {
-        var inputData = new LinkedHashMap<String, FeelType>();
-        for (int i = 0; i < inputNames.length; i++) {
-            inputData.put(inputNames[i], inputTypes[i]);
-        }
-        return Collections.unmodifiableMap(inputData);
+        return inputData;
     }
 
     /**
-     * The type of a decision's value: a decision table's as the class description gives it, a literal expression's as
-     * its decision declares it, or as its expression computes it.
+     * The type of a decision's value: as its decision declares it, or, where it declares none (or one its logic's values
+     * conform to, which is then more precise), a decision table's as the class description gives it and a literal
+     * expression's as its expression computes it; {@link FeelType#ANY} where that is known only when it is evaluated.
      *
      * @throws NoSuchElementException if the graph has no decision of that name
      */
@@ -350,8 +361,9 @@ public final class DecisionGraph {
     }
 
     /**
-     * The graph's validation report: missing requirements, cycles and type mismatches, all ERRORs, each naming its
-     * decision. Each decision table's own analysis is in {@link #validationReport(String)}.
+     * The graph's validation report: missing requirements, cycles, type mismatches and what Praecepta does not evaluate
+     * yet, all ERRORs, and decisions whose value is always null, WARNINGs, each naming its decision. Each decision table's
+     * own analysis is in {@link #validationReport(String)}.
      */
     public ValidationReport validationReport() {
         return report;
@@ -422,11 +434,19 @@ public final class DecisionGraph {
         }
 
         /**
-         * Adds a decision whose logic is a decision table, named after the table, requiring what its columns and the
-         * inputs its cells compare with read ({@code Pricing.discount} reads {@code Pricing}).
+         * Adds a decision whose logic is a decision table, named after the table, of no declared type, requiring what its
+         * columns and the inputs its cells compare with read ({@code Pricing.discount} reads {@code Pricing}).
          */
         public Builder decision(DecisionTable table) {
-            return inferred(new Decision(table.name(), List.of(), List.of(), new DecisionLogic.Table(table)));
+            return decision(table, FeelType.ANY);
+        }
+
+        /**
+         * Adds a decision whose logic is a decision table, named after the table, of a declared type, to which its value
+         * is bound (see the class description), requiring what its columns and the inputs its cells compare with read.
+         */
+        public Builder decision(DecisionTable table, FeelType type) {
+            return inferred(new Decision(table.name(), List.of(), List.of(), new DecisionLogic.Table(table, type)));
         }
 
         /**
@@ -492,7 +512,8 @@ public final class DecisionGraph {
             var requiredDecisions = new LinkedHashSet<String>();
             var requiredInputs = new LinkedHashSet<String>();
             for (var read : GraphAnalysis.namesRead(decision)) {
-                var root = root(read, inputNames, decisionNames);
+                var element = DecisionModel.elementOf(read, name -> inputNames.contains(name) || decisionNames.contains(name));
+                var root = element == null ? read : element;
                 if (decisionNames.contains(root)) {
                     requiredDecisions.add(root);
                 } else {
@@ -500,17 +521,6 @@ public final class DecisionGraph {
                 }
             }
             return new Decision(decision.name(), List.copyOf(requiredDecisions), List.copyOf(requiredInputs), decision.logic());
-        }
-
-        /** The element a name reads: the one so named, or named by its longest part before a dot; the name itself if none. */
-        private static String root(String name, Set<String> inputNames, Set<String> decisionNames) {
-            for (int end = name.length(); end > 0; end = name.lastIndexOf('.', end - 1)) {
-                var prefix = name.substring(0, end);
-                if (inputNames.contains(prefix) || decisionNames.contains(prefix)) {
-                    return prefix;
-                }
-            }
-            return name;
         }
     }
 }

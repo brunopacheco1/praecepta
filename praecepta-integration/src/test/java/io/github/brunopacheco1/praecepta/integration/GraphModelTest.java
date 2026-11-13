@@ -348,4 +348,94 @@ class GraphModelTest {
         var notAList = Map.of("Codes", "> 3");
         Assertions.assertThatThrownBy(() -> decisions.evaluate("Label", notAList)).isInstanceOf(InvalidInputException.class);
     }
+
+    @Test
+    void decisions_listed_before_the_decisions_they_require_are_evaluated_after_them() {
+        var decisions = load("chain-reversed.dmn");
+        var inputs = Map.of("Applicant Age", "30", "Income", "1200");
+
+        Assertions.assertThat(decisions.evaluate("Monthly Limit", inputs)).containsExactly(Map.of("Monthly Limit", "200"));
+        Assertions.assertThat(decisions.evaluate("Monthly Limit", Map.of("Applicant Age", "20", "Income", "1200")))
+                .containsExactly(Map.of("Monthly Limit", "50"));
+        Assertions.assertThat(decisions.evaluate("Credit Limit", inputs)).isEqualTo(load("chain.dmn").evaluate("Credit Limit", inputs));
+    }
+
+    private static final String UNTYPED = """
+            <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="u" name="Untyped" namespace="n">
+              <inputData id="a" name="A"><variable name="A"/></inputData>
+              <decision id="t" name="T">
+                <informationRequirement><requiredInput href="#a"/></informationRequirement>
+                <decisionTable hitPolicy="FIRST">
+                  <input><inputExpression typeRef="number"><text>A.d</text></inputExpression></input>
+                  <output name="T" typeRef="string"/>
+                  <rule><inputEntry><text>&gt; 1</text></inputEntry><outputEntry><text>"hit"</text></outputEntry></rule>
+                  <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"other"</text></outputEntry></rule>
+                </decisionTable>
+              </decision>
+              <decision id="u" name="U">
+                <informationRequirement><requiredDecision href="#t"/></informationRequirement>
+                <literalExpression><text>T + "!"</text></literalExpression>
+              </decision>
+              <decision id="n" name="Name">
+                <variable name="Name" typeRef="string"/>
+                <informationRequirement><requiredInput href="#a"/></informationRequirement>
+                <literalExpression><text>A.e.f</text></literalExpression>
+              </decision>
+            </definitions>""";
+
+    @Test
+    void input_data_without_a_type_are_given_by_the_paths_a_decision_reads_into_them() {
+        var decisions = Decisions.load(List.of(TableSource.of("untyped.dmn", UNTYPED.getBytes(StandardCharsets.UTF_8))), Severity.ERROR);
+
+        // the graph and the table's own engine agree
+        Assertions.assertThat(decisions.evaluate("T", Map.of("A.d", "5"))).containsExactly(Map.of("T", "hit"))
+                .isEqualTo(decisions.engine("T").evaluate(Map.of("A.d", "5")));
+        Assertions.assertThat(decisions.evaluate("T", Map.of("A.d", "0"))).containsExactly(Map.of("T", "other"));
+        Assertions.assertThat(decisions.evaluate("U", Map.of("A.d", "5"))).containsExactly(Map.of("U", "hit!"));
+        // and so does the engine's graph given the same values as Java values
+        var graph = decisions.models().getFirst().graph();
+        Assertions.assertThat(graph.evaluate("U", Map.of("A", Map.of("d", 5)))).isEqualTo("hit!");
+        // a path of several components is a context in a context
+        Assertions.assertThat(decisions.evaluate("Name", Map.of("A.e.f", "x", "A.d", "1"))).containsExactly(Map.of("Name", "x"));
+        Assertions.assertThat(decisions.evaluate("Name", Map.of())).isEmpty();
+        Assertions.assertThatThrownBy(() -> decisions.evaluate("T", Map.of("A.d", "five"))).isInstanceOf(InvalidInputException.class)
+                .hasMessageContaining("A.d=five is not a valid number");
+        Assertions.assertThatThrownBy(() -> decisions.evaluate("Name", Map.of("A.e", "x", "A.e.f", "y")))
+                .isInstanceOf(InvalidInputException.class).hasMessageContaining("continues the path 'A.e'");
+    }
+
+    @Test
+    void blank_text_for_a_string_input_data_is_the_empty_string_as_the_engines_graph_has_it() {
+        var file = """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="g" name="Greeting" namespace="n">
+                  <inputData id="name" name="Name"><variable name="Name" typeRef="string"/></inputData>
+                  <inputData id="age" name="Age"><variable name="Age" typeRef="number"/></inputData>
+                  <decision id="g" name="Greeting">
+                    <informationRequirement><requiredInput href="#name"/></informationRequirement>
+                    <literalExpression><text>"Hello " + Name</text></literalExpression>
+                  </decision>
+                  <decision id="n" name="Next">
+                    <informationRequirement><requiredInput href="#age"/></informationRequirement>
+                    <literalExpression><text>Age + 1</text></literalExpression>
+                  </decision>
+                </definitions>""";
+        var decisions = Decisions.load(List.of(TableSource.of("greeting.dmn", file.getBytes(StandardCharsets.UTF_8))), Severity.ERROR);
+        var graph = decisions.models().getFirst().graph();
+
+        Assertions.assertThat(decisions.evaluate("Greeting", Map.of("Name", ""))).containsExactly(Map.of("Greeting", "Hello "));
+        Assertions.assertThat(graph.evaluate("Greeting", Map.of("Name", ""))).isEqualTo("Hello ");
+        Assertions.assertThat(decisions.evaluate("Greeting", Map.of())).isEmpty();
+        // blank text for any other type is missing, as for a decision table's map-based inputs
+        Assertions.assertThat(decisions.evaluate("Next", Map.of("Age", " "))).isEmpty();
+    }
+
+    @Test
+    void fail_on_checks_the_tables_report_as_the_graph_and_the_build_plugins_have_it() {
+        var decisions = load("chain.dmn");
+        var graph = decisions.models().getFirst().graph();
+
+        for (var name : List.of("Risk Category", "Credit Limit")) {
+            Assertions.assertThat(decisions.get(name).report()).isEqualTo(graph.validationReport(name));
+        }
+    }
 }

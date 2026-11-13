@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Missing links: a required decision that does not exist, a name no requirement provides, a requirement of the wrong kind -->
+<!-- Missing links: a required decision that does not exist, a name no requirement provides, requirements of the wrong kind -->
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="missing" name="Missing" namespace="https://example.com/missing">
   <inputData id="x" name="X">
     <variable name="X" typeRef="number"/>
@@ -28,5 +28,15 @@
     <variable name="E" typeRef="number"/>
     <informationRequirement><requiredDecision href="#b"/></informationRequirement>
     <literalExpression><text>B</text></literalExpression>
+  </decision>
+  <decision id="f" name="F">
+    <variable name="F" typeRef="number"/>
+    <informationRequirement><requiredDecision href="#x"/></informationRequirement>
+    <literalExpression><text>X</text></literalExpression>
+  </decision>
+  <decision id="g" name="G">
+    <variable name="G" typeRef="number"/>
+    <informationRequirement><requiredDecision href="#f"/></informationRequirement>
+    <literalExpression><text>F + 1</text></literalExpression>
   </decision>
 </definitions>

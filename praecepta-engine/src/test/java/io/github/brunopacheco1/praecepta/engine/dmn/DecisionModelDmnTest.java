@@ -199,7 +199,7 @@ class DecisionModelDmnTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"chain.dmn", "diamond.dmn", "multi-output.dmn", "multiple-results.dmn", "literals.dmn", "cycle.dmn",
-        "missing-free.dmn", "type-mismatch.dmn"})
+        "missing-free.dmn", "type-mismatch.dmn", "untyped.dmn", "chain-reversed.dmn"})
     void a_model_written_as_dmn_reads_back_as_the_same_model_and_writes_the_same(String name) {
         var model = name.equals("missing-free.dmn") ? withoutMissing(model("missing.dmn")) : model(name);
 

@@ -98,7 +98,7 @@ public final class DmnWriter {
      * {@code inputData} per input data, typed by its type (an item definition for a list or a context, and no
      * {@code typeRef} for {@link FeelType#ANY any type}), and a {@code decision} per decision, with an
      * {@code informationRequirement} per requirement and its logic: a decision table, written as {@link #write(DecisionTable)}
-     * writes it, or a {@code literalExpression}, as written, its declared type on the decision's variable. Elements are
+     * writes it, or a {@code literalExpression}, as written; the type the decision declares is its variable's. Elements are
      * identified by their position ({@code input_data_0}, {@code decision_0}), so that any names may be told apart.
      *
      * @throws InvalidDecisionTableException if a decision requires a decision or an input data the model does not have,
@@ -123,8 +123,10 @@ public final class DmnWriter {
             var decision = decisions.get(d);
             ids.put(decision.name(), DECISION + d);
             switch (decision.logic()) {
-                // a table's decision is typed by its outputs, so its variable is left untyped, as write(table) leaves it
-                case DecisionLogic.Table(var table) -> listItemDefinitions(xml, table, DECISION + d + "_");
+                case DecisionLogic.Table(var table, var type) -> {
+                    listItemDefinitions(xml, table, DECISION + d + "_");
+                    decisionTypes[d] = typeRef(xml, type, DECISION + d + "_type", "decision '" + decision.name() + "'");
+                }
                 case DecisionLogic.LiteralExpression literal -> decisionTypes[d] = typeRef(xml, literal.type(), DECISION + d + "_type",
                         "decision '" + decision.name() + "'");
             }
@@ -170,7 +172,7 @@ public final class DmnWriter {
                .append(attribute("href", "#" + href)).append("/></informationRequirement>\n");
         }
         switch (decision.logic()) {
-            case DecisionLogic.Table(var table) -> decisionTable(xml, table, DECISION + d + "_");
+            case DecisionLogic.Table(var table, var tableType) -> decisionTable(xml, table, DECISION + d + "_");
             case DecisionLogic.LiteralExpression literal -> xml.append("    <literalExpression").append(id(DECISION + d + "_literal"))
                     .append("><text>").append(escapeText(literal.text())).append("</text></literalExpression>\n");
         }

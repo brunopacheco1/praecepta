@@ -93,6 +93,24 @@ class GraphCompilerTest {
     }
 
     @Test
+    void decisions_listed_before_the_decisions_they_require_are_evaluated_after_them() throws Exception {
+        // chain.dmn with each decision listed before the one it requires, and the input data last, Income first
+        var result = compile(TableDefinition.dmn(table("chain-reversed.dmn")), Severity.ERROR);
+
+        Assertions.assertThat(result.sources().get("MonthlyLimitInput"))
+                .contains("public record MonthlyLimitInput(java.math.BigDecimal income, java.math.BigDecimal applicantAge)");
+        var graph = graph("chain.dmn");
+        try (var loader = compileAndLoad(result)) {
+            var monthly = decision(loader, "MonthlyLimit");
+            for (int age = 0; age <= 60; age += 15) {
+                var inputData = Map.<String, Object>of("Applicant Age", BigDecimal.valueOf(age), "Income", new BigDecimal(1200));
+                Assertions.assertThat(monthly.evaluate(new BigDecimal(1200), BigDecimal.valueOf(age)))
+                        .isEqualTo(graph.evaluate("Monthly Limit", inputData));
+            }
+        }
+    }
+
+    @Test
     void a_context_becomes_a_record_and_lists_become_lists() throws Exception {
         var result = compile(TableDefinition.dmn(table("multi-output.dmn")), Severity.ERROR);
         Assertions.assertThat(result.sources()).containsKeys("PricingModel", "PricingOutput", "Pricing", "Shipping", "Total");

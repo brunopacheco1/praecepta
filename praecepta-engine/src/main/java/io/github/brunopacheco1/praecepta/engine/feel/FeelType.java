@@ -25,6 +25,9 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
  * {@code OffsetTime} or {@link ZonedTime}, {@code LocalDateTime} or {@code ZonedDateTime}, {@code Duration},
  * {@link YearsAndMonths}), a list's a {@code List}, a context's a {@code Map} from component name to value; any of
  * them may be null, FEEL's null.
+ *
+ * <p>Later releases add types (ranges and functions, with the full FEEL language and business knowledge models), so a
+ * {@code switch} over a {@code FeelType} should keep a {@code default} branch.
  */
 public sealed interface FeelType {
 
@@ -72,6 +75,22 @@ public sealed interface FeelType {
     /** A list of a column type. */
     static FeelType listOf(ColumnType type) {
         return new ListOf(new Simple(type));
+    }
+
+    /**
+     * The type of a component of a value of this type, as a path reads it ({@code Loan.principal}): a context's
+     * component; of a list of contexts, the list of their components (DMN 1.5, 10.3.2.5: a selection on "a list of
+     * contexts" is a list of selections); any type in a value of any type, or of a list of any type; null if a value of
+     * this type has no such component.
+     */
+    default FeelType component(String name) {
+        return switch (this) {
+            case Context(var components) -> components.get(name);
+            case ListOf(Context(var components)) -> components.containsKey(name) ? new ListOf(components.get(name)) : null;
+            case ListOf(Any any) -> new ListOf(ANY);
+            case Any any -> ANY;
+            default -> null;
+        };
     }
 
     /**

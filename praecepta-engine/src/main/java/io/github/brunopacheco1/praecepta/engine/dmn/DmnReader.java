@@ -38,6 +38,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
@@ -104,7 +105,7 @@ public final class DmnReader {
     public static DecisionTable read(InputStream dmn, String decisionName) {
         var root = parseModel(dmn);
         var decision = decisionToRead(root, decisionName);
-        return decisionTable(decision, new ItemDefinitions(root));
+        return decisionTable(decision, new ItemDefinitions(root), null);
     }
 
     /**
@@ -118,7 +119,7 @@ public final class DmnReader {
     public static List<DecisionTable> readAll(InputStream dmn) {
         var root = parseModel(dmn);
         var types = new ItemDefinitions(root);
-        return decisionsWithTables(root).stream().map(decision -> decisionTable(decision, types)).toList();
+        return decisionsWithTables(root).stream().map(decision -> decisionTable(decision, types, null)).toList();
     }
 
     // ---- the decision model ----------------------------------------------------------------------
@@ -129,7 +130,13 @@ public final class DmnReader {
      * it) or a literal expression in Praecepta's expression subset ({@link DecisionLogic.LiteralExpression}). An input
      * data's type is its variable's {@code typeRef}: a built-in type, or an item definition, which may be a collection or
      * have components (a context), nested up to {@value #MAX_TYPE_DEPTH} levels; none if it has no {@code typeRef}. A
-     * literal expression's type is the decision variable's {@code typeRef} (or the literal expression's own). A
+     * literal expression's type is the decision variable's {@code typeRef} (or the literal expression's own, where the
+     * variable has none), and so is a decision table's, which its value is bound to. Where a decision table's input
+     * expression or output declares no {@code typeRef}, the model gives it one: an input is of the type of the input data
+     * or decision it reads (or of the component of it a path reads), and an output of the type the decision's variable
+     * declares for it (the variable's for a single output, its component's of the output's name for several), else of
+     * the type of its output entries and default, when they are all literals of one type ({@code 10} is a number, as
+     * FEEL reads it); else they are strings, as {@link #read(InputStream, String)} reads them. A
      * requirement names a decision or an input data of the model by its {@code href} ({@code #id}); one that refers to
      * no element of the model is kept as the {@code id} it refers to, which {@code DecisionGraph} reports as a missing
      * requirement. Knowledge sources and authority requirements, which do not take part in evaluation, text annotations,
@@ -153,15 +160,22 @@ public final class DmnReader {
             children(root, kind).forEach(element -> elements.putIfAbsent(element.getAttribute("id"), element));
         }
         var inputData = new ArrayList<DecisionModel.InputData>();
+        var model = new ModelTypes();
         for (var input : children(root, "inputData")) {
             var name = elementName(input, "an input data");
             var variable = child(input, "variable");
             var typeRef = variable == null ? "" : variable.getAttribute(TYPE_REF);
-            inputData.add(new DecisionModel.InputData(name, types.feelType(typeRef, "Input data '" + name + "'")));
+            var type = types.feelType(typeRef, "Input data '" + name + "'");
+            inputData.add(new DecisionModel.InputData(name, type));
+            model.types.putIfAbsent(name, type);
+        }
+        for (var decision : children(root, "decision")) {
+            var name = nameOr(decision, "id");
+            model.types.putIfAbsent(name, declaredTableType(decision, types, "Decision '" + name + "'"));
         }
         var decisions = new ArrayList<DecisionModel.Decision>();
         for (var decision : children(root, "decision")) {
-            decisions.add(decision(decision, types, elements));
+            decisions.add(decision(decision, types, model, elements));
         }
         try {
             return new DecisionModel(root.getAttribute("name"), inputData, decisions);
@@ -172,18 +186,32 @@ public final class DmnReader {
 
     /** Rejects the elements of a model that Praecepta does not evaluate yet, naming the release that plans them. */
     private static void rejectUnsupported(Element root) {
-        rejectAny(root, "import", "namespace", "DMN model imports '%s', which Praecepta does not support yet: imports are planned for 0.11 (#119)");
+        rejectAny(root, "import", "namespace", "DMN model imports '%s', which Praecepta does not support yet: imports are planned for 0.11 (#119)",
+                IMPORTS);
         rejectAny(root, "businessKnowledgeModel", "id", "DMN model has the business knowledge model '%s', which Praecepta does not support "
-                + "yet: business knowledge models and their invocations are planned for 0.10 (#118)");
+                + "yet: business knowledge models and their invocations are planned for 0.10 (#118)", BOXED);
         rejectAny(root, "decisionService", "id", "DMN model has the decision service '%s', which Praecepta does not support yet: "
-                + "decision services are planned for 0.11 (#119)");
+                + "decision services are planned for 0.11 (#119)", IMPORTS);
     }
 
+    /** The releases that plan what Praecepta does not evaluate yet, as {@link UnsupportedFeatureException} names them. */
+    private record Planned(String release, int issue) {
+
+        UnsupportedFeatureException exception(String message) {
+            return new UnsupportedFeatureException(message, release, issue);
+        }
+    }
+
+    private static final Planned FEEL = new Planned("0.8", 116);
+    private static final Planned FUNCTIONS = new Planned("0.9", 117);
+    private static final Planned BOXED = new Planned("0.10", 118);
+    private static final Planned IMPORTS = new Planned("0.11", 119);
+
     /** Rejects the model if it has an element of that kind, naming the first by its name, or {@code fallback} attribute. */
-    private static void rejectAny(Element root, String kind, String fallback, String message) {
+    private static void rejectAny(Element root, String kind, String fallback, String message, Planned planned) {
         var elements = children(root, kind);
         if (!elements.isEmpty()) {
-            throw new InvalidDecisionTableException(message.formatted(nameOr(elements.getFirst(), fallback)));
+            throw planned.exception(message.formatted(nameOr(elements.getFirst(), fallback)));
         }
     }
 
@@ -197,11 +225,11 @@ public final class DmnReader {
     }
 
     /** A decision of a model: its information requirements and its logic. */
-    private static DecisionModel.Decision decision(Element decision, ItemDefinitions types, Map<String, Element> elements) {
+    private static DecisionModel.Decision decision(Element decision, ItemDefinitions types, ModelTypes model, Map<String, Element> elements) {
         var name = elementName(decision, "a decision");
         var where = "Decision '" + name + "'";
         if (child(decision, "knowledgeRequirement") != null) {
-            throw new InvalidDecisionTableException(("%s requires business knowledge, which Praecepta does not support yet: business "
+            throw BOXED.exception(("%s requires business knowledge, which Praecepta does not support yet: business "
                     + "knowledge models and their invocations are planned for 0.10 (#118)").formatted(where));
         }
         var requiredDecisions = new ArrayList<String>();
@@ -219,7 +247,7 @@ public final class DmnReader {
                 requiredInputs.add(required(requiredInput, elements, where));
             }
         }
-        return new DecisionModel.Decision(name, requiredDecisions, requiredInputs, logic(decision, types, where));
+        return new DecisionModel.Decision(name, requiredDecisions, requiredInputs, logic(decision, types, model, where));
     }
 
     /**
@@ -229,7 +257,7 @@ public final class DmnReader {
     private static String required(Element requirement, Map<String, Element> elements, String where) {
         var href = requirement.getAttribute("href").strip();
         if (!href.startsWith("#")) {
-            throw new InvalidDecisionTableException(("%s requires '%s', an element of another model, which Praecepta does not support "
+            throw IMPORTS.exception(("%s requires '%s', an element of another model, which Praecepta does not support "
                     + "yet: imports are planned for 0.11 (#119)").formatted(where, href));
         }
         var id = href.substring(1);
@@ -251,7 +279,7 @@ public final class DmnReader {
             "filter", "a boxed filter");
 
     /** A decision's logic: its decision table or its literal expression. */
-    private static DecisionLogic logic(Element decision, ItemDefinitions types, String where) {
+    private static DecisionLogic logic(Element decision, ItemDefinitions types, ModelTypes model, String where) {
         for (var node = decision.getFirstChild(); node != null; node = node.getNextSibling()) {
             if (node.getNodeType() != Node.ELEMENT_NODE) {
                 continue;
@@ -259,13 +287,13 @@ public final class DmnReader {
             var element = (Element) node;
             var kind = element.getLocalName();
             if (kind.equals("decisionTable")) {
-                return new DecisionLogic.Table(decisionTable(decision, types));
+                return new DecisionLogic.Table(decisionTable(decision, types, model), declaredTableType(decision, types, where));
             }
             if (kind.equals("literalExpression")) {
                 return literalExpression(decision, element, types, where);
             }
             if (BOXED_EXPRESSIONS.containsKey(kind)) {
-                throw new InvalidDecisionTableException(("%s: its logic is %s, which Praecepta does not support yet: boxed expressions are "
+                throw BOXED.exception(("%s: its logic is %s, which Praecepta does not support yet: boxed expressions are "
                         + "planned for 0.10 (#118)").formatted(where, BOXED_EXPRESSIONS.get(kind)));
             }
         }
@@ -280,23 +308,43 @@ public final class DmnReader {
             throw new InvalidDecisionTableException("%s: its literal expression is in '%s'; Praecepta reads FEEL".formatted(where, language));
         }
         if (child(literal, "importedValues") != null) {
-            throw new InvalidDecisionTableException(("%s: its literal expression imports values, which Praecepta does not support yet: "
+            throw IMPORTS.exception(("%s: its literal expression imports values, which Praecepta does not support yet: "
                     + "imports are planned for 0.11 (#119)").formatted(where));
         }
         var text = child(literal, "text") == null ? "" : textOf(literal).strip();
         if (text.isEmpty()) {
             throw new InvalidDecisionTableException(where + ": its literal expression is empty");
         }
-        var typeRef = literal.getAttribute(TYPE_REF);
+        // the value is bound to the decision's variable (DMN 1.5, 10.3.2.9.4), whose typeRef 7.3.1 requires the literal
+        // expression's to equal; the literal expression's own is read only where the variable has none
+        var typeRef = variableTypeRef(decision);
         if (typeRef.isBlank()) {
-            var variable = child(decision, "variable");
-            typeRef = variable == null ? "" : variable.getAttribute(TYPE_REF);
+            typeRef = literal.getAttribute(TYPE_REF);
         }
         var type = types.feelType(typeRef, where);
         try {
             return new DecisionLogic.LiteralExpression(text, type);
         } catch (IllegalArgumentException e) {
-            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+            var planned = e.getCause() != null && String.valueOf(e.getCause().getMessage()).contains("function call") ? FUNCTIONS : FEEL;
+            throw planned.exception(where + ": " + e.getMessage());
+        }
+    }
+
+    /** The {@code typeRef} of a decision's variable, blank if it has none. */
+    private static String variableTypeRef(Element decision) {
+        var variable = child(decision, "variable");
+        return variable == null ? "" : variable.getAttribute(TYPE_REF);
+    }
+
+    /**
+     * The type a decision's variable declares, for its decision table's value to be bound to; any type if it declares
+     * none, or one Praecepta cannot hold, in which case the table's value is passed on as its outputs give it.
+     */
+    private static FeelType declaredTableType(Element decision, ItemDefinitions types, String where) {
+        try {
+            return types.feelType(variableTypeRef(decision), where);
+        } catch (InvalidDecisionTableException e) {
+            return FeelType.ANY;
         }
     }
 
@@ -326,7 +374,11 @@ public final class DmnReader {
         return decisions.getFirst();
     }
 
-    private static DecisionTable decisionTable(Element decision, ItemDefinitions types) {
+    /**
+     * @param model the types of the model's input data and decisions, which type the columns and outputs that declare
+     *              none, when the table is read as part of a model; null when it is read alone
+     */
+    private static DecisionTable decisionTable(Element decision, ItemDefinitions types, ModelTypes model) {
         var name = nameOr(decision, "id");
         var table = child(decision, "decisionTable");
         var where = "Decision '" + name + "'";
@@ -335,7 +387,7 @@ public final class DmnReader {
         var aggregation = aggregation(table.getAttribute("aggregation"), where);
 
         var lists = new HashSet<String>();
-        var inputs = children(table, "input").stream().map(input -> inputColumn(input, types, lists, where)).toList();
+        var inputs = children(table, "input").stream().map(input -> inputColumn(input, types, model, lists, where)).toList();
         var outputElements = children(table, "output");
         if (outputElements.isEmpty()) {
             throw new InvalidDecisionTableException(where + ": the decision table has no output");
@@ -343,11 +395,16 @@ public final class DmnReader {
         // a single unnamed output is the decision's result, named after the decision, and typed by it
         var single = outputElements.size() == 1;
         var unnamedOutput = single ? name : "";
+        var ruleElements = children(table, "rule");
         var resultType = single ? resultType(decision, table, hitPolicy, aggregation, types, where) : ColumnType.STRING;
-        var outputs = outputElements.stream().map(output -> outputColumn(output, unnamedOutput, resultType, types, where)).toList();
+        var outputs = new ArrayList<OutputColumn>();
+        for (int o = 0; o < outputElements.size(); o++) {
+            var output = outputElements.get(o);
+            var untypedAs = model == null ? resultType : model.untypedOutputType(decision, output, o, ruleElements, types, where);
+            outputs.add(outputColumn(output, unnamedOutput, untypedAs, types, where));
+        }
 
         var rules = new ArrayList<Praeceptum>();
-        var ruleElements = children(table, "rule");
         var columns = new Columns(inputs, outputs, lists);
         var names = new ArrayList<NamedInput>();
         for (int i = 0; i < ruleElements.size(); i++) {
@@ -360,6 +417,114 @@ public final class DmnReader {
         }
         var checked = checkComputedOutputs(rules, inputs, named, lists, outputs, where);
         return new DecisionTable(name, hitPolicy, aggregation, inputs, outputs, checked, true, lists);
+    }
+
+    /**
+     * The types of a model's input data and decisions, as declared, by name, for the decision tables of the model whose
+     * input expressions and outputs declare no type.
+     */
+    private static final class ModelTypes {
+        private final Map<String, FeelType> types = new HashMap<>();
+
+        /**
+         * The type of a column that declares none, from what it reads: the input data or decision of its name, or of its
+         * longest part before a dot, at the path the rest names, when that is a simple type or a list of one.
+         */
+        Optional<Type> columnType(String column) {
+            var element = DecisionModel.elementOf(column, types::containsKey);
+            if (element == null) {
+                return Optional.empty();
+            }
+            var type = types.get(element);
+            if (element.length() < column.length()) {
+                for (var component : column.substring(element.length() + 1).split("\\.")) {
+                    type = type == null ? null : type.component(component);
+                }
+            }
+            return switch (type) {
+                case FeelType.Simple(var simple) -> Optional.of(new Type(simple, null, false));
+                case FeelType.ListOf(FeelType.Simple(var simple)) -> Optional.of(new Type(simple, null, true));
+                case null, default -> Optional.empty();
+            };
+        }
+
+        /**
+         * The type of an output that declares none ({@link #declaredOutputType}), else that of its literal entries
+         * ({@link DmnReader#literalType}), else a string.
+         *
+         * @param index the output's position among the table's outputs
+         * @param rules the table's rules
+         */
+        ColumnType untypedOutputType(Element decision, Element output, int index, List<Element> rules, ItemDefinitions items, String where) {
+            return declaredOutputType(decision, output, items, where)
+                    .or(() -> literalType(rules, index, output))
+                    .orElse(ColumnType.STRING);
+        }
+
+        /**
+         * The type of an output that declares none, as the decision's variable declares it: for a single output, the
+         * variable's type, or the type of its elements (whatever the hit policy: the table's value is bound to the
+         * variable, a single result to a list as a list of one); for several, the type of the variable's component of the
+         * output's name. Empty where it declares none Praecepta can hold, and for COUNT, whose outputs say nothing of its
+         * value.
+         */
+        private Optional<ColumnType> declaredOutputType(Element decision, Element output, ItemDefinitions items, String where) {
+            var table = child(decision, "decisionTable");
+            boolean single = children(table, "output").size() == 1;
+            if (!output.getAttribute(TYPE_REF).isBlank() || single && "COUNT".equalsIgnoreCase(table.getAttribute("aggregation").strip())) {
+                return Optional.empty();
+            }
+            var typeRef = table.getAttribute(TYPE_REF);
+            FeelType declared;
+            try {
+                declared = typeRef.isBlank() ? declaredTableType(decision, items, where) : items.feelType(typeRef, where);
+            } catch (InvalidDecisionTableException e) {
+                return Optional.empty();
+            }
+            var type = single ? declared : declared.component(nameOr(output, "label"));
+            return switch (type) {
+                case FeelType.Simple(var simple) -> Optional.of(simple);
+                case FeelType.ListOf(FeelType.Simple(var simple)) -> Optional.of(simple);
+                case null, default -> Optional.empty();
+            };
+        }
+    }
+
+    /**
+     * The type of an output from its entries, for a table of a model whose output declares no type: the type of its
+     * literal output entries and default, when all of them that are not {@code null} are literals of one type (a quoted
+     * string, or an unquoted number, boolean, date, time or date and time, as FEEL reads {@code 10} as the number 10);
+     * empty when one names an input or computes a value, or they differ.
+     *
+     * @param index the output's position among the table's outputs
+     */
+    private static Optional<ColumnType> literalType(List<Element> rules, int index, Element output) {
+        var texts = new ArrayList<String>();
+        for (var rule : rules) {
+            var entries = children(rule, "outputEntry");
+            if (index >= entries.size()) {
+                return Optional.empty(); // reported when the rule is read
+            }
+            texts.add(textOf(entries.get(index)));
+        }
+        var defaultEntry = nonBlankText(output, "defaultOutputEntry");
+        if (defaultEntry != null) {
+            texts.add(defaultEntry);
+        }
+        var found = new HashSet<ColumnType>();
+        for (var text : texts) {
+            var literal = text.strip();
+            if (literal.isEmpty() || literal.equals("null") || isNull(literal, ColumnType.STRING)) {
+                continue;
+            }
+            var candidates = literal.startsWith("\"") ? List.of(ColumnType.STRING) : UNQUOTED_OUTPUT_TYPES;
+            var type = candidates.stream().filter(candidate -> literalValue(literal, candidate).isPresent()).findFirst();
+            if (type.isEmpty()) {
+                return Optional.empty();
+            }
+            found.add(type.get());
+        }
+        return found.size() == 1 ? Optional.of(found.iterator().next()) : Optional.empty();
     }
 
     /** An input a cell compares with that is not a column of the table, with the type of the column whose cell names it. */
@@ -449,7 +614,7 @@ public final class DmnReader {
      * A column; one whose type is a collection is added to {@code lists}, and its allowed values (those of
      * its item type) apply to the list's elements.
      */
-    private static InputColumn inputColumn(Element input, ItemDefinitions types, Set<String> lists, String where) {
+    private static InputColumn inputColumn(Element input, ItemDefinitions types, ModelTypes model, Set<String> lists, String where) {
         var expression = child(input, "inputExpression");
         var column = expression == null ? "" : textOf(expression).strip();
         if (column.isEmpty()) {
@@ -460,7 +625,10 @@ public final class DmnReader {
                     .formatted(where, column));
         }
         var typeRef = expression == null ? "" : expression.getAttribute(TYPE_REF);
-        var type = types.resolve(typeRef, where + ", input '" + column + "'");
+        var name = column;
+        var type = typeRef.isBlank() && model != null
+                ? model.columnType(column).orElseGet(() -> types.resolve("", where + ", input '" + name + "'"))
+                : types.resolve(typeRef, where + ", input '" + column + "'");
         var values = nonBlankText(input, "inputValues");
         if (type.list()) {
             if (values != null) {
@@ -1013,7 +1181,7 @@ public final class DmnReader {
                         .formatted(where, name, MAX_TYPE_DEPTH));
             }
             if (child(definition, "functionItem") != null) {
-                throw new InvalidDecisionTableException(("%s: type '%s' is a function type, which Praecepta does not support yet: "
+                throw BOXED.exception(("%s: type '%s' is a function type, which Praecepta does not support yet: "
                         + "business knowledge models and functions are planned for 0.10 (#118)").formatted(where, name));
             }
             var components = children(definition, "itemComponent");

@@ -275,7 +275,7 @@ final class GraphSourceGenerator {
                 .append(inputType(needed.get(i)).toValue(getter, 0)).append(");");
         }
         var logic = switch (graph.model().decision(decision).orElseThrow().logic()) {
-            case DecisionLogic.Table(var table) -> "a decision table (hit policy %s%s)".formatted(table.hitPolicy(),
+            case DecisionLogic.Table(var table, var declared) -> "a decision table (hit policy %s%s)".formatted(table.hitPolicy(),
                     table.aggregation() == null ? "" : ", " + table.aggregation());
             case DecisionLogic.LiteralExpression literal -> "the literal expression {@code " + SourceGenerator.javadoc(literal.text().strip()) + "}";
         };

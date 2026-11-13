@@ -240,6 +240,18 @@ class PraeceptaAutoConfigurationTest {
     }
 
     @Test
+    void a_decision_requirements_graph_with_a_cycle_stops_startup_naming_it_unless_fail_on_is_none() {
+        var cycle = "praecepta.locations=classpath:broken-graphs/cycle.dmn";
+        runner.withPropertyValues(cycle).run(context -> Assertions.assertThat(problems(context)).singleElement().asString()
+                .contains("cycle.dmn: decision model 'Cycle' has validation issues at ERROR or above")
+                .contains("decisions 'A' -> 'B' -> 'A' require one another in a cycle"));
+        runner.withPropertyValues(cycle, "praecepta.fail-on=NONE").run(context -> {
+            Assertions.assertThat(context).hasNotFailed();
+            Assertions.assertThat(context.getBean(Decisions.class).evaluate("D", Map.of("X", "1"))).containsExactly(Map.of("D", "2"));
+        });
+    }
+
+    @Test
     void the_actuator_endpoint_reports_the_decisions_when_exposed() {
         var withActuator = runner.withConfiguration(AutoConfigurations.of(EndpointAutoConfiguration.class));
         withActuator.withPropertyValues("management.endpoints.web.exposure.include=praecepta").run(context -> {

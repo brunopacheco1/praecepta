@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_Pricing" name="Pricing" namespace="https://github.com/brunopacheco1/praecepta/Pricing">
+  <itemDefinition name="decision_0_type">
+    <itemComponent name="discount">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent name="grade">
+      <typeRef>string</typeRef>
+    </itemComponent>
+  </itemDefinition>
   <inputData id="input_data_0" name="Order Total">
     <variable id="input_data_0_variable" name="Order Total" typeRef="number"/>
   </inputData>
@@ -7,7 +15,7 @@
     <variable id="input_data_1_variable" name="Customer Type" typeRef="string"/>
   </inputData>
   <decision id="decision_0" name="Pricing">
-    <variable id="decision_0_variable" name="Pricing"/>
+    <variable id="decision_0_variable" name="Pricing" typeRef="decision_0_type"/>
     <informationRequirement id="decision_0_requirement_0"><requiredInput href="#input_data_1"/></informationRequirement>
     <decisionTable id="decision_0_table" hitPolicy="UNIQUE">
       <input id="decision_0_input_0" label="Customer Type">
@@ -33,7 +41,7 @@
     </decisionTable>
   </decision>
   <decision id="decision_1" name="Shipping">
-    <variable id="decision_1_variable" name="Shipping"/>
+    <variable id="decision_1_variable" name="Shipping" typeRef="string"/>
     <informationRequirement id="decision_1_requirement_0"><requiredDecision href="#decision_0"/></informationRequirement>
     <decisionTable id="decision_1_table" hitPolicy="UNIQUE">
       <input id="decision_1_input_0" label="Pricing.grade">

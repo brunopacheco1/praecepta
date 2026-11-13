@@ -30,6 +30,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.feel.ExpressionTypeException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
+import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 
 /**
  * The static analysis of a decision model, done once when a {@link DecisionGraph} is built: each element gets a slot
@@ -44,9 +45,14 @@ final class GraphAnalysis {
     /**
      * A name a decision's logic reads, resolved: the slot of the requirement that provides it, the path into that
      * requirement's value, and the type of the value there ({@link FeelType#ANY} when unknown); {@code error} says why
-     * the path does not exist in the requirement's type, else it is null.
+     * the path does not exist in the requirement's type, else it is null, and {@code unsupported} whether the path
+     * exists in FEEL but Praecepta does not read it yet (a property of a date, {@code Birth.year}).
      */
-    record Resolution(int slot, String[] path, FeelType type, String error) {
+    record Resolution(int slot, String[] path, FeelType type, String error, boolean unsupported) {
+
+        Resolution(int slot, String[] path, FeelType type) {
+            this(slot, path, type, null, false);
+        }
     }
 
     /** How a decision table reads a name: as a column of {@code type}, or of lists of it, or as an input its cells compare with. */
@@ -69,8 +75,12 @@ final class GraphAnalysis {
     private final List<int[]> requiredDecisions = new ArrayList<>();
     /** By decision: why it cannot be evaluated, or null if it can. */
     final String[] blocked;
-    /** By decision: how its literal expression's value is bound to it; as it is for a decision table. */
+    /** By decision: how its logic's value is bound to it (DMN 1.5, 10.3.2.9.4). */
     final GraphValues.Binding[] bindings;
+    /** By decision: its literal expression, parsed once; null for a decision table. */
+    final OutputExpression[] expressions;
+    /** By decision: whether its literal expression reads a value whose type is known only when it is evaluated. */
+    final boolean[] dynamic;
     /** The decisions that can be ordered, required ones first, as their indexes: those in no cycle and requiring none in one. */
     final int[] order;
     private final List<Issue> issues = new ArrayList<>();
@@ -85,6 +95,8 @@ final class GraphAnalysis {
         blocked = new String[decisions.size()];
         bindings = new GraphValues.Binding[decisions.size()];
         Arrays.fill(bindings, GraphValues.Binding.AS_IS);
+        expressions = new OutputExpression[decisions.size()];
+        dynamic = new boolean[decisions.size()];
         for (int i = 0; i < inputCount; i++) {
             var input = model.inputData().get(i);
             slots.put(input.name(), i);
@@ -165,18 +177,19 @@ final class GraphAnalysis {
         var resolved = new LinkedHashMap<String, Resolution>();
         var names = new LinkedHashSet<String>();
         switch (decision.logic()) {
-            case DecisionLogic.Table(var table) -> {
+            case DecisionLogic.Table(var table, var type) -> {
                 var columnReads = columnReads(decision.name(), table);
                 tableReads.add(columnReads);
                 columnReads.forEach(read -> names.add(read.name()));
             }
             case DecisionLogic.LiteralExpression literal -> {
                 tableReads.add(List.of());
-                names.addAll(literal.expression().names());
+                expressions[d] = literal.expression();
+                names.addAll(expressions[d].names());
             }
         }
         for (var name : names) {
-            var requirement = requirementOf(name, scope);
+            var requirement = DecisionModel.elementOf(name, scope::contains);
             if (requirement == null) {
                 report(d, Kind.MISSING_REQUIREMENT, ("decision '%s' reads '%s', which none of its information requirements provides "
                         + "(DMN 1.5, 7.3.4)%s").formatted(decision.name(), name, operatorHint(name)));
@@ -186,7 +199,7 @@ final class GraphAnalysis {
                 continue; // a requirement the model does not have, or of the other kind, which is reported already
             }
             var path = requirement.length() == name.length() ? new String[0] : name.substring(requirement.length() + 1).split("\\.");
-            resolved.put(name, new Resolution(slots.get(requirement), path, null, null));
+            resolved.put(name, new Resolution(slots.get(requirement), path, null));
         }
         reads.add(resolved);
         listedNamedInputs.add(new LinkedHashSet<>());
@@ -213,25 +226,11 @@ final class GraphAnalysis {
         return slot != null && slot < inputCount;
     }
 
-    /** The requirement that provides a name: the name itself, or its longest part before a dot; null if none. */
-    private static String requirementOf(String name, Set<String> scope) {
-        if (scope.contains(name)) {
-            return name;
-        }
-        for (int dot = name.lastIndexOf('.'); dot > 0; dot = name.lastIndexOf('.', dot - 1)) {
-            var prefix = name.substring(0, dot);
-            if (scope.contains(prefix)) {
-                return prefix;
-            }
-        }
-        return null;
-    }
-
     /** The names a decision's logic reads: a table's columns and the inputs its cells compare with, or a literal expression's names. */
     static Set<String> namesRead(Decision decision) {
         var names = new LinkedHashSet<String>();
         switch (decision.logic()) {
-            case DecisionLogic.Table(var table) -> columnReads(decision.name(), table).forEach(read -> names.add(read.name()));
+            case DecisionLogic.Table(var table, var type) -> columnReads(decision.name(), table).forEach(read -> names.add(read.name()));
             case DecisionLogic.LiteralExpression literal -> names.addAll(literal.expression().names());
         }
         return names;
@@ -490,7 +489,7 @@ final class GraphAnalysis {
         locateReads(d);
         var decision = model.decisions().get(d);
         types[inputCount + d] = switch (decision.logic()) {
-            case DecisionLogic.Table(var table) -> tableType(table);
+            case DecisionLogic.Table(var table, var declared) -> bind(d, declared, tableType(table), "decision table");
             case DecisionLogic.LiteralExpression literal -> literalType(d, literal);
         };
     }
@@ -502,16 +501,34 @@ final class GraphAnalysis {
             var type = types[resolution.slot()];
             var at = rootName(name, path);
             for (var component : path) {
-                var next = component(type, component);
+                var next = type.component(component);
                 if (next == null) {
-                    var error = "'%s' is a %s, which has no component '%s'".formatted(at, type.feelName(), component);
-                    return new Resolution(resolution.slot(), path, FeelType.ANY, error);
+                    return missingComponent(resolution, at, type, component);
                 }
                 type = next;
                 at = at + "." + component;
             }
-            return new Resolution(resolution.slot(), path, type, null);
+            return new Resolution(resolution.slot(), path, type);
         });
+    }
+
+    /** The properties FEEL gives dates, times, date-times and durations (DMN 1.5, Table 65), which a path reads. */
+    private static final Set<String> TEMPORAL_PROPERTIES = Set.of("year", "month", "day", "weekday", "hour", "minute", "second",
+            "time offset", "timezone", "years", "months", "days", "hours", "minutes", "seconds");
+
+    /**
+     * A path that reads a component {@code at}'s type does not have: a property of a date, time or duration, which the
+     * full FEEL language brings, or else a component that does not exist.
+     */
+    private static Resolution missingComponent(Resolution resolution, String at, FeelType type, String component) {
+        if (type instanceof FeelType.Simple(var simple) && simple != ColumnType.STRING && simple != ColumnType.NUMBER
+                && simple != ColumnType.BOOLEAN && TEMPORAL_PROPERTIES.contains(component)) {
+            var error = ("'%s' is a %s, whose property '%s' Praecepta does not read yet: the full FEEL language is planned for "
+                    + "0.8 (#116)").formatted(at, type.feelName(), component);
+            return new Resolution(resolution.slot(), resolution.path(), FeelType.ANY, error, true);
+        }
+        var error = "'%s' is a %s, which has no component '%s'".formatted(at, type.feelName(), component);
+        return new Resolution(resolution.slot(), resolution.path(), FeelType.ANY, error, false);
     }
 
     /** The requirement's name in a name that reads a path into it. */
@@ -521,20 +538,6 @@ final class GraphAnalysis {
             length -= component.length() + 1;
         }
         return name.substring(0, length);
-    }
-
-    /**
-     * The type of a component of a value of {@code type}: a context's component, and of a list of contexts the list of
-     * their components (DMN 1.5, 10.3.2.5); any type in a value of any type; null if there is no such component.
-     */
-    private static FeelType component(FeelType type, String name) {
-        return switch (type) {
-            case FeelType.Context(var components) -> components.get(name);
-            case FeelType.ListOf(FeelType.Context(var components)) -> components.containsKey(name) ? new FeelType.ListOf(components.get(name)) : null;
-            case FeelType.ListOf(FeelType.Any any) -> new FeelType.ListOf(FeelType.ANY);
-            case FeelType.Any any -> FeelType.ANY;
-            default -> null;
-        };
     }
 
     /**
@@ -558,83 +561,144 @@ final class GraphAnalysis {
 
     private static FeelType declaredType(Decision decision) {
         return switch (decision.logic()) {
-            case DecisionLogic.Table(var table) -> tableType(table);
+            case DecisionLogic.Table(var table, var declared) -> declared instanceof FeelType.Any ? tableType(table) : declared;
             case DecisionLogic.LiteralExpression literal -> literal.type();
         };
     }
 
     /**
-     * The type of a literal expression's value, from the types of the names it reads, each of which must be a single
-     * string, number, date, time or duration, checked against the type its decision declares; the declared type, or
-     * any type, where it cannot be worked out.
+     * The type of a literal expression's value, bound to the type its decision declares ({@link #bind}). A name alone
+     * gives the value it reads, of whatever type. Otherwise the expression computes with FEEL's arithmetic: its type
+     * follows from the types of the names it reads, when they are known; a name of a type known only when the decision
+     * is evaluated (an input data without a declared type) makes the expression typed then ({@link #dynamic}); and
+     * operands FEEL's arithmetic does not combine (a string and a number, a boolean, a list, a context) make its value
+     * null whatever its inputs, which is reported ({@link Kind#ALWAYS_NULL}).
      */
     private FeelType literalType(int d, DecisionLogic.LiteralExpression literal) {
-        var decision = model.decisions().get(d);
+        var expression = expressions[d];
         var operands = new HashMap<String, ColumnType>();
-        boolean known = true;
-        for (var read : reads.get(d).entrySet()) {
-            var resolution = read.getValue();
-            if (resolution.error() != null) {
-                report(d, Kind.TYPE_MISMATCH, "decision '%s' reads '%s', but %s".formatted(decision.name(), read.getKey(), resolution.error()));
-                known = false;
-            } else if (resolution.type() instanceof FeelType.Simple(var type)) {
-                operands.put(read.getKey(), type);
-            } else {
-                report(d, Kind.TYPE_MISMATCH, (resolution.type() instanceof FeelType.Any
-                        ? "decision '%s' reads '%s', whose type is not declared; its literal expression needs the type of every name it reads"
-                        : "decision '%s' reads '%s', a %s; its literal expression computes with single strings, numbers, dates, times and durations")
-                        .formatted(decision.name(), read.getKey(), resolution.type().feelName()));
-                known = false;
+        var uncombined = operands(d, operands);
+        if (blocked[d] != null || !reads.get(d).keySet().containsAll(expression.names())) {
+            dynamic[d] = false;
+            return literal.type(); // reported already: a name none of its requirements provides, or a path that does not exist
+        }
+        var logic = "literal expression '%s'".formatted(literal.text().strip());
+        if (expression instanceof OutputExpression.Name(var name)) {
+            dynamic[d] = false; // a name alone gives the value it reads, of its type
+            return bind(d, literal.type(), reads.get(d).get(name).type(), logic);
+        }
+        if (uncombined == null && !dynamic[d]) {
+            try {
+                return bind(d, literal.type(), FeelType.of(expression.type(operands::get)), logic);
+            } catch (ExpressionTypeException e) {
+                uncombined = e.getMessage();
             }
         }
-        known &= operands.keySet().containsAll(literal.expression().names());
-        if (!known) {
+        if (uncombined != null) {
+            dynamic[d] = false;
+            bindings[d] = GraphValues.Binding.NULL;
+            issues.add(new Issue(Kind.ALWAYS_NULL, List.of(), "decision '%s': in %s, %s; its value is null (DMN 1.5, 10.3.2.15, Tables 56 to 59)"
+                    .formatted(model.decisions().get(d).name(), logic, uncombined), Map.of()));
             return literal.type();
         }
-        ColumnType type;
-        try {
-            type = literal.expression().type(operands::get);
-        } catch (ExpressionTypeException e) {
-            report(d, Kind.TYPE_MISMATCH,
-                    "decision '%s': literal expression '%s' %s".formatted(decision.name(), literal.text().strip(), e.getMessage()));
-            return literal.type();
-        }
-        return checkDeclared(d, literal, type);
+        // a name of a type known only when the decision is evaluated: the operands are typed then, as FEEL types them
+        bindings[d] = literal.type() instanceof FeelType.Any ? GraphValues.Binding.AS_IS : GraphValues.Binding.CHECKED;
+        return literal.type();
     }
 
     /**
-     * The type of the decision whose literal expression gives values of {@code type}, and how they are bound to it (DMN
-     * 1.5, 10.3.2.9.4, binding contexts): as they are, to the type the decision declares or to their own if it declares
-     * none; a date converted to a date and time at UTC midnight, or a value to a list of one, where the decision declares
-     * that; and otherwise as null, the value not conforming to the declared type, which is also reported, as a type
-     * mismatch, though the decision is evaluated.
+     * Sorts the names a literal expression reads: those of a simple type its arithmetic takes go into {@code operands},
+     * one of any type makes the decision {@linkplain #dynamic dynamic}, and a path that does not exist is reported.
+     *
+     * @return why its arithmetic does not combine a name it reads (a boolean, a list, a context); null if it does
      */
-    private FeelType checkDeclared(int d, DecisionLogic.LiteralExpression literal, ColumnType type) {
-        var declared = literal.type();
-        if (declared instanceof FeelType.Any) {
-            return FeelType.of(type);
+    private String operands(int d, Map<String, ColumnType> operands) {
+        var decision = model.decisions().get(d).name();
+        String uncombined = null;
+        for (var read : reads.get(d).entrySet()) {
+            var resolution = read.getValue();
+            if (resolution.error() != null) {
+                report(d, resolution.unsupported() ? Kind.UNSUPPORTED_FEATURE : Kind.TYPE_MISMATCH,
+                        "decision '%s' reads '%s', but %s".formatted(decision, read.getKey(), resolution.error()));
+            } else if (resolution.type() instanceof FeelType.Simple(var type) && type != ColumnType.BOOLEAN) {
+                operands.put(read.getKey(), type);
+            } else if (resolution.type() instanceof FeelType.Any) {
+                dynamic[d] = true;
+            } else if (uncombined == null) {
+                uncombined = "'%s' is a %s, which FEEL's arithmetic does not combine".formatted(read.getKey(), resolution.type().feelName());
+            }
         }
-        if (declared.equals(FeelType.of(type))) {
+        return uncombined;
+    }
+
+    /**
+     * The type of a decision whose logic gives values of type {@code actual}, and how they are bound to it (DMN 1.5,
+     * 10.3.2.9.4, binding contexts): as they are if the decision declares no type, or one they conform to (10.3.2.9.2),
+     * keeping their own; a date converted to a date and time at UTC midnight, a value to a list of one, or a list of one
+     * to its value, where the decision declares that; checked when the decision is evaluated where the values' type is
+     * known only then; and otherwise as null, the values not conforming to the declared type, which is reported
+     * ({@link Kind#ALWAYS_NULL}), though the decision is evaluated.
+     *
+     * @param logic the decision's logic, as the report names it
+     */
+    private FeelType bind(int d, FeelType declared, FeelType actual, String logic) {
+        if (conforms(actual, declared)) {
+            return actual;
+        }
+        if (actual.equals(FeelType.of(ColumnType.DATE)) && declared.equals(FeelType.of(ColumnType.DATE_TIME))) {
+            bindings[d] = GraphValues.Binding.DATE_TO_DATE_TIME;
             return declared;
         }
-        if (type == ColumnType.DATE && declared.equals(FeelType.of(ColumnType.DATE_TIME))) {
-            bindings[d] = GraphValues.Binding.DATE_TO_DATE_TIME;
-        } else if (declared.equals(FeelType.listOf(type))) {
+        if (declared instanceof FeelType.ListOf(var element) && conforms(actual, element)) {
             bindings[d] = GraphValues.Binding.SINGLETON_LIST;
-        } else {
-            bindings[d] = GraphValues.Binding.NULL;
-            issues.add(new Issue(Kind.TYPE_MISMATCH, List.of(), ("decision '%s' declares a %s, but its literal expression '%s' gives a %s, "
-                    + "so its value is null (DMN 1.5, 10.3.2.9.4)").formatted(model.decisions().get(d).name(), declared.feelName(),
-                    literal.text().strip(), type.feelName()), Map.of()));
+            return new FeelType.ListOf(actual);
         }
+        if (actual instanceof FeelType.ListOf(var element) && conforms(element, declared)) {
+            bindings[d] = GraphValues.Binding.FROM_SINGLETON_LIST;
+            return element;
+        }
+        if (holdsAny(actual)) {
+            bindings[d] = GraphValues.Binding.CHECKED;
+            return declared;
+        }
+        bindings[d] = GraphValues.Binding.NULL;
+        issues.add(new Issue(Kind.ALWAYS_NULL, List.of(),
+                "decision '%s' declares a %s, but its %s gives a %s, so its value is null (DMN 1.5, 10.3.2.9.4)".formatted(model.decisions().get(d).name(), declared.feelName(), logic, actual.feelName()), Map.of()));
         return declared;
+    }
+
+    /**
+     * Whether every value of type {@code type} conforms to {@code target} (DMN 1.5, 10.3.2.9.2): any type does to any
+     * type; a type does to an equivalent one; a list does to a list whose elements' type its elements' conforms to; a
+     * context does to a context each of whose components it has, of a type that conforms. A value of any type may or may
+     * not conform to another, which only the value tells.
+     */
+    static boolean conforms(FeelType type, FeelType target) {
+        return switch (target) {
+            case FeelType.Any any -> true;
+            case FeelType.ListOf(var element) -> type instanceof FeelType.ListOf(var typeElement) && conforms(typeElement, element);
+            case FeelType.Context(var components) -> type instanceof FeelType.Context(var typeComponents)
+                    && components.entrySet().stream().allMatch(component -> typeComponents.containsKey(component.getKey())
+                            && conforms(typeComponents.get(component.getKey()), component.getValue()));
+            default -> type.equals(target);
+        };
+    }
+
+    /** Whether a type is, or holds, any type, so that whether its values conform is known only from them. */
+    private static boolean holdsAny(FeelType type) {
+        return switch (type) {
+            case FeelType.Any any -> true;
+            case FeelType.ListOf(var element) -> holdsAny(element);
+            case FeelType.Context(var components) -> components.values().stream().anyMatch(GraphAnalysis::holdsAny);
+            default -> false;
+        };
     }
 
     /** Checks that every value a decision table reads fits the column, or the input its cells compare with, that reads it. */
     private void checkTableReads() {
         for (int d = 0; d < model.decisions().size(); d++) {
             var decision = model.decisions().get(d);
-            if (!(decision.logic() instanceof DecisionLogic.Table(var table))) {
+            if (!(decision.logic() instanceof DecisionLogic.Table(var table, var type))) {
                 continue;
             }
             var columns = table.inputs().stream().map(DecisionTable.InputColumn::name).collect(Collectors.toSet());
@@ -650,7 +714,8 @@ final class GraphAnalysis {
     private void checkTableRead(int d, ColumnRead read, Resolution resolution, boolean column) {
         var decision = model.decisions().get(d).name();
         if (resolution.error() != null) {
-            report(d, Kind.TYPE_MISMATCH, "decision '%s' reads '%s', but %s".formatted(decision, read.name(), resolution.error()));
+            report(d, resolution.unsupported() ? Kind.UNSUPPORTED_FEATURE : Kind.TYPE_MISMATCH,
+                    "decision '%s' reads '%s', but %s".formatted(decision, read.name(), resolution.error()));
             return;
         }
         var source = resolution.type();

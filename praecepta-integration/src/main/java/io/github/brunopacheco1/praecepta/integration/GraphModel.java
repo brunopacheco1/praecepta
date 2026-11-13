@@ -6,12 +6,14 @@
 package io.github.brunopacheco1.praecepta.integration;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.DecisionGraph;
@@ -36,13 +38,18 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * <p><b>Input data</b> are given by name, as text, read with the type the model declares for them (or, for one it
  * declares none for, the type of the decision table columns that read it): {@code "42"}, {@code "2025-01-31"}, a list
  * as a list column takes it ({@code ["PT", "BR"]}), and a structured input data by its components, each under its path
- * ({@code Loan.principal}, {@code Loan.term.years}), as a decision table's column of that name reads it. A missing or
- * blank value is missing. A list of structured values cannot be written as text.
+ * ({@code Loan.principal}, {@code Loan.term.years}), as a decision table's column of that name reads it. An input data
+ * of no known type is given as text under its name, a string, or by the paths a decision reads into it
+ * ({@code Applicant.age}), each component then read as the column that reads it is typed. A missing value is missing,
+ * and so is blank text, except for a {@code string} input data, for which it is the empty string, as FEEL has it
+ * (docs/DMN-CONFORMANCE.md, case 16). A list of structured values cannot be written as text.
  *
  * <p><b>A decision's value</b> is given as the maps a decision table's map-based engine gives: one map per value of a
  * list, the components of a context as text by name, any other value under the name of the table's one output, or of
- * the decision for a literal expression; none when the value is null. So a table gives exactly the maps its own engine
- * gives for the same values, and a decision with a single result gives one map.
+ * the decision for a literal expression; none when the value is null. So a table whose decision declares no type, or
+ * the type its outputs give, gives exactly the maps its own engine gives for the same values, and a decision with a
+ * single result gives one map; a table whose value is bound to another type its decision declares (DMN 1.5,
+ * 10.3.2.9.4) gives the bound value's maps, a single result as a list of one, one map either way.
  */
 public final class GraphModel {
 
@@ -59,7 +66,7 @@ public final class GraphModel {
         this.graph = graph;
         var names = new HashMap<String, String>();
         for (var decision : graph.model().decisions()) {
-            names.put(decision.name(), decision.logic() instanceof DecisionLogic.Table(var table)
+            names.put(decision.name(), decision.logic() instanceof DecisionLogic.Table(var table, var type)
                     ? table.outputs().getFirst().name() : decision.name());
         }
         this.valueNames = Map.copyOf(names);
@@ -83,12 +90,12 @@ public final class GraphModel {
     }
 
     /**
-     * Whether a model needs its graph: one of its decisions requires another decision, or is not a decision table.
-     * The decision tables of any other model are evaluated alone, from their columns, as each file's tables always were.
+     * Whether a model needs its graph ({@link DecisionModel#needsGraph()}): one of its decisions requires another
+     * decision, or is not a decision table. The decision tables of any other model are evaluated alone, from their
+     * columns, as each file's tables always were.
      */
     public static boolean needed(DecisionModel model) {
-        return model.decisions().stream()
-                .anyMatch(decision -> !decision.requiredDecisions().isEmpty() || !(decision.logic() instanceof DecisionLogic.Table));
+        return model.needsGraph();
     }
 
     /** The model's name: the DMN {@code definitions} element's. */
@@ -189,7 +196,8 @@ public final class GraphModel {
 
     /**
      * An input data's value from the text under its name, or for a context, under the paths of its components. Simple
-     * values stay text, which the graph reads with their type; blank text is missing, a string included.
+     * values stay text, which the graph reads with their type; blank text is missing, but for a string. A value of no
+     * known type is the text under its name, or else a context of the text under the paths into it.
      *
      * @param depth how many contexts enclose it, bounded so that no input recurses without limit
      */
@@ -207,9 +215,48 @@ public final class GraphModel {
                 }
                 yield null;
             }
-            case FeelType.Simple simple -> present(text.get(name));
-            case FeelType.Any any -> present(text.get(name));
+            case FeelType.Simple(var simple) -> simple == ColumnType.STRING ? text.get(name) : present(text.get(name));
+            case FeelType.Any any -> text.get(name) != null ? present(text.get(name)) : paths(name, text);
         };
+    }
+
+    /**
+     * A value of no known type from the text under the paths into it ({@code Applicant.age}, {@code Applicant.address.city}):
+     * a context of each path's text, a path of several components nested as contexts, as a decision reads a path into it
+     * (docs/DMN-CONFORMANCE.md, case 15); null if no path is given. Built with a loop, so a long path takes no stack.
+     *
+     * @throws InvalidInputException if a path both holds text and continues ({@code A.b} and {@code A.b.c})
+     */
+    private static Map<String, Object> paths(String name, Map<String, String> text) {
+        var prefix = name + ".";
+        Map<String, Object> root = null;
+        for (var entry : new TreeMap<>(text).entrySet()) {
+            if (!entry.getKey().startsWith(prefix) || entry.getKey().length() == prefix.length()) {
+                continue;
+            }
+            if (root == null) {
+                root = new HashMap<>();
+            }
+            var components = entry.getKey().substring(prefix.length()).split("\\.", -1);
+            var context = root;
+            for (int i = 0; i < components.length - 1; i++) {
+                var next = context.computeIfAbsent(components[i], component -> new HashMap<String, Object>());
+                if (!(next instanceof Map<?, ?>)) {
+                    throw new InvalidInputException(entry.getKey(), entry.getValue(), "continues the path '%s', which is given as text"
+                            .formatted(name + "." + String.join(".", Arrays.copyOf(components, i + 1))));
+                }
+                context = cast(next);
+            }
+            if (context.putIfAbsent(components[components.length - 1], present(entry.getValue())) instanceof Map<?, ?>) {
+                throw new InvalidInputException(entry.getKey(), entry.getValue(), "is given as text, but a longer path continues it");
+            }
+        }
+        return root;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> cast(Object context) {
+        return (Map<String, Object>) context;
     }
 
     /** Text, or null where it is blank: a missing value, as for a decision table's map-based inputs. */

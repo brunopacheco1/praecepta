@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
@@ -49,9 +50,36 @@ public record DecisionModel(String name, List<InputData> inputData, List<Decisio
         }
     }
 
+    /**
+     * The element a name that a decision reads refers to, among the names {@code inScope} accepts: the one of that whole
+     * name, else the one named by its longest part before a dot, the rest of the name being a path into its value
+     * ({@code Pricing.discount} reads the component {@code discount} of {@code Pricing}; DMN 1.5, 10.3.2.11, and
+     * docs/DMN-CONFORMANCE.md, case 15). Every part of Praecepta that reads a model resolves names with it.
+     *
+     * @return the element's name, or null if no part of the name is in scope
+     */
+    public static String elementOf(String name, Predicate<String> inScope) {
+        for (int end = name.length(); end > 0; end = name.lastIndexOf('.', end - 1)) {
+            var prefix = name.substring(0, end);
+            if (inScope.test(prefix)) {
+                return prefix;
+            }
+        }
+        return null;
+    }
+
     /** The decision of that name, if the model has one. */
     public Optional<Decision> decision(String name) {
         return decisions.stream().filter(decision -> decision.name().equals(name)).findFirst();
+    }
+
+    /**
+     * Whether the model needs its decision requirements graph to be evaluated: one of its decisions does
+     * ({@link Decision#needsGraph()}). The decision tables of any other model may each be evaluated alone, from their
+     * columns, as the build plugins and framework integrations evaluate them.
+     */
+    public boolean needsGraph() {
+        return decisions.stream().anyMatch(Decision::needsGraph);
     }
 
     /** The input data of that name, if the model has one. */
@@ -96,10 +124,18 @@ public record DecisionModel(String name, List<InputData> inputData, List<Decisio
             Objects.requireNonNull(logic, "logic");
             requiredDecisions = List.copyOf(requiredDecisions);
             requiredInputs = List.copyOf(requiredInputs);
-            if (logic instanceof DecisionLogic.Table(var table) && !table.name().equals(name)) {
+            if (logic instanceof DecisionLogic.Table(var table, var type) && !table.name().equals(name)) {
                 throw new IllegalArgumentException("Decision '%s' has a decision table named '%s'; a decision's table takes its name"
                         .formatted(name, table.name()));
             }
+        }
+
+        /**
+         * Whether it needs the decision requirements graph to be evaluated: it requires another decision, or its logic
+         * is not a decision table, which only a graph evaluates.
+         */
+        public boolean needsGraph() {
+            return !requiredDecisions.isEmpty() || !(logic instanceof DecisionLogic.Table);
         }
 
         /** Its information requirements: the decisions it requires, then the input data. */

@@ -58,7 +58,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
  * @param table    the table as read; null for a decision of a model whose logic is a literal expression
  * @param engine   the table's engine, built once, immutable and thread-safe; null where {@code table} is
  * @param report   the table's static analysis (overlaps, unreachable rules, gaps); empty for a literal expression.
- *                 The issues of the graph a decision belongs to are its model's {@link GraphModel#report()}
+ *                 For a decision of a model, the analysis of its table as the graph evaluates it
+ *                 ({@code DecisionGraph.validationReport(decision)}), which the build plugins check too; the issues
+ *                 of the graph itself are its model's {@link GraphModel#report()}
  * @param model    the decision requirements graph the decision belongs to, which {@link #evaluate} evaluates it
  *                 through; null for a decision table read alone
  */
@@ -142,9 +144,10 @@ public record Decision(String name, String location, DecisionTable table, Praece
     public static Decision of(GraphModel model, String name, boolean logReport) {
         var element = model.graph().model().decision(name).orElseThrow(() -> new NoSuchElementException(
                 "Decision model '%s' has no decision named '%s'".formatted(model.name(), name)));
-        if (element.logic() instanceof DecisionLogic.Table(var table)) {
+        if (element.logic() instanceof DecisionLogic.Table(var table, var type)) {
+            // the report is the graph's analysis of the table, as the build plugins check it, so fail-on agrees with them
             var alone = of(model.location(), table, logReport);
-            return new Decision(name, model.location(), table, alone.engine(), alone.report(), model);
+            return new Decision(name, model.location(), table, alone.engine(), model.graph().validationReport(name), model);
         }
         return new Decision(name, model.location(), null, null, model.graph().validationReport(name), model);
     }

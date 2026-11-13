@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Values that do not fit where they go -->
+<!-- Values that do not fit where they go, values always null, and what Praecepta does not evaluate yet -->
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="mismatch" name="Mismatch" namespace="https://example.com/mismatch">
   <itemDefinition name="tNames" isCollection="true">
     <typeRef>string</typeRef>
@@ -9,6 +9,12 @@
   </inputData>
   <inputData id="names" name="Names">
     <variable name="Names" typeRef="tNames"/>
+  </inputData>
+  <inputData id="count" name="Count">
+    <variable name="Count" typeRef="number"/>
+  </inputData>
+  <inputData id="birth" name="Birth">
+    <variable name="Birth" typeRef="date"/>
   </inputData>
   <decision id="size" name="Size">
     <informationRequirement><requiredInput href="#name"/></informationRequirement>
@@ -48,5 +54,40 @@
   <decision id="downstream" name="Downstream">
     <informationRequirement><requiredDecision href="#size"/></informationRequirement>
     <literalExpression><text>Size + "?"</text></literalExpression>
+  </decision>
+  <decision id="path" name="Path">
+    <informationRequirement><requiredInput href="#name"/></informationRequirement>
+    <decisionTable hitPolicy="FIRST">
+      <input><inputExpression typeRef="string"><text>Name.first</text></inputExpression></input>
+      <output typeRef="string"/>
+      <rule>
+        <inputEntry><text>"a"</text></inputEntry>
+        <outputEntry><text>"yes"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="compare" name="Compare">
+    <informationRequirement><requiredInput href="#count"/></informationRequirement>
+    <informationRequirement><requiredInput href="#name"/></informationRequirement>
+    <decisionTable hitPolicy="FIRST">
+      <input><inputExpression typeRef="number"><text>Count</text></inputExpression></input>
+      <output typeRef="string"/>
+      <rule>
+        <inputEntry><text>&lt; Name</text></inputEntry>
+        <outputEntry><text>"fewer"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="year" name="Year">
+    <informationRequirement><requiredInput href="#birth"/></informationRequirement>
+    <literalExpression><text>Birth.year</text></literalExpression>
+  </decision>
+  <decision id="listed" name="Listed">
+    <informationRequirement><requiredInput href="#names"/></informationRequirement>
+    <literalExpression><text>Names + 1</text></literalExpression>
+  </decision>
+  <decision id="after-year" name="After Year">
+    <informationRequirement><requiredDecision href="#year"/></informationRequirement>
+    <literalExpression><text>Year + 1</text></literalExpression>
   </decision>
 </definitions>
