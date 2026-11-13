@@ -33,14 +33,19 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException
 import io.github.brunopacheco1.praecepta.integration.Decisions;
 import io.github.brunopacheco1.praecepta.integration.TableLocations;
 import io.github.brunopacheco1.praecepta.loader.csv.CsvLoader;
+import it.nativeapp.generated.CreditModel;
 import it.nativeapp.generated.Fees;
 import it.nativeapp.generated.FeesInput;
+import it.nativeapp.generated.MonthlyLimit;
+import it.nativeapp.generated.MonthlyLimitInput;
+import it.nativeapp.generated.RiskCategory;
+import it.nativeapp.generated.RiskCategoryInput;
 import it.nativeapp.generated.Shipping;
 import it.nativeapp.generated.ShippingInput;
 
 /**
  * An application that uses Praecepta the ways a native executable would: classes the Maven plugin generated
- * from a CSV and a DMN table, a DMN file read with {@code DmnReader}, a CSV file read with the loader, and
+ * from a CSV and a DMN table and from a decision requirements graph, a DMN file read with {@code DmnReader}, a CSV file read with the loader, and
  * the DMN files {@code praecepta-integration} finds by its default location. Every check compares with the
  * answer the DMN semantics give; the same checks run on the JVM ({@code NativeAppTest}) and, built with
  * GraalVM's native-image, as an executable that exits with 1 if any fails.
@@ -62,6 +67,7 @@ public final class NativeApp {
     public List<String> run() {
         generatedFromCsv();
         generatedFromDmn();
+        generatedFromGraph();
         dmnReadAtRuntime();
         csvLoadedAtRuntime();
         integrationDefaultLocation();
@@ -91,6 +97,20 @@ public final class NativeApp {
         var noBrazil = new ShippingInput(ShippingInput.Country.PT, new BigDecimal("4"), LocalDate.of(2025, 6, 1),
                 OffsetTime.parse("10:30:00Z"), List.of("ES"));
         check("Shipping list without BR", () -> Shipping.evaluate(noBrazil).orElseThrow().carrier(), "ground");
+    }
+
+    /**
+     * The decisions of rules/credit.dmn, a decision requirements graph (#14) of two tables and a literal expression,
+     * each generated as a class that evaluates it through CreditModel's graph.
+     */
+    private void generatedFromGraph() {
+        check("Monthly Limit, low risk", () -> MonthlyLimit.evaluate(new MonthlyLimitInput(new BigDecimal(30), new BigDecimal(1200))),
+                new BigDecimal(200));
+        // high risk: 1200 * 0.5 / 12
+        check("Monthly Limit, high risk", () -> MonthlyLimit.evaluate(new MonthlyLimitInput(new BigDecimal(20), new BigDecimal(1200))),
+                new BigDecimal(50));
+        check("Risk Category", () -> RiskCategory.evaluate(new RiskCategoryInput(new BigDecimal(20))), "High");
+        check("Credit model report", () -> CreditModel.validationReport().isEmpty(), true);
     }
 
     /**

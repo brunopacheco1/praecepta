@@ -405,7 +405,7 @@ final class SourceGenerator {
 
     // ---- helpers --------------------------------------------------------------------------------
 
-    private static List<String> headerLines(String text, String setting) {
+    static List<String> headerLines(String text, String setting) {
         if (text == null || text.isBlank()) {
             return List.of();
         }
@@ -444,7 +444,7 @@ final class SourceGenerator {
         }));
     }
 
-    private static String stringLiteral(String value) {
+    static String stringLiteral(String value) {
         var java = new StringBuilder("\"");
         for (char c : value.toCharArray()) {
             switch (c) {
@@ -465,7 +465,7 @@ final class SourceGenerator {
         return java.append('"').toString();
     }
 
-    private static String javadoc(String text) {
+    static String javadoc(String text) {
         // backslashes too: javac decodes unicode escapes (backslash, 'u', hex digits) even inside comments
         return text.replace("\\", "&#92;").replace("*/", "*&#47;").replace("@", "&#64;").replace("{", "&#123;").replace("}", "&#125;")
                 .replaceAll("[\\r\\n]", " ");

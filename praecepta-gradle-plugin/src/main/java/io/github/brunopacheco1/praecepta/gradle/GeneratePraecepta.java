@@ -163,14 +163,15 @@ public abstract class GeneratePraecepta extends DefaultTask {
         var classNames = new HashSet<String>();
         for (var table : tables) {
             var compiled = compile(table, options);
-            if (!classNames.add(compiled.className())) {
-                throw new GradleException("Two tables generate the class %s; set %s on one"
-                        .formatted(compiled.className(), SETTING_NAMES.apply("name")));
+            for (var className : compiled.classNames()) {
+                if (!classNames.add(className)) {
+                    throw new GradleException("Two tables generate the class %s; set %s on one".formatted(className, SETTING_NAMES.apply("name")));
+                }
             }
-            compiled.report().issues().forEach(issue -> getLogger().warn(compiled.className() + ": " + issue));
+            compiled.reports().forEach((className, report) -> report.issues().forEach(issue -> getLogger().warn(className + ": " + issue)));
             write(compiled, sourceRoot, resourceRoot);
-            getLogger().info("Compiled table {} ({} rules, {}) into {}", table.getName(), compiled.table().rules().size(),
-                    compiled.table().hitPolicy(), packageName.isEmpty() ? compiled.className() : packageName + "." + compiled.className());
+            getLogger().info("Compiled {} {} ({}) into {}", compiled.table() != null ? "table" : "decision model", table.getName(),
+                    compiled.summary(), packageName.isEmpty() ? compiled.className() : packageName + "." + compiled.className());
         }
     }
 

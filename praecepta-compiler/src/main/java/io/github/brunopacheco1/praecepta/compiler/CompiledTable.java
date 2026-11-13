@@ -16,23 +16,57 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 
 /**
- * A compiled table: what a build tool writes and reports.
+ * A compiled table, or a compiled decision model: what a build tool writes and reports.
  *
- * @param table       the table as loaded
+ * @param table       the table as loaded; null for a decision model compiled as a decision requirements graph
  * @param packageName package of the generated classes and DMN resource
- * @param className   simple name of the generated decision class
- * @param report      the engine's static analysis of the table, to report as the tool's warnings
- * @param dmn         the table as DMN, to ship as {@link #resourcePath()} next to the classes
+ * @param className   simple name of the generated decision class; of a decision model, of its model class
+ *                    ({@code CreditModel}), which loads the DMN resource
+ * @param report      the engine's static analysis of the table, to report as the tool's warnings; of a decision model,
+ *                    its graph's validation report (cycles, missing requirements, type mismatches)
+ * @param dmn         the table, or the decision model, as DMN, to ship as {@link #resourcePath()} next to the classes
  * @param sources     generated Java sources by simple class name
+ * @param model       the decision model compiled as a graph; null for a table
+ * @param reports     every report to give as the tool's warnings, by the generated class it concerns: the table's by
+ *                    {@code className}; of a decision model, its graph's by the model class and each decision table's
+ *                    by its decision's class
  */
 public record CompiledTable(DecisionTable table, String packageName, String className, ValidationReport report, String dmn,
-        Map<String, String> sources) {
+        Map<String, String> sources, DecisionModel model, Map<String, ValidationReport> reports) {
 
     public CompiledTable {
         sources = Collections.unmodifiableMap(new LinkedHashMap<>(sources));
+        reports = Collections.unmodifiableMap(new LinkedHashMap<>(reports));
+    }
+
+    /** A compiled table: its report is the only one, by its class. */
+    public CompiledTable(DecisionTable table, String packageName, String className, ValidationReport report, String dmn,
+            Map<String, String> sources) {
+        this(table, packageName, className, report, dmn, sources, null, Map.of(className, report));
+    }
+
+    /**
+     * The classes generated: {@link #className()} first, then the others, as a build tool checks that no two tables
+     * generate one class.
+     */
+    public List<String> classNames() {
+        var names = new ArrayList<String>();
+        names.add(className);
+        sources.keySet().stream().filter(name -> !name.equals(className)).forEach(names::add);
+        return List.copyOf(names);
+    }
+
+    /**
+     * What was compiled, for a build tool's log: {@code 3 rules, FIRST} for a table, {@code 3 decisions} for a decision
+     * model (those of its model, of which the generated classes evaluate the ones compiled).
+     */
+    public String summary() {
+        return table != null ? "%d rules, %s".formatted(table.rules().size(), table.hitPolicy())
+                : "%d decisions".formatted(model.decisions().size());
     }
 
     /**

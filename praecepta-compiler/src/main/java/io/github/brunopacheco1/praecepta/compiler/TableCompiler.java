@@ -20,6 +20,7 @@ import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
@@ -34,6 +35,12 @@ import io.github.brunopacheco1.praecepta.loader.excel.ExcelLoader;
  * sources that load that DMN at runtime. Independent of any build tool: the Maven plugin (and the Gradle
  * plugin and Quarkus extension) turn their configuration into a {@link TableDefinition} and write the
  * {@link CompiledTable} where their build expects it.
+ *
+ * <p>A DMN source whose decision requires other decisions, or is a literal expression, compiles as a decision
+ * requirements graph (#14) instead: the decision named by {@link TableDefinition#decision()}, or, when it names none,
+ * every decision of the model, each with an input record of the input data it needs and a class whose
+ * {@code evaluate} evaluates it through the model's {@code DecisionGraph}, held by a model class ({@code CreditModel}).
+ * Any other source compiles as before.
  *
  * <pre>{@code
  * var options = CompilerOptions.of("com.acme.pricing", "praecepta-gradle-plugin").withFailOn(Severity.WARNING);
@@ -53,7 +60,8 @@ public final class TableCompiler {
     /**
      * Compiles one table.
      *
-     * @return the loaded table, its validation report, its DMN and the generated sources
+     * @return the loaded table, its validation report, its DMN and the generated sources; for a decision model
+     *         compiled as a graph, the model, its graph's report, its DMN and the generated sources
      * @throws IllegalArgumentException with a readable message, naming settings as
      *                                  {@link CompilerOptions#settingNames()} does, if the definition or the
      *                                  table is invalid, or if validation finds issues at least as severe as
@@ -62,6 +70,10 @@ public final class TableCompiler {
     public static CompiledTable compile(TableDefinition definition, CompilerOptions options) {
         if (definition.source() == null) {
             throw new IllegalArgumentException("Every %s needs a %s".formatted(options.setting("table"), options.setting("source")));
+        }
+        var model = graphModel(definition, options);
+        if (model != null) {
+            return GraphCompiler.compile(definition, model, options);
         }
         var table = load(definition, options);
         var className = JavaNames.type(definition.name() != null ? definition.name() : table.name());
@@ -72,6 +84,20 @@ public final class TableCompiler {
     }
 
     // ---- loading ----------------------------------------------------------------------------------
+
+    /** The decision model of a DMN source to compile as a graph; null for every other source, compiled as a table. */
+    private static DecisionModel graphModel(TableDefinition definition, CompilerOptions options) {
+        var file = definition.source();
+        if (!extension(file).equals("dmn") || !Files.isRegularFile(file)) {
+            return null;
+        }
+        checkDmnDefinition(definition, options);
+        try {
+            return GraphCompiler.model(Files.readAllBytes(file), definition.decision());
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Cannot read table source " + file + ": " + e.getMessage(), e);
+        }
+    }
 
     private static DecisionTable load(TableDefinition definition, CompilerOptions options) {
         var file = definition.source();
@@ -100,13 +126,17 @@ public final class TableCompiler {
     }
 
     private static DecisionTable dmn(TableDefinition definition, InputStream stream, CompilerOptions options) {
+        checkDmnDefinition(definition, options);
+        return DmnReader.read(stream, definition.decision());
+    }
+
+    private static void checkDmnDefinition(TableDefinition definition, CompilerOptions options) {
         if (definition.hitPolicy() != null || definition.aggregation() != null || !definition.inputs().isEmpty()
                 || !definition.outputs().isEmpty()) {
             throw new IllegalArgumentException(("Table source %s: a DMN model declares its own hit policy and columns; "
                     + "remove %s, %s, %s and %s").formatted(definition.source(), options.setting("hitPolicy"),
                             options.setting("aggregation"), options.setting("inputs"), options.setting("outputs")));
         }
-        return DmnReader.read(stream, definition.decision());
     }
 
     /** An Excel or CSV table: the build declares its hit policy and columns, the file holds its rules. */

@@ -37,7 +37,7 @@ class GenerateMojoTest {
         project = new MavenProject();
         project.setFile(basedir.resolve("pom.xml").toFile());
         var rules = Files.createDirectories(basedir.resolve("src/main/rules"));
-        for (var name : List.of("fees.csv", "overlapping.csv")) {
+        for (var name : List.of("fees.csv", "overlapping.csv", "credit.dmn")) {
             Files.copy(Path.of(GenerateMojoTest.class.getResource("/tables/" + name).toURI()), rules.resolve(name));
         }
     }
@@ -59,6 +59,27 @@ class GenerateMojoTest {
                 .contains(basedir.resolve("target/generated-sources/praecepta").toString());
         Assertions.assertThat(project.getResources()).extracting(Resource::getDirectory)
                 .contains(basedir.resolve("target/generated-resources/praecepta").toString());
+    }
+
+    /** A DMN model whose decisions require one another (#14): a model class, and an input record and a class per decision. */
+    @Test
+    void a_decision_requirements_graph_generates_a_class_per_decision() throws Exception {
+        var credit = new TableConfig(new File("src/main/rules/credit.dmn"), null, null, null, null, List.of(), List.of());
+        mojo(List.of(credit), "ERROR", null).execute();
+
+        var sources = basedir.resolve("target/generated-sources/praecepta/com/acme/rules");
+        for (var name : List.of("CreditModel", "RiskCategory", "RiskCategoryInput", "CreditLimit", "CreditLimitInput", "MonthlyLimit",
+                "MonthlyLimitInput")) {
+            Assertions.assertThat(sources.resolve(name + ".java")).exists();
+        }
+        Assertions.assertThat(basedir.resolve("target/generated-resources/praecepta/com/acme/rules/CreditModel.dmn")).content()
+                .contains("<literalExpression");
+
+        // the model and a decision of it, compiled apart, would both generate the decision's classes
+        var monthly = new TableConfig(new File("src/main/rules/credit.dmn"), null, "Monthly Limit", null, null, List.of(), List.of());
+        Assertions.assertThatThrownBy(() -> mojo(List.of(credit, monthly), "ERROR", null).execute())
+                .isInstanceOf(MojoFailureException.class)
+                .hasMessage("Two tables generate the class MonthlyLimitInput; set <name> on one");
     }
 
     @Test
