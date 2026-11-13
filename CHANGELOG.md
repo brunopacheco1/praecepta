@@ -14,6 +14,8 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 ### Added
 - A documentation page for the Gradle plugin, [bruno.pacheco.lu/praecepta/gradle-plugin](https://bruno.pacheco.lu/praecepta/gradle-plugin/),
   with every setting, the generated classes and the task; the Gradle Plugin Portal links to it.
+- The Gradle plugin declares that it supports Gradle's configuration cache, so the Gradle Plugin Portal says
+  so from 0.7.0 (a `compatibility.feature.configuration-cache` flag in its plugin descriptor).
 
 ## [0.6.0] - 2026-11-13
 
