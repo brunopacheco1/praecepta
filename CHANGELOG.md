@@ -11,6 +11,27 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+### Fixed
+- **Rules reached only by a time with a zone id are no longer reported unreachable**
+  ([#114](https://github.com/brunopacheco1/praecepta/issues/114)): a time column whose inputs can be times
+  with a zone id (map-based inputs, as the framework integrations read them, and the elements of a list) but
+  whose cells name no zone id with a changing offset left such times out of the validation report's
+  overlaps, unreachable rules and gaps, though the completeness search counted them since 0.6.0. Such a
+  time compares with none of those cells, which is FEEL's null, so neither a test nor its `not(...)` matches
+  it (docs/DMN-CONFORMANCE.md, case 9): earlier rules that together matched every other time, such as
+  `< time("12:00:00")` and `>= time("12:00:00")`, made a later rule look unreachable (`UNREACHABLE_RULE`, a
+  WARNING) although `10:30@Europe/Paris` reaches it. The column's index now has a class for a time in a zone no cell names
+  wherever the column takes one, and every analysis visits it as it does the others; the property tests'
+  reference does the same. Evaluation is unchanged, and so are tables bound with typed getters, columns of
+  other types and time columns whose cells name such a zone id, which had the class already. **The report
+  changes** for map-based time columns, and time list columns, whose cells name no such zone id: unless a
+  rule accepts any value there (`-`, `!= null`), a time in another zone is now reported as a gap
+  (`cutOff in {[time("12:00:00")..+inf), any time with a zone id no cell names}`, a WARNING, which stops a
+  startup only where `fail-on` is `WARNING`), and a rule that only such a time reaches is no longer
+  reported unreachable. Overlaps cannot change, as a cell that
+  matches such a time matches every time. Declared input values that rule such times out, such as
+  `[time("00:00:00")..time("23:59:59")]`, leave the report as it was.
+
 ## [0.6.0] - 2026-11-13
 
 DMN 1.5 in single tables: Praecepta now reads the FEEL that 0.5 rejected in cells and output entries, and
