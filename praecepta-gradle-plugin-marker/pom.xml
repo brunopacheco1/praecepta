@@ -11,7 +11,7 @@
     <parent>
         <groupId>io.github.brunopacheco1</groupId>
         <artifactId>praecepta</artifactId>
-        <version>0.6.0-SNAPSHOT</version>
+        <version>0.7.0-SNAPSHOT</version>
     </parent>
     <!--
         The Gradle plugin marker: Gradle resolves `plugins { id("io.github.brunopacheco1.praecepta") version "..." }`
