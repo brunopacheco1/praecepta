@@ -6,14 +6,14 @@ SPDX-License-Identifier: Apache-2.0
 
 # Architecture
 
-Praecepta evaluates single DMN decision tables. It is a library, not a service: an application
-builds an engine once and calls it.
+Praecepta evaluates DMN decision tables, and the decision requirement graphs of tables and literal expressions
+around them. It is a library, not a service: an application builds an engine, or a graph, once and calls it.
 
 ## Modules
 
 | Module | Depends on | Role |
 |---|---|---|
-| `praecepta-engine` | the JDK only (`java.xml`) | The engine, the cell parser, DMN reading and writing, and validation. A JPMS module, `io.github.brunopacheco1.praecepta.engine`. |
+| `praecepta-engine` | the JDK only (`java.xml`) | The engine, the cell parser, DMN reading and writing, validation, and decision requirement graphs (`DecisionGraph`). A JPMS module, `io.github.brunopacheco1.praecepta.engine`. |
 | `praecepta-loader` | engine, Apache POI | Reads rules from Excel (first sheet) and semicolon-separated CSV files. |
 | `praecepta-compiler` | engine, loader | The build-time core of the build tools: loads a table, validates it, writes it as DMN and generates typed Java classes (`TableCompiler`). Independent of any build tool. |
 | `praecepta-integration` | engine | The runtime core of the framework integrations: finds DMN files by location pattern and builds a map-based engine per decision, with its validation report (`Decisions`). Independent of any framework. |
@@ -177,6 +177,100 @@ An engine is **immutable** once built: any number of threads may share it withou
   exactly those forms back into the same tests Praecepta's own syntax writes `"PT", >= 18`.
 - `DmnWriter` writes a `DecisionTable` as standard DMN 1.3, which `DmnReader` reads back unchanged
   and which Camunda 8 and Drools evaluate identically (the benchmarks check this).
+
+## Decision requirement graphs (#14)
+A DMN model whose decisions require other decisions and input data is a decision requirements graph (DMN 1.5,
+chapter 6). 0.7 evaluates graphs whose decisions are decision tables or literal expressions in the expression
+subset output entries take; later releases add the other kinds of logic as further implementations of the same
+types (see *Growing it* below).
+
+```
+ DMN file ──(DmnReader.readModel)──► DecisionModel ──► DecisionGraph.Builder ──► DecisionGraph ──► evaluate(decision, inputData)
+ code ──(DecisionGraph.builder())───────────────────────────┘        │
+                                                                     ├──► validationReport(): cycles, missing requirements, type mismatches
+ DecisionModel ──(DmnWriter.write)──► DMN                            └──► validationReport(decision): each table's own analysis
+```
+
+**The model** (`beans`, plain records, no behaviour): `DecisionModel(name, inputData, decisions)`; an
+`InputData(name, FeelType type)`; a `Decision(name, requiredDecisions, requiredInputs, DecisionLogic logic)`, whose
+requirements are names of the model's elements (the information requirements of DMN 1.5, 6.3.13). `DecisionLogic` is
+a sealed interface with two kinds today: `Table(DecisionTable)`, named after its decision, and
+`LiteralExpression(text, declared FeelType)`, checked to be in the expression subset when it is made
+(`OutputExpression`). `FeelType` (`feel`) is the type of a value passed between elements: `Simple(ColumnType)`,
+`ListOf(FeelType)`, `Context(components by name, ordered)`, or `Any` where the model declares none. The model
+rejects two elements of one name (6.3.7, 6.3.11), and nothing else: a model may be ill-formed, which the graph reports.
+
+**Reading and writing.** `DmnReader.readModel` reads every `inputData` (its variable's `typeRef`, resolved through
+item definitions to a `FeelType`: collections, components, nested to `MAX_TYPE_DEPTH` levels, with a check for types
+defined in terms of themselves) and every `decision`: its information requirements, by `href` to an element of the
+model (one to no element is kept as the id it names, which the graph reports as missing), and its logic, a decision
+table read exactly as `read(dmn, decision)` reads it, or a literal expression, typed by the decision variable's
+`typeRef`. What later releases bring is rejected whole, naming the feature and its issue: business knowledge models,
+knowledge requirements and boxed expressions as logic (#118), FEEL beyond the subset (#116, function calls #117),
+decision services, imports and references into other models (#119). Knowledge sources, authority requirements,
+annotations and diagrams take no part in evaluation and are ignored. `DmnWriter.write(DecisionModel)` writes DMN 1.3
+with ids by position (`input_data_0`, `decision_0`, and `decision_0_` before the ids of a decision's table, so the
+tables of a model never share an id), item definitions for list and context types, and literal expressions as
+written; a model it writes reads back as the same model, and writes the same again. `read(dmn)`, `read(dmn, decision)`
+and `readAll(dmn)` read single tables as before.
+
+**Building** (`DecisionGraph`, with the package-private `GraphAnalysis`, `GraphNodes` and `GraphValues`). Every
+input data and decision gets a *slot*: input data first, then decisions, in the model's order. `GraphAnalysis` then:
+1. checks each requirement exists and is of its kind (`MISSING_REQUIREMENT`);
+2. resolves each name a decision's logic reads (a table's columns and the inputs its cells compare with, a literal
+   expression's names) among that decision's requirements: the requirement so named, else the one named by its
+   longest part before a dot, the rest being a path into its value (`Pricing.discount`, `Loan.principal`); a name
+   no requirement provides is a `MISSING_REQUIREMENT` (7.3.4);
+3. finds cycles among required decisions (Tarjan's algorithm with an explicit stack), reported with the cycle's
+   path (`DECISION_CYCLE`), and orders the other decisions so each comes after those it requires (Kahn's algorithm);
+4. works out types: an input data without a `typeRef` takes the type of the table columns that read it whole, when
+   they agree; a table's value is its one output's type, or a context of its outputs, a list of that under a hit
+   policy with several results and no aggregation, a number for COUNT; a literal expression's comes from the types
+   of the names it reads (single strings, numbers, dates, times or durations), bound to the declared type as DMN 1.5,
+   10.3.2.9.4, binds a decision's value (a date to a date and time, a value to a list of one, anything else that does
+   not conform to null, which is also reported);
+5. checks that each value a table reads fits its column (`TYPE_MISMATCH`): the column's type, or for a column of lists
+   a list of it or a single value (a list of one); a path must exist in the type it reads; a cell that names a list
+   (`Flu Symptoms`) asks whether the value is in it, so such an input is bound as a list of the table;
+6. marks the decisions that cannot be evaluated: those with an issue, in a cycle, or requiring such a decision.
+
+The graph's report lists those issues, all ERRORs; `Builder.failOn(severity)` rejects the graph when its report, or
+one of its tables', has issues that severe, and `logValidationReport` logs them once, as `PraeceptaEngine` does.
+Each decision table becomes a `PraeceptaEngine<Object[], Object>` (`GraphNodes.TableNode`), whose inputs are the
+graph's slots: each column is bound with a getter that reads its slot and path (`PraeceptaEngine.Builder.valueInput`,
+package-private, of `Zoning.EITHER`, as map-based inputs are, so each table's validation report is the one the
+framework integrations' map-based engines report), and whose output strategy gives the table's value (each output
+converted from text to its type once, when the engine is built, for rules that compute nothing). A literal expression
+is parsed once (`GraphNodes.LiteralNode`) and reads its names through resolved slots and paths.
+
+**Evaluating.** `evaluate(decision, inputData)` takes the decision's *plan*, worked out the first time and cached:
+the slots of the input data it needs and the decisions it needs, itself last, in dependency order. It fills an
+`Object[]` of slots with the input data, made FEEL values of their declared types (`GraphValues.normalise`: an
+`Integer` becomes a `BigDecimal`, a `Period` a `YearsAndMonths`, text of a simple type its value, a map the declared
+components of a context), then evaluates each decision once into its slot. A path reads a context's component, or of
+a list of contexts the list of their components (10.3.2.5), and a column of lists takes a single value as a list of
+one (10.3.2.9.4). No walk over the graph recurses, so a chain of thousands of decisions builds and evaluates on any
+thread's stack. A graph is immutable once built (the plans are cached in a concurrent map) and thread-safe.
+
+**For the build plugins and the framework integrations.** Everything they need is public API of `DecisionGraph`:
+`decisions()` (names, in model order), `inputData()` (each input data's `FeelType`, declared or worked out),
+`type(decision)` (a decision's `FeelType`), `requiredInputData(decision)` (what a decision reads, directly or
+through the decisions it requires), `canEvaluate(decision)`, `validationReport()` and `validationReport(decision)`,
+`evaluate(decision, inputData)` and `evaluate(decisions, inputData)` (several at once, each required decision once),
+and `model()` (to write the model with `DmnWriter`, as generated code would ship it). A typed input record per
+decision can be generated from `requiredInputData` and `inputData()`'s types; an output type from `type(decision)`
+(`Simple` → its Java type, `Context` → a record of components, `ListOf` → a `List`). The map-based integrations can
+pass maps of text, as simple types take text. The values a graph gives are the `FeelType` value classes listed in
+its Javadoc, immutable.
+
+**Growing it.** Each later layer adds to these types rather than replacing them: full FEEL (0.8, #116) replaces
+`LiteralExpression`'s subset parser and `GraphNodes.LiteralNode` with a FEEL interpreter over the same slots, and
+`FeelType` with FEEL's full type system (ranges, functions); built-in functions (0.9, #117) are names that
+resolve to the built-in context; boxed expressions and business knowledge models (0.10, #118) are further
+`DecisionLogic` kinds with nodes of their own, and invocables become elements with slots that hold functions,
+required through knowledge requirements, with the same cycle and type checks; decision services and imports (0.11,
+#119) add elements and qualified names to the resolution of step 2. The reader rejects each of them by name until
+then.
 
 ## The compiler and the build plugins
 `TableCompiler` (in `praecepta-compiler`) compiles one table, described by a `TableDefinition`, with

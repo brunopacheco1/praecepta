@@ -52,6 +52,31 @@ are counted as not supported, and one check is known to differ: a power that is 
 gives to 13 digits where FEEL's numbers have 34. These cases have no decision table, so they do not
 appear in RESULTS.md.
 
+## Decision requirement graphs
+`DecisionGraph` (0.7, [#14](https://github.com/brunopacheco1/praecepta/issues/14)) evaluates whole models whose
+decisions are decision tables and literal expressions in Praecepta's expression subset. This module does not score
+it yet (scoring the whole TCK is [#115](https://github.com/brunopacheco1/praecepta/issues/115)); a survey of the
+pinned commit's 156 model files of compliance levels 2 and 3 found that `DmnReader.readModel` reads 32, and the
+rest are rejected for what later releases bring, nearly all for FEEL beyond the subset (#116) or its functions
+(#117), and the others for business knowledge models (#118) and decision services or imports (#119). Of the 121
+decision results of the test cases of those 32 models, 100 are the kit's: besides the decision tables above, the
+literal-expression models `0001-input-data-string`, `0002-input-data-number`, `0003-input-data-string-allowed-values`,
+`0101-feel-constants`, `0102-feel-constants`, `0073-feel-comments`, `0077-feel-nan` and `0078-feel-infinity` give
+every result. No model at that commit has a decision that requires another decision with only tables and literal
+expressions in the subset. The closest are:
+- `0008-LX-arithmetic`, one literal expression over a structured input data (`loan.principal`), read and evaluated,
+  whose payment Praecepta computes to FEEL's 34 digits (`2778.693549432766768088520383236299`) where the kit gives
+  15 (`2778.69354943277`), the case of the power that is not whole above;
+- `0106-feel-ternary-logic`, whose literal expressions `A and B` and `A or B` use FEEL's boolean operators (#116),
+  which the subset reads as a single name no requirement provides;
+- `0020-vacation-days`, a graph of three decision tables and two literal expressions, rejected for `max(...)`, a
+  built-in function (#117);
+- `0008-listGen` (two tables and eight literal expressions), `0009-append-flatten`, `0010-concatenate`,
+  `0011-insert-remove` and `0012-list-functions`, graphs of literal expressions that build lists (#116) and call
+  list functions (#117);
+- `0004-lending` and `0087-chapter-11-example`, whose decision tables read other decisions, the three checks above
+  not supported, which invoke business knowledge models (#118) and, for the latter, decision services (#119).
+
 ## The TCK files
 `src/test/resources/tck` holds the TCK test directories that contain a decision table, and the two
 arithmetic test cases above (their DMN models and test files, without the PDFs), copied unchanged from

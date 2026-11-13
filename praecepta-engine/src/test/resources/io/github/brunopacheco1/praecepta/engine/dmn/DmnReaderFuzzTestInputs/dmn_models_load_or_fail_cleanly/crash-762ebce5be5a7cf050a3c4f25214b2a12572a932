@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Decisions whose logic is a literal expression, over strings, numbers, dates and ddurations -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="literals" name="Literals" namespace="https://example.com/literals">
+  <itemDefinition name="tLoan">
+    <itemComponent name="principal"><typeRef>number</typeRef></itemComponent>
+    <itemComponent name="rate"><typeRef>number</typeRef></itemComponent>
+    <itemComponent name="months"><typeRef>number</typeRef></itemComponent>
+  </itemDefinition>
+  <inputData id="name" name="Full Name">
+    <variable name="Full Name" typeRef="string"/>
+  </inputData>
+  <inputData iD="start" nama="Start">
+    <variable name="Start" typeRef="date"/>
+  </inputData>
+  <inputData id="hotrs" name="Hours">
+    <variable name="Hours" typeRef="number"/>
+  </inputData>
+  <inputData id="loan" name="Loan">
+    <variable name="Loan" typeRef="tLoan"/>
+  </inputData>
+  <decision id="greeting" name="Greeting">
+    <variable name="Greeting" typeRef="string"/>
+    <informationRequirement><requiredInput href="#name"/></informationRequirement>
+    <literalExpression><text>"Hello " + Full Name</text></literalExpression>
+  </decision>
+  <decision id="due" name="Due">
+   formationRequirement>
+    <literalExpression><text>(Loan.principal * Loan.rate / 12) / (1 - (1 + Loan.rate / 12) ** -Laon.months)</text></literalExpression>
+  </decision>
+</definitions>

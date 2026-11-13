@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Values that do not fit where they go -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="mismatch" name="Mismatch" namespace="https://example.com/mismatch">
+  <itemDefinition name="tNames" isCollection="true">
+    <typeRef>string</typeRef>
+  </itemDefinition>
+  <inputData id="name" name="Name">
+    <variable name="Name" typeRef="string"/>
+  </inputData>
+  <inputData id="names" name="Names">
+    <variable name="Names" typeRef="tNames"/>
+  </inputData>
+  <decision id="size" name="Size">
+    <informationRequirement><requiredInput href="#name"/></informationRequirement>
+    <decisionTable hitPolicy="FIRST">
+      <input><inputExpression typeRef="number"><text>Name</text></inputExpression></input>
+      <output typeRef="string"/>
+      <rule>
+        <inputEntry><text>&gt; 3</text></inputEntry>
+        <outputEntry><text>"long"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="twice" name="Twice">
+    <informationRequirement><requiredInput href="#name"/></informationRequirement>
+    <literalExpression><text>Name * 2</text></literalExpression>
+  </decision>
+  <decision id="first" name="First">
+    <informationRequirement><requiredInput href="#name"/></informationRequirement>
+    <literalExpression><text>Name.first</text></literalExpression>
+  </decision>
+  <decision id="declared" name="Declared">
+    <variable name="Declared" typeRef="number"/>
+    <informationRequirement><requiredInput href="#name"/></informationRequirement>
+    <literalExpression><text>Name + "!"</text></literalExpression>
+  </decision>
+  <decision id="single" name="Single">
+    <informationRequirement><requiredInput href="#names"/></informationRequirement>
+    <decisionTable hitPolicy="FIRST">
+      <input><inputExpression typeRef="string"><text>Names</text></inputExpression></input>
+      <output typeRef="string"/>
+      <rule>
+        <inputEntry><text>"a"</text></inputEntry>
+        <outputEntry><text>"yes"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="downstream" name="Downstream">
+    <informationRequirement><requiredDecision href="#size"/></informationRequirement>
+    <literalExpression><text>Size + "?"</text></literalExpression>
+  </decision>
+</definitions>

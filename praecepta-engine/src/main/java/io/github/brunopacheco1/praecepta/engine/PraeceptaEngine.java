@@ -1437,6 +1437,16 @@ public final class PraeceptaEngine<I, O> {
             return this;
         }
 
+        /**
+         * For {@link DecisionGraph}: binds a column, or an input the cells compare with, to a getter of values of its type
+         * in any of the forms the typed bindings take (a time or date-time with a time zone or without one), or of lists
+         * of them, as a map-based input reads them from text, so the analysis looks at the same values as for a table
+         * bound with {@link #inputs(InputStrategy)}.
+         */
+        Builder<I, O> valueInput(String column, ColumnType type, boolean list, Function<? super I, ?> extractor) {
+            return bind(column, type, extractor, null, Zoning.EITHER, list);
+        }
+
         /** Test hook: stores the masks in this form instead of choosing by density ({@link Masks.Form#AUTO}). */
         Builder<I, O> maskForm(Masks.Form form) {
             this.maskForm = Objects.requireNonNull(form, "form");

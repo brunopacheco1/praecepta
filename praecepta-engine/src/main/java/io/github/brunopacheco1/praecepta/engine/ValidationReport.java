@@ -21,6 +21,10 @@ import java.util.stream.Collectors;
  * list columns a rule, or the table's gaps, go unreported when a list column can leave more than 1024
  * different sets of rules.
  *
+ * <p>A {@link DecisionGraph} reports what is wrong with its decision model the same way: cycles of required decisions,
+ * missing requirements and type mismatches ({@link Kind#DECISION_CYCLE}, {@link Kind#MISSING_REQUIREMENT},
+ * {@link Kind#TYPE_MISMATCH}), beside each of its tables' own reports.
+ *
  * @param issues findings, most severe first
  */
 public record ValidationReport(List<Issue> issues) {
@@ -77,7 +81,31 @@ public record ValidationReport(List<Issue> issues) {
          * left out of the search, as from the other analyses, so a table that is complete only through them is not
          * reported.
          */
-        UNREACHABLE_DEFAULT_OUTPUT(Severity.ERROR);
+        UNREACHABLE_DEFAULT_OUTPUT(Severity.ERROR),
+        /**
+         * Decisions of a decision model that require one another in a cycle, directly or indirectly ({@code DecisionGraph}):
+         * DMN 1.5, 6.3.7, "a Decision element SHALL not require itself, directly or indirectly". None of them, nor any
+         * decision that requires one of them, can be evaluated. The detail names the cycle.
+         */
+        DECISION_CYCLE(Severity.ERROR),
+        /**
+         * A decision of a decision model that requires a decision or an input data the model does not have, or one of
+         * the other kind, or whose logic reads a name none of its information requirements provides (DMN 1.5, 6.3.13, and
+         * 7.3.4: "each variable that is referenced by a decision's expression must be associated with a required decision,
+         * required input data, or required knowledge"). It cannot be evaluated, nor can any decision that requires it.
+         * The detail names the decision and what is missing.
+         */
+        MISSING_REQUIREMENT(Severity.ERROR),
+        /**
+         * A value one element of a decision model gives a decision that cannot fit where it goes: a value of another type
+         * than the decision table input it feeds (a string into a number column, a list into a column of single values),
+         * a path into a value that has no such component, operands a literal expression cannot combine, or a literal
+         * expression's value of another type than its decision declares. The decision cannot be evaluated, nor can any
+         * decision that requires it, except in the last case, where DMN 1.5 defines the decision's value: null, as the
+         * value does not conform to the declared type (10.3.2.9.4). The detail names the decision, the value and both
+         * types.
+         */
+        TYPE_MISMATCH(Severity.ERROR);
 
         private final Severity severity;
 
@@ -95,7 +123,9 @@ public record ValidationReport(List<Issue> issues) {
      * @param ruleIds identifiers ({@code Praeceptum.priority}) of the rules involved, in rule order
      *                (empty for gaps and for an unreachable default output)
      * @param detail  for gaps, the uncovered region, e.g. {@code country = "FR", age in (18..21)};
-     *                columns not mentioned may take any declared value. Null otherwise.
+     *                columns not mentioned may take any declared value; for the issues of a decision model
+     *                ({@link Kind#DECISION_CYCLE}, {@link Kind#MISSING_REQUIREMENT}, {@link Kind#TYPE_MISMATCH}), what is
+     *                wrong, naming the decision. Null otherwise.
      * @param example for gaps, one concrete uncovered input (columns not mentioned: any value).
      *                Empty otherwise.
      */
@@ -123,6 +153,7 @@ public record ValidationReport(List<Issue> issues) {
                 case GAP -> "WARNING no rule matches " + detail;
                 case UNREACHABLE_DEFAULT_OUTPUT -> "ERROR every input matches a rule, so the default output is never given "
                         + "(a complete table declares no default output: DMN 1.5, 10.3.2.10)";
+                case DECISION_CYCLE, MISSING_REQUIREMENT, TYPE_MISMATCH -> "ERROR " + detail;
             };
         }
     }

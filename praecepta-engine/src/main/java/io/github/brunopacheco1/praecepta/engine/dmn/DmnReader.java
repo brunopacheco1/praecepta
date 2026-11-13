@@ -28,6 +28,8 @@ import org.xml.sax.SAXException;
 
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
@@ -41,6 +43,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.ExpressionTypeException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
@@ -71,10 +74,15 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * {@link PraeceptaOutput#expressions()}); every hit policy; SUM, MIN, MAX and COUNT aggregation. Anything else is rejected with an
  * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered
  * from 1 in table order.
+ *
+ * <p>{@link #readModel} reads a whole decision model instead, with its input data, its decisions (decision tables and
+ * literal expressions) and their information requirements, for {@code DecisionGraph}.
  */
 public final class DmnReader {
 
     private static final String TYPE_REF = "typeRef";
+    /** At most this many levels of item definitions and components in the type of an input data or a decision. */
+    public static final int MAX_TYPE_DEPTH = 32;
 
     /** Literal types an unquoted output entry of an untyped (string) output may hold, kept as their text. */
     private static final List<ColumnType> UNQUOTED_OUTPUT_TYPES =
@@ -111,6 +119,185 @@ public final class DmnReader {
         var root = parseModel(dmn);
         var types = new ItemDefinitions(root);
         return decisionsWithTables(root).stream().map(decision -> decisionTable(decision, types)).toList();
+    }
+
+    // ---- the decision model ----------------------------------------------------------------------
+
+    /**
+     * Reads a whole decision model, for {@code DecisionGraph}: its input data, with their types, and its decisions, with
+     * their information requirements and their logic, a decision table (read as {@link #read(InputStream, String)} reads
+     * it) or a literal expression in Praecepta's expression subset ({@link DecisionLogic.LiteralExpression}). An input
+     * data's type is its variable's {@code typeRef}: a built-in type, or an item definition, which may be a collection or
+     * have components (a context), nested up to {@value #MAX_TYPE_DEPTH} levels; none if it has no {@code typeRef}. A
+     * literal expression's type is the decision variable's {@code typeRef} (or the literal expression's own). A
+     * requirement names a decision or an input data of the model by its {@code href} ({@code #id}); one that refers to
+     * no element of the model is kept as the {@code id} it refers to, which {@code DecisionGraph} reports as a missing
+     * requirement. Knowledge sources and authority requirements, which do not take part in evaluation, text annotations,
+     * groups and diagrams are ignored.
+     *
+     * <p>What Praecepta does not evaluate yet is rejected, naming the element and the release that plans it: business
+     * knowledge models, knowledge requirements and invocations, and decision logic that is a boxed expression (a context,
+     * an invocation, a function definition, a relation, a list, a conditional, an iteration, a quantified expression, a
+     * filter), planned for 0.10 (#118); literal expressions beyond Praecepta's expression subset, for 0.8 (#116) and,
+     * for function calls, 0.9 (#117); decision services and imports, for 0.11 (#119).
+     *
+     * @throws InvalidDecisionTableException if the model cannot be read, uses what Praecepta does not support yet, or
+     *                                       names two of its decisions and input data alike
+     */
+    public static DecisionModel readModel(InputStream dmn) {
+        var root = parseModel(dmn);
+        rejectUnsupported(root);
+        var types = new ItemDefinitions(root);
+        var elements = new HashMap<String, Element>();
+        for (var kind : List.of("inputData", "decision")) {
+            children(root, kind).forEach(element -> elements.putIfAbsent(element.getAttribute("id"), element));
+        }
+        var inputData = new ArrayList<DecisionModel.InputData>();
+        for (var input : children(root, "inputData")) {
+            var name = elementName(input, "an input data");
+            var variable = child(input, "variable");
+            var typeRef = variable == null ? "" : variable.getAttribute(TYPE_REF);
+            inputData.add(new DecisionModel.InputData(name, types.feelType(typeRef, "Input data '" + name + "'")));
+        }
+        var decisions = new ArrayList<DecisionModel.Decision>();
+        for (var decision : children(root, "decision")) {
+            decisions.add(decision(decision, types, elements));
+        }
+        try {
+            return new DecisionModel(root.getAttribute("name"), inputData, decisions);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidDecisionTableException("DMN model: " + e.getMessage());
+        }
+    }
+
+    /** Rejects the elements of a model that Praecepta does not evaluate yet, naming the release that plans them. */
+    private static void rejectUnsupported(Element root) {
+        rejectAny(root, "import", "namespace", "DMN model imports '%s', which Praecepta does not support yet: imports are planned for 0.11 (#119)");
+        rejectAny(root, "businessKnowledgeModel", "id", "DMN model has the business knowledge model '%s', which Praecepta does not support "
+                + "yet: business knowledge models and their invocations are planned for 0.10 (#118)");
+        rejectAny(root, "decisionService", "id", "DMN model has the decision service '%s', which Praecepta does not support yet: "
+                + "decision services are planned for 0.11 (#119)");
+    }
+
+    /** Rejects the model if it has an element of that kind, naming the first by its name, or {@code fallback} attribute. */
+    private static void rejectAny(Element root, String kind, String fallback, String message) {
+        var elements = children(root, kind);
+        if (!elements.isEmpty()) {
+            throw new InvalidDecisionTableException(message.formatted(nameOr(elements.getFirst(), fallback)));
+        }
+    }
+
+    /** The name of an input data or a decision of a model, or its id if it has none; one with neither is rejected. */
+    private static String elementName(Element element, String kind) {
+        var name = nameOr(element, "id");
+        if (name.isBlank()) {
+            throw new InvalidDecisionTableException("DMN model has %s with neither a name nor an id".formatted(kind));
+        }
+        return name;
+    }
+
+    /** A decision of a model: its information requirements and its logic. */
+    private static DecisionModel.Decision decision(Element decision, ItemDefinitions types, Map<String, Element> elements) {
+        var name = elementName(decision, "a decision");
+        var where = "Decision '" + name + "'";
+        if (child(decision, "knowledgeRequirement") != null) {
+            throw new InvalidDecisionTableException(("%s requires business knowledge, which Praecepta does not support yet: business "
+                    + "knowledge models and their invocations are planned for 0.10 (#118)").formatted(where));
+        }
+        var requiredDecisions = new ArrayList<String>();
+        var requiredInputs = new ArrayList<String>();
+        for (var requirement : children(decision, "informationRequirement")) {
+            var requiredDecision = child(requirement, "requiredDecision");
+            var requiredInput = child(requirement, "requiredInput");
+            if ((requiredDecision == null) == (requiredInput == null)) {
+                throw new InvalidDecisionTableException(where + ": an information requirement must name either a required decision or a "
+                        + "required input (DMN 1.5, 6.3.13)");
+            }
+            if (requiredDecision != null) {
+                requiredDecisions.add(required(requiredDecision, elements, where));
+            } else {
+                requiredInputs.add(required(requiredInput, elements, where));
+            }
+        }
+        return new DecisionModel.Decision(name, requiredDecisions, requiredInputs, logic(decision, types, where));
+    }
+
+    /**
+     * The name of the element a requirement refers to ({@code href="#id"}), or the {@code id} it refers to if the model
+     * has no element with that id.
+     */
+    private static String required(Element requirement, Map<String, Element> elements, String where) {
+        var href = requirement.getAttribute("href").strip();
+        if (!href.startsWith("#")) {
+            throw new InvalidDecisionTableException(("%s requires '%s', an element of another model, which Praecepta does not support "
+                    + "yet: imports are planned for 0.11 (#119)").formatted(where, href));
+        }
+        var id = href.substring(1);
+        var element = elements.get(id);
+        return element == null ? id : nameOr(element, "id");
+    }
+
+    /** The kinds of boxed expression a decision's logic may be, which Praecepta does not evaluate yet, as messages name them. */
+    private static final Map<String, String> BOXED_EXPRESSIONS = Map.of(
+            "context", "a boxed context",
+            "invocation", "a boxed invocation",
+            "functionDefinition", "a function definition",
+            "relation", "a relation",
+            "list", "a boxed list",
+            "conditional", "a boxed conditional",
+            "for", "a boxed iteration (for)",
+            "every", "a boxed quantified expression (every)",
+            "some", "a boxed quantified expression (some)",
+            "filter", "a boxed filter");
+
+    /** A decision's logic: its decision table or its literal expression. */
+    private static DecisionLogic logic(Element decision, ItemDefinitions types, String where) {
+        for (var node = decision.getFirstChild(); node != null; node = node.getNextSibling()) {
+            if (node.getNodeType() != Node.ELEMENT_NODE) {
+                continue;
+            }
+            var element = (Element) node;
+            var kind = element.getLocalName();
+            if (kind.equals("decisionTable")) {
+                return new DecisionLogic.Table(decisionTable(decision, types));
+            }
+            if (kind.equals("literalExpression")) {
+                return literalExpression(decision, element, types, where);
+            }
+            if (BOXED_EXPRESSIONS.containsKey(kind)) {
+                throw new InvalidDecisionTableException(("%s: its logic is %s, which Praecepta does not support yet: boxed expressions are "
+                        + "planned for 0.10 (#118)").formatted(where, BOXED_EXPRESSIONS.get(kind)));
+            }
+        }
+        throw new InvalidDecisionTableException(where + " has no decision logic; Praecepta evaluates decisions whose logic is a decision "
+                + "table or a literal expression");
+    }
+
+    /** A literal expression, of the type its decision's variable (or the expression itself) declares. */
+    private static DecisionLogic literalExpression(Element decision, Element literal, ItemDefinitions types, String where) {
+        var language = literal.getAttribute("expressionLanguage").strip();
+        if (!language.isEmpty() && !language.toUpperCase(Locale.ROOT).contains("FEEL")) {
+            throw new InvalidDecisionTableException("%s: its literal expression is in '%s'; Praecepta reads FEEL".formatted(where, language));
+        }
+        if (child(literal, "importedValues") != null) {
+            throw new InvalidDecisionTableException(("%s: its literal expression imports values, which Praecepta does not support yet: "
+                    + "imports are planned for 0.11 (#119)").formatted(where));
+        }
+        var text = child(literal, "text") == null ? "" : textOf(literal).strip();
+        if (text.isEmpty()) {
+            throw new InvalidDecisionTableException(where + ": its literal expression is empty");
+        }
+        var typeRef = literal.getAttribute(TYPE_REF);
+        if (typeRef.isBlank()) {
+            var variable = child(decision, "variable");
+            typeRef = variable == null ? "" : variable.getAttribute(TYPE_REF);
+        }
+        var type = types.feelType(typeRef, where);
+        try {
+            return new DecisionLogic.LiteralExpression(text, type);
+        } catch (IllegalArgumentException e) {
+            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+        }
     }
 
     // ---- the table -------------------------------------------------------------------------------
@@ -785,6 +972,75 @@ public final class DmnReader {
                 throw new InvalidDecisionTableException(("%s: type '%s' constrains a collection as a whole, which is not supported; "
                         + "declare the allowed values of its items in their item definition").formatted(where, name));
             }
+        }
+
+        /**
+         * The type of an input data or a decision ({@link FeelType}): a built-in type, {@code Any}, or an item definition,
+         * which may be a collection, have components, or both, nested up to {@value DmnReader#MAX_TYPE_DEPTH} levels; any type if
+         * {@code typeRef} is blank. An item definition's allowed values are not part of the type.
+         */
+        FeelType feelType(String typeRef, String where) {
+            return typeRef.isBlank() ? FeelType.ANY : typeOf(typeRef, where, 0, new HashSet<>());
+        }
+
+        /** @param enclosing the item definitions being read, which a type within them may not name */
+        private FeelType typeOf(String typeRef, String where, int depth, Set<String> enclosing) {
+            var builtIn = builtInType(typeRef);
+            if (builtIn.isPresent()) {
+                return FeelType.of(builtIn.get());
+            }
+            if (localName(typeRef).equals("Any")) {
+                return FeelType.ANY;
+            }
+            var name = byName.containsKey(typeRef.strip()) ? typeRef.strip() : localName(typeRef);
+            var definition = byName.get(name);
+            if (definition == null) {
+                throw new InvalidDecisionTableException("%s: type '%s' is not a built-in type or an item definition of the model"
+                        .formatted(where, typeRef));
+            }
+            if (!enclosing.add(name)) {
+                throw new InvalidDecisionTableException("%s: item definition '%s' is defined in terms of itself".formatted(where, name));
+            }
+            var type = definitionType(definition, name, where, depth + 1, enclosing);
+            enclosing.remove(name);
+            return type;
+        }
+
+        /** The type an item definition, or one of its components, defines. */
+        private FeelType definitionType(Element definition, String name, String where, int depth, Set<String> enclosing) {
+            if (depth > MAX_TYPE_DEPTH) {
+                throw new InvalidDecisionTableException("%s: type '%s' nests more than %d levels of item definitions and components"
+                        .formatted(where, name, MAX_TYPE_DEPTH));
+            }
+            if (child(definition, "functionItem") != null) {
+                throw new InvalidDecisionTableException(("%s: type '%s' is a function type, which Praecepta does not support yet: "
+                        + "business knowledge models and functions are planned for 0.10 (#118)").formatted(where, name));
+            }
+            var components = children(definition, "itemComponent");
+            FeelType type;
+            if (!components.isEmpty()) {
+                var types = new LinkedHashMap<String, FeelType>();
+                for (var component : components) {
+                    var componentName = component.getAttribute("name");
+                    types.put(componentName, definitionType(component, name + "." + componentName, where, depth + 1, enclosing));
+                }
+                type = new FeelType.Context(types);
+            } else {
+                var base = child(definition, TYPE_REF);
+                if (base == null || base.getTextContent().isBlank()) {
+                    throw new InvalidDecisionTableException(
+                            "%s: type '%s' is not supported; its item definition has no base type".formatted(where, name));
+                }
+                type = typeOf(base.getTextContent(), where, depth, enclosing);
+            }
+            if (Boolean.parseBoolean(definition.getAttribute("isCollection").strip())) {
+                if (type instanceof FeelType.ListOf) {
+                    throw new InvalidDecisionTableException("%s: type '%s' is a collection of collections, which is not supported"
+                            .formatted(where, name));
+                }
+                type = new FeelType.ListOf(type);
+            }
+            return type;
         }
 
         /** The item definition of that name, if it is a simple type or a collection: one with a base type and no components. */

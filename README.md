@@ -24,8 +24,8 @@ you build; evaluate them with a dependency-free engine, on its own or as beans i
 Quarkus or Micronaut.
 
 > **Status: 0.x.** The API may still change between minor versions until 1.0. It covers the
-> decision-table part of DMN, not full FEEL or decision requirement graphs; see
-> [what Praecepta is not](#what-praecepta-is-not).
+> decision-table part of DMN and decision requirement graphs of tables and literal expressions, not full
+> FEEL or business knowledge models; see [what Praecepta is not](#what-praecepta-is-not).
 
 # Features
 - All DMN hit policies: UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER and COLLECT
@@ -44,6 +44,9 @@ Quarkus or Micronaut.
 - DMN output entries that name an input or compute with `+`, `-`, `*`, `/` and `**` on strings,
   numbers, dates, times and durations (`(price - discount) * 1.2`, `Symptom + " is listed"`,
   `due + duration("P14D")`, `returned - sent`), evaluated only for the rules that match
+- [Decision requirement graphs](#decision-requirement-graphs): DMN files whose decisions, tables and
+  literal expressions, require one another, evaluated in dependency order, with cycles, missing requirements
+  and type mismatches reported when the graph is built
 - Optional DMN input value lists: values outside them are rejected
 - Static validation when the table is built: overlapping rules (UNIQUE), conflicting outputs (ANY),
   rules that can never be selected (FIRST, PRIORITY), gaps (declared inputs no rule matches), and
@@ -105,15 +108,19 @@ third-party notices on its [GitHub release](https://github.com/brunopacheco1/pra
 rebuilds it independently to check it is bit-for-bit identical to Maven Central.
 
 # What Praecepta is not
-Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drools when you need:
+Praecepta does one thing: DMN decision tables, fast, and the graphs of decisions that feed them. Use Camunda
+or Drools when you need:
 - **Full FEEL**: functions, contexts, `if`, and tests that compute (e.g. `income > 2 * rent`).
   Praecepta's input entries are FEEL *simple unary tests*: in DMN they may compare with another
   input (`> limit`) or test a list's elements, but not compute. Output entries may compute with `+`,
   `-`, `*`, `/` and `**` on strings, numbers, dates, times and durations, but call no functions
   (other than the date and time literals `date(...)`, `time(...)`, `date and time(...)` and
   `duration(...)`) and hold no comparison or `if`.
-- **Decision requirement graphs**: decisions feeding other decisions, business knowledge models,
-  boxed expressions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)).
+- **Business knowledge models and boxed expressions**: invocations, contexts, relations and the other
+  boxed expressions ([#118](https://github.com/brunopacheco1/praecepta/issues/118)), and decision services
+  ([#119](https://github.com/brunopacheco1/praecepta/issues/119)). Decisions feeding other decisions are
+  supported where each is a decision table or a literal expression in the subset above
+  ([decision requirement graphs](#decision-requirement-graphs)).
 - **A process engine, a modeller or a decision service** around the tables.
 
 # Getting Started
@@ -405,10 +412,57 @@ Supported:
   output (`[{fee=null}]`), and COUNT counts the rule.
 
 Anything else is rejected with a message naming the decision, rule and column: function calls such as
-`upper case(a)`, `if`, comparisons in output entries, and inputs computed by
-other decisions ([#14](https://github.com/brunopacheco1/praecepta/issues/14)). `DmnReader.readAll(dmn)`
+`upper case(a)`, `if` and comparisons in output entries. A column may read another decision's value (its
+input expression names it), which a table read alone takes as an input of the engine, and a
+[decision graph](#decision-requirement-graphs) gives it from that decision. `DmnReader.readAll(dmn)`
 reads every decision table of a file. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
 evaluate identically, which is how the benchmarks feed them.
+
+### Decision requirement graphs
+A DMN file with several decisions, some requiring others, is a decision requirement graph (DMN 1.5,
+chapter 6). `DecisionGraph` reads it and evaluates any decision by name from the input data it needs, each
+decision it requires evaluated once, in dependency order, with nothing parsed per call
+([#14](https://github.com/brunopacheco1/praecepta/issues/14)):
+
+```java
+DecisionGraph graph;
+try (var dmn = Files.newInputStream(Path.of("credit.dmn"))) {
+    graph = DecisionGraph.read(dmn);
+}
+graph.evaluate("Monthly Limit", Map.of("Applicant Age", 30, "Income", 1200));   // 200
+graph.requiredInputData("Monthly Limit");                                      // [Applicant Age, Income]
+graph.validationReport();                                  // cycles, missing requirements, type mismatches
+graph.validationReport("Credit Limit");                    // that table's own analysis
+```
+
+- **Decisions** are decision tables, or literal expressions in the subset output entries take: literals and
+  names joined with `+`, `-`, `*`, `/` and `**` (`"Hello " + Full Name`, `Credit Limit / 12`,
+  `Order Total * (1 - Pricing.discount)`, `Start + duration("P14D")`).
+- **Values.** A table with one output gives its value, with several a context (a `Map` of its outputs), whose
+  components a decision reads by path (`Pricing.discount`), and under RULE ORDER, OUTPUT ORDER or COLLECT
+  without an aggregation a list of those, which a list column downstream takes (`Checks.code` is the list of
+  each result's `code`); no match without a default output gives null. Input data are given as Java values
+  (`Integer`, `BigDecimal`, `LocalDate`, `List`, `Map` for a structured type...) or, for simple types, as text.
+- **Input data** are typed by their `typeRef`: a built-in type, or an item definition, which may be a
+  collection or have components (`Loan.principal`). One without a `typeRef` takes the type of the decision
+  table columns that read it.
+- **Checked when the graph is built**, as ERRORs of its validation report: decisions that require one another in
+  a cycle (`DECISION_CYCLE`), a requirement the model does not have or a name no requirement provides
+  (`MISSING_REQUIREMENT`), and a value that does not fit where it goes, such as a string into a number column or
+  a list into a column of single values (`TYPE_MISMATCH`). Such a decision, and every decision that requires it,
+  cannot be evaluated; the others can. (A literal expression whose value does not fit the type its decision
+  declares is reported too, but evaluates to null, as DMN 1.5 binds it, 10.3.2.9.4.) `DecisionGraph.builder().failOn(Severity.ERROR)` rejects the graph
+  instead. Each table keeps its own analysis.
+- **In code**, `DecisionGraph.builder()` assembles a graph from input data, `DecisionTable`s and literal
+  expressions, each decision requiring what it reads; `graph.model()` is the `DecisionModel`, which
+  `DmnReader.readModel` reads and `DmnWriter.write(model)` writes back.
+
+Business knowledge models, invocations and boxed expressions (0.10,
+[#118](https://github.com/brunopacheco1/praecepta/issues/118)), the full FEEL language (0.8,
+[#116](https://github.com/brunopacheco1/praecepta/issues/116)) and its built-in functions (0.9,
+[#117](https://github.com/brunopacheco1/praecepta/issues/117)), decision services and imports (0.11,
+[#119](https://github.com/brunopacheco1/praecepta/issues/119)) come later: a model that uses them is rejected
+when it is read, with a message that names the feature and its issue.
 
 ## Praecepta Loader
 Loads rules from the first sheet of an Excel file (or a semicolon-separated CSV file), from the
@@ -872,8 +926,9 @@ engine against a naive reference implementation of DMN decision-table semantics 
 # DMN conformance
 `praecepta-tck` runs the decision-table test cases of the
 [DMN Technology Compatibility Kit](https://github.com/dmn-tck/tck) in every build. Every check whose
-table Praecepta can read passes (83 of 86); the other three need inputs computed by other decisions
-([#14](https://github.com/brunopacheco1/praecepta/issues/14)), which Praecepta does not have yet.
+table Praecepta can read passes (83 of 86); the other three read inputs computed by other decisions in models
+that also invoke business knowledge models, which come in 0.10
+([#118](https://github.com/brunopacheco1/praecepta/issues/118)).
 The pass rate, the results per test case and what each unsupported check needs are in
 [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md). The literal expressions of the TCK's arithmetic test
 cases run as output expressions too: of their 1,101 checks, Praecepta reads 489, of which 276 give the kit's

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tables with several results give lists, which list inputs downstream take: Flags is a list of strings, Checks a list of contexts -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="screening" name="Screening" namespace="https://example.com/screening">
+  <itemDefinition name="tFlags" isCollection="true">
+    <typeRef>string</typeRef>
+  </itemDefinition>
+  <inputData id="amount" name="Amount">
+    <variable name="Amount" typeRef="number"/>
+  </inputData>
+  <inputData id="country" name="Country">
+    <variable name="Country" typeRef="string"/>
+  </inputData>
+  <decision id="flags" name="Flags">
+    <variable name="Flags" typeRef="tFlags"/>
+    <informationRequirement><requiredInput href="#amount"/></informationRequirement>
+    <informationRequirement><requiredInput href="#country"/></informationRequirement>
+    <decisionTable hitPolicy="COLLECT">
+      <input><inputExpression typeRef="number"><text>Amount</text></inputExpression></input>
+      <input><inputExpression typeRef="string"><text>Country</text></inputExpression></input>
+      <output typeRef="string"/>
+      <rule>
+        <inputEntry><text>&gt; 10000</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"large"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <inputEntry><text>"XX"</text></inputEntry>
+        <outputEntry><text>"sanctioned"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>&lt; 0</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"negative"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="checks" name="Checks">
+    <informationRequirement><requiredInput href="#amount"/></informationRequirement>
+    <decisionTable hitPolicy="RULE ORDER">
+      <input><inputExpression typeRef="number"><text>Amount</text></inputExpression></input>
+      <output name="code" typeRef="string"/>
+      <output name="weight" typeRef="number"/>
+      <rule>
+        <inputEntry><text>&gt; 10000</text></inputEntry>
+        <outputEntry><text>"AML"</text></outputEntry>
+        <outputEntry><text>3</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"BASIC"</text></outputEntry>
+        <outputEntry><text>1</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="review" name="Review">
+    <informationRequirement><requiredDecision href="#flags"/></informationRequirement>
+    <decisionTable hitPolicy="FIRST">
+      <input><inputExpression typeRef="tFlags"><text>Flags</text></inputExpression></input>
+      <output typeRef="string"/>
+      <rule>
+        <inputEntry><text>list contains(?, "sanctioned")</text></inputEntry>
+        <outputEntry><text>"Block"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>list contains(?, "large")</text></inputEntry>
+        <outputEntry><text>"Manual"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"Auto"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="diligence" name="Due Diligence">
+    <informationRequirement><requiredDecision href="#checks"/></informationRequirement>
+    <decisionTable hitPolicy="FIRST">
+      <input><inputExpression typeRef="tFlags"><text>Checks.code</text></inputExpression></input>
+      <output typeRef="string"/>
+      <rule>
+        <inputEntry><text>list contains(?, "AML")</text></inputEntry>
+        <outputEntry><text>"Enhanced"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"Standard"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="total_flags" name="Flag Count">
+    <informationRequirement><requiredInput href="#amount"/></informationRequirement>
+    <informationRequirement><requiredInput href="#country"/></informationRequirement>
+    <decisionTable hitPolicy="COLLECT" aggregation="COUNT">
+      <input><inputExpression typeRef="number"><text>Amount</text></inputExpression></input>
+      <input><inputExpression typeRef="string"><text>Country</text></inputExpression></input>
+      <output typeRef="string"/>
+      <rule>
+        <inputEntry><text>&gt; 10000</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"large"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <inputEntry><text>"XX"</text></inputEntry>
+        <outputEntry><text>"sanctioned"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

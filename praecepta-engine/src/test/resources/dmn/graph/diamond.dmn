@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A diamond: Score -> Band and Eligible -> Offer -> Offer Text -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="diamond" name="Offers" namespace="https://example.com/offers">
+  <inputData id="score" name="Score">
+    <variable id="score_variable" name="Score" typeRef="number"/>
+  </inputData>
+  <decision id="band" name="Band">
+    <variable id="band_variable" name="Band" typeRef="string"/>
+    <informationRequirement><requiredInput href="#score"/></informationRequirement>
+    <decisionTable id="band_table" hitPolicy="FIRST">
+      <input id="band_input">
+        <inputExpression typeRef="number"><text>Score</text></inputExpression>
+      </input>
+      <output id="band_output" typeRef="string"/>
+      <rule>
+        <inputEntry><text>&gt;= 700</text></inputEntry>
+        <outputEntry><text>"A"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>&gt;= 500</text></inputEntry>
+        <outputEntry><text>"B"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"C"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="eligible" name="Eligible">
+    <variable id="eligible_variable" name="Eligible" typeRef="boolean"/>
+    <informationRequirement><requiredInput href="#score"/></informationRequirement>
+    <decisionTable id="eligible_table" hitPolicy="UNIQUE">
+      <input id="eligible_input">
+        <inputExpression typeRef="number"><text>Score</text></inputExpression>
+      </input>
+      <output id="eligible_output" typeRef="boolean"/>
+      <rule>
+        <inputEntry><text>&gt;= 600</text></inputEntry>
+        <outputEntry><text>true</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>&lt; 600</text></inputEntry>
+        <outputEntry><text>false</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="offer" name="Offer">
+    <variable id="offer_variable" name="Offer" typeRef="string"/>
+    <informationRequirement><requiredDecision href="#band"/></informationRequirement>
+    <informationRequirement><requiredDecision href="#eligible"/></informationRequirement>
+    <decisionTable id="offer_table" hitPolicy="FIRST">
+      <input id="offer_band">
+        <inputExpression typeRef="string"><text>Band</text></inputExpression>
+      </input>
+      <input id="offer_eligible">
+        <inputExpression typeRef="boolean"><text>Eligible</text></inputExpression>
+      </input>
+      <output id="offer_output" typeRef="string"/>
+      <rule>
+        <inputEntry><text>"A"</text></inputEntry>
+        <inputEntry><text>true</text></inputEntry>
+        <outputEntry><text>"Gold"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <inputEntry><text>true</text></inputEntry>
+        <outputEntry><text>"Silver"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <inputEntry><text>false</text></inputEntry>
+        <outputEntry><text>"None"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="offer_text" name="Offer Text">
+    <variable id="offer_text_variable" name="Offer Text" typeRef="string"/>
+    <informationRequirement><requiredDecision href="#offer"/></informationRequirement>
+    <literalExpression><text>"Offer: " + Offer</text></literalExpression>
+  </decision>
+</definitions>

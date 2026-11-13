@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Missing links: a required decision that does not exist, a name no requirement provides, a requirement of the wrong kind -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="missing" name="Missing" namespace="https://example.com/missing">
+  <inputData id="x" name="X">
+    <variable name="X" typeRef="number"/>
+  </inputData>
+  <decision id="a" name="A">
+    <variable name="A" typeRef="number"/>
+    <informationRequirement><requiredDecision href="#nowhere"/></informationRequirement>
+    <literalExpression><text>1</text></literalExpression>
+  </decision>
+  <decision id="b" name="B">
+    <variable name="B" typeRef="number"/>
+    <informationRequirement><requiredInput href="#x"/></informationRequirement>
+    <literalExpression><text>X + Y</text></literalExpression>
+  </decision>
+  <decision id="c" name="C">
+    <variable name="C" typeRef="number"/>
+    <informationRequirement><requiredInput href="#d"/></informationRequirement>
+    <literalExpression><text>D</text></literalExpression>
+  </decision>
+  <decision id="d" name="D">
+    <variable name="D" typeRef="number"/>
+    <informationRequirement><requiredInput href="#x"/></informationRequirement>
+    <literalExpression><text>X * 2</text></literalExpression>
+  </decision>
+  <decision id="e" name="E">
+    <variable name="E" typeRef="number"/>
+    <informationRequirement><requiredDecision href="#b"/></informationRequirement>
+    <literalExpression><text>B</text></literalExpression>
+  </decision>
+</definitions>
