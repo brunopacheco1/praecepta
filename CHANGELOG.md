@@ -11,6 +11,10 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+### Added
+- A documentation page for the Gradle plugin, [bruno.pacheco.lu/praecepta/gradle-plugin](https://bruno.pacheco.lu/praecepta/gradle-plugin/),
+  with every setting, the generated classes and the task; the Gradle Plugin Portal links to it.
+
 ## [0.6.0] - 2026-11-13
 
 DMN 1.5 in single tables: Praecepta now reads the FEEL that 0.5 rejected in cells and output entries, and

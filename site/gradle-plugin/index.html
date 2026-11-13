@@ -1,0 +1,255 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: Bruno Pacheco
+
+SPDX-License-Identifier: Apache-2.0
+
+The documentation page of the Gradle plugin (the Gradle Plugin Portal links to it).
+@VERSION@ is replaced with the latest release by .github/workflows/pages.yml.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Praecepta Gradle plugin: DMN decision tables compiled at build time</title>
+  <meta name="description" content="The Praecepta Gradle plugin validates DMN, Excel and CSV decision tables when you build, and generates typed Java records and a decision class for each.">
+  <meta property="og:title" content="Praecepta Gradle plugin">
+  <meta property="og:description" content="Validate DMN, Excel and CSV decision tables at build time and generate typed Java classes for them.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://bruno.pacheco.lu/praecepta/brand/social.png">
+  <meta property="og:image:alt" content="Praecepta: DMN decision tables for Java">
+  <meta name="theme-color" content="#f4eee3" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#16120f" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <div class="wrap top-row">
+      <a class="brand" href="../" aria-label="Praecepta home">
+        <img src="../brand/mark.svg" alt="" width="56" height="32">
+        <span aria-hidden="true">Præcepta</span>
+      </a>
+      <nav aria-label="Main">
+        <ul>
+          <li><a href="#apply">Apply</a></li>
+          <li><a href="#configure">Configure</a></li>
+          <li><a href="#use">Use the classes</a></li>
+          <li><a href="#task">The task</a></li>
+          <li><a href="../api/gradle-plugin/">API</a></li>
+          <li><a href="https://github.com/brunopacheco1/praecepta">GitHub</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">Gradle plugin · <code>io.github.brunopacheco1.praecepta</code> · Gradle 8.5+ · Java 21+</p>
+        <h1>Compile DMN, Excel and CSV decision tables when you build.</h1>
+        <p class="lede">
+          The <em>Praecepta</em> Gradle plugin reads your decision tables, <em>validates</em> them (gaps,
+          overlapping and unreachable rules, values outside the declared lists), fails the build on errors,
+          and <em>generates typed Java</em>: an input record, an output record and a class that evaluates the
+          table with the Praecepta engine. It does for Gradle what the Maven plugin does, with the same
+          settings and the same generated files.
+        </p>
+      </div>
+    </section>
+
+    <section id="apply" class="wrap section prose" aria-labelledby="apply-title">
+      <h2 id="apply-title">Apply the plugin</h2>
+      <p>The plugin is on the Gradle Plugin Portal, where Gradle looks for plugins by default. The generated
+        classes need the engine at runtime, and nothing else: the plugin's own dependencies (Apache POI for
+        Excel) stay in the build.</p>
+      <figure class="code">
+        <figcaption>build.gradle.kts</figcaption>
+<pre><code>plugins {
+    java
+    id("io.github.brunopacheco1.praecepta") version "@VERSION@"
+}
+
+dependencies {
+    implementation("io.github.brunopacheco1:praecepta-engine:@VERSION@")
+}
+
+praecepta {
+    packageName = "com.acme.pricing"
+    tables {
+        // a DMN file carries its own hit policy, columns and value lists
+        register("shipping") { source = file("src/main/rules/shipping.dmn") }
+    }
+}</code></pre>
+      </figure>
+      <figure class="code">
+        <figcaption>build.gradle (Groovy DSL)</figcaption>
+<pre><code>plugins {
+    id 'java'
+    id 'io.github.brunopacheco1.praecepta' version '@VERSION@'
+}
+
+dependencies {
+    implementation 'io.github.brunopacheco1:praecepta-engine:@VERSION@'
+}
+
+praecepta {
+    packageName = 'com.acme.pricing'
+    tables {
+        register('shipping') { source = file('src/main/rules/shipping.dmn') }
+    }
+}</code></pre>
+      </figure>
+      <p>Then <code>./gradlew build</code>: the plugin validates <code>shipping.dmn</code>, writes it as a
+        resource, and generates <code>ShippingInput</code>, <code>ShippingOutput</code> and <code>Shipping</code>
+        in <code>com.acme.pricing</code>, compiled with the rest of <code>main</code>.</p>
+    </section>
+
+    <section id="configure" class="wrap section prose" aria-labelledby="configure-title">
+      <h2 id="configure-title">Configure the tables</h2>
+      <p>A DMN file needs only its <code>source</code>. An Excel workbook (first sheet) or a semicolon-separated
+        CSV file has a header row that names the columns and one rule per row, with cells in DMN's syntax
+        (<code>&gt;= 18</code>, <code>"PT","ES"</code>, <code>[1..10]</code>, <code>-</code>); declare its hit
+        policy and its input and output columns in the build:</p>
+      <figure class="code">
+        <figcaption>build.gradle.kts</figcaption>
+<pre><code>praecepta {
+    packageName = "com.acme.pricing"
+    failOn = "WARNING"                       // ERROR by default, WARNING or NONE
+    tables {
+        register("discount") {
+            source = file("src/main/rules/discount.xlsx")
+            hitPolicy = "FIRST"
+            inputs {
+                column("country") { allowedValues = "\"PT\",\"ES\",\"FR\"" }
+                column("age") { type = "NUMBER" }
+                column("nationalities") { list = true }
+            }
+            outputs {
+                column("discount") { type = "NUMBER" }
+            }
+        }
+        register("carrier") {
+            source = file("src/main/rules/shipping.dmn")
+            decision = "Carrier"             // when the file has several decision tables
+            className = "CarrierRules"
+        }
+    }
+}</code></pre>
+      </figure>
+
+      <div class="settings-wrap">
+        <table class="settings">
+          <caption>The <code>praecepta</code> extension</caption>
+          <thead><tr><th scope="col">Setting</th><th scope="col">Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>packageName</code></td><td>Package of the generated classes and DMN resources (required; empty for the default package).</td></tr>
+            <tr><td><code>failOn</code></td><td>Fail the build when validation finds issues at least this severe: <code>ERROR</code> (default), <code>WARNING</code> or <code>NONE</code>. A table that cannot be read fails the build whatever this says. Every finding is logged.</td></tr>
+            <tr><td><code>fileHeader</code></td><td>Text put first in every generated source as <code>//</code> comments, such as your project's SPDX lines. None by default: generated code belongs to your project.</td></tr>
+            <tr><td><code>skip</code></td><td>Write nothing. Defaults to the Gradle property <code>praecepta.skip</code> (<code>-Ppraecepta.skip=true</code>).</td></tr>
+            <tr><td><code>tables</code></td><td>The tables to compile, each registered under a name of its own (used in Gradle's messages).</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="settings-wrap">
+        <table class="settings">
+          <caption>Each table</caption>
+          <thead><tr><th scope="col">Setting</th><th scope="col">Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>source</code></td><td>The <code>.dmn</code>, <code>.xlsx</code> or <code>.csv</code> file (required).</td></tr>
+            <tr><td><code>className</code></td><td>Name of the generated class; by default the DMN decision's name or the file name (<code>discount.xlsx</code> gives <code>Discount</code>).</td></tr>
+            <tr><td><code>decision</code></td><td>DMN only: which decision table to read, when the file has several.</td></tr>
+            <tr><td><code>hitPolicy</code></td><td>Excel and CSV only (required there): <code>UNIQUE</code>, <code>ANY</code>, <code>PRIORITY</code>, <code>FIRST</code>, <code>OUTPUT_ORDER</code>, <code>RULE_ORDER</code> or <code>COLLECT</code>.</td></tr>
+            <tr><td><code>aggregation</code></td><td>Excel and CSV only: <code>SUM</code>, <code>MIN</code>, <code>MAX</code> or <code>COUNT</code>, for a <code>COLLECT</code> table with one <code>NUMBER</code> output.</td></tr>
+            <tr><td><code>inputs</code>, <code>outputs</code></td><td>Excel and CSV only: the columns, in order, each declared with <code>column("name")</code> and configured as below.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="settings-wrap">
+        <table class="settings">
+          <caption>Each column</caption>
+          <thead><tr><th scope="col">Setting</th><th scope="col">Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>type</code></td><td><code>STRING</code> (default), <code>NUMBER</code>, <code>DATE</code>, <code>BOOLEAN</code>, <code>TIME</code>, <code>DATE_TIME</code>, <code>DAY_TIME_DURATION</code> or <code>YEAR_MONTH_DURATION</code>.</td></tr>
+            <tr><td><code>allowedValues</code></td><td>Inputs: the DMN input value list, as unary tests (<code>"PT","ES"</code> or <code>[0..120]</code>). A string column with one becomes an enum in the input record, and validation reports values outside it.</td></tr>
+            <tr><td><code>list</code></td><td>Inputs: the column holds lists of its type, such as a customer's nationalities; a cell then matches when some element passes one of its tests.</td></tr>
+            <tr><td><code>priority</code></td><td>Outputs: the DMN output value list, highest priority first, for <code>PRIORITY</code> and <code>OUTPUT_ORDER</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The settings are the Maven plugin's, as Gradle properties. One name differs: <code>name</code> is the
+        name a table is registered under, as in every Gradle container, so the class is named by
+        <code>className</code> (the Maven plugin's <code>&lt;name&gt;</code>).</p>
+    </section>
+
+    <section id="use" class="wrap section prose" aria-labelledby="use-title">
+      <h2 id="use-title">Use the generated classes</h2>
+      <figure class="code">
+<pre><code>Optional&lt;DiscountOutput&gt; discount =
+        Discount.evaluate(new DiscountInput(DiscountInput.Country.PT, new BigDecimal(30), List.of("PT")));
+
+ValidationReport report = Discount.validationReport();   // the findings of the build
+PraeceptaEngine&lt;DiscountInput, DiscountOutput&gt; engine = Discount.engine();</code></pre>
+      </figure>
+      <ul class="plain">
+        <li>Single-hit tables and aggregations return an <code>Optional</code>; multi-hit tables return a
+          <code>List</code>. When no rule matches they are empty, unless the table declares default output
+          values: then they hold the default output.</li>
+        <li>Numbers are <code>BigDecimal</code> and dates <code>LocalDate</code>. Times and date-times are
+          <code>LocalTime</code> and <code>LocalDateTime</code>, or <code>OffsetTime</code> and
+          <code>ZonedDateTime</code> when every value written for the column has a time zone; a column whose
+          values name zone ids is the engine's <code>ZonedTime</code>. A string column with a value list is an
+          enum, and a list column a <code>java.util.List</code>.</li>
+        <li>The DMN resource is written next to the classes, so the table ships in your jar as DMN.</li>
+      </ul>
+    </section>
+
+    <section id="task" class="wrap section prose" aria-labelledby="task-title">
+      <h2 id="task-title">The <code>generatePraecepta</code> task</h2>
+      <ul class="plain">
+        <li>Writes the classes to <code>build/generated/sources/praecepta/java/main</code> and the DMN resources
+          to <code>build/generated/resources/praecepta/main</code>. Both belong to the <code>main</code> source
+          set, so <code>compileJava</code> and <code>processResources</code> run the task first.</li>
+        <li>Cacheable: its inputs are the table files (by name and content) and the settings, so an unchanged
+          build takes it from the build cache. It works with the configuration cache.</li>
+        <li>Empties both directories on each run, so a table you remove leaves no class behind.</li>
+        <li>Runs on Gradle 8.5 and later; CI builds a sample project with Gradle 8.5, the last 8.x and the
+          current 9.x, on Java 21 and later.</li>
+      </ul>
+    </section>
+
+    <section class="wrap section prose" aria-labelledby="more-title">
+      <h2 id="more-title">More</h2>
+      <ul class="plain">
+        <li><a href="../api/gradle-plugin/">API documentation</a> of the plugin's extension, tables and columns.</li>
+        <li>The <a href="https://github.com/brunopacheco1/praecepta#praecepta-gradle-plugin">README's Gradle
+          section</a>, and the <a href="https://github.com/brunopacheco1/praecepta#readme">README</a> for the
+          cell syntax, typed columns and DMN support.</li>
+        <li>The same tables at runtime, without generated code: the
+          <a href="https://github.com/brunopacheco1/praecepta#praecepta-spring-boot-starter">Spring Boot</a>,
+          <a href="https://github.com/brunopacheco1/praecepta#praecepta-quarkus-extension">Quarkus</a> and
+          <a href="https://github.com/brunopacheco1/praecepta#praecepta-micronaut">Micronaut</a> integrations.</li>
+        <li><a href="https://github.com/brunopacheco1/praecepta/issues">Issues and questions</a> ·
+          <a href="https://github.com/brunopacheco1/praecepta/blob/main/CHANGELOG.md">Changelog</a> ·
+          Apache-2.0.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot-row">
+      <p>© Bruno Pacheco · Apache-2.0</p>
+      <ul>
+        <li><a href="../">Praecepta</a></li>
+        <li><a href="https://github.com/brunopacheco1/praecepta/blob/main/CHANGELOG.md">Changelog</a></li>
+        <li><a href="../api/gradle-plugin/">API</a></li>
+        <li><a href="https://github.com/brunopacheco1/praecepta">GitHub</a></li>
+      </ul>
+    </div>
+  </footer>
+  <script src="../copy.js" defer></script>
+</body>
+</html>
