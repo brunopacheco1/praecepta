@@ -157,10 +157,11 @@ where `${version}` is the buildspec's own `version=`. Written that way, the buil
 its release, so Reproducible Central's tooling can add the next release on its own: it notices new
 versions on Maven Central and copies the previous buildspec, changing only `version=` (and `jdk=` if
 the jars name another JDK). Nothing needs doing per release unless the rebuild command changes; a
-pull request adding `praecepta-X.Y.Z.buildspec` there only makes it sooner. The command last changed in
-0.5.0, and the buildspec submitted for 0.5.0
-([jvm-repo-rebuild/reproducible-central#8148](https://github.com/jvm-repo-rebuild/reproducible-central/pull/8148),
-which rebuilt all 44 of its artifacts identically) has it, so it is the one later releases copy. 0.2.0 is
+pull request adding `praecepta-X.Y.Z.buildspec` there is not wanted. When the command changes, a pull
+request there must change the `command=` of the latest release's buildspec, so that the next release copies
+it. The command last changed in 0.5.0, but Reproducible Central added 0.5.0 on its own by copying 0.4.0's
+buildspec, so it rebuilds only the engine, the loader, the Maven plugin and the modules they need (22
+artifacts); its `command=` needs the one above, which rebuilds all 44 of 0.5.0's artifacts identically. 0.2.0 is
 the exception: its workflow still stamped the time of the release run, so its `.buildspec` names 0.2.0
 and also sets `project.build.outputTimestamp` to `2026-11-08T20:08:06Z`.
 
