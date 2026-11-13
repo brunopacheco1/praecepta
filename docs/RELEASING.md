@@ -76,7 +76,11 @@ publishes it (0.5.0).
 Sign in at <https://plugins.gradle.org> with the GitHub account, so the Portal accepts plugin ids under
 `io.github.brunopacheco1`, then create an API key and secret under **API Keys**. The Portal reviews a
 plugin's first version by hand, which takes a few days; later versions are published at once, unless the
-plugin id or group changes. To check a publication without publishing, run, with the jars and POM in
+plugin id or group changes. The Portal's `website` (in `praecepta-gradle-plugin/portal/build.gradle.kts`) must be
+a page documenting the plugin itself, `site/gradle-plugin/`: the Portal rejected 0.6.0 when it pointed at the
+project's home page. A cancelled submission may be published again under the same version, from the
+maintainer's machine with the same command without `--validate-only`. To check a publication without
+publishing, run, with the jars and POM in
 place (as the release job fetches them) and the key and secret in `GRADLE_PUBLISH_KEY` and
 `GRADLE_PUBLISH_SECRET`:
 

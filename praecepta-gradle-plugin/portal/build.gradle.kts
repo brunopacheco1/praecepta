@@ -26,7 +26,7 @@ group = "io.github.brunopacheco1"
 version = releaseVersion
 
 gradlePlugin {
-    website = "https://bruno.pacheco.lu/praecepta/"
+    website = "https://bruno.pacheco.lu/praecepta/gradle-plugin/"
     vcsUrl = "https://github.com/brunopacheco1/praecepta"
     plugins {
         create("praecepta") {

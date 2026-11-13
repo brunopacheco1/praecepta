@@ -148,6 +148,10 @@ zone id with a changing offset (its report now lists a time in another zone as a
   `time("13:20:00+19:00")` as the local time `13:20:00` and accepts `date and time("+99999-12-01T11:22:33")`, where
   the kit expects errors, and that `0008-LX-arithmetic`'s payments, a power that is not whole, which graphs now
   evaluate, are computed to FEEL's 34 digits where the kit gives 15; they are reported as failures.
+- A documentation page for the Gradle plugin, [bruno.pacheco.lu/praecepta/gradle-plugin](https://bruno.pacheco.lu/praecepta/gradle-plugin/),
+  with every setting, the generated classes and the task; the Gradle Plugin Portal links to it.
+- The Gradle plugin declares that it supports Gradle's configuration cache, so the Gradle Plugin Portal says
+  so from 0.7.0 (a `compatibility.feature.configuration-cache` flag in its plugin descriptor).
 
 ### Changed
 - **The framework integrations read each DMN file as a decision model** (#14). **Upgrade note:** in a file where a
