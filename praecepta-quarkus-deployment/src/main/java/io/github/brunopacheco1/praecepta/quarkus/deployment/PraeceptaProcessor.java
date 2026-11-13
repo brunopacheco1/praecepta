@@ -170,11 +170,17 @@ public class PraeceptaProcessor {
     private static List<Table> compileDeclaredTables(PraeceptaBuildTimeConfig config, Path projectDirectory,
             BuildProducer<HotDeploymentWatchedFileBuildItem> watched, List<String> problems) {
         var tables = new ArrayList<Table>();
+        // a declared DMN file compiled as its decision table alone, as its model uses what a later release plans: once per file
+        var logged = new HashSet<String>();
         for (var entry : config.tables().entrySet()) {
             entry.getValue().source().ifPresent(source -> watched.produce(new HotDeploymentWatchedFileBuildItem(
                     DeclaredTables.resolve(source, projectDirectory).toString())));
             try {
-                tables.add(DeclaredTables.compile(entry.getKey(), entry.getValue(), projectDirectory));
+                tables.add(DeclaredTables.compile(entry.getKey(), entry.getValue(), projectDirectory, line -> {
+                    if (logged.add(line)) {
+                        LOG.info(line);
+                    }
+                }));
             } catch (IllegalArgumentException e) {
                 problems.add(e.getMessage());
             }

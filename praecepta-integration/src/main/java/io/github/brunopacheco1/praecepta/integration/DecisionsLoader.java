@@ -55,7 +55,12 @@ public final class DecisionsLoader {
     /** Where the loader reports what it loaded, through the framework's logging. */
     public interface Log {
 
-        /** One line: {@code Loaded 2 decision(s) from 1 DMN file(s): Discount, Fee}, or that none were found. */
+        /**
+         * One line: {@code Loaded 2 decision(s) from 1 DMN file(s): Discount, Fee}, or that none were found; then one
+         * line per DMN file whose decision tables are loaded alone because its model uses what a later release plans:
+         * {@code rules/fees.dmn: its decision tables are loaded alone, without its decision requirements graph, which
+         * needs Praecepta 0.10 (#118): ...}.
+         */
         void info(String message);
 
         /**
@@ -102,9 +107,10 @@ public final class DecisionsLoader {
     }
 
     /**
-     * Finds and loads the tables, then logs how many decisions were loaded and every validation issue below
-     * {@code fail-on} as a warning, once: the engines do not log their reports themselves
-     * ({@link Decisions#load(java.util.Collection, Severity, boolean)}).
+     * Finds and loads the tables, then logs how many decisions were loaded, each DMN file whose decision tables are
+     * loaded alone because its model uses what a later release plans (one line at INFO naming the file, the feature and
+     * the release and issue that plan it), and every validation issue below {@code fail-on} as a warning, once: the
+     * engines do not log their reports themselves ({@link Decisions#load(java.util.Collection, Severity, boolean)}).
      *
      * @throws DecisionsException listing every problem with the settings, the locations or the tables
      */
@@ -130,9 +136,10 @@ public final class DecisionsLoader {
         problems.addAll(declaredProblems);
 
         var decisions = Decisions.empty();
+        var fallbacks = new ArrayList<String>();
         try {
             // the issues are logged below, through the framework's logger, once each: not by the engines too
-            decisions = Decisions.load(sources.values(), severity, false);
+            decisions = Decisions.load(sources.values(), severity, false, fallbacks::add);
         } catch (DecisionsException e) {
             problems.addAll(e.problems());
         }
@@ -145,6 +152,7 @@ public final class DecisionsLoader {
             log.info("Loaded %d decision(s) from %d DMN file(s): %s".formatted(decisions.names().size(), sources.size(),
                     String.join(", ", decisions.names())));
         }
+        fallbacks.forEach(log::info);
         for (var model : decisions.models()) {
             model.report().issues().forEach(issue -> log.warn("Decision model " + model.name() + ": " + issue));
         }

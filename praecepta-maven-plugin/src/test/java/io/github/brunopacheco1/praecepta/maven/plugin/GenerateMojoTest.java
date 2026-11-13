@@ -10,10 +10,12 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.maven.model.Resource;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugin.logging.SystemStreamLog;
 import org.apache.maven.project.MavenProject;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,6 +82,42 @@ class GenerateMojoTest {
         Assertions.assertThatThrownBy(() -> mojo(List.of(credit, monthly), "ERROR", null).execute())
                 .isInstanceOf(MojoFailureException.class)
                 .hasMessage("Two tables generate the class MonthlyLimitInput; set <name> on one");
+    }
+
+    /**
+     * A DMN file whose model uses what a later release plans compiles its decision table alone, as in 0.6, and the
+     * build says so at info level, once per file however many tables read it, naming the file, the feature and the
+     * release and issue that plan it.
+     */
+    @Test
+    void a_table_compiled_alone_for_what_a_later_release_plans_is_logged_once_per_file() throws Exception {
+        Files.writeString(basedir.resolve("src/main/rules/later.dmn"), """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
+                  <businessKnowledgeModel id="bkm" name="Rate"/>
+                  <decision id="tier" name="Tier"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>
+                    <output name="tier" typeRef="string"/>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"any"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var tiers = List.of(new TableConfig(new File("src/main/rules/later.dmn"), "Tier", null, null, null, List.of(), List.of()),
+                new TableConfig(new File("src/main/rules/later.dmn"), "OtherTier", null, null, null, List.of(), List.of()));
+        var infos = new ArrayList<String>();
+        var mojo = mojo(tiers, "ERROR", null);
+        mojo.setLog(new SystemStreamLog() {
+            @Override
+            public void info(CharSequence content) {
+                infos.add(content.toString());
+            }
+        });
+        mojo.execute();
+
+        Assertions.assertThat(basedir.resolve("target/generated-sources/praecepta/com/acme/rules/OtherTier.java")).exists();
+        Assertions.assertThat(infos).filteredOn(line -> line.contains("compiled alone")).singleElement().asString()
+                .startsWith(basedir.resolve("src/main/rules/later.dmn") + ": its decision table is compiled alone, "
+                        + "without its decision requirements graph, which needs Praecepta 0.10 (#118): ")
+                .contains("business knowledge model 'Rate'");
+        Assertions.assertThat(infos).filteredOn(line -> line.startsWith("Compiled table")).hasSize(2);
     }
 
     @Test

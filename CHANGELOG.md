@@ -40,8 +40,8 @@ the versions-maven-plugin 2.25.1); no published module's dependencies changed. R
 upgrading if a framework integration loads DMN files in which a decision requires another decision (its decisions now
 evaluate through the graph, from the model's input data, and the graph's errors stop startup), a build plugin or the Quarkus extension compiles a DMN file whose named
 decision requires another decision, or that holds a literal expression decision (it now compiles as a graph, with
-other classes), your code switches over `ValidationReport.Kind` exhaustively or deconstructs `integration.Decision`
-with a record pattern, a map-based time column of yours has cells that name no
+other classes), your code switches over `ValidationReport.Kind` exhaustively or deconstructs `integration.Decision` or
+`compiler.CompilerOptions` with a record pattern, a map-based time column of yours has cells that name no
 zone id with a changing offset (its report now lists a time in another zone as a gap, a WARNING), or your tables or
 inputs hold a time or date and time with an offset beyond -14:00..+14:00 or a year with a leading `+` (now rejected).
 
@@ -168,8 +168,13 @@ inputs hold a time or date and time with an offset beyond -14:00..+14:00 or a ye
   are decisions now (a file of literal expressions alone, which 0.6 rejected as having no decision table, loads).
   Files of decision tables that require no other decision load as before, `Decisions.describe()` included, and so does
   a file with a business knowledge model, a decision service, an import, a boxed expression or a literal expression
-  beyond the expression subset: its decision tables load alone, as in 0.6; such a file without a decision table fails
-  with a message that names the release planning what it uses, rather than `no decision table`.
+  beyond the expression subset: its decision tables load alone, as in 0.6, and one line is logged at INFO per such
+  file, naming it, what it uses and the release and issue that plan it, so that the graph left out is seen
+  (`rules/fees.dmn: its decision tables are loaded alone, without its decision requirements graph, which needs
+  Praecepta 0.10 (#118): DMN model has the business knowledge model 'Rate', ...`), through the framework's logging
+  (`DecisionsLoader.Log.info`), or through `Decisions`' own `System.Logger` when `Decisions.load` is called on its own
+  and logs; such a file without a decision table fails with a message that names the release planning what it uses,
+  rather than `no decision table`.
 - **`Decision` has a sixth component, `model`** (#14), the graph the decision belongs to, null for a table read alone;
   the five-component constructor remains. **Upgrade note:** a record pattern over `Decision` needs the sixth
   component.
@@ -190,6 +195,14 @@ inputs hold a time or date and time with an offset beyond -14:00..+14:00 or a ye
   such tables alone, compile as before.
 - **The build plugins check that no two tables generate any one class** (#14), the input and output records included,
   where they compared only the decision classes; and they log `Compiled decision model ...` for a model.
+- **The build plugins and the Quarkus extension log a DMN file whose decision table they compile alone** (#14): a
+  file whose model uses what a later release plans (business knowledge models, boxed expressions, decision services,
+  imports, FEEL beyond the expression subset) compiles its decision table alone, as in 0.6, and the build now says so
+  in one line per file, naming it, what it uses and the release and issue that plan it (`.../fees.dmn: its decision
+  table is compiled alone, without its decision requirements graph, which needs Praecepta 0.10 (#118): ...`), at
+  Maven's info level, Gradle's lifecycle level (shown without `--info`) and the Quarkus build step's INFO. The
+  compiler sends it through `CompilerOptions.log`, a new sixth component (`withLog`; the five-component constructor
+  remains, and logs nothing). **Upgrade note:** a record pattern over `CompilerOptions` needs the sixth component.
 - **Build and test dependencies**: Guava 33.8.0 and Groovy 3.0.25 (tests only), Jackson 2.23.0 (the benchmarks) and
   the versions-maven-plugin 2.25.1. No published module's dependencies change.
 

@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.integration;
 
 import java.io.IOException;
+import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -16,6 +17,7 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Consumer;
 
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
@@ -37,6 +39,8 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureExc
  * }</pre>
  */
 public final class Decisions {
+
+    private static final System.Logger LOG = System.getLogger(Decisions.class.getName());
 
     private final Map<String, Decision> byName;
     private final List<GraphModel> models;
@@ -75,25 +79,42 @@ public final class Decisions {
      * name, such as a table with a column of its own name as {@code DmnWriter} writes it, a decision without logic),
      * which a file of decision tables never had to be, has its decision tables read alone, as before
      * ({@code DmnReader.readAll}), and nothing else of it is evaluated; one that has no decision table is rejected,
-     * naming the feature and its issue.
+     * naming the feature and its issue. A file whose tables are read alone because the model uses what a later release
+     * plans is logged, one line at INFO, naming the file, the feature and the release and issue that plan it
+     * ({@link #fallbackMessage}), so that its graph is not left out unseen.
      *
      * @param failOn     the validation severity that fails loading: ERROR, WARNING, or null for none
      *                   (unreadable or invalid tables always fail)
      * @param logReports whether each engine, and each graph, logs its validation report
-     *                   ({@code PraeceptaEngine.Builder.logValidationReport}); false when the caller reports
-     *                   the decisions' {@link Decision#report() reports} and the models'
-     *                   {@link GraphModel#report() reports} itself, as {@link DecisionsLoader} does
+     *                   ({@code PraeceptaEngine.Builder.logValidationReport}), and this class each file whose
+     *                   decision tables are read alone (logger {@code io.github.brunopacheco1.praecepta.integration.Decisions},
+     *                   at INFO); false when the caller reports the decisions' {@link Decision#report() reports}
+     *                   and the models' {@link GraphModel#report() reports} itself, as {@link DecisionsLoader} does,
+     *                   which logs those files through the framework's logging
      * @throws DecisionsException listing every problem: a source that cannot be read or holds no decision, a
      *                            model Praecepta cannot evaluate, a table that is not valid DMN or cannot be
      *                            built, two decisions with the same name, and validation issues at least as
      *                            severe as {@code failOn}, a graph's included
      */
     public static Decisions load(Collection<TableSource> sources, Severity failOn, boolean logReports) {
+        return load(sources, failOn, logReports, logReports ? message -> LOG.log(Level.INFO, message) : message -> {
+            // the caller does not log
+        });
+    }
+
+    /**
+     * As {@link #load(Collection, Severity, boolean)}, giving {@code fallbacks} the line to log of each file whose
+     * decision tables are read alone ({@link #fallbackMessage}), whether or not loading then fails.
+     */
+    static Decisions load(Collection<TableSource> sources, Severity failOn, boolean logReports, Consumer<String> fallbacks) {
         var problems = new ArrayList<String>();
         var byName = new TreeMap<String, Decision>();
         var models = new ArrayList<GraphModel>();
         for (var source : sources) {
             var read = read(source, logReports, problems);
+            if (read.fallback() != null) {
+                fallbacks.accept(read.fallback());
+            }
             if (read.model() != null) {
                 models.add(read.model());
                 check(read.model(), failOn, problems);
@@ -122,10 +143,24 @@ public final class Decisions {
         }
     }
 
-    /** What a source holds: its decisions, and the graph they are evaluated through, or null if they need none. */
-    private record Read(List<Decision> decisions, GraphModel model) {
+    /**
+     * What a source holds: its decisions, the graph they are evaluated through, or null if they need none, and the line
+     * to log if its decision tables are read alone because its model uses what a later release plans, else null.
+     */
+    private record Read(List<Decision> decisions, GraphModel model, String fallback) {
 
-        static final Read NOTHING = new Read(List.of(), null);
+        static final Read NOTHING = new Read(List.of(), null, null);
+    }
+
+    /**
+     * The line logged, at INFO, of a DMN file whose decision tables are loaded alone because {@code DmnReader.readModel}
+     * rejects its model with what a later release plans: {@code rules/fees.dmn: its decision tables are loaded alone,
+     * without its decision requirements graph, which needs Praecepta 0.10 (#118): DMN model has the business
+     * knowledge model 'Rate', ...}.
+     */
+    static String fallbackMessage(String location, UnsupportedFeatureException rejected) {
+        return "%s: its decision tables are loaded alone, without its decision requirements graph, which needs Praecepta %s (#%d): %s"
+                .formatted(location, rejected.release(), rejected.issue(), rejected.getMessage());
     }
 
     private static Read read(TableSource source, boolean logReports, List<String> problems) {
@@ -147,12 +182,16 @@ public final class Decisions {
         }
         var tableProblems = new ArrayList<String>();
         var tables = tables(source, logReports, tableProblems);
-        if (rejected instanceof UnsupportedFeatureException && tables.isEmpty()) {
-            problems.add(source.location() + ": " + rejected.getMessage());
-        } else {
+        if (!(rejected instanceof UnsupportedFeatureException unsupported)) {
             problems.addAll(tableProblems);
+            return new Read(tables, null, null);
         }
-        return new Read(tables, null);
+        if (tables.isEmpty()) {
+            problems.add(source.location() + ": " + unsupported.getMessage());
+            return Read.NOTHING;
+        }
+        problems.addAll(tableProblems);
+        return new Read(tables, null, fallbackMessage(source.location(), unsupported));
     }
 
     /** Each decision table of a source, read alone, as {@code DmnReader.readAll} reads them. */
@@ -194,7 +233,7 @@ public final class Decisions {
                 problems.add(source.location() + ": " + e.getMessage());
             }
         }
-        return new Read(decisions, graph);
+        return new Read(decisions, graph, null);
     }
 
     private static Optional<Decision> decision(TableSource source, DecisionTable table, boolean logReports, List<String> problems) {

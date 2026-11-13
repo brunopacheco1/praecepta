@@ -260,6 +260,43 @@ class PraeceptaPluginFunctionalTest {
         Assertions.assertThat(success.getOutput()).contains("Tier: ERROR rules [0, 1] both match some inputs (UNIQUE)");
     }
 
+    /**
+     * A DMN file whose model uses what a later release plans compiles its decision table alone, as in 0.6, and the
+     * build says so at lifecycle level, shown without {@code --info}, once per file however many tables read it.
+     */
+    @Test
+    void a_table_compiled_alone_for_what_a_later_release_plans_is_logged_once_per_file() throws IOException {
+        var project = project("later", javaProject() + """
+                praecepta {
+                    packageName = 'com.acme.rules'
+                    tables {
+                        register('tier') { source = file('src/main/rules/later.dmn') }
+                        register('other') {
+                            source = file('src/main/rules/later.dmn')
+                            className = 'OtherTier'
+                        }
+                    }
+                }
+                """);
+        write(project.resolve("src/main/rules/later.dmn"), """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
+                  <businessKnowledgeModel id="bkm" name="Rate"/>
+                  <decision id="tier" name="Tier"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>
+                    <output name="tier" typeRef="string"/>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"any"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+
+        var result = gradle(project, "generatePraecepta").build();
+
+        Assertions.assertThat(project.resolve("build/generated/sources/praecepta/java/main/com/acme/rules/OtherTier.java")).exists();
+        Assertions.assertThat(result.getOutput().lines().filter(line -> line.contains("compiled alone"))).singleElement().asString()
+                .endsWith("later.dmn: its decision table is compiled alone, without its decision requirements graph, which needs "
+                        + "Praecepta 0.10 (#118): DMN model has the business knowledge model 'Rate', which Praecepta does not "
+                        + "support yet: business knowledge models and their invocations are planned for 0.10 (#118)");
+    }
+
     @Test
     void the_skip_property_writes_nothing() throws IOException {
         var project = project("skip", javaProject() + FEES);

@@ -109,7 +109,14 @@ public class GenerateMojo extends AbstractMojo {
         if (tables.isEmpty()) {
             throw new MojoFailureException("Configure at least one <table>");
         }
-        var options = new CompilerOptions(packageName, severity(failOn), fileHeader, GENERATOR, CompilerOptions.XML_ELEMENTS);
+        // a DMN file compiled as its decision table alone, as its model uses what a later release plans: once per file
+        var logged = new HashSet<String>();
+        var options = new CompilerOptions(packageName, severity(failOn), fileHeader, GENERATOR, CompilerOptions.XML_ELEMENTS)
+                .withLog(line -> {
+                    if (logged.add(line)) {
+                        getLog().info(line);
+                    }
+                });
         var classNames = new HashSet<String>();
         try {
             for (var table : tables) {

@@ -93,7 +93,7 @@ public final class TableCompiler {
         }
         checkDmnDefinition(definition, options);
         try {
-            return GraphCompiler.model(Files.readAllBytes(file), definition.decision());
+            return GraphCompiler.model(Files.readAllBytes(file), definition.decision(), file.toString(), options);
         } catch (IOException e) {
             throw new IllegalArgumentException("Cannot read table source " + file + ": " + e.getMessage(), e);
         }

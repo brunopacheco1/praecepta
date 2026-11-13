@@ -106,8 +106,16 @@ integrations find their tables at runtime, so their engines take maps instead:
   imports, FEEL beyond the expression subset), or that is not a well-formed decision model (two elements of one
   name, as `DmnWriter` writes a table with a column of its own name, a decision without logic), which a file of
   tables never had to be. Its decision tables load alone, as in 0.6, and nothing else of it is evaluated; a file
-  with no decision table fails, naming the feature and its issue. The build plugins compile such a file's table
-  the same way.
+  with no decision table fails, naming the feature and its issue. A file whose tables load alone because it uses
+  what a later release plans is logged, one line at INFO per file through the framework's logging (the same
+  `DecisionsLoader.Log` that reports what was loaded; `Decisions.load` on its own logs it through its
+  `System.Logger`, `io.github.brunopacheco1.praecepta.integration.Decisions`, unless told not to log), naming the
+  file, what it uses and the release and issue that plan it, so that the graph left out is seen:
+  `rules/fees.dmn: its decision tables are loaded alone, without its decision requirements graph, which needs
+  Praecepta 0.10 (#118): DMN model has the business knowledge model 'Rate', ...`. The build plugins compile such a
+  file's table the same way, and log it likewise at info level (Maven's info, Gradle's lifecycle, the Quarkus build
+  step's INFO), once per file, through the compiler's `CompilerOptions.log`: `.../fees.dmn: its decision table is
+  compiled alone, ...`.
 - **Generated classes are not beans.** They are static and need no container; declare one as a bean
   yourself if you want it injected. The DMN resources the build plugins write are ordinary DMN files, so a
   location pattern that covers their package (`classpath*:com/acme/pricing/*.dmn`) gives them map-based

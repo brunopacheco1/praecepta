@@ -615,7 +615,10 @@ DecisionGraph graph = CreditModel.graph();     // the whole graph, e.g. to evalu
   decision that is always null); below it they are logged, and a decision that cannot be evaluated gets no
   classes. A file with business knowledge models, boxed expressions, decision
   services, imports or FEEL beyond the expression subset is no graph Praecepta evaluates yet: its decision table
-  compiles alone, as before, and without one the build fails, naming the release that plans what it uses.
+  compiles alone, as before, and the build logs one line at info level per such file, naming it, what it uses and
+  the release that plans it (`.../fees.dmn: its decision table is compiled alone, without its decision requirements
+  graph, which needs Praecepta 0.10 (#118): ...`); without one the build fails, naming the release that plans what
+  it uses.
 
 ## Praecepta Gradle Plugin
 Does for Gradle what the Maven plugin does, with the same settings and the same generated files.
@@ -762,8 +765,10 @@ build plugins, or are logged as `Decision model Credit: ERROR ...`; the endpoint
 and issues, and gives each of its decisions its `model`, `logic`, `type`, `requiredDecisions`, `inputData` and
 `canEvaluate`. Files without such decisions load exactly as before, and so does a file with what later releases
 bring (business knowledge models, boxed expressions, decision services, imports, FEEL beyond the expression
-subset): its decision tables load alone, as in 0.6, and nothing else of it; without one, it fails, naming the
-release that plans what it uses.
+subset): its decision tables load alone, as in 0.6, and nothing else of it, and the startup logs one line at INFO
+per such file, naming it, what it uses and the release that plans it (`rules/fees.dmn: its decision tables are
+loaded alone, without its decision requirements graph, which needs Praecepta 0.10 (#118): ...`); without one, it
+fails, naming the release that plans what it uses.
 
 ## Praecepta Micronaut
 For Micronaut 4 applications on Java 21+. At startup, the module:

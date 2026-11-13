@@ -34,12 +34,15 @@ final class GraphCompiler {
     /**
      * The model to compile as a graph, or null to compile the source as a table: one whose decisions do not need a
      * graph, or that Praecepta does not evaluate as a graph (it uses what a later release plans, or is not a
-     * well-formed decision model, as a DMN file of tables never had to be) but whose table reads alone, as before.
+     * well-formed decision model, as a DMN file of tables never had to be) but whose table reads alone, as before. A
+     * table compiled alone because the model uses what a later release plans is logged ({@link CompilerOptions#log()},
+     * {@link #fallbackMessage}).
      *
+     * @param source the source's path, as the line logged names it
      * @throws InvalidDecisionTableException if the model uses what a later release plans, naming it, and its table
      *                                       cannot be read alone either
      */
-    static DecisionModel model(byte[] dmn, String decision) {
+    static DecisionModel model(byte[] dmn, String decision, String source, CompilerOptions options) {
         DecisionModel model;
         try {
             model = DmnReader.readModel(new ByteArrayInputStream(dmn));
@@ -47,6 +50,7 @@ final class GraphCompiler {
             if (!readsAlone(dmn, decision)) {
                 throw e;
             }
+            options.log().accept(fallbackMessage(source, e));
             return null;
         } catch (InvalidDecisionTableException e) {
             return null;
@@ -55,6 +59,17 @@ final class GraphCompiler {
             return model.needsGraph() ? model : null;
         }
         return model.decision(decision).filter(DecisionModel.Decision::needsGraph).isPresent() ? model : null;
+    }
+
+    /**
+     * The line logged of a DMN source whose decision table is compiled alone because {@code DmnReader.readModel}
+     * rejects its model with what a later release plans: {@code src/main/rules/fees.dmn: its decision table is
+     * compiled alone, without its decision requirements graph, which needs Praecepta 0.10 (#118): DMN model has the
+     * business knowledge model 'Rate', ...}.
+     */
+    static String fallbackMessage(String source, UnsupportedFeatureException rejected) {
+        return "%s: its decision table is compiled alone, without its decision requirements graph, which needs Praecepta %s (#%d): %s"
+                .formatted(source, rejected.release(), rejected.issue(), rejected.getMessage());
     }
 
     /** Whether the source has the decision table to compile, as {@code DmnReader.read} reads it alone. */

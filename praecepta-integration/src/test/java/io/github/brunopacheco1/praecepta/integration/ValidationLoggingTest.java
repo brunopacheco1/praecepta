@@ -107,6 +107,51 @@ class ValidationLoggingTest {
                 .satisfies(logged -> Assertions.assertThat(logged.getParameters()).contains(decisions.get("Grade").report()));
     }
 
+    /**
+     * Loading on its own, a file whose decision tables load alone because its model uses what a later release plans is
+     * logged once at INFO by {@link Decisions}' own logger; without logging, it is not.
+     */
+    @Test
+    void loading_on_its_own_logs_each_file_whose_tables_load_alone() {
+        var later = TableSource.of("later.dmn", UNREACHABLE.replace("<decision ", "<businessKnowledgeModel id=\"bkm\" name=\"Rate\"/><decision ")
+                .replace("name=\"Grade\"", "name=\"Later Grade\"").getBytes(StandardCharsets.UTF_8));
+        var logger = Logger.getLogger(Decisions.class.getName());
+        var records = new ArrayList<LogRecord>();
+        var capture = new Handler() {
+            @Override
+            public void publish(LogRecord logRecord) {
+                records.add(logRecord);
+            }
+
+            @Override
+            public void flush() {
+                // nothing buffered
+            }
+
+            @Override
+            public void close() {
+                // nothing to release
+            }
+        };
+        var previous = logger.getLevel();
+        logger.setLevel(Level.ALL);
+        logger.addHandler(capture);
+        try {
+            Decisions.load(List.of(later, SOURCE), Severity.ERROR);
+            Assertions.assertThat(records).singleElement().satisfies(logged -> {
+                Assertions.assertThat(logged.getLevel()).isEqualTo(Level.INFO);
+                Assertions.assertThat(logged.getMessage()).startsWith("later.dmn: its decision tables are loaded alone, ")
+                        .contains("0.10 (#118)", "business knowledge model 'Rate'");
+            });
+            records.clear();
+            Decisions.load(List.of(later), Severity.ERROR, false);
+            Assertions.assertThat(records).isEmpty();
+        } finally {
+            logger.removeHandler(capture);
+            logger.setLevel(previous);
+        }
+    }
+
     @Test
     void loading_without_logging_keeps_the_same_reports() {
         var quiet = Decisions.load(List.of(SOURCE), Severity.ERROR, false);

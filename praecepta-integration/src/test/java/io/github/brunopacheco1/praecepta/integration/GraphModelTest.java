@@ -290,6 +290,29 @@ class GraphModelTest {
         Assertions.assertThat(decisions.models()).isEmpty();
         Assertions.assertThat(decisions.evaluate("Tier", Map.of("age", "3"))).containsExactly(Map.of("tier", "any"));
 
+        // the loader says so, one line at INFO per such file, naming it, the feature and the release that plans it
+        var infos = new ArrayList<String>();
+        var warnings = new ArrayList<String>();
+        var bkm = TableSource.of("rules/bkm.dmn", file.getBytes(StandardCharsets.UTF_8));
+        new DecisionsLoader("praecepta", null, "ERROR").declared(List.of(bkm, source("chain.dmn")), List.of())
+                .load(location -> List.of(), new DecisionsLoader.Log() {
+                    @Override
+                    public void info(String message) {
+                        infos.add(message);
+                    }
+
+                    @Override
+                    public void warn(String message) {
+                        warnings.add(message);
+                    }
+                });
+        Assertions.assertThat(infos).hasSize(2).first().asString().startsWith("Loaded 4 decision(s) from 2 DMN file(s): ");
+        Assertions.assertThat(infos.get(1))
+                .startsWith("rules/bkm.dmn: its decision tables are loaded alone, without its decision requirements graph, "
+                        + "which needs Praecepta 0.10 (#118): ")
+                .contains("business knowledge model 'Rate'");
+        Assertions.assertThat(warnings).isEmpty();
+
         var withoutTables = """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
                   <businessKnowledgeModel id="bkm" name="Rate"/>

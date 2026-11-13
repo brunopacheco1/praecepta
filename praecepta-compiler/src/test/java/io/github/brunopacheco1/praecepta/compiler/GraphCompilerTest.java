@@ -270,6 +270,43 @@ class GraphCompilerTest {
                 .hasMessageContaining("#118");
     }
 
+    /**
+     * A file whose model uses what a later release plans compiles its decision table alone, as in 0.6, and the compiler
+     * says so in one line for the build tool to log, naming the file, the feature and the release and issue that plan
+     * it; a file it compiles as before, or as a graph, logs nothing.
+     */
+    @Test
+    void a_table_compiled_alone_for_what_a_later_release_plans_is_logged_once() throws IOException {
+        var file = out.resolve("later.dmn");
+        Files.writeString(file, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
+                  <businessKnowledgeModel id="bkm" name="Rate"/>
+                  <decision id="tier" name="Tier"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>
+                    <output name="tier" typeRef="string"/>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"any"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""", StandardCharsets.UTF_8);
+        var lines = new ArrayList<String>();
+        var options = CompilerOptions.of(PACKAGE, "praecepta-maven-plugin").withLog(lines::add);
+
+        var result = TableCompiler.compile(TableDefinition.dmn(file), options);
+        Assertions.assertThat(result.table()).isNotNull();
+        Assertions.assertThat(result.className()).isEqualTo("Tier");
+        Assertions.assertThat(lines).singleElement().asString()
+                .startsWith(file + ": its decision table is compiled alone, without its decision requirements graph, "
+                        + "which needs Praecepta 0.10 (#118): ")
+                .contains("business knowledge model 'Rate'");
+
+        lines.clear();
+        TableCompiler.compile(TableDefinition.dmn(table("chain.dmn")), options);
+        TableCompiler.compile(new TableDefinition(table("chain.dmn"), null, "Risk Category", null, null, List.of(), List.of()), options);
+        Assertions.assertThat(lines).isEmpty();
+        // the options log nothing unless told where
+        Assertions.assertThat(TableCompiler.compile(TableDefinition.dmn(file), CompilerOptions.of(PACKAGE, "praecepta-maven-plugin")).className())
+                .isEqualTo("Tier");
+    }
+
     @Test
     void two_decisions_whose_classes_would_clash_are_rejected() throws IOException {
         var file = out.resolve("clash.dmn");

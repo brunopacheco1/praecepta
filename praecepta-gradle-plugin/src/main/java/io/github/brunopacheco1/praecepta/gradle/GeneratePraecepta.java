@@ -156,10 +156,17 @@ public abstract class GeneratePraecepta extends DefaultTask {
             throw new GradleException("Register at least one table: praecepta { tables { register(\"discount\") { ... } } }");
         }
         var packageName = getPackageName().get();
+        // a DMN file compiled as its decision table alone, as its model uses what a later release plans: once per file
+        var logged = new HashSet<String>();
         var options = CompilerOptions.of(packageName, GENERATOR)
                 .withFailOn(severity(getFailOn().get()))
                 .withFileHeader(getFileHeader().getOrNull())
-                .withSettingNames(SETTING_NAMES);
+                .withSettingNames(SETTING_NAMES)
+                .withLog(line -> {
+                    if (logged.add(line)) {
+                        getLogger().lifecycle(line);
+                    }
+                });
         var classNames = new HashSet<String>();
         for (var table : tables) {
             var compiled = compile(table, options);
