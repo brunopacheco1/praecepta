@@ -76,9 +76,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
  * <li>TIME columns also take times with a zone id ({@link ZonedTime}), which compare only with a time in the same
  * zone, by local time; any other comparison of them is one FEEL does not define, so unknown. Each zone id the
  * cells name has a line of local times, split by its boundaries; after those come a class for every other zone
- * id, then the missing class. A column whose inputs may have a zone id (map-based inputs) but whose cells name
- * none keeps that last class out of the analysis: such a time matches only the rules that accept any value, and
- * every table that names no zone id keeps the report it had. A time in a zone with one fixed offset
+ * id, then the missing class. A column whose inputs may have a zone id (map-based inputs, {@code zonedTimeInput}, a
+ * list's elements) has that class even if its cells name none: such a time then matches only the rules that accept
+ * any value, and the analyses visit it as they do every class (#114). A time in a zone with one fixed offset
  * ({@code Etc/UTC}) is no such time: it is the time at that offset (DMN 1.5, Table 72), in cells as in inputs
  * ({@link FeelTemporals#withFixedOffset}), so a column bound with {@code zonedTimeInput} also takes times with a zone
  * that has an offset.</li>
@@ -131,15 +131,8 @@ final class ColumnIndex {
     private final Map<ZoneId, Integer> zoneBases;
     /** The number of the first class of times with a zone id; the missing class's when there is none. */
     private final int zoneIdBase;
-    /** The class of times with a zone id that no cell names, or -1 if it is not a class (see {@link #hiddenZoneIdMask}). */
+    /** The class of times with a zone id that no cell names, or -1 if the column takes no time with a zone id. */
     private final int otherZoneIdClass;
-    /**
-     * A column whose inputs may have a zone id though its cells name none: the mask of such a time, which is no class;
-     * null for other columns.
-     */
-    private final long[] hiddenZoneIdMask;
-    /** With {@link #hiddenZoneIdMask}: whether the declared input values allow such a time. */
-    private final boolean hiddenZoneIdAllowed;
     /** Whether the column's input binding takes times with a zone id. */
     private final boolean takesZoneIds;
     /** Whether the column's getter gives times with a zone id only ({@code zonedTimeInput}): its examples are such times. */
@@ -213,15 +206,6 @@ final class ColumnIndex {
         nullMask = masks[nullClass];
         ordinalMasks = enumValues == null ? null : masksByOrdinal(enumValues);
         this.enumValues = enumValues == null ? null : enumValues.clone();
-        if (takesZoneIds && otherZoneIdClass < 0) {
-            var mask = new long[words];
-            markAcceptingRules(mask, cells.byBit(), new ValueClass.OtherZoneId());
-            hiddenZoneIdMask = Masks.compact(mask, cells.form());
-            hiddenZoneIdAllowed = allowedValues == null || accepts(allowedValues, new ValueClass.OtherZoneId());
-        } else {
-            hiddenZoneIdMask = null;
-            hiddenZoneIdAllowed = false;
-        }
     }
 
     /**
@@ -260,8 +244,6 @@ final class ColumnIndex {
         zoneBases = Map.of();
         zoneIdBase = nullClass;
         otherZoneIdClass = -1;
-        hiddenZoneIdMask = null;
-        hiddenZoneIdAllowed = false;
         takesZoneIds = false;
         bindsZoneIds = false;
         var all = new long[words];
@@ -356,11 +338,9 @@ final class ColumnIndex {
                     zoneBases.put(zone, classes.size());
                     orderedClasses(times.toArray(Comparable<?>[]::new), false).forEach(part -> classes.add(new ValueClass.InZone(zone, part)));
                 });
-                // without a zone id in the cells, such times are left out of the analysis, unless they are all the column takes
-                if (zoning == Zoning.ZONE_ID || !zoneLines.isEmpty()) {
-                    otherZoneIdClass = classes.size();
-                    classes.add(new ValueClass.OtherZoneId());
-                }
+                // also where the cells name no zone id: such a time then matches only the rules that accept any value (#114)
+                otherZoneIdClass = classes.size();
+                classes.add(new ValueClass.OtherZoneId());
             }
             classes.add(new ValueClass.Missing());
             var stringClasses = type == ColumnType.STRING ? boundaryClasses(localLine.boundaries) : null;
@@ -641,12 +621,6 @@ final class ColumnIndex {
 
     /** The mask of a converted value of an ordered column (null if missing), checked against the declared values. */
     private long[] maskOf(Object value) {
-        if (value instanceof ZonedTime && hiddenZoneIdMask != null) { // a column whose cells name no zone id
-            if (hasAllowedValues && !hiddenZoneIdAllowed) {
-                throw new InvalidInputException(name, value);
-            }
-            return hiddenZoneIdMask;
-        }
         int valueClass = classOf(value);
         if (hasAllowedValues && !allowed[valueClass]) {
             throw new InvalidInputException(name, value);
@@ -810,15 +784,6 @@ final class ColumnIndex {
      */
     boolean groupsOtherValues() {
         return lists != null ? lists.elements().groupsOtherValues() : otherMask != null;
-    }
-
-    /**
-     * The mask of a valid time with a zone id in a column whose inputs may have one though its cells name none, which
-     * is no class (the other analyses leave such times out, so that tables without zone ids keep their reports); null
-     * if the column has no such inputs, or its declared input values do not allow them. {@link Completeness} visits it.
-     */
-    long[] hiddenZoneIdMask() {
-        return hiddenZoneIdMask != null && (!hasAllowedValues || hiddenZoneIdAllowed) ? hiddenZoneIdMask : null;
     }
 
     /** Whether a valid input can fall in the class: it holds some value and the declared input values allow it. */

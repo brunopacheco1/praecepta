@@ -298,7 +298,8 @@ class ColumnIndexBehaviourTest {
                 9 (time("12:00:00+01:00")..+inf) at local time (-inf..time("12:00:00")) rules=[0, 1, 2, 3] example=11:30Z (OffsetTime)
                 10 (time("12:00:00+01:00")..+inf) at local time time("12:00:00") rules=[1, 2] example=12:00Z (OffsetTime)
                 11 (time("12:00:00+01:00")..+inf) at local time (time("12:00:00")..+inf) rules=[1, 2, 3] example=18:00Z (OffsetTime)
-                12 null missing rules=[3] example=-
+                12 any time with a zone id no cell names rules=[2] example=12:00:00@Africa/Abidjan (ZonedTime)
+                13 null missing rules=[3] example=-
                 """);
         // runs never cross from one kind to the other; all of a kind says which it is
         Assertions.assertThat(column.describe(List.of(1, 2, 3)))
@@ -348,10 +349,14 @@ class ColumnIndexBehaviourTest {
     }
 
     @Test
-    void a_map_input_with_a_zone_id_is_left_out_of_the_classes_when_no_cell_names_one() {
+    void a_map_input_with_a_zone_id_has_a_class_when_no_cell_names_one() {
         var column = columnTaking(ColumnType.TIME, Zoning.EITHER, null, "< time(\"12:00:00\")", "not(time(\"12:00:00\"))", "!= null",
                 "not(null)", "-");
-        Assertions.assertThat(dump(column)).doesNotContain("zone id");
+        // #114: the analyses visit it as any other class; only the cells that accept any value match it
+        Assertions.assertThat(dump(column)).contains("""
+                6 any time with a zone id no cell names rules=[2, 3, 4] example=12:00:00@Africa/Abidjan (ZonedTime)
+                7 null missing rules=[1, 4] example=-
+                """);
         // FEEL does not define how a time with a zone id compares with one without: < and not(...) are both unknown
         Assertions.assertThat(lookups(column, "11:00@Europe/Paris", "11:00")).isEqualTo("""
                 '11:00@Europe/Paris' (String) -> [2, 3, 4]
@@ -369,7 +374,8 @@ class ColumnIndexBehaviourTest {
                 3 (-inf..time("12:00:00")) with a time zone rules=[0, 1] example=11:00Z (OffsetTime)
                 4 time("12:00:00") with a time zone rules=[] example=12:00Z (OffsetTime)
                 5 (time("12:00:00")..+inf) with a time zone rules=[1] example=13:00Z (OffsetTime)
-                6 null missing rules=[1] example=-
+                6 any time with a zone id no cell names rules=[] example=12:00:00@Africa/Abidjan (ZonedTime)
+                7 null missing rules=[1] example=-
                 """);
         // the same local times of both kinds are described once
         Assertions.assertThat(column.describe(List.of(1, 2, 4, 5))).containsExactly("[time(\"12:00:00\")..+inf)");

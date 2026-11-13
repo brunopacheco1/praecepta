@@ -311,6 +311,19 @@ class EngineMatchesReferencePropertiesTest {
         }
     }
 
+    /**
+     * Among times and date-times of every kind: with map-based inputs, a time column takes times with a zone id whether
+     * its cells name one or not, and they are gaps unless a rule takes any value there (#114).
+     */
+    @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
+    void temporal_tables_gaps_are_reported_exactly_wherever_gap_analysis_applies(@ForAll("temporalScenarios") DecisionTableScenario s,
+            @ForAll boolean perColumn) {
+        var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of(), perColumn);
+        if (reference.gapAnalysisApplies(s.columns())) {
+            assertGapsMatchUncoveredInputs(s, reference, perColumn);
+        }
+    }
+
     private static void assertGapsMatchUncoveredInputs(DecisionTableScenario s, ReferenceMatcher reference, boolean perColumn) {
         var engine = engine(s, s.rules(), HitPolicy.COLLECT, List.of(), perColumn);
         var gaps = engine.validationReport().issues(Kind.GAP);

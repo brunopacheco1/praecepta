@@ -89,9 +89,10 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
      comparison of it is one DMN 1.5 leaves open, which Praecepta takes as FEEL's null (see
      [DMN conformance](DMN-CONFORMANCE.md)). Each zone id the cells name has a line of
      local times of its own, and one class holds the zone ids no cell names; every test of another kind is
-     unknown on them, and theirs on every other class. A column of map-based inputs whose cells name no zone
-     id keeps that class out of the analysis, and gives such a time the mask of the rules that accept any
-     value, so that tables without zone ids keep the report they had. A zone with one fixed offset
+     unknown on them, and theirs on every other class. A column whose inputs can be such times (map-based
+     inputs, `zonedTimeInput`, a list's elements) has that class even when its cells name no zone id: only
+     the rules that accept any value match it, and the analyses visit it as they do every class, so a rule
+     that only such a time reaches is not reported unreachable (#114). A zone with one fixed offset
      (`Etc/UTC`) is no such zone: DMN 1.5's example of `time(from)` (Table 72) has
      `time("00:01:00@Etc/UTC")` equal `time("00:01:00Z")`, so the engine reads a time in such a zone as the
      `OffsetTime` at that offset at its edges (`FeelTemporals.parseTime` for text, cells and output entries,
@@ -135,10 +136,8 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
    it is complete (`Completeness`): whether every input, a missing value in any column and a string no rule
    mentions included, matches a rule, so that the default can never be given (an ERROR,
    `UNREACHABLE_DEFAULT_OUTPUT`). It searches a list column as the minimal sets of rules every list it takes
-   can match (`ListAnalysis.everyOutcome`: missing lists and missing elements included), and it also visits
-   the time with a zone id that a column takes though no cell names one, which the other analyses leave out
-   (`ColumnIndex.hiddenZoneIdMask`). The analysis is exact, because it searches
-   the same column classes the index uses. A list column is searched as the sets of its element
+   can match (`ListAnalysis.everyOutcome`: missing lists and missing elements included). The analysis is
+   exact, because it searches the same column classes the index uses. A list column is searched as the sets of its element
    classes (`ListAnalysis`): rules `"PT"` and `"BR"` overlap on `["PT","BR"]`. Which rules a list
    matches depends only on which element classes it holds, and adding an element only adds positive
    rules and removes `not(...)` ones, so overlaps are decided pairwise and the last list column of a

@@ -193,9 +193,10 @@ class ZonedTimesTest {
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "11:00Z"))).containsExactly("morning");
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "11:00-08:00"))).as("19:00Z, but 11:00 on the clock").containsExactly("morning");
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "13:00+02:00"))).as("11:00Z, but 13:00 on the clock").isEmpty();
-        // the zone makes no difference to cells without one, so the gap is given once, by local time
+        // the zone makes no difference to cells without one, so the gap is given once, by local time; a time with a zone id
+        // compares with no cell (#114)
         Assertions.assertThat(engine.validationReport().issues(Kind.GAP)).extracting(ValidationReport.Issue::detail)
-                .containsExactly("cutOff in [time(\"12:00:00\")..+inf)");
+                .containsExactly("cutOff in {[time(\"12:00:00\")..+inf), any time with a zone id no cell names}");
     }
 
     @Test
@@ -213,7 +214,7 @@ class ZonedTimesTest {
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "13:00+02:00"))).containsExactly("morning");
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "11:00-08:00"))).isEmpty();
         Assertions.assertThat(engine.validationReport().issues(Kind.GAP)).extracting(ValidationReport.Issue::detail)
-                .containsExactly("cutOff in {[time(\"12:00:00\")..+inf), [time(\"12:00:00Z\")..+inf)}");
+                .containsExactly("cutOff in {[time(\"12:00:00\")..+inf), [time(\"12:00:00Z\")..+inf), any time with a zone id no cell names}");
     }
 
     @Test

@@ -93,7 +93,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
  *                       specified, DTI=FEEL(d)", before any hit policy or aggregation
  * @param zoneIdColumns  the time columns whose inputs have a zone id ({@code 10:30@Europe/Paris}), which compare by
  *                       local time with times in the same zone, and with no other (FEEL's null); with
- *                       {@code bothKinds}, the static analysis visits such times in every column whose cells name one
+ *                       {@code bothKinds}, the static analysis visits such times in every time column, whether its
+ *                       cells name one or not (#114)
  */
 public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
         Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
@@ -593,10 +594,10 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     public List<Object> representativeValues(String column, boolean withMissing) {
         if (lists.contains(column)) {
             var values = new ArrayList<Object>();
-            representativeLists(column, withMissing, false, values::add);
+            representativeLists(column, withMissing, values::add);
             return values;
         }
-        return representativeElements(column, withMissing, bothKinds, false);
+        return representativeElements(column, withMissing, bothKinds);
     }
 
     /**
@@ -613,16 +614,16 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * that rules out each {@code not(...)} cell that must not match (one per set of such elements at most),
      * for removing an element never makes a positive cell match or a {@code not(...)} cell fail.
      */
-    private void representativeLists(String column, boolean withMissing, boolean hidden, Consumer<Object> sink) {
+    private void representativeLists(String column, boolean withMissing, Consumer<Object> sink) {
         var exhaustive = EXHAUSTIVE_LISTS.get();
         if (exhaustive != null) {
             var allowed = allowedValues.containsKey(column) ? CellParser.parse(allowedValues.get(column), type(column)) : null;
-            var elements = representativeElements(column, withMissing, true, hidden).stream()
+            var elements = representativeElements(column, withMissing, true).stream()
                     .filter(element -> element == null || allowed == null || accepts(allowed, single(element), name -> null))
                     .toList();
             multisets(elements, 0, new ArrayList<>(), Math.min(exhaustive, elements.size()), sink);
         } else {
-            var pool = listPool(column, withMissing, hidden);
+            var pool = listPool(column, withMissing);
             subLists(pool.elements(), 0, new ArrayList<>(), pool.size(), sink);
         }
         if (withMissing) {
@@ -658,7 +659,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         if (!lists.contains(column)) {
             return BigInteger.valueOf(representativeValues(column, withMissing).size());
         }
-        var pool = listPool(column, withMissing, false);
+        var pool = listPool(column, withMissing);
         int n = pool.elements().size();
         var count = BigInteger.ZERO;
         var choose = BigInteger.ONE; // n choose k, from k = 0
@@ -673,11 +674,11 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     private record ListPool(List<Object> elements, int size) {
     }
 
-    private ListPool listPool(String column, boolean withMissing, boolean hidden) {
+    private ListPool listPool(String column, boolean withMissing) {
         var cells = rules.stream().map(rule -> parse(rule.input().values().get(column), column)).toList();
         var allowed = allowedValues.containsKey(column) ? CellParser.parse(allowedValues.get(column), type(column)) : null;
         var bySignature = new LinkedHashMap<List<Boolean>, Object>();
-        for (var element : representativeElements(column, withMissing, true, hidden)) {
+        for (var element : representativeElements(column, withMissing, true)) {
             if (element == null || allowed == null || accepts(allowed, single(element), name -> null)) {
                 bySignature.putIfAbsent(cells.stream().map(cell -> some(tests(cell), Collections.singletonList(single(element)))).toList(),
                         element);
@@ -707,11 +708,11 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     }
 
     /**
-     * The representative single values of a column, of both kinds of time if {@code eitherKind}; with {@code hidden},
-     * also a time with a zone id where map-based inputs take one though no cell names one, which the engine's analyses
-     * leave out but its completeness search visits.
+     * The representative single values of a column, of both kinds of time if {@code eitherKind}; a time column whose
+     * inputs may have a zone id (map-based inputs, a getter of such times, a list's elements) also takes one in a zone
+     * no cell names, which compares with no time a cell names (#114).
      */
-    private List<Object> representativeElements(String column, boolean withMissing, boolean eitherKind, boolean hidden) {
+    private List<Object> representativeElements(String column, boolean withMissing, boolean eitherKind) {
         var type = type(column);
         var cells = new ArrayList<UnaryTests>();
         rules.forEach(rule -> cells.add(parse(rule.input().values().get(column), column)));
@@ -738,12 +739,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                     // a getter of times with a zone id may give one in a zone with one fixed offset, the time at that offset
                     orderedRepresentatives(type, cells, true).forEach(time -> values.add(inFixedZone((OffsetTime) time)));
                 }
-                // read from text, or as a list's element, a time with a zone id counts only where a cell names one (the
-                // engine's analyses leave it out elsewhere, but its completeness search does not)
-                if (zoneIds || eitherKind && cells.stream().anyMatch(cell -> literals(cell).stream().anyMatch(ZonedTime.class::isInstance))) {
+                // read from text, or as a list's element, a time may have a zone id, whether a cell names one or not
+                if (zoneIds || eitherKind && type == ColumnType.TIME) {
                     values.addAll(zoneIdRepresentatives(cells));
-                } else if (hidden && eitherKind && type == ColumnType.TIME) {
-                    values.add(new ZonedTime(LocalTime.NOON, ZoneId.of("Pacific/Kiritimati")));
                 }
             }
             default -> values.addAll(orderedRepresentatives(type, cells, false));
@@ -764,19 +762,10 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * the cartesian product of their {@link #representativeValues representative values}.
      */
     public List<Map<String, Object>> representativeInputs(Map<String, Object> partial, List<String> columns, boolean withMissing) {
-        return representativeInputs(partial, columns, withMissing, false);
-    }
-
-    /**
-     * As {@link #representativeInputs(Map, List, boolean)}; with {@code hidden}, also the times with a zone id that the
-     * engine's analyses leave out (see {@link #representativeElements}).
-     */
-    private List<Map<String, Object>> representativeInputs(Map<String, Object> partial, List<String> columns, boolean withMissing,
-            boolean hidden) {
         List<Map<String, Object>> inputs = new ArrayList<>();
         inputs.add(new HashMap<>(partial));
         for (var column : columns) {
-            var options = distinctValues(column, withMissing, hidden);
+            var options = distinctValues(column, withMissing);
             var next = new ArrayList<Map<String, Object>>();
             for (var shorter : inputs) {
                 for (var option : options) {
@@ -797,8 +786,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * set are alike to every rule, and an input that combines them with the same values of the other columns
      * matches the same rules. This keeps the product of several list columns small.
      */
-    private List<Object> distinctValues(String column, boolean withMissing, boolean hidden) {
-        return new ArrayList<>(bySignature(column, withMissing, hidden).values());
+    private List<Object> distinctValues(String column, boolean withMissing) {
+        return new ArrayList<>(bySignature(column, withMissing).values());
     }
 
     /**
@@ -811,7 +800,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         all.set(0, rules.size());
         Set<BitSet> sets = new LinkedHashSet<>(List.of(all));
         for (var column : columns) {
-            var accepting = bySignature(column, true, false).keySet().stream().map(signature -> {
+            var accepting = bySignature(column, true).keySet().stream().map(signature -> {
                 var set = new BitSet();
                 for (int r = 0; r < signature.size(); r++) {
                     set.set(r, signature.get(r));
@@ -832,7 +821,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     }
 
     /** The {@link #distinctValues} of a column, each by the rules whose cell in the column accepts it. */
-    private Map<List<Boolean>, Object> bySignature(String column, boolean withMissing, boolean hidden) {
+    private Map<List<Boolean>, Object> bySignature(String column, boolean withMissing) {
         var bySignature = new LinkedHashMap<List<Boolean>, Object>();
         Consumer<Object> keep = option -> {
             var alone = new HashMap<String, Object>();
@@ -842,9 +831,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             }
         };
         if (lists.contains(column)) {
-            representativeLists(column, withMissing, hidden, keep); // many lists: kept one by one
+            representativeLists(column, withMissing, keep); // many lists: kept one by one
         } else {
-            representativeElements(column, withMissing, bothKinds, hidden).forEach(keep);
+            representativeElements(column, withMissing, bothKinds).forEach(keep);
         }
         return bySignature;
     }
@@ -863,9 +852,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return representativeInputs(Map.of(), columns, withMissing);
     }
 
-    /** Every input completeness asks about: missing values, and times with a zone id that no cell names, included. */
+    /** Every input completeness asks about: missing values included. */
     private List<Map<String, Object>> everyRepresentativeInput(List<String> columns) {
-        return representativeInputs(Map.of(), columns, true, true);
+        return representativeInputs(Map.of(), columns, true);
     }
 
     /**

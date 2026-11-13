@@ -66,13 +66,6 @@ final class ListAnalysis {
     private final long[][] rulesOut;
     /** The positive rules some element passes: the union of {@link #passes}. */
     private final long[] anyPasses;
-    /**
-     * For an element that is a time with a zone id the element index has no class for ({@link ColumnIndex#hiddenZoneIdMask}):
-     * the positive rules it passes and the negated rules it rules out; null if the column takes no such element. Only
-     * {@link #everyOutcome} counts it, as the other questions leave such times out, as for single values.
-     */
-    private final long[] hiddenPasses;
-    private final long[] hiddenRulesOut;
 
     ListAnalysis(ColumnIndex column, int words) {
         this.column = column;
@@ -101,19 +94,6 @@ final class ListAnalysis {
                 passes[i][w] = mask[w] & positiveRules[w];
                 rulesOut[i][w] = ~mask[w] & negatedRules[w];
                 anyPasses[w] |= passes[i][w];
-            }
-        }
-        var hidden = elements.hiddenZoneIdMask();
-        if (hidden == null) {
-            hiddenPasses = null;
-            hiddenRulesOut = null;
-        } else {
-            var mask = Masks.dense(hidden, words);
-            hiddenPasses = new long[words];
-            hiddenRulesOut = new long[words];
-            for (int w = 0; w < words; w++) {
-                hiddenPasses[w] = mask[w] & positiveRules[w];
-                hiddenRulesOut[w] = ~mask[w] & negatedRules[w];
             }
         }
     }
@@ -322,20 +302,6 @@ final class ListAnalysis {
      * there are more than {@link #MAX_OUTCOMES}.
      */
     Optional<List<Outcome>> outcomes(long[] relevant, int required, boolean withMissing) {
-        return outcomes(relevant, required, withMissing, false);
-    }
-
-    /**
-     * Of every list the column takes, a missing one, ones holding missing elements and ones holding a time with a zone
-     * id that no cell names included, the sets of rules of {@code relevant} they match that are minimal under
-     * inclusion, for {@link Completeness}; empty, as they are not known, if there are more than {@link #MAX_OUTCOMES}.
-     * An empty set among them means some list matches none of the rules.
-     */
-    Optional<List<Outcome>> everyOutcome(long[] relevant) {
-        return outcomes(relevant, -1, true, true);
-    }
-
-    private Optional<List<Outcome>> outcomes(long[] relevant, int required, boolean withMissing, boolean withHidden) {
         var rules = relevant.clone();
         if (required >= 0) {
             BitsetIndex.set(rules, required);
@@ -355,10 +321,6 @@ final class ListAnalysis {
                 return Optional.empty();
             }
         }
-        // a time with a zone id no cell names, which has no class: its index is one past the classes'
-        if (withHidden && hiddenPasses != null && !addElement(outcomes, seenTypes, rules, hiddenPasses, hiddenRulesOut, classes.length, required)) {
-            return Optional.empty();
-        }
         if (required >= 0) {
             outcomes.removeIf(outcome -> !BitsetIndex.get(outcome.matches(), required));
         }
@@ -368,6 +330,16 @@ final class ListAnalysis {
             keepMinimal(outcomes, new Outcome(missing, List.of(), true), required);
         }
         return Optional.of(List.copyOf(outcomes));
+    }
+
+    /**
+     * Of every list the column takes, a missing one and ones holding missing elements included, the sets of rules of
+     * {@code relevant} they match that are minimal under inclusion, for {@link Completeness}; empty, as they are not
+     * known, if there are more than {@link #MAX_OUTCOMES}. An empty set among them means some list matches none of the
+     * rules.
+     */
+    Optional<List<Outcome>> everyOutcome(long[] relevant) {
+        return outcomes(relevant, -1, true);
     }
 
     /**

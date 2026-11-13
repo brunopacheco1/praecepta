@@ -247,11 +247,14 @@ their text is parsed. A time or date-time column then takes values with and with
 (`08:30`, `08:30Z`, `2025-01-31T08:30@Europe/Paris`), and its gaps are looked for among both, while
 a typed getter gives one kind only. To cells without a zone the zone makes no difference (`08:30Z`
 and `08:30+05:00` both count as `08:30`), so a table whose cells all lack one reports the same gaps
-either way, once; to cells with a zone, a value with a zone counts by its instant and one without
-by its local time, so gaps are reported for each kind (`cutOff in {[time("12:00:00")..+inf),
-[time("12:00:00Z")..+inf)}`). Declared input values are compared the same way. To keep a column to
-one kind, bind the inputs per column, with `timeInput` or `offsetTimeInput`, `dateTimeInput` or
-`zonedDateTimeInput`.
+among them either way, once; to cells with a zone, a value with a zone counts by its instant and one
+without by its local time, so gaps are reported for each kind (`cutOff in {[time("12:00:00")..+inf),
+[time("12:00:00Z")..+inf), any time with a zone id no cell names}`). A time column read from text also
+takes a time with a zone id (`08:30@Europe/Paris`), which no cell compares with unless it names that
+zone, so only the cells that accept any value (`-`, `!= null`) match it: unless one does, it is a gap
+too, and a rule that only such a time reaches is not reported as unreachable. Declared input values
+are compared the same way. To keep a column to one kind, bind the inputs per column, with `timeInput`
+or `offsetTimeInput`, `dateTimeInput` or `zonedDateTimeInput`.
 
 Notes:
 - `PRIORITY` and `OUTPUT_ORDER` need DMN output value lists:

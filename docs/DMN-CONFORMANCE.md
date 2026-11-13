@@ -116,7 +116,7 @@ integrations alike.
   really never be given: a table whose rules cover every declared value but not a missing one is not
   reported, since its default is what a missing input gives. For the same reason the search counts every
   list a list column takes (a missing list, the empty list and lists holding missing elements), and a time
-  with a zone id where map-based inputs or a list take one though no cell names one (case 9).
+  with a zone id wherever a time column takes one (case 9).
 
 ## 9. A time with a zone id against a time in another zone, at an offset or without a zone
 - **DMN 1.5.** 10.3.4.1 lets a time name a zone id (`time("10:30:00@Europe/Paris")`), which has no offset
@@ -147,9 +147,11 @@ integrations alike.
   neither a test nor its `not(...)` matches, an interval's ends must be in one zone, and a COLLECT MIN or MAX over
   such times in two zones is null (in the framework integrations' map-based engine; the generated classes
   aggregate numbers only), as FEEL's `min` and `max` take a list of comparable items (Table 75) and a built-in
-  function is null outside its domain (10.3.2.16). A column of map-based inputs whose cells name no such zone id
-  still takes such a time, which only the cells that accept any value match; the analyses of overlaps, unreachable
-  rules and gaps leave it out, the completeness search (case 8) does not.
+  function is null outside its domain (10.3.2.16). A column of map-based inputs (or a list's elements) whose cells
+  name no such zone id still takes such a time, which only the cells that accept any value match; since 0.7.0
+  ([#114](https://github.com/brunopacheco1/praecepta/issues/114)) the analyses of overlaps, unreachable rules and
+  gaps count it, as the completeness search (case 8) did, so a rule that only such a time reaches is not reported
+  unreachable, and a table whose rules all compare in that column has a gap there.
 
 ## 10. The difference of two times in different zones, or one with a zone and one without
 - **DMN 1.5.** Table 57 defines `e1 - e2` of two times as the difference of their values (10.3.2.3.4), which
