@@ -270,7 +270,8 @@ class CellParserTest {
 
     @Test
     void not_equal_negates_only_an_equality_or_null() {
-        Assertions.assertThatThrownBy(() -> new NotEqual(new Compare(Operator.LT, BigDecimal.ONE)))
+        var comparison = new Compare(Operator.LT, BigDecimal.ONE);
+        Assertions.assertThatThrownBy(() -> new NotEqual(comparison))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

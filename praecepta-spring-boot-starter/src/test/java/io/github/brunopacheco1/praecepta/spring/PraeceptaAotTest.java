@@ -77,8 +77,8 @@ class PraeceptaAotTest {
             Assertions.assertThat(shipping.carrier).isSameAs(decisions.engine("Carrier"));
             Assertions.assertThat(shipping.fee).isSameAs(decisions.engine("Fee"));
             var definition = (AbstractBeanDefinition) application.getBeanFactory().getBeanDefinition("praecepta.Discount");
-            Assertions.assertThat(DecisionsRegistrar.QUALIFIER_TYPES)
-                    .allSatisfy(type -> Assertions.assertThat(definition.getQualifier(type).getAttribute("value")).isEqualTo("Discount"));
+            var qualifiers = DecisionsRegistrar.QUALIFIER_TYPES.stream().map(type -> definition.getQualifier(type).getAttribute("value")).toList();
+            Assertions.assertThat(qualifiers).containsOnly("Discount");
             application.close();
         });
     }

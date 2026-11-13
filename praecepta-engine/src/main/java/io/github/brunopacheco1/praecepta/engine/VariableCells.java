@@ -16,6 +16,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Name;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NotEqual;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NullTest;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Operator;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Range;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
 
@@ -40,74 +41,69 @@ final class VariableCells {
     static boolean accepts(UnaryTests cell, Object value, Function<String, Object> inputs) {
         return switch (cell) {
             case UnaryTests.Any any -> true;
-            case UnaryTests.Positive(var tests) -> any(tests, value, inputs) == Boolean.TRUE;
-            case UnaryTests.Negated(var tests) -> any(tests, value, inputs) == Boolean.FALSE;
+            case UnaryTests.Positive(var tests) -> any(tests, value, inputs) == Truth.TRUE;
+            case UnaryTests.Negated(var tests) -> any(tests, value, inputs) == Truth.FALSE;
         };
     }
 
-    /** True if a test is true; else unknown (null) if one is unknown; else false. */
-    private static Boolean any(List<Test> tests, Object value, Function<String, Object> inputs) {
-        Boolean result = Boolean.FALSE;
+    /** True if a test is true; else unknown if one is unknown; else false. */
+    private static Truth any(List<Test> tests, Object value, Function<String, Object> inputs) {
+        var result = Truth.FALSE;
         for (var test : tests) {
             var outcome = test(test, value, inputs);
-            if (outcome == Boolean.TRUE) {
-                return Boolean.TRUE;
+            if (outcome == Truth.TRUE) {
+                return Truth.TRUE;
             }
-            if (outcome == null) {
-                result = null;
+            if (outcome == Truth.UNKNOWN) {
+                result = Truth.UNKNOWN;
             }
         }
         return result;
     }
 
-    private static Boolean test(Test test, Object value, Function<String, Object> inputs) {
+    private static Truth test(Test test, Object value, Function<String, Object> inputs) {
         return switch (test) {
-            case NullTest n -> value == null;
-            case UnaryTests.NullElement n -> value == null; // only list columns' cells hold it, and they name no input
-            case NotEqual(var negated) -> {
-                var equal = test(negated, value, inputs); // != is not(=), so unknown stays unknown
-                yield equal == null ? null : !equal;
-            }
-            case Equals(var literal, var explicit) -> {
-                var other = resolve(literal, inputs);
-                if (other instanceof List<?> list) {
-                    yield in(value, list);
-                }
-                if (value == null || other == null) {
-                    yield value == other;
-                }
-                yield FeelTemporals.comparable(value, other) ? FeelTemporals.compare(value, other) == 0 : null;
-            }
-            case Compare(var operator, var literal) -> {
-                var other = resolve(literal, inputs);
-                if (value == null || other == null || !FeelTemporals.comparable(value, other)) {
-                    yield null;
-                }
-                int cmp = FeelTemporals.compare(value, other);
-                yield switch (operator) {
-                    case LT -> cmp < 0;
-                    case LE -> cmp <= 0;
-                    case GT -> cmp > 0;
-                    case GE -> cmp >= 0;
-                };
-            }
+            case NullTest n -> Truth.of(value == null);
+            case UnaryTests.NullElement n -> Truth.of(value == null); // only list columns' cells hold it, and they name no input
+            case NotEqual(var negated) -> test(negated, value, inputs).not(); // != is not(=), so unknown stays unknown
+            case Equals(var literal, var explicit) -> equal(value, resolve(literal, inputs));
+            case Compare(var operator, var literal) -> compare(value, operator, resolve(literal, inputs));
             case Range(var low, var lowClosed, var high, var highClosed) -> {
                 var from = resolve(low, inputs);
                 var to = resolve(high, inputs);
                 if (value == null || from == null || to == null) {
-                    yield null;
+                    yield Truth.UNKNOWN;
                 }
                 // e1 >= e2 and e1 <= e3 (Table 55), each unknown when FEEL does not define it (a time with a zone id)
-                var aboveLow = !FeelTemporals.comparable(value, from) ? null
-                        : Boolean.valueOf(lowClosed ? FeelTemporals.compare(value, from) >= 0 : FeelTemporals.compare(value, from) > 0);
-                var belowHigh = !FeelTemporals.comparable(value, to) ? null
-                        : Boolean.valueOf(highClosed ? FeelTemporals.compare(value, to) <= 0 : FeelTemporals.compare(value, to) < 0);
-                if (aboveLow == Boolean.FALSE || belowHigh == Boolean.FALSE) {
-                    yield Boolean.FALSE;
-                }
-                yield aboveLow == null || belowHigh == null ? null : Boolean.TRUE;
+                yield compare(value, lowClosed ? Operator.GE : Operator.GT, from)
+                        .and(compare(value, highClosed ? Operator.LE : Operator.LT, to));
             }
         };
+    }
+
+    /** {@code value = other}: a member of {@code other} if it is a list; true if both are missing, false if one is. */
+    private static Truth equal(Object value, Object other) {
+        if (other instanceof List<?> list) {
+            return in(value, list);
+        }
+        if (value == null || other == null) {
+            return Truth.of(value == other);
+        }
+        return FeelTemporals.comparable(value, other) ? Truth.of(FeelTemporals.compare(value, other) == 0) : Truth.UNKNOWN;
+    }
+
+    /** {@code value operator other}: unknown if either is missing, or FEEL does not compare them. */
+    private static Truth compare(Object value, Operator operator, Object other) {
+        if (value == null || other == null || !FeelTemporals.comparable(value, other)) {
+            return Truth.UNKNOWN;
+        }
+        int cmp = FeelTemporals.compare(value, other);
+        return Truth.of(switch (operator) {
+            case LT -> cmp < 0;
+            case LE -> cmp <= 0;
+            case GT -> cmp > 0;
+            case GE -> cmp >= 0;
+        });
     }
 
     /**
@@ -116,19 +112,19 @@ final class VariableCells {
      * with it (a time in another zone), else false. A missing value equals only a missing element, and a missing
      * element only a missing value ({@code null = x} is false).
      */
-    private static Boolean in(Object value, List<?> list) {
+    private static Truth in(Object value, List<?> list) {
         if (value == null) {
-            return list.stream().anyMatch(Objects::isNull); // List.of(...) would throw on contains(null)
+            return Truth.of(list.stream().anyMatch(Objects::isNull)); // List.of(...) would throw on contains(null)
         }
-        Boolean in = Boolean.FALSE;
+        var in = Truth.FALSE;
         for (var element : list) {
             if (element == null) {
                 continue; // a missing element equals no value that is there
             }
             if (!FeelTemporals.comparable(value, element)) {
-                in = null; // an element FEEL cannot compare with the value: unknown, unless another equals it
+                in = Truth.UNKNOWN; // an element FEEL cannot compare with the value: unknown, unless another equals it
             } else if (FeelTemporals.compare(value, element) == 0) {
-                return Boolean.TRUE;
+                return Truth.TRUE;
             }
         }
         return in;

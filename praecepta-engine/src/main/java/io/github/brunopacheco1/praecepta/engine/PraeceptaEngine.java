@@ -195,21 +195,7 @@ public final class PraeceptaEngine<I, O> {
         computedByBit = new ComputedOutputs[ruleCount];
         ruleOutputByBit = new PraeceptaOutput[ruleCount];
         idByBit = new Integer[ruleCount];
-        boolean anyReads = false;
-        for (int bit = 0; bit < ruleCount; bit++) {
-            var rule = rules.get(bitToRule[bit]);
-            idByBit[bit] = rule.priority();
-            ruleOutputByBit[bit] = rule.output();
-            if (!rule.output().readsInputs()) {
-                var output = outputStrategy.transform(rule.output());
-                outputByBit[bit] = output;
-                singleByBit[bit] = List.of(output);
-            } else {
-                computedByBit[bit] = computedOutputs(rule, evaluationOrder, lists, types);
-                anyReads = true;
-            }
-        }
-        readsInputs = anyReads;
+        readsInputs = fillOutputsByBit(rules, bitToRule, evaluationOrder, lists, types);
         numericOutputs = numeric;
         // with outputs that read inputs, ANY compares the outputs of each evaluation instead
         sameOutputsByBit = hitPolicy == HitPolicy.ANY && !readsInputs
@@ -217,11 +203,7 @@ public final class PraeceptaEngine<I, O> {
                 : null;
         reduce = reducer(builder.aggregation, builder.outputStrategy);
         aggregatedOutput = reduce == null ? null : onlyOutput(builder.tableOutputTypes, rules);
-        missingAggregateByBit = new boolean[ruleCount];
-        for (int bit = 0; bit < ruleCount; bit++) {
-            missingAggregateByBit[bit] = aggregatedOutput != null && computedByBit[bit] == null
-                    && rules.get(bitToRule[bit]).output().values().get(aggregatedOutput) == null;
-        }
+        missingAggregateByBit = missingAggregates(rules, bitToRule, aggregatedOutput, computedByBit);
         count = builder.aggregation == AggregationOperator.COUNT ? builder.outputStrategy::count : null;
         if (count != null) {
             count.apply(1); // so that a strategy without count fails here, not when a rule first matches
@@ -231,8 +213,47 @@ public final class PraeceptaEngine<I, O> {
         variableCellsByBit = variableCellsByBit(variableCells, bitToRule, evaluationOrder);
         variableRules = variableRules(variableCellsByBit, words);
         hasVariableCells = !BitsetIndex.isEmpty(variableRules);
-        report = validate(index, rules, hitPolicy, variableRules, numericOutputs, builder.defaultOutput != null, builder.failOn,
+        report = enforce(analyse(index, rules, hitPolicy, variableRules, numericOutputs, builder.defaultOutput != null), builder.failOn,
                 builder.logValidationReport);
+    }
+
+    /**
+     * Fills in, by bit, each rule's id and output, and the output transformed once if it reads no input, or how to
+     * compute it if it does.
+     *
+     * @return whether some rule's output reads inputs
+     */
+    private boolean fillOutputsByBit(List<Praeceptum> rules, int[] bitToRule, List<String> evaluationOrder, Set<String> lists,
+            Map<String, ColumnType> types) {
+        boolean anyReads = false;
+        for (int bit = 0; bit < rules.size(); bit++) {
+            var rule = rules.get(bitToRule[bit]);
+            idByBit[bit] = rule.priority();
+            ruleOutputByBit[bit] = rule.output();
+            if (rule.output().readsInputs()) {
+                computedByBit[bit] = computedOutputs(rule, evaluationOrder, lists, types);
+                anyReads = true;
+            } else {
+                var output = outputStrategy.transform(rule.output());
+                outputByBit[bit] = output;
+                singleByBit[bit] = List.of(output);
+            }
+        }
+        return anyReads;
+    }
+
+    /**
+     * By bit, for a SUM, MIN or MAX of the {@code aggregatedOutput} (null for none), whether a rule whose output reads no
+     * input leaves that output missing.
+     */
+    private static boolean[] missingAggregates(List<Praeceptum> rules, int[] bitToRule, String aggregatedOutput,
+            ComputedOutputs[] computedByBit) {
+        var missing = new boolean[rules.size()];
+        for (int bit = 0; bit < rules.size(); bit++) {
+            missing[bit] = aggregatedOutput != null && computedByBit[bit] == null
+                    && rules.get(bitToRule[bit]).output().values().get(aggregatedOutput) == null;
+        }
+        return missing;
     }
 
     /** Starts configuring an engine. */
@@ -1005,12 +1026,9 @@ public final class PraeceptaEngine<I, O> {
 
     // ---- validation ----------------------------------------------------------------------------
 
-    /**
-     * Runs the static analysis, most severe findings first. Fails if a finding is at least as severe
-     * as {@code failOn}; otherwise logs the findings as a warning, unless {@code log} is false.
-     */
-    private static ValidationReport validate(BitsetIndex index, List<Praeceptum> rules, HitPolicy hitPolicy, long[] variableRules,
-            Set<String> numericOutputs, boolean hasDefaultOutput, Severity failOn, boolean log) {
+    /** Runs the static analysis: its findings, most severe first. */
+    private static ValidationReport analyse(BitsetIndex index, List<Praeceptum> rules, HitPolicy hitPolicy, long[] variableRules,
+            Set<String> numericOutputs, boolean hasDefaultOutput) {
         var analysed = new ArrayList<>(
                 TableAnalysis.analyse(index, rules, hitPolicy, variableRules, output -> comparable(output, numericOutputs)));
         if (hasDefaultOutput) {
@@ -1021,9 +1039,16 @@ public final class PraeceptaEngine<I, O> {
                 analysed.add(new Issue(ValidationReport.Kind.UNREACHABLE_DEFAULT_OUTPUT, List.of()));
             }
         }
-        var report = new ValidationReport(analysed.stream()
+        return new ValidationReport(analysed.stream()
                 .sorted(Comparator.comparing(Issue::severity).reversed())
                 .toList());
+    }
+
+    /**
+     * Fails if a finding of the report is at least as severe as {@code failOn}; otherwise logs the findings as a
+     * warning, unless {@code log} is false.
+     */
+    private static ValidationReport enforce(ValidationReport report, Severity failOn, boolean log) {
         if (failOn != null && report.hasIssuesAtLeast(failOn)) {
             throw new InvalidDecisionTableException(report);
         }

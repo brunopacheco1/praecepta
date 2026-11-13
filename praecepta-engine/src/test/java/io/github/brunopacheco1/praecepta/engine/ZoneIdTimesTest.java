@@ -123,9 +123,9 @@ class ZoneIdTimesTest {
                 .rules(List.of(rule(1, "-")))
                 .build();
         Assertions.assertThat(engine.evaluate(input("09:00@Europe/Paris"))).containsExactly("1");
-        Assertions.assertThatThrownBy(() -> engine.evaluate(input("19:00@Europe/Paris"))).isInstanceOf(InvalidInputException.class);
-        Assertions.assertThatThrownBy(() -> engine.evaluate(input("09:00@Asia/Dhaka"))).isInstanceOf(InvalidInputException.class);
-        Assertions.assertThatThrownBy(() -> engine.evaluate(input("09:00"))).isInstanceOf(InvalidInputException.class);
+        for (var outside : List.of(input("19:00@Europe/Paris"), input("09:00@Asia/Dhaka"), input("09:00"))) {
+            Assertions.assertThatThrownBy(() -> engine.evaluate(outside)).isInstanceOf(InvalidInputException.class);
+        }
     }
 
     @Test

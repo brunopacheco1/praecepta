@@ -138,8 +138,10 @@ jobs:
           base="https://repo1.maven.org/maven2/io/github/brunopacheco1/praecepta-gradle-plugin/${VERSION}"
           mkdir -p praecepta-gradle-plugin/target
           fetch() {
+            local file="$1"
+            local url="$2"
             curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL --retry 10 --retry-all-errors \
-              --retry-delay 30 -o "$1" "$2"
+              --retry-delay 30 -o "${file}" "${url}"
           }
           for suffix in .jar -sources.jar -javadoc.jar; do
             fetch "praecepta-gradle-plugin/target/praecepta-gradle-plugin-${VERSION}${suffix}" \

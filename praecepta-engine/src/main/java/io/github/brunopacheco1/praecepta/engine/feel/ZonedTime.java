@@ -69,7 +69,7 @@ public record ZonedTime(LocalTime time, ZoneId zone) implements Comparable<Zoned
     @Override
     public int compareTo(ZonedTime other) {
         int byZone = zone.getId().compareTo(other.zone.getId());
-        return byZone != 0 ? byZone : time.compareTo(other.time);
+        return byZone == 0 ? time.compareTo(other.time) : byZone;
     }
 
     /** The time as FEEL writes it: {@code 10:30:00@Europe/Paris}. */

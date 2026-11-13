@@ -149,21 +149,11 @@ final class TableAnalysis {
             if (BitsetIndex.get(variableRules, bit)) {
                 continue;
             }
-            var overlapping = overlapping(bit);
-            BitsetIndex.andNot(overlapping, variableRules);
-            var seconds = new ArrayList<Integer>();
-            for (int other = BitsetIndex.next(overlapping, 0); other >= 0; other = BitsetIndex.next(overlapping, other + 1)) {
-                if (index.ruleAt(other) > first) { // each pair once, from its first rule
-                    seconds.add(index.ruleAt(other));
-                }
-            }
-            seconds.sort(null);
-            for (int second : seconds) {
+            for (int second : laterOverlappingRules(first, bit)) {
                 if (issues.size() == MAX_OVERLAPS) {
                     break;
                 }
-                if (!onlyConflictingOutputs || !Objects.equals(comparableOutput.apply(rules.get(first).output()),
-                        comparableOutput.apply(rules.get(second).output()))) {
+                if (!onlyConflictingOutputs || outputsDiffer(first, second)) {
                     issues.add(new Issue(kind, List.of(rules.get(first).priority(), rules.get(second).priority())));
                 }
             }
@@ -171,24 +161,34 @@ final class TableAnalysis {
         return issues;
     }
 
+    /**
+     * The rules after {@code first}, whose bit is {@code bit}, that overlap it, in rule order, so that each pair is
+     * found once, from its first rule; rules with variable cells are left out.
+     */
+    private List<Integer> laterOverlappingRules(int first, int bit) {
+        var overlapping = overlapping(bit);
+        BitsetIndex.andNot(overlapping, variableRules);
+        var seconds = new ArrayList<Integer>();
+        for (int other = BitsetIndex.next(overlapping, 0); other >= 0; other = BitsetIndex.next(overlapping, other + 1)) {
+            if (index.ruleAt(other) > first) {
+                seconds.add(index.ruleAt(other));
+            }
+        }
+        seconds.sort(null);
+        return seconds;
+    }
+
+    /** Whether two rules give outputs that differ, as {@code comparableOutput} compares them. */
+    private boolean outputsDiffer(int first, int second) {
+        return !Objects.equals(comparableOutput.apply(rules.get(first).output()), comparableOutput.apply(rules.get(second).output()));
+    }
+
     // ---- unreachable rules ----------------------------------------------------------------------
 
     private List<Issue> unreachable() {
         var unreachable = new ArrayList<Integer>();
         for (int bit = 0; bit < index.ruleCount(); bit++) {
-            var candidates = overlapping(bit);
-            if (!BitsetIndex.get(candidates, bit)) {
-                unreachable.add(index.ruleAt(bit)); // matches no valid input at all
-                continue;
-            }
-            // only rules with a lower bit win over this one, and only rules matching what the index sees
-            BitsetIndex.and(candidates, BitsetIndex.below(index.words(), bit));
-            BitsetIndex.andNot(candidates, variableRules);
-            if (BitsetIndex.isEmpty(candidates)) {
-                continue;
-            }
-            var search = new CoverSearch(bit, candidates);
-            if (search.decidable && search.covered(0, candidates)) {
+            if (isUnreachable(bit)) {
                 unreachable.add(index.ruleAt(bit));
             }
         }
@@ -196,6 +196,25 @@ final class TableAnalysis {
                 .sorted()
                 .map(rule -> new Issue(Kind.UNREACHABLE_RULE, List.of(rules.get(rule).priority())))
                 .toList();
+    }
+
+    /**
+     * Whether the rule owning {@code bit} matches no valid input at all, or only inputs that rules with a lower bit
+     * match too; not if a column holding lists makes that too costly to decide.
+     */
+    private boolean isUnreachable(int bit) {
+        var candidates = overlapping(bit);
+        if (!BitsetIndex.get(candidates, bit)) {
+            return true; // matches no valid input at all
+        }
+        // only rules with a lower bit win over this one, and only rules matching what the index sees
+        BitsetIndex.and(candidates, BitsetIndex.below(index.words(), bit));
+        BitsetIndex.andNot(candidates, variableRules);
+        if (BitsetIndex.isEmpty(candidates)) {
+            return false;
+        }
+        var search = new CoverSearch(bit, candidates);
+        return search.decidable && search.covered(0, candidates);
     }
 
     /**
@@ -238,30 +257,42 @@ final class TableAnalysis {
             coversRest[columns] = index.allRules();
             lastLists = columns == 0 ? null : lists(columns - 1);
             for (int c = columns - 1; c >= 0; c--) {
-                var col = column(c);
-                var masks = new ArrayList<long[]>();
                 var rest = coversRest[c + 1].clone();
+                List<long[]> masks;
                 if (c == columns - 1 && lastLists != null) {
+                    masks = List.of();
                     Masks.and(rest, lastLists.covering(candidates, bit));
-                } else if (lists(c) != null) {
-                    var outcomes = lists(c).outcomes(candidates, bit, true);
-                    if (outcomes == null) {
-                        decidable = false;
+                } else {
+                    masks = masksAcceptedIn(c, candidates);
+                    if (!decidable) {
                         return;
                     }
-                    outcomes.forEach(outcome -> masks.add(outcome.matches()));
                     masks.forEach(mask -> Masks.and(rest, mask));
-                } else {
-                    for (int k = 0; k < col.classCount(); k++) {
-                        if (col.canOccur(k) && col.accepts(k, bit)) {
-                            masks.add(col.masks[k]);
-                            Masks.and(rest, col.masks[k]);
-                        }
-                    }
                 }
                 acceptedMasks[c] = masks.toArray(long[][]::new);
                 coversRest[c] = rest;
             }
+        }
+
+        /**
+         * The masks of what this rule accepts in a column before the last list column: of each class, or, in a column
+         * that holds lists, of each minimal set of candidates its lists leave. None, and the search not
+         * {@code decidable}, if those sets are too many to search.
+         */
+        private List<long[]> masksAcceptedIn(int c, long[] candidates) {
+            if (lists(c) != null) {
+                var outcomes = lists(c).outcomes(candidates, bit, true);
+                decidable = outcomes.isPresent();
+                return outcomes.orElse(List.of()).stream().map(ListAnalysis.Outcome::matches).toList();
+            }
+            var col = column(c);
+            var masks = new ArrayList<long[]>();
+            for (int k = 0; k < col.classCount(); k++) {
+                if (col.canOccur(k) && col.accepts(k, bit)) {
+                    masks.add(col.masks[k]);
+                }
+            }
+            return masks;
         }
 
         /**
@@ -418,12 +449,7 @@ final class TableAnalysis {
         }
         var branches = branches(column, candidates);
         for (var branch : branches) {
-            var nextPath = path;
-            // a column that does not discriminate here is left out ("any value")
-            if (branch.lists ? branch.listStep != null : branches.size() > 1) {
-                nextPath = new ArrayList<>(path);
-                nextPath.add(branch.lists ? branch.listStep : new Step(column, branch.classes));
-            }
+            var nextPath = withStep(path, stepOf(branch, column, branches.size()));
             if (BitsetIndex.isEmpty(branch.candidates)) {
                 gaps.add(gapIssue(nextPath));
                 if (gaps.size() >= MAX_GAPS) {
@@ -435,6 +461,24 @@ final class TableAnalysis {
         }
     }
 
+    /** The step a branch adds to a gap's path; null if the column does not discriminate here ("any value"), so is left out. */
+    private static Step stepOf(Branch branch, int column, int branchCount) {
+        if (branch.lists) {
+            return branch.listStep;
+        }
+        return branchCount > 1 ? new Step(column, branch.classes) : null;
+    }
+
+    /** The path with a step added, or the path as it is if the step is null. */
+    private static List<Step> withStep(List<Step> path, Step step) {
+        if (step == null) {
+            return path;
+        }
+        var nextPath = new ArrayList<>(path);
+        nextPath.add(step);
+        return nextPath;
+    }
+
     /**
      * The last column the search fixes, which holds lists: a gap if some list of values escapes the candidates,
      * described as every such list.
@@ -442,20 +486,18 @@ final class TableAnalysis {
     private void lastListGap(int column, long[] candidates, List<Step> path, List<Issue> gaps) {
         var region = lists(column).escape(candidates, -1, false);
         if (region != null) {
-            var step = listStep(column, region);
-            var nextPath = path;
-            if (step != null) {
-                nextPath = new ArrayList<>(path);
-                nextPath.add(step);
-            }
-            gaps.add(gapIssue(nextPath));
+            gaps.add(gapIssue(withStep(path, listStep(column, region))));
         }
     }
 
     /** The lists of a region as a step of a gap's path; null if they are every list (the column is then left out). */
     private Step listStep(int column, ListAnalysis.Region region) {
         var detail = lists(column).describe(region);
-        return detail == null ? null : new Step(column, List.of(), detail, lists(column).example(region));
+        if (detail == null) {
+            return null;
+        }
+        // the missing list's example is a missing value
+        return new Step(column, List.of(), detail, region.missing() ? null : lists(column).example(region));
     }
 
     /**
@@ -464,12 +506,12 @@ final class TableAnalysis {
      */
     private Collection<Branch> listBranches(int column, long[] candidates) {
         var outcomes = lists(column).outcomes(candidates, -1, false);
-        if (outcomes == null) {
+        if (outcomes.isEmpty()) {
             undecidedGaps = true;
             return List.of();
         }
         var branches = new ArrayList<Branch>();
-        for (var outcome : outcomes) {
+        for (var outcome : outcomes.get()) {
             var branch = new Branch(outcome.matches());
             var left = candidates.clone();
             BitsetIndex.andNot(left, outcome.matches()); // the candidates these lists match none of

@@ -112,14 +112,7 @@ final class TimeZones {
             if (!isTemporal(column.type())) {
                 continue;
             }
-            var cells = new ArrayList<UnaryTests>();
-            for (var rule : table.rules()) {
-                cells.add(table.cell(rule, column)); // a list column's cells test its elements
-            }
-            if (column.allowedValues() != null) {
-                cells.add(CellParser.parse(column.allowedValues(), column.type()));
-            }
-            for (var cell : cells) {
+            for (var cell : cells(table, column)) {
                 UnaryTests.names(cell).forEach(name -> groups.join(column.name(), name));
                 literals(cell).forEach(value -> kinds.computeIfAbsent(column.name(), any -> EnumSet.noneOf(Kind.class)).add(kind(value)));
             }
@@ -139,6 +132,18 @@ final class TimeZones {
             }
         }
         return inputKinds;
+    }
+
+    /** A column's cells, rule by rule (a list column's test its elements), and its allowed values as one more, if it has them. */
+    private static List<UnaryTests> cells(DecisionTable table, DecisionTable.InputColumn column) {
+        var cells = new ArrayList<UnaryTests>();
+        for (var rule : table.rules()) {
+            cells.add(table.cell(rule, column));
+        }
+        if (column.allowedValues() != null) {
+            cells.add(CellParser.parse(column.allowedValues(), column.type()));
+        }
+        return cells;
     }
 
     private static Map<String, Kind> outputKinds(DecisionTable table, Map<String, Kind> inputKinds) {
@@ -188,15 +193,13 @@ final class TimeZones {
     private static void expressionKinds(OutputExpression expression, ColumnType type, Map<String, ColumnType> inputTypes,
             Map<String, Kind> inputKinds, Set<Kind> kinds) {
         switch (expression) {
-            case OutputExpression.Literal(var value) -> {
-                if (typeOf(value) == type) {
-                    kinds.add(kind(value));
-                }
+            case OutputExpression.Literal(var value) when typeOf(value) == type -> kinds.add(kind(value));
+            case OutputExpression.Name(var name) when inputTypes.get(name) == type -> kinds.add(inputKinds.getOrDefault(name, Kind.LOCAL));
+            case OutputExpression.Literal literal -> {
+                // of another type: not the output's value
             }
-            case OutputExpression.Name(var name) -> {
-                if (inputTypes.get(name) == type) {
-                    kinds.add(inputKinds.getOrDefault(name, Kind.LOCAL));
-                }
+            case OutputExpression.Name name -> {
+                // an input of another type: not the output's value
             }
             case OutputExpression.Negation(var operand) -> expressionKinds(operand, type, inputTypes, inputKinds, kinds);
             case OutputExpression.Arithmetic(var operator, var left, var right) -> {

@@ -46,8 +46,8 @@ class FeelTemporalsTest {
         Assertions.assertThatThrownBy(() -> FeelTemporals.parseTime("10:30:00@Mars/Olympus")).isInstanceOf(DateTimeParseException.class);
         Assertions.assertThatThrownBy(() -> FeelTemporals.parseTime("10:30:00@+01:00")).isInstanceOf(DateTimeParseException.class);
         Assertions.assertThatThrownBy(() -> new ZonedTime(LocalTime.NOON, ZoneOffset.UTC)).isInstanceOf(IllegalArgumentException.class);
-        Assertions.assertThat(new ZonedTime(LocalTime.NOON, ZoneId.of("Europe/Paris")).compareTo(new ZonedTime(LocalTime.MIDNIGHT,
-                ZoneId.of("Asia/Dhaka")))).isPositive(); // a total order for sorting: zone id first
+        Assertions.assertThat(new ZonedTime(LocalTime.NOON, ZoneId.of("Europe/Paris")))
+                .isGreaterThan(new ZonedTime(LocalTime.MIDNIGHT, ZoneId.of("Asia/Dhaka"))); // a total order for sorting: zone id first
     }
 
     @Test

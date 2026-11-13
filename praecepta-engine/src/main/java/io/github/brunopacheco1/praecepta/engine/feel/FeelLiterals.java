@@ -40,18 +40,23 @@ public final class FeelLiterals {
         return switch (value) {
             case null -> "null";
             case String text -> "\"" + FeelStrings.escaped(text) + "\"";
-            case LocalDate date -> "date(\"" + date + "\")";
-            case LocalTime time -> "time(\"" + text(time) + "\")";
-            case OffsetTime time -> "time(\"" + text(time) + "\")";
-            case ZonedTime time -> "time(\"" + time + "\")";
-            case LocalDateTime dateTime -> "date and time(\"" + text(dateTime) + "\")";
+            case LocalDate date -> invocation("date", date.toString());
+            case LocalTime time -> invocation("time", text(time));
+            case OffsetTime time -> invocation("time", text(time));
+            case ZonedTime time -> invocation("time", time.toString());
+            case LocalDateTime dateTime -> invocation("date and time", text(dateTime));
             // FEEL has no literal for the later of two equal local times in a zone: the offset keeps its instant
-            case ZonedDateTime dateTime -> "date and time(\"" + (isLaterAtOverlap(dateTime)
-                    ? DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(dateTime) : text(dateTime)) + "\")";
-            case Duration duration -> "duration(\"" + text(duration) + "\")";
-            case YearsAndMonths duration -> "duration(\"" + duration + "\")";
+            case ZonedDateTime dateTime -> invocation("date and time", isLaterAtOverlap(dateTime)
+                    ? DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(dateTime) : text(dateTime));
+            case Duration duration -> invocation("duration", text(duration));
+            case YearsAndMonths duration -> invocation("duration", duration.toString());
             default -> text(value); // numbers and booleans
         };
+    }
+
+    /** A date time literal: the function that reads its string, invoked on it, as in {@code date("2025-01-31")}. */
+    private static String invocation(String function, String text) {
+        return function + "(\"" + text + "\")";
     }
 
     /**

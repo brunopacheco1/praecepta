@@ -42,8 +42,9 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
  */
 final class TemporalLiterals {
 
+    private static final String DATE_AND_TIME = "date and time";
     /** The functions rule 60 permits, longest name first, so that {@code date and time} is not read as {@code date}. */
-    private static final List<String> FUNCTIONS = List.of("date and time", "duration", "date", "time");
+    private static final List<String> FUNCTIONS = List.of(DATE_AND_TIME, "duration", "date", "time");
     private static final Pattern DATE = Pattern.compile("-?\\d{4,}-\\d{2}-\\d{2}");
     private static final Pattern YEARS_AND_MONTHS = Pattern.compile("-?P(\\d+Y)?(\\d+M)?");
     private static final Pattern NUMBER = Pattern.compile("-?(\\d+(\\.\\d+)?|\\.\\d+)([eE][+-]?\\d+)?");
@@ -274,7 +275,7 @@ final class TemporalLiterals {
         return switch (name) {
             case "date" -> dateOf(arguments);
             case "time" -> timeOf(arguments);
-            case "date and time" -> dateTimeOf(arguments);
+            case DATE_AND_TIME -> dateTimeOf(arguments);
             default -> durationOf(arguments);
         };
     }
@@ -356,8 +357,8 @@ final class TemporalLiterals {
                     case OffsetTime time -> {
                         return ZonedDateTime.of(date, time.toLocalTime(), time.getOffset());
                     }
-                    case ZonedTime time -> {
-                        return ZonedDateTime.of(date, time.time(), time.zone());
+                    case ZonedTime(var time, var zone) -> {
+                        return ZonedDateTime.of(date, time, zone);
                     }
                     case null, default -> {
                         // not a time
@@ -365,7 +366,7 @@ final class TemporalLiterals {
                 }
             }
         }
-        throw takes("date and time", "a date time string, or a date (or date and time) and a time");
+        throw takes(DATE_AND_TIME, "a date time string, or a date (or date and time) and a time");
     }
 
     private Object durationOf(List<Object> arguments) {

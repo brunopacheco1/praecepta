@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -146,21 +147,30 @@ final class ListAnalysis {
                 }
             }
         } else {
-            boolean matches = false;
-            for (int i = 0; i < classes.length; i++) {
-                if (BitsetIndex.get(passes[i], bit)) {
-                    matches = true;
-                    var negated = negatedRules.clone(); // a list of that one element
-                    BitsetIndex.andNot(negated, rulesOut[i]);
-                    BitsetIndex.or(result, negated);
-                }
-            }
-            if (matches) { // one element for this rule, another for each other positive rule
-                BitsetIndex.or(result, anyRules);
-                BitsetIndex.or(result, anyPasses);
-            }
+            addPositiveOverlaps(result, bit);
         }
         return result;
+    }
+
+    /**
+     * Adds to {@code result} the rules that some list matches together with the positive rule owning {@code bit}: for
+     * each element it accepts, the negated rules that element does not rule out; if it accepts any, the rules taking
+     * any list and every other positive rule, through a list with one more element.
+     */
+    private void addPositiveOverlaps(long[] result, int bit) {
+        boolean matches = false;
+        for (int i = 0; i < classes.length; i++) {
+            if (BitsetIndex.get(passes[i], bit)) {
+                matches = true;
+                var negated = negatedRules.clone(); // a list of that one element
+                BitsetIndex.andNot(negated, rulesOut[i]);
+                BitsetIndex.or(result, negated);
+            }
+        }
+        if (matches) { // one element for this rule, another for each other positive rule
+            BitsetIndex.or(result, anyRules);
+            BitsetIndex.or(result, anyPasses);
+        }
     }
 
     // ---- escapes -----------------------------------------------------------------------------------
@@ -308,24 +318,24 @@ final class ListAnalysis {
     /**
      * Of the lists that the rule owning {@code required} matches (any list, if it is negative), the sets of rules
      * of {@code relevant} they match that are minimal under inclusion, each with one list that gives it; with
-     * {@code withMissing}, the missing list and lists holding missing elements too. Null if there are more than
-     * {@link #MAX_OUTCOMES}.
+     * {@code withMissing}, the missing list and lists holding missing elements too. Empty, as they are not known, if
+     * there are more than {@link #MAX_OUTCOMES}.
      */
-    List<Outcome> outcomes(long[] relevant, int required, boolean withMissing) {
+    Optional<List<Outcome>> outcomes(long[] relevant, int required, boolean withMissing) {
         return outcomes(relevant, required, withMissing, false);
     }
 
     /**
      * Of every list the column takes, a missing one, ones holding missing elements and ones holding a time with a zone
      * id that no cell names included, the sets of rules of {@code relevant} they match that are minimal under
-     * inclusion, for {@link Completeness}; null if there are more than {@link #MAX_OUTCOMES}. An empty set among them
-     * means some list matches none of the rules.
+     * inclusion, for {@link Completeness}; empty, as they are not known, if there are more than {@link #MAX_OUTCOMES}.
+     * An empty set among them means some list matches none of the rules.
      */
-    List<Outcome> everyOutcome(long[] relevant) {
+    Optional<List<Outcome>> everyOutcome(long[] relevant) {
         return outcomes(relevant, -1, true, true);
     }
 
-    private List<Outcome> outcomes(long[] relevant, int required, boolean withMissing, boolean withHidden) {
+    private Optional<List<Outcome>> outcomes(long[] relevant, int required, boolean withMissing, boolean withHidden) {
         var rules = relevant.clone();
         if (required >= 0) {
             BitsetIndex.set(rules, required);
@@ -342,12 +352,12 @@ final class ListAnalysis {
                 continue;
             }
             if (!addElement(outcomes, seenTypes, rules, passes[i], rulesOut[i], i, required)) {
-                return null;
+                return Optional.empty();
             }
         }
         // a time with a zone id no cell names, which has no class: its index is one past the classes'
         if (withHidden && hiddenPasses != null && !addElement(outcomes, seenTypes, rules, hiddenPasses, hiddenRulesOut, classes.length, required)) {
-            return null;
+            return Optional.empty();
         }
         if (required >= 0) {
             outcomes.removeIf(outcome -> !BitsetIndex.get(outcome.matches(), required));
@@ -357,7 +367,7 @@ final class ListAnalysis {
             BitsetIndex.and(missing, rules);
             keepMinimal(outcomes, new Outcome(missing, List.of(), true), required);
         }
-        return List.copyOf(outcomes);
+        return Optional.of(List.copyOf(outcomes));
     }
 
     /**
@@ -459,11 +469,8 @@ final class ListAnalysis {
         return parts.size() == 1 ? parts.getFirst() : parts.stream().collect(Collectors.joining(", ", "{", "}"));
     }
 
-    /** A list of the region, as a getter returns it: a value of each element class of its example; null for the missing list. */
+    /** A list of a region of lists (not the missing list), as a getter returns it: a value of each element class of its example. */
     List<Object> example(Region region) {
-        if (region.missing()) {
-            return null;
-        }
         var example = new ArrayList<Object>();
         region.example().forEach(i -> example.add(elements.representative(classes[i])));
         return example;

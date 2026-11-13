@@ -411,7 +411,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         var x = a instanceof LocalDate date ? date.atStartOfDay(ZoneOffset.UTC) : a;
         var y = b instanceof LocalDate date ? date.atStartOfDay(ZoneOffset.UTC) : b;
         return switch (x) {
-            case LocalDateTime from when y instanceof LocalDateTime to -> Duration.between(to, from);
+            // local date-times at one place, which subtract as they would at any one offset (10.3.2.3.5)
+            case LocalDateTime from when y instanceof LocalDateTime to -> Duration.between(to.toInstant(ZoneOffset.UTC),
+                    from.toInstant(ZoneOffset.UTC));
             case ZonedDateTime from when y instanceof ZonedDateTime to -> Duration.between(to.toInstant(), from.toInstant());
             case OffsetTime from when y instanceof OffsetTime to -> Duration.ofNanos(nanosAtUtc(from) - nanosAtUtc(to));
             case OffsetTime from when y instanceof LocalTime to -> Duration.ofNanos(from.toLocalTime().toNanoOfDay() - to.toNanoOfDay());
@@ -1159,19 +1161,6 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     /** Whether the engine's index cannot see what a rule matches: a cell compares with another input ({@code > dateE}). */
     private boolean isVariable(Praeceptum rule) {
         return rule.input().values().entrySet().stream().anyMatch(cell -> parse(cell.getValue(), cell.getKey()).namesInputs());
-    }
-
-    /** What the engine's index sees of a rule: its cells, with those naming inputs taken as "any value". */
-    private boolean staticallyAccepts(Praeceptum rule, Map<String, ?> input) {
-        for (var cell : rule.input().values().entrySet()) {
-            var parsed = parse(cell.getValue(), cell.getKey());
-            var value = value(input, cell.getKey());
-            boolean accepted = lists.contains(cell.getKey()) ? acceptsList(parsed, (List<?>) value) : accepts(parsed, value, name -> null);
-            if (!parsed.namesInputs() && !accepted) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /** @param inputs the value of each input a cell names */

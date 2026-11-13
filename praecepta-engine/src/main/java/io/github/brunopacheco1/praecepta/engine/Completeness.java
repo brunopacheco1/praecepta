@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -111,26 +112,10 @@ final class Completeness {
             return true;
         }
         var next = new LinkedHashMap<List<Long>, long[]>(); // classes leading to the same candidates are searched once
-        if (lists[column] != null) {
-            var outcomes = lists[column].everyOutcome(candidates);
-            if (outcomes == null) {
-                return false; // too many to search: not proven complete
-            }
-            for (var outcome : outcomes) {
-                if (BitsetIndex.isEmpty(outcome.matches())) {
-                    return false; // such lists match none of the rules
-                }
-                next.putIfAbsent(key(outcome.matches()), outcome.matches());
-            }
-        } else {
-            for (var mask : classMasks[column]) {
-                var left = candidates.clone();
-                BitsetIndex.and(left, mask);
-                if (BitsetIndex.isEmpty(left)) {
-                    return false; // inputs of this class match none of the rules
-                }
-                next.putIfAbsent(key(left), left);
-            }
+        boolean everyInputLeavesSome = lists[column] != null ? addListCandidates(column, candidates, next)
+                : addClassCandidates(column, candidates, next);
+        if (!everyInputLeavesSome) {
+            return false;
         }
         var fewestFirst = new ArrayList<>(next.values());
         fewestFirst.sort(Comparator.comparingInt(BitsetIndex::count));
@@ -140,6 +125,43 @@ final class Completeness {
             }
         }
         covered.add(state);
+        return true;
+    }
+
+    /**
+     * Adds to {@code next} the candidates each set of rules the column's lists can match leaves, by key.
+     *
+     * @return false if some lists match none of the candidates, or the sets are too many to search (not proven
+     *         complete)
+     */
+    private boolean addListCandidates(int column, long[] candidates, Map<List<Long>, long[]> next) {
+        var outcomes = lists[column].everyOutcome(candidates);
+        if (outcomes.isEmpty()) {
+            return false; // too many to search: not proven complete
+        }
+        for (var outcome : outcomes.get()) {
+            if (BitsetIndex.isEmpty(outcome.matches())) {
+                return false; // such lists match none of the rules
+            }
+            next.putIfAbsent(key(outcome.matches()), outcome.matches());
+        }
+        return true;
+    }
+
+    /**
+     * Adds to {@code next} the candidates each class of the column leaves, by key.
+     *
+     * @return false if the inputs of some class match none of the candidates
+     */
+    private boolean addClassCandidates(int column, long[] candidates, Map<List<Long>, long[]> next) {
+        for (var mask : classMasks[column]) {
+            var left = candidates.clone();
+            BitsetIndex.and(left, mask);
+            if (BitsetIndex.isEmpty(left)) {
+                return false; // inputs of this class match none of the rules
+            }
+            next.putIfAbsent(key(left), left);
+        }
         return true;
     }
 

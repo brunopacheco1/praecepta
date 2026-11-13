@@ -99,38 +99,52 @@ public final class FeelStrings {
         }
         var result = new StringBuilder(text.length());
         int i = 0;
-        boolean inString = false;
         while (i < text.length()) {
-            char c = text.charAt(i);
-            if (inString) {
-                result.append(c);
-                if (c == '\\' && i + 1 < text.length()) {
-                    result.append(text.charAt(++i));
-                } else if (c == '"') {
-                    inString = false;
-                }
-                i++;
-            } else if (text.startsWith("//", i)) {
-                int end = i;
-                while (end < text.length() && text.charAt(end) != '\n' && text.charAt(end) != '\r') {
-                    end++;
-                }
-                result.append(' ');
+            if (text.charAt(i) == '"') {
+                int end = afterString(text, i);
+                result.append(text, i, end);
                 i = end;
-            } else if (text.startsWith("/*", i)) {
-                int end = text.indexOf("*/", i + 2);
-                if (end < 0) {
-                    throw new IllegalArgumentException("a comment /* is not closed");
-                }
+            } else if (text.startsWith("//", i) || text.startsWith("/*", i)) {
                 result.append(' ');
-                i = end + 2;
+                i = afterComment(text, i);
             } else {
-                inString = c == '"';
-                result.append(c);
-                i++;
+                result.append(text.charAt(i++));
             }
         }
         return result.toString();
+    }
+
+    /**
+     * Where the string literal opened at {@code open} ends: after its closing quote, or at the end of the text if it
+     * has none. A backslash escapes the next character, so an escaped quote does not close it.
+     */
+    private static int afterString(String text, int open) {
+        int i = open + 1;
+        while (i < text.length() && text.charAt(i) != '"') {
+            i += text.charAt(i) == '\\' && i + 1 < text.length() ? 2 : 1;
+        }
+        return Math.min(i + 1, text.length());
+    }
+
+    /**
+     * Where the comment that starts at {@code start} ends: at the end of its line for {@code //}, after its
+     * {@code *&#47;} for {@code /*}.
+     *
+     * @throws IllegalArgumentException if a block comment is not closed
+     */
+    private static int afterComment(String text, int start) {
+        if (text.startsWith("//", start)) {
+            int end = start;
+            while (end < text.length() && text.charAt(end) != '\n' && text.charAt(end) != '\r') {
+                end++;
+            }
+            return end;
+        }
+        int end = text.indexOf("*/", start + 2);
+        if (end < 0) {
+            throw new IllegalArgumentException("a comment /* is not closed");
+        }
+        return end + 2;
     }
 
     /** Whether a character is vertical space (U+000A to U+000D, grammar rule 62), which a string literal may not hold. */

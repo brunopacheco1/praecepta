@@ -66,14 +66,17 @@ final class FeelArithmetic {
         return productType(operand, ColumnType.NUMBER);
     }
 
-    /** {@code left + right}'s type, with {@code left} the operand whose type the sum keeps; null if none. */
-    private static ColumnType sumType(ColumnType left, ColumnType right) {
-        if (left == right && (left == ColumnType.NUMBER || left == ColumnType.STRING || isDuration(left))) {
-            return left;
+    /**
+     * The type of a sum of {@code kept} and {@code added}, either way round, with {@code kept} the operand whose type
+     * the sum keeps; null if none.
+     */
+    private static ColumnType sumType(ColumnType kept, ColumnType added) {
+        if (kept == added && (kept == ColumnType.NUMBER || kept == ColumnType.STRING || isDuration(kept))) {
+            return kept;
         }
-        return switch (left) {
-            case DATE, DATE_TIME -> isDuration(right) ? left : null;
-            case TIME -> right == ColumnType.DAY_TIME_DURATION ? left : null;
+        return switch (kept) {
+            case DATE, DATE_TIME -> isDuration(added) ? kept : null;
+            case TIME -> added == ColumnType.DAY_TIME_DURATION ? kept : null;
             default -> null;
         };
     }
@@ -89,12 +92,15 @@ final class FeelArithmetic {
         return dates || left == ColumnType.TIME && right == ColumnType.TIME ? ColumnType.DAY_TIME_DURATION : null;
     }
 
-    /** {@code left * right}'s type, with {@code left} the operand whose type the product keeps; null if none. */
-    private static ColumnType productType(ColumnType left, ColumnType right) {
-        if (right != ColumnType.NUMBER) {
+    /**
+     * The type of a product of {@code kept} and {@code factor}, either way round, with {@code kept} the operand whose
+     * type the product keeps; null if none.
+     */
+    private static ColumnType productType(ColumnType kept, ColumnType factor) {
+        if (factor != ColumnType.NUMBER) {
             return null;
         }
-        return left == ColumnType.NUMBER || isDuration(left) ? left : null;
+        return kept == ColumnType.NUMBER || isDuration(kept) ? kept : null;
     }
 
     private static ColumnType quotientType(ColumnType left, ColumnType right) {
@@ -130,7 +136,7 @@ final class FeelArithmetic {
         return switch (a) {
             case BigDecimal number -> FeelNumbers.negate(number);
             case Duration duration -> duration.negated();
-            case YearsAndMonths duration -> new YearsAndMonths(Math.negateExact(duration.months()));
+            case YearsAndMonths(var months) -> new YearsAndMonths(Math.negateExact(months));
             default -> null;
         };
     }
@@ -140,7 +146,7 @@ final class FeelArithmetic {
             case String text -> text + b;
             case BigDecimal x -> FeelNumbers.add(x, (BigDecimal) b);
             case Duration x when b instanceof Duration y -> x.plus(y);
-            case YearsAndMonths x when b instanceof YearsAndMonths y -> new YearsAndMonths(Math.addExact(x.months(), y.months()));
+            case YearsAndMonths(var x) when b instanceof YearsAndMonths(var y) -> new YearsAndMonths(Math.addExact(x, y));
             case Duration duration -> shift(b, duration, 1);
             case YearsAndMonths duration -> shift(b, duration, 1);
             default -> shift(a, b, 1);
@@ -151,15 +157,15 @@ final class FeelArithmetic {
         return switch (a) {
             case BigDecimal x -> FeelNumbers.subtract(x, (BigDecimal) b);
             case Duration x -> x.minus((Duration) b);
-            case YearsAndMonths x -> new YearsAndMonths(Math.subtractExact(x.months(), ((YearsAndMonths) b).months()));
+            case YearsAndMonths(var x) -> new YearsAndMonths(Math.subtractExact(x, ((YearsAndMonths) b).months()));
             default -> b instanceof Duration || b instanceof YearsAndMonths ? shift(a, b, -1) : between(b, a);
         };
     }
 
     /** A date, date and time or time moved by a duration, forwards ({@code sign} 1) or backwards (-1). */
     private static Object shift(Object value, Object duration, int sign) {
-        if (duration instanceof YearsAndMonths months) {
-            long by = sign * months.months();
+        if (duration instanceof YearsAndMonths(var months)) {
+            long by = sign * months;
             return switch (value) {
                 case LocalDate date -> plusMonths(date, by);
                 case LocalDateTime dateTime -> plusMonths(dateTime.toLocalDate(), by).atTime(dateTime.toLocalTime());
@@ -176,7 +182,7 @@ final class FeelArithmetic {
             case ZonedDateTime dateTime -> dateTime.plus(by);
             case LocalTime time -> time.plus(by);
             case OffsetTime time -> time.plus(by);
-            case ZonedTime time -> FeelTemporals.timeIn(time.time().plus(by), time.zone());
+            case ZonedTime(var time, var zone) -> FeelTemporals.timeIn(time.plus(by), zone);
             default -> throw new IllegalStateException("not a date or time: " + value);
         };
     }
@@ -197,7 +203,10 @@ final class FeelArithmetic {
             return between(asDateTime(earlier), asDateTime(later));
         }
         return switch (later) {
-            case LocalDateTime b when earlier instanceof LocalDateTime a -> Duration.between(a, b);
+            // two without a zone are local times at one place, the same for both (10.3.2.3.5): they subtract as they
+            // would at any one offset, here UTC, with no daylight saving time between them
+            case LocalDateTime b when earlier instanceof LocalDateTime a -> Duration.between(a.toInstant(ZoneOffset.UTC),
+                    b.toInstant(ZoneOffset.UTC));
             case ZonedDateTime b when earlier instanceof ZonedDateTime a -> Duration.between(a.toInstant(), b.toInstant());
             case LocalDateTime b -> null; // one with a zone, one without: undefined (Table 57)
             case ZonedDateTime b -> null;
@@ -238,8 +247,8 @@ final class FeelArithmetic {
         return switch (a) {
             case BigDecimal x -> FeelNumbers.divide(x, (BigDecimal) b);
             case Duration x when b instanceof Duration y -> FeelNumbers.divide(seconds(x), seconds(y));
-            case YearsAndMonths x when b instanceof YearsAndMonths y -> FeelNumbers.divide(BigDecimal.valueOf(x.months()),
-                    BigDecimal.valueOf(y.months()));
+            case YearsAndMonths(var x) when b instanceof YearsAndMonths(var y) -> FeelNumbers.divide(BigDecimal.valueOf(x),
+                    BigDecimal.valueOf(y));
             default -> scale(a, (BigDecimal) b, true);
         };
     }
@@ -260,8 +269,8 @@ final class FeelArithmetic {
                 var whole = nanos.divideAndRemainder(NANOS_PER_SECOND.toBigIntegerExact());
                 yield Duration.ofSeconds(whole[0].longValueExact(), whole[1].longValueExact());
             }
-            case YearsAndMonths months -> {
-                var value = BigDecimal.valueOf(months.months());
+            case YearsAndMonths(var months) -> {
+                var value = BigDecimal.valueOf(months);
                 var scaled = divide ? value.divide(by, FeelNumbers.PRECISION) : value.multiply(by);
                 yield new YearsAndMonths(scaled.setScale(0, RoundingMode.DOWN).longValueExact());
             }

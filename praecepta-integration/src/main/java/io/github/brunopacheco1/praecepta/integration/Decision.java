@@ -199,7 +199,7 @@ public record Decision(String name, String location, DecisionTable table, Praece
             if (!FeelTemporals.comparable(x, y)) {
                 return Collections.singletonMap(aggregated.name(), null);
             }
-            return Integer.signum(FeelTemporals.compare(x, y)) != -sign ? a : b;
+            return Integer.signum(FeelTemporals.compare(x, y)) == -sign ? b : a;
         }
 
         @Override

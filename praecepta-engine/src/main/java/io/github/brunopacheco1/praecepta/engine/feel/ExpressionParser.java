@@ -63,6 +63,11 @@ final class ExpressionParser {
     private final String text;
     private int position;
     private int operations;
+    /** The operands read and the trees built from them, the last on top. */
+    private final Deque<OutputExpression> operands = new ArrayDeque<>();
+    /** The operators, unary minuses and open parentheses waiting for their operands, the last on top. */
+    private final Deque<Pending> pending = new ArrayDeque<>();
+    private int openParentheses;
 
     ExpressionParser(String text) {
         this.text = text == null ? "" : withoutComments(text);
@@ -82,57 +87,68 @@ final class ExpressionParser {
         if (position == text.length()) {
             throw unsupported("it is empty");
         }
-        var operands = new ArrayDeque<OutputExpression>();
-        var pending = new ArrayDeque<Pending>();
-        int openParentheses = 0;
-        while (true) {
-            openParentheses += prefixes(pending);
+        do {
+            prefixes();
             operands.push(primary());
-            while (true) {
-                skipWhitespace();
-                var operator = binaryOperator();
-                if (operator != null) {
-                    reduceWhile(operands, pending, top -> top.precedence >= operator.precedence);
-                    pending.push(operator);
-                    break;
-                }
-                if (openParentheses == 0) {
-                    if (position < text.length()) {
-                        throw unsupported("unexpected '" + text.substring(position) + "'");
-                    }
-                    reduceWhile(operands, pending, top -> true);
-                    return operands.pop();
-                }
-                if (position == text.length() || text.charAt(position) != ')') {
-                    throw unsupported("a parenthesis is not closed");
-                }
-                position++;
-                reduceWhile(operands, pending, top -> top != Pending.PARENTHESIS);
-                pending.pop();
-                openParentheses--;
-            }
-        }
+        } while (operatorFollows());
+        reduceWhile(top -> true);
+        return operands.pop();
     }
 
     /**
-     * Pushes the unary minuses and open parentheses before an operand, and returns how many parentheses it opened.
-     * They wait on the stack, not on the call stack, so nesting costs no recursion.
+     * Pushes the unary minuses and open parentheses before an operand. They wait on the stack, not on the call stack,
+     * so nesting costs no recursion.
      */
-    private int prefixes(Deque<Pending> pending) {
-        int opened = 0;
+    private void prefixes() {
         while (true) {
             skipWhitespace();
             if (position < text.length() && text.charAt(position) == '-') {
                 pending.push(Pending.NEGATION);
             } else if (position < text.length() && text.charAt(position) == '(') {
                 pending.push(Pending.PARENTHESIS);
-                opened++;
+                openParentheses++;
             } else {
-                return opened;
+                return;
             }
             position++;
             count();
         }
+    }
+
+    /**
+     * After an operand, closes the parentheses that follow it and reads the binary operator after them, if any,
+     * applying the pending operators that bind at least as tightly.
+     *
+     * @return whether an operator follows, so another operand must; false at the end of the expression
+     */
+    private boolean operatorFollows() {
+        while (true) {
+            skipWhitespace();
+            var operator = binaryOperator();
+            if (operator != null) {
+                reduceWhile(top -> top.precedence >= operator.precedence);
+                pending.push(operator);
+                return true;
+            }
+            if (openParentheses == 0) {
+                if (position < text.length()) {
+                    throw unsupported("unexpected '" + text.substring(position) + "'");
+                }
+                return false;
+            }
+            closeParenthesis();
+        }
+    }
+
+    /** Reads the {@code )} of the innermost open parenthesis, and applies the operators inside it. */
+    private void closeParenthesis() {
+        if (position == text.length() || text.charAt(position) != ')') {
+            throw unsupported("a parenthesis is not closed");
+        }
+        position++;
+        reduceWhile(top -> top != Pending.PARENTHESIS);
+        pending.pop();
+        openParentheses--;
     }
 
     /** The binary operator at the current position, consumed, or null if none is: {@code **} before {@code *}. */
@@ -160,7 +176,7 @@ final class ExpressionParser {
     }
 
     /** Applies the pending operators to their operands, from the top of the stack, while the top one passes the test. */
-    private static void reduceWhile(Deque<OutputExpression> operands, Deque<Pending> pending, Predicate<Pending> test) {
+    private void reduceWhile(Predicate<Pending> test) {
         while (!pending.isEmpty() && test.test(pending.peek())) {
             var top = pending.pop();
             if (top == Pending.NEGATION) {

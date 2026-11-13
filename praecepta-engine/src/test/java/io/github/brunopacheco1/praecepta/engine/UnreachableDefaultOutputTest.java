@@ -43,8 +43,9 @@ class UnreachableDefaultOutputTest {
     void a_rule_that_matches_every_input_makes_the_default_unreachable_an_error() {
         var engine = engine(HitPolicy.FIRST, Map.of(), rule(1, "risk", "\"High\""), rule(2, "risk", "-")).build();
         Assertions.assertThat(engine.validationReport().issues()).containsExactly(UNREACHABLE_DEFAULT);
-        Assertions.assertThat(UNREACHABLE_DEFAULT.severity()).isEqualTo(Severity.ERROR);
-        Assertions.assertThat(UNREACHABLE_DEFAULT).hasToString("ERROR every input matches a rule, so the default output is never "
+        var issue = engine.validationReport().issues().getFirst();
+        Assertions.assertThat(issue.severity()).isEqualTo(Severity.ERROR);
+        Assertions.assertThat(issue).hasToString("ERROR every input matches a rule, so the default output is never "
                 + "given (a complete table declares no default output: DMN 1.5, 10.3.2.10)");
         var strict = engine(HitPolicy.FIRST, Map.of(), rule(1, "risk", "-")).failOn(Severity.ERROR);
         Assertions.assertThatThrownBy(strict::build)

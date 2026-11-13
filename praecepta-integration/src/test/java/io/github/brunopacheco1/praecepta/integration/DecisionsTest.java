@@ -190,11 +190,12 @@ class DecisionsTest {
     /** Rules that test different values of a list overlap on a list holding both (#78): an ERROR that stops loading. */
     @Test
     void rules_that_test_a_list_column_are_validated() {
-        var source = TableSource.of("offer.dmn", NATIONALITIES.formatted("UNIQUE", "list contains(?, \"BR\")").getBytes(StandardCharsets.UTF_8));
-        Assertions.assertThatThrownBy(() -> Decisions.load(List.of(source), Severity.ERROR))
+        var dmn = NATIONALITIES.formatted("UNIQUE", "list contains(?, \"BR\")");
+        var sources = List.of(TableSource.of("offer.dmn", dmn.getBytes(StandardCharsets.UTF_8)));
+        Assertions.assertThatThrownBy(() -> Decisions.load(sources, Severity.ERROR))
                 .isInstanceOf(DecisionsException.class)
                 .hasMessageContaining("rules [1, 2] both match some inputs (UNIQUE)");
-        var table = DmnReader.readAll(stream(NATIONALITIES.formatted("UNIQUE", "list contains(?, \"BR\")"))).getFirst();
+        var table = DmnReader.readAll(stream(dmn)).getFirst();
         Assertions.assertThat(Decision.of("offer", table).report().issues()).hasSize(1);
     }
 
@@ -475,14 +476,15 @@ class DecisionsTest {
                 </definitions>""".getBytes(StandardCharsets.UTF_8));
         var message = "ERROR every input matches a rule, so the default output is never given "
                 + "(a complete table declares no default output: DMN 1.5, 10.3.2.10)";
-        Assertions.assertThatThrownBy(() -> Decisions.load(List.of(complete), Severity.ERROR))
+        var sources = List.of(complete);
+        Assertions.assertThatThrownBy(() -> Decisions.load(sources, Severity.ERROR))
                 .isInstanceOf(DecisionsException.class)
                 .hasMessageStartingWith("Cannot load decision tables: grade.dmn: decision 'Grade' has validation issues at ERROR")
                 .hasMessageContaining(message);
 
-        var lenient = Decisions.load(List.of(complete), null);
-        Assertions.assertThat(lenient.get("Grade").describe().get("issues"))
-                .isEqualTo(List.of(issue("ERROR", "UNREACHABLE_DEFAULT_OUTPUT", List.of(), message)));
+        var lenient = Decisions.load(sources, null);
+        Assertions.assertThat(lenient.get("Grade").describe())
+                .containsEntry("issues", List.of(issue("ERROR", "UNREACHABLE_DEFAULT_OUTPUT", List.of(), message)));
         // the default is never given
         Assertions.assertThat(lenient.evaluate("Grade", Map.of())).containsExactly(Map.of("grade", "B"));
     }

@@ -359,7 +359,8 @@ class DefaultOutputsTest {
         Assertions.assertThat(mapEngine(again).evaluate(Map.of("score", "3"))).isEqualTo(engine.evaluate(Map.of("score", "3")));
 
         // a default outside the output values, in any form, is still rejected
-        Assertions.assertThatThrownBy(() -> read(xml.replace("date(2025, 3, 31) // the quarter's end", "@\"2025-04-30\"")))
+        var outside = xml.replace("date(2025, 3, 31) // the quarter's end", "@\"2025-04-30\"");
+        Assertions.assertThatThrownBy(() -> read(outside))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("is not in its output values");
     }

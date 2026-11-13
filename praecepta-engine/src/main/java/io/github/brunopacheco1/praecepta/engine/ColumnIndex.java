@@ -843,20 +843,33 @@ final class ColumnIndex {
      */
     List<String> describe(List<Integer> valueClasses) {
         if (valueClasses.stream().anyMatch(this::hasZoneId)) {
-            var parts = new ArrayList<String>();
-            var others = valueClasses.stream().filter(k -> !hasZoneId(k) && k != nullClass).toList();
-            if (!others.isEmpty()) {
-                parts.addAll(describe(others));
-            }
-            parts.addAll(zoneIdRuns(valueClasses.stream().filter(this::hasZoneId).sorted().toList()));
-            if (valueClasses.contains(nullClass)) {
-                parts.add(plain(classes.get(nullClass)));
-            }
-            return parts;
+            return describeWithZoneIds(valueClasses);
         }
         if (localLine == null && zonedLine == null || !type.supportsComparisons()) { // no intervals to merge
             return valueClasses.stream().map(k -> plain(classes.get(k))).toList();
         }
+        return describeAsIntervals(valueClasses);
+    }
+
+    /** Classes some of which are of times with a zone id: the others first, then those zone id by zone id, then null. */
+    private List<String> describeWithZoneIds(List<Integer> valueClasses) {
+        var parts = new ArrayList<String>();
+        var others = valueClasses.stream().filter(k -> !hasZoneId(k) && k != nullClass).toList();
+        if (!others.isEmpty()) {
+            parts.addAll(describe(others));
+        }
+        parts.addAll(zoneIdRuns(valueClasses.stream().filter(this::hasZoneId).sorted().toList()));
+        if (valueClasses.contains(nullClass)) {
+            parts.add(plain(classes.get(nullClass)));
+        }
+        return parts;
+    }
+
+    /**
+     * Classes of an ordered column, adjacent ones merged into intervals: those of values without a zone, then those
+     * with one (unless they mirror the others), then null.
+     */
+    private List<String> describeAsIntervals(List<Integer> valueClasses) {
         var sorted = valueClasses.stream().sorted().toList();
         var local = sorted.stream().filter(k -> k != nullClass && !hasZone(k)).toList();
         var zoned = sorted.stream().filter(this::hasZone).map(k -> k - zonedBase).toList(); // numbered from the first class with a zone
@@ -1104,60 +1117,59 @@ final class ColumnIndex {
     private static boolean accepts(UnaryTests cell, ValueClass valueClass) {
         return switch (cell) {
             case UnaryTests.Any any -> true;
-            case UnaryTests.Positive(var tests) -> disjunction(tests, valueClass) == Boolean.TRUE;
+            case UnaryTests.Positive(var tests) -> disjunction(tests, valueClass) == Truth.TRUE;
             // not(unknown) is unknown: no match
-            case UnaryTests.Negated(var tests) -> disjunction(tests, valueClass) == Boolean.FALSE;
+            case UnaryTests.Negated(var tests) -> disjunction(tests, valueClass) == Truth.FALSE;
         };
     }
 
-    /** FEEL disjunction: true if any test is true, else unknown (null) if any is unknown, else false. */
-    private static Boolean disjunction(List<Test> tests, ValueClass valueClass) {
-        Boolean result = Boolean.FALSE;
+    /** FEEL disjunction: true if any test is true, else unknown if any is unknown, else false. */
+    private static Truth disjunction(List<Test> tests, ValueClass valueClass) {
+        var result = Truth.FALSE;
         for (var test : tests) {
             var outcome = test(test, valueClass);
-            if (outcome == Boolean.TRUE) {
-                return Boolean.TRUE;
+            if (outcome == Truth.TRUE) {
+                return Truth.TRUE;
             }
-            if (outcome == null) {
-                result = null;
+            if (outcome == Truth.UNKNOWN) {
+                result = Truth.UNKNOWN;
             }
         }
         return result;
     }
 
-    private static Boolean test(Test test, ValueClass valueClass) {
+    private static Truth test(Test test, ValueClass valueClass) {
         if (test instanceof NotEqual(var negated)) { // != is not(=), so unknown stays unknown
-            var equal = test(negated, valueClass);
-            return equal == null ? null : !equal;
+            return test(negated, valueClass).not();
         }
         if (valueClass instanceof ValueClass.Missing) {
             return switch (test) {
-                case NullTest n -> true;
-                case UnaryTests.NullElement n -> true; // an element index's cell: the element is missing
-                case Equals e -> false;       // null = x is false
-                case Compare c -> null;       // null < x is unknown
-                case Range r -> null;
+                case NullTest n -> Truth.TRUE;
+                case UnaryTests.NullElement n -> Truth.TRUE; // an element index's cell: the element is missing
+                case Equals e -> Truth.FALSE;       // null = x is false
+                case Compare c -> Truth.UNKNOWN;    // null < x is unknown
+                case Range r -> Truth.UNKNOWN;
                 case NotEqual n -> throw new IllegalStateException("decided above");
             };
         }
         if (!comparable(valueClass, test)) {
-            return null; // FEEL gives null for a comparison it does not define, of a time with a zone id
+            return Truth.UNKNOWN; // FEEL gives null for a comparison it does not define, of a time with a zone id
         }
         return switch (test) {
             case NotEqual n -> throw new IllegalStateException("decided above");
-            case NullTest n -> false;
-            case UnaryTests.NullElement n -> false;
+            case NullTest n -> Truth.FALSE;
+            case UnaryTests.NullElement n -> Truth.FALSE;
             // literals are boundaries / written values, never inside other classes
-            case Equals(var literal, var explicit) ->
-                    coordinate(valueClass, literal) instanceof ValueClass.Point(var value) && compare(value, literal) == 0;
-            case Compare(var operator, var literal) -> switch (operator) {
+            case Equals(var literal, var explicit) -> Truth.of(
+                    coordinate(valueClass, literal) instanceof ValueClass.Point(var value) && compare(value, literal) == 0);
+            case Compare(var operator, var literal) -> Truth.of(switch (operator) {
                 case LT -> below(coordinate(valueClass, literal), literal, false);
                 case LE -> below(coordinate(valueClass, literal), literal, true);
                 case GT -> above(coordinate(valueClass, literal), literal, false);
                 case GE -> above(coordinate(valueClass, literal), literal, true);
-            };
-            case Range(var low, var lowClosed, var high, var highClosed) -> above(coordinate(valueClass, low), low, lowClosed)
-                    && below(coordinate(valueClass, high), high, highClosed);
+            });
+            case Range(var low, var lowClosed, var high, var highClosed) -> Truth.of(above(coordinate(valueClass, low), low, lowClosed)
+                    && below(coordinate(valueClass, high), high, highClosed));
         };
     }
 

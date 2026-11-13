@@ -1078,7 +1078,12 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
             var text = rules.getFirst().input().values().get(column);
             var type = types.get(column);
             boolean list = lists.contains(column);
-            var cell = !feelCells ? CellParser.parse(text, type) : list ? CellParser.parseFeelList(text, type) : CellParser.parseFeel(text, type);
+            UnaryTests cell;
+            if (feelCells) {
+                cell = list ? CellParser.parseFeelList(text, type) : CellParser.parseFeel(text, type);
+            } else {
+                cell = CellParser.parse(text, type);
+            }
             if (cell instanceof UnaryTests.Any || cell.namesInputs()) {
                 continue;
             }
