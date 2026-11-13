@@ -148,8 +148,10 @@ A new integration or other module needs these, and nothing else:
    allowlist in `.github/scripts/check_sbom_licenses.py`.
 5. Describe what changed and why in the pull request, and add a line to `CHANGELOG.md` under
    *Unreleased*.
-6. Commits must be signed, and `main` only changes through pull requests that pass the required
-   checks, are up to date with `main`, and are approved by a code owner (`.github/CODEOWNERS`).
+6. `main` only changes through pull requests that pass the required checks, are up to date with
+   `main`, and are approved by a code owner (`.github/CODEOWNERS`). Every commit on `main` is signed:
+   pull requests are squash-merged, so the commit GitHub creates for the merge is the signed one, and
+   the commits on your branch need not be signed.
 
 ## Licensing of contributions
 Praecepta is licensed under the [Apache License 2.0](LICENSE). Unless you state otherwise, any
