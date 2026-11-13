@@ -25,22 +25,25 @@ evaluate a graph's decisions through `Decisions`. A model that uses what later r
 language, built-in functions, business knowledge models and boxed expressions, decision services and imports) is
 rejected when it is read, naming the release that plans it. The DMN conformance kit (TCK) is now scored whole
 ([#115](https://github.com/brunopacheco1/praecepta/issues/115)): of the 3,511 result nodes of its compliance levels 2
-and 3, 454 pass (12.9 %), 5 fail and 3,052 need a feature Praecepta does not have yet, each listed with the release
+and 3, 454 pass (12.9 %), 4 fail and 3,053 need a feature Praecepta does not have yet, each listed with the release
 that brings it, in [RESULTS.md](praecepta-tck/RESULTS.md). That measures how much of DMN 1.5 Praecepta covers, not how
-well it does what it covers: of the 459 nodes it evaluates, 454 pass. No node of the kit needs graphs alone, so they
+well it does what it covers: of the 458 nodes it evaluates, 454 pass. No node of the kit needs graphs alone, so they
 add no pass yet; the decision-table checks still pass 83 of 86 (the other three also invoke business knowledge models,
 0.10), and the build now fails only on a regression from a committed baseline. Fixes: rules reached only by a time
 with a zone id that no cell names are no longer reported unreachable
-([#114](https://github.com/brunopacheco1/praecepta/issues/114)), and a time or date and time whose offset lies beyond
--14:00..+14:00 is rejected rather than read without it ([#123](https://github.com/brunopacheco1/praecepta/issues/123)). Build and test dependencies were updated (Guava
-33.8.0 and Groovy 3.0.25 in tests, Jackson 2.23.0 in the benchmarks, the versions-maven-plugin 2.25.1); no published
-module's dependencies changed. Read *Changed* and *Fixed* before upgrading if a framework integration loads DMN files
-in which a decision requires another decision (its decisions now evaluate through the graph, from the model's input
-data, and the graph's errors stop startup), a build plugin or the Quarkus extension compiles a DMN file whose named
+([#114](https://github.com/brunopacheco1/praecepta/issues/114)), and dates, times and date-times are read in XML
+Schema's lexical forms: an offset beyond -14:00..+14:00 is rejected rather than dropped
+([#123](https://github.com/brunopacheco1/praecepta/issues/123)), and so is a year with a leading `+`, while a year of
+more than four digits is read and written without one ([#124](https://github.com/brunopacheco1/praecepta/issues/124)).
+Build and test dependencies were updated (Guava 33.8.0 and Groovy 3.0.25 in tests, Jackson 2.23.0 in the benchmarks,
+the versions-maven-plugin 2.25.1); no published module's dependencies changed. Read *Changed* and *Fixed* before
+upgrading if a framework integration loads DMN files in which a decision requires another decision (its decisions now
+evaluate through the graph, from the model's input data, and the graph's errors stop startup), a build plugin or the Quarkus extension compiles a DMN file whose named
 decision requires another decision, or that holds a literal expression decision (it now compiles as a graph, with
 other classes), your code switches over `ValidationReport.Kind` exhaustively or deconstructs `integration.Decision`
-with a record pattern, or a map-based time column of yours has cells that name no
-zone id with a changing offset (its report now lists a time in another zone as a gap, a WARNING).
+with a record pattern, a map-based time column of yours has cells that name no
+zone id with a changing offset (its report now lists a time in another zone as a gap, a WARNING), or your tables or
+inputs hold a time or date and time with an offset beyond -14:00..+14:00 or a year with a leading `+` (now rejected).
 
 ### Added
 - **Decision requirement graphs** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)): `DecisionGraph`
@@ -135,7 +138,7 @@ zone id with a changing offset (its report now lists a time in another zone as a
   of the 3,511 pass (12.9 %): Praecepta evaluates a decision through its model's decision requirement graph
   ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) where `DmnReader.readModel` reads the model, and
   otherwise on its own, a decision table as before and a literal expression as an output expression, and 454 of the
-  459 nodes it evaluates pass; no node of the kit needs graphs alone, so they add no pass.
+  458 nodes it evaluates pass; no node of the kit needs graphs alone, so they add no pass.
   [RESULTS.md](praecepta-tck/RESULTS.md) keeps the decision-table checks (still 83 of 86) and adds the totals by
   compliance level, by feature area, by feature, by model, and how many nodes each release would complete. The build
   now fails only on a regression, a node that passed in the committed baseline (`praecepta-tck/baseline.txt`) and no
@@ -146,10 +149,10 @@ zone id with a changing offset (its report now lists a time in another zone as a
   missing or empty baseline fails the run. A simple value is compared by its kind as well as its text, so the text
   `"10"` is not the number 10. The run takes about a second. How a model is evaluated is one
   seam, `ModelEvaluator`, which later layers plug into as graphs do. The run found that the engine read
-  `time("13:20:00+19:00")` as the local time `13:20:00`, where the kit expects an error (fixed, see *Fixed*), and that
-  it accepts `date and time("+99999-12-01T11:22:33")`, where the kit expects an error too, and that
-  `0008-LX-arithmetic`'s payments, a power that is not whole, which graphs now evaluate, are computed to FEEL's 34
-  digits where the kit gives 15; they are reported as failures.
+  `time("13:20:00+19:00")` as the local time `13:20:00` and accepted `date and time("+99999-12-01T11:22:33")`, where
+  the kit expects errors (both fixed, see *Fixed*), and that `0008-LX-arithmetic`'s payments, a power that is not
+  whole, which graphs now evaluate, are computed to FEEL's 34 digits where the kit gives 15; they are reported as
+  failures.
 - A documentation page for the Gradle plugin, [bruno.pacheco.lu/praecepta/gradle-plugin](https://bruno.pacheco.lu/praecepta/gradle-plugin/),
   with every setting, the generated classes and the task; the Gradle Plugin Portal links to it.
 - The Gradle plugin declares that it supports Gradle's configuration cache, so the Gradle Plugin Portal says
@@ -227,6 +230,21 @@ zone id with a changing offset (its report now lists a time in another zone as a
   built, and the kit counts the two time cases, which it reported as failures, among those that need null from an
   invalid literal (0.8). An offset a zone id gives is never rejected (`1800-01-01T00:00:00@America/Sitka` has
   +14:58:47).
+- **A date or date and time whose year has a leading `+` is rejected**
+  ([#124](https://github.com/brunopacheco1/praecepta/issues/124)): DMN 1.5 reads dates in XML Schema's lexical form
+  (10.3.4.1, date string and date time string), whose year has an optional `-`, no `+`, and four digits or more, with
+  no leading zero beyond four. Praecepta read years as Java's ISO form writes them, which takes
+  `+99999-12-01` (and, in a date and time, `+2012-12-24T23:59:00`) and wants the `+` before more than four digits,
+  so `99999-12-31`, a date by DMN 1.5, was rejected. Now a `+` is rejected, as is `01211-12-31`, wherever Praecepta
+  reads a date or date and time, in the same places as above (a map-based input given `+99999-12-01` is an
+  `InvalidInputException`); `99999-12-31` and `99999-12-31T11:22:33` are read; and such a year is written without
+  the `+` (`FeelLiterals.text` and `literal`, so the outputs of the map-based engines, the DMN `DmnWriter` writes, and
+  the outputs the generated classes read back, through `FeelTemporals.parseDate` and `parseLocalDateTime`, which
+  they now call instead of `LocalDate.parse` and `LocalDateTime.parse`). The DMN TCK expects null from
+  `date("+2012-12-02")` and `date and time("+99999-12-01T11:22:33")` (`1115-feel-date-function`, error case 041;
+  `1117-feel-date-and-time-function`, error case 068, which it reported as a failure and now counts among the nodes
+  that need null from an invalid literal, 0.8), and `"99999-12-31T11:22:33"` from
+  `string(date and time("99999-12-31T11:22:33"))` (`1117`, case 011, which needs `string()`, 0.9).
 
 ## [0.6.0] - 2026-11-13
 

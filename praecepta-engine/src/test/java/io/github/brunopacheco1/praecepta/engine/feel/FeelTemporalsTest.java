@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine.feel;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetTime;
@@ -158,6 +159,44 @@ class FeelTemporalsTest {
         // a zone id gives the offset its rules have, a local mean time beyond 14:00 before 1900 included
         Assertions.assertThat(FeelTemporals.parseDateTime("1800-01-01T00:00:00@America/Sitka"))
                 .isEqualTo(ZonedDateTime.of(1800, 1, 1, 0, 0, 0, 0, ZoneId.of("America/Sitka")));
+    }
+
+    /**
+     * XML Schema's year, which DMN 1.5 takes (10.3.4.1, date string), has an optional {@code -}, no {@code +}, and four
+     * digits or more, with no leading zero beyond four (#124), as the DMN TCK has it: {@code date("+2012-12-02")},
+     * {@code date("01211-12-31")} and {@code date and time("+99999-12-01T11:22:33")} are null
+     * ({@code 1115-feel-date-function}, {@code ErrorCase_041} and {@code _039}; {@code 1117-feel-date-and-time-function},
+     * {@code ErrorCase_068}), {@code date and time("99999-12-31T11:22:33")} and {@code date("-999999999-12-31")} are
+     * not ({@code 1117}, {@code 011}; {@code 1115}, {@code 016}). Java's ISO form takes the first and the last of these
+     * and wants a {@code +} before more than four digits.
+     */
+    @Test
+    void years_have_an_optional_minus_and_no_plus() {
+        Assertions.assertThat(FeelTemporals.parseDate("99999-12-31")).isEqualTo(LocalDate.of(99999, 12, 31));
+        Assertions.assertThat(FeelTemporals.parseDate("-99999-12-31")).isEqualTo(LocalDate.of(-99999, 12, 31));
+        Assertions.assertThat(FeelTemporals.parseDate("999999999-12-31")).isEqualTo(LocalDate.of(999999999, 12, 31));
+        Assertions.assertThat(FeelTemporals.parseDate("-999999999-12-31")).isEqualTo(LocalDate.of(-999999999, 12, 31));
+        Assertions.assertThat(FeelTemporals.parseDate("-0044-03-15")).isEqualTo(LocalDate.of(-44, 3, 15));
+        Assertions.assertThat(FeelTemporals.parseDate("0001-01-01")).isEqualTo(LocalDate.of(1, 1, 1));
+        Assertions.assertThat(FeelTemporals.parseDateTime("99999-12-31T11:22:33")).isEqualTo(LocalDateTime.of(99999, 12, 31, 11, 22, 33));
+        Assertions.assertThat(FeelTemporals.parseDateTime("-99999-12-31T11:22:33Z"))
+                .isEqualTo(ZonedDateTime.of(-99999, 12, 31, 11, 22, 33, 0, ZoneOffset.UTC));
+        Assertions.assertThat(FeelTemporals.parseDateTime("99999-12-31T11:22:33@Europe/Paris"))
+                .isEqualTo(ZonedDateTime.of(99999, 12, 31, 11, 22, 33, 0, ZoneId.of("Europe/Paris")));
+        // as generated code reads the outputs of a date or date and time column
+        Assertions.assertThat(FeelTemporals.parseLocalDateTime("99999-12-31T11:22:33")).isEqualTo(LocalDateTime.of(99999, 12, 31, 11, 22, 33));
+        Assertions.assertThatThrownBy(() -> FeelTemporals.parseLocalDateTime("2025-01-31T11:22:33Z")).isInstanceOf(DateTimeParseException.class)
+                .hasMessageContaining("with a time zone");
+
+        for (var date : List.of("+2012-12-02", "+99999-12-31", "01211-12-31", "-01211-12-31", "9999999999-12-25", "998-12-31", "+-2012-12-02")) {
+            Assertions.assertThatThrownBy(() -> FeelTemporals.parseDate(date)).as(date).isInstanceOf(DateTimeParseException.class);
+            for (var time : List.of("T11:22:33", "T11:22:33Z", "T11:22:33@Europe/Paris")) {
+                Assertions.assertThatThrownBy(() -> FeelTemporals.parseDateTime(date + time)).as(date + time)
+                        .isInstanceOf(DateTimeParseException.class);
+            }
+            Assertions.assertThatThrownBy(() -> FeelTemporals.parseLocalDateTime(date + "T11:22:33")).isInstanceOf(DateTimeParseException.class);
+            Assertions.assertThatThrownBy(() -> FeelTemporals.parseZonedDateTime(date + "T11:22:33Z")).isInstanceOf(DateTimeParseException.class);
+        }
     }
 
     @Test

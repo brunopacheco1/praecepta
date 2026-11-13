@@ -7,7 +7,6 @@ package io.github.brunopacheco1.praecepta.engine.feel;
 
 import java.math.BigDecimal;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -467,7 +466,7 @@ public final class CellParser {
                 case STRING -> string(text);
                 case NUMBER -> number(text);
                 case BOOLEAN -> bool(text);
-                case DATE -> temporal(text, BARE_DATE, LocalDate::parse, "date(\"yyyy-mm-dd\")");
+                case DATE -> temporal(text, BARE_DATE, FeelTemporals::parseDate, "date(\"yyyy-mm-dd\")");
                 case TIME -> temporal(text, BARE_TIME, iso -> (Comparable<?>) FeelTemporals.parseTime(iso), "time(\"hh:mm:ss\")");
                 case DATE_TIME -> temporal(text, BARE_DATE_TIME, iso -> (Comparable<?>) FeelTemporals.parseDateTime(iso),
                         "date and time(\"yyyy-mm-ddThh:mm:ss\")");

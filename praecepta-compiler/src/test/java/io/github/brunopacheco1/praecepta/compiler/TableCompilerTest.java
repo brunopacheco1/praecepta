@@ -49,6 +49,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.integration.Decision;
 
@@ -1243,7 +1244,7 @@ class TableCompilerTest {
         Assertions.assertThat(decision.evaluate(Map.of("zone", "mainland"))).containsExactly(nothing);
     }
 
-    /** A table of a time or date and time input and output, holding literals in its value list, cell, output entry and default. */
+    /** A table of a date, time or date and time input and output, holding literals in its value list, cell, output entry and default. */
     private static final String LEXICAL = """
             <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
               <decision id="slot" name="slot"><decisionTable hitPolicy="FIRST">
@@ -1254,15 +1255,19 @@ class TableCompilerTest {
             </definitions>""";
 
     /**
-     * Times and date-times take XML Schema's lexical forms (DMN 1.5, 10.3.4.1): an offset beyond -14:00..+14:00 (#123)
-     * fails the build wherever the table holds it, as the engine rejects it, and the generated code reads back the
-     * outputs at the edge the engine writes.
+     * Dates, times and date-times take XML Schema's lexical forms (DMN 1.5, 10.3.4.1): an offset beyond -14:00..+14:00
+     * (#123), or a year with a {@code +} (#124), fails the build wherever the table holds it, as the engine rejects it,
+     * and the generated code reads back the outputs the engine writes at the edges, a year of more than four digits
+     * without Java's {@code +} included.
      */
     @ParameterizedTest(name = "{0} {2}")
     @CsvSource(delimiter = ';', value = {
             "time;     time(\"08:00:00+14:00\");                     time(\"08:00:00+19:00\")",
             "time;     time(\"08:00:00-14:00\");                     @\"08:00:00-14:01\"",
             "dateTime; date and time(\"2025-01-31T08:00:00+14:00\"); date and time(\"2025-01-31T08:00:00+15:00\")",
+            "date;     date(\"99999-12-31\");                        date(\"+2012-12-02\")",
+            "dateTime; date and time(\"99999-12-31T11:22:33\");      date and time(\"+99999-12-01T11:22:33\")",
+            "dateTime; date and time(\"-99999-12-31T11:22:33Z\");    @\"+2012-12-24T23:59:00Z\"",
     })
     void a_literal_beyond_xml_schemas_lexical_forms_fails_the_build(String type, String valid, String invalid) throws Exception {
         var dmn = out.resolve("slot.dmn");
@@ -1273,7 +1278,12 @@ class TableCompilerTest {
             var input = loader.loadClass(PACKAGE + ".SlotInput");
             var evaluate = loader.loadClass(PACKAGE + ".Slot").getMethod("evaluate", input);
             var text = valid.substring(valid.indexOf('"') + 1, valid.lastIndexOf('"'));
-            var at = type.equals("time") ? FeelTemporals.parseOffsetTime(text) : FeelTemporals.parseZonedDateTime(text);
+            var columnType = switch (type) {
+                case "date" -> ColumnType.DATE;
+                case "time" -> ColumnType.TIME;
+                default -> ColumnType.DATE_TIME;
+            };
+            var at = FeelLiterals.value(text, columnType);
             var expected = decision.evaluate(Map.of("at", text)).getFirst().get("until");
             Assertions.assertThat(expected).isEqualTo(text);
             Assertions.assertThat((Optional<?>) evaluate.invoke(null, input.getDeclaredConstructors()[0].newInstance(at)))

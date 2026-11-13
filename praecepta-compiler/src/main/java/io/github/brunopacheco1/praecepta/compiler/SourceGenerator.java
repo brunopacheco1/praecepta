@@ -552,10 +552,13 @@ final class SourceGenerator {
             return switch (type) {
                 case STRING -> new Converter("String", "input", null, null);
                 case NUMBER -> new Converter("java.math.BigDecimal", "numberInput", "number", "new java.math.BigDecimal");
-                case DATE -> new Converter("java.time.LocalDate", "dateInput", "date", "java.time.LocalDate.parse");
+                // a year of more than four digits is written without Java's '+' (99999-12-31), which LocalDate.parse wants
+                case DATE -> new Converter("java.time.LocalDate", "dateInput", "date",
+                        "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseDate");
                 case BOOLEAN -> new Converter("Boolean", "booleanInput", "bool", "Boolean.valueOf");
                 case TIME -> new Converter("java.time.LocalTime", "timeInput", "time", "java.time.LocalTime.parse");
-                case DATE_TIME -> new Converter("java.time.LocalDateTime", "dateTimeInput", "dateTime", "java.time.LocalDateTime.parse");
+                case DATE_TIME -> new Converter("java.time.LocalDateTime", "dateTimeInput", "dateTime",
+                        "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseLocalDateTime");
                 case DAY_TIME_DURATION -> new Converter("java.time.Duration", "durationInput", "duration", "java.time.Duration.parse");
                 case YEAR_MONTH_DURATION -> new Converter("java.time.Period", "periodInput", "period", "java.time.Period.parse");
             };

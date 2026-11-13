@@ -21,15 +21,19 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 
 /**
- * Times and date-times are read in XML Schema's lexical forms (DMN 1.5, 10.3.4.1, time string and date time string),
- * whose offsets lie in -14:00..+14:00, as Table 66 bounds the time offset property: an offset beyond them (#123) is
- * not a time, where 0.6 read {@code 13:20:00+19:00} as {@code 13:20:00}, dropping the offset Java does not take, and
- * {@code 13:20:00+15:00} at that offset. Each place Praecepta reads one rejects such text: a cell, a value list, an
- * output entry and a default output when a table is read from DMN or its engine built, as it rejects any invalid
- * literal; and a map-based input or a graph's input data given as text when it is evaluated, as any text that is not
- * of the column's type ({@code InvalidInputException}). The DMN TCK expects FEEL's null from {@code time(from)} and
+ * Dates, times and date-times are read in XML Schema's lexical forms (DMN 1.5, 10.3.4.1, date string, time string and
+ * date time string). Their offsets lie in -14:00..+14:00, as Table 66 bounds the time offset property: an offset beyond
+ * them (#123) is not a time, where 0.6 read {@code 13:20:00+19:00} as {@code 13:20:00}, dropping the offset Java does
+ * not take, and {@code 13:20:00+15:00} at that offset. A year has an optional {@code -} and no {@code +} (#124), where
+ * 0.6 read {@code +99999-12-01} as Java writes it, and four digits or more, so {@code 99999-12-31} is a date, which 0.6
+ * did not read. Each place Praecepta reads one rejects other text: a cell, a value list, an output entry and a default
+ * output when a table is read from DMN or its engine built, as it rejects any invalid literal; and a map-based input or
+ * a graph's input data given as text when it is evaluated, as any text that is not of the column's type
+ * ({@code InvalidInputException}). The DMN TCK expects FEEL's null from {@code time(from)}, {@code date(from)} and
  * {@code date and time(from)} of such a string ({@code 1116-feel-time-function}, {@code ErrorCase_067} and
- * {@code _068}; {@code 1117-feel-date-and-time-function}, {@code ErrorCase_078} and {@code _079}).
+ * {@code _068}; {@code 1115-feel-date-function}, {@code ErrorCase_041}; {@code 1117-feel-date-and-time-function},
+ * {@code ErrorCase_068}, {@code _078} and {@code _079}), and {@code date and time("99999-12-31T11:22:33")} to be a
+ * date and time ({@code 1117-feel-date-and-time-function}, {@code 011}).
  */
 class TemporalLexicalFormsTest {
 
@@ -63,6 +67,11 @@ class TemporalLexicalFormsTest {
             "time;          time(\"08:00:00+14:00\");                time(\"08:00:00-14:00\");                @\"08:00:00-19:00\"",
             "dateTime;      date and time(\"2025-01-31T08:00:00+14:00\"); date and time(\"2025-01-31T08:00:00-14:00\"); date and time(\"2025-01-31T08:00:00+15:00\")",
             "dateTime;      date and time(\"2025-01-31T08:00:00+14:00\"); date and time(\"2025-01-31T08:00:00-14:00\"); @\"2025-01-31T08:00:00-19:00\"",
+            "date;          date(\"99999-12-31\");                    date(\"-0044-03-15\");                    date(\"+2012-12-02\")",
+            "date;          date(\"99999-12-31\");                    date(\"-0044-03-15\");                    @\"+99999-12-31\"",
+            "date;          date(\"99999-12-31\");                    date(\"-0044-03-15\");                    date(\"01211-12-31\")",
+            "dateTime;      date and time(\"99999-12-31T11:22:33\");  date and time(\"-99999-12-31T11:22:33\"); date and time(\"+99999-12-01T11:22:33\")",
+            "dateTime;      date and time(\"99999-12-31T11:22:33\");  date and time(\"-99999-12-31T11:22:33\"); @\"+2012-12-24T23:59:00@Europe/Paris\"",
     })
     void a_literal_beyond_the_lexical_form_is_rejected_wherever_a_table_holds_it(String type, String valid, String other, String invalid) {
         var values = valid + ", " + other;
@@ -82,9 +91,13 @@ class TemporalLexicalFormsTest {
             "time,     08:00:00-14:00,            08:00:00-19:00",
             "dateTime, 2025-01-31T08:00:00+14:00, 2025-01-31T08:00:00+15:00",
             "dateTime, 2025-01-31T08:00:00-14:00, 2025-01-31T08:00:00-19:00",
+            "date,     99999-12-31,               +99999-12-31",
+            "date,     2012-12-02,                +2012-12-02",
+            "dateTime, 99999-12-31T11:22:33,      +99999-12-31T11:22:33",
+            "dateTime, 2012-12-24T23:59:00Z,      +2012-12-24T23:59:00Z",
     })
     void text_beyond_the_lexical_form_is_an_invalid_input_as_any_text_not_of_the_type(String type, String valid, String invalid) {
-        var literal = (type.equals("time") ? "time(\"%s\")" : "date and time(\"%s\")").formatted(valid);
+        var literal = "%s(\"%s\")".formatted(columnType(type).feelName(), valid);
         var engine = engine(TABLE.formatted(type, literal, literal, literal, literal));
         Assertions.assertThat(engine.evaluate(Map.of("at", valid))).containsExactly(Map.of("until", valid));
         var beyond = Map.of("at", invalid);
@@ -98,7 +111,11 @@ class TemporalLexicalFormsTest {
     }
 
     private static ColumnType columnType(String typeRef) {
-        return typeRef.equals("time") ? ColumnType.TIME : ColumnType.DATE_TIME;
+        return switch (typeRef) {
+            case "date" -> ColumnType.DATE;
+            case "time" -> ColumnType.TIME;
+            default -> ColumnType.DATE_TIME;
+        };
     }
 
     /** The text of a literal: its string. */

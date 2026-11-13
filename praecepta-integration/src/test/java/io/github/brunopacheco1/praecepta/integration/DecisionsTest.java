@@ -620,7 +620,7 @@ class DecisionsTest {
         Assertions.assertThat(Decision.of("offer", table).describe().get("issues").toString()).contains("UNREACHABLE_DEFAULT_OUTPUT");
     }
 
-    /** A table of a time input and output, holding literals in its cell, output entry and default. */
+    /** A table of a date, time or date and time input and output, holding literals in its cell, output entry and default. */
     private static final String SLOT = """
             <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
               <decision id="slot" name="Slot"><decisionTable hitPolicy="FIRST">
@@ -631,18 +631,26 @@ class DecisionsTest {
             </definitions>""";
 
     /**
-     * Times and date-times take XML Schema's lexical forms (DMN 1.5, 10.3.4.1): an offset beyond -14:00..+14:00 (#123)
-     * fails loading wherever a table holds it, and given as an input it is rejected, as any text that is not of the
-     * column's type is ({@code InvalidInputException}).
+     * Dates, times and date-times take XML Schema's lexical forms (DMN 1.5, 10.3.4.1): an offset beyond -14:00..+14:00
+     * (#123), or a year with a {@code +} (#124), fails loading wherever a table holds it, and given as an input it is
+     * rejected, as any text that is not of the column's type is ({@code InvalidInputException}); a year of more than
+     * four digits is written and read without one.
      */
     @ParameterizedTest(name = "{0} {2}")
     @CsvSource(delimiter = ';', value = {
             "time;     08:00:00+14:00;            08:00:00+19:00",
             "time;     08:00:00-14:00;            08:00:00-14:01",
             "dateTime; 2025-01-31T08:00:00+14:00; 2025-01-31T08:00:00+15:00",
+            "date;     99999-12-31;               +99999-12-31",
+            "date;     2012-12-02;                +2012-12-02",
+            "dateTime; 99999-12-31T11:22:33;      +99999-12-31T11:22:33",
+            "dateTime; 2012-12-24T23:59:00@Europe/Paris; +2012-12-24T23:59:00@Europe/Paris",
     })
     void a_value_beyond_xml_schemas_lexical_forms_is_rejected(String type, String valid, String invalid) {
-        var function = type.equals("time") ? "time" : "date and time";
+        var function = switch (type) {
+            case "date", "time" -> type;
+            default -> "date and time";
+        };
         var good = "%s(\"%s\")".formatted(function, valid);
         var bad = "@\"%s\"".formatted(invalid);
         var decisions = Decisions.load(List.of(TableSource.of("slot.dmn", SLOT.formatted(type, good, good, good).getBytes(StandardCharsets.UTF_8))),

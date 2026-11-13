@@ -109,8 +109,6 @@ done. *What each release unlocks* counts the not-supported nodes by the latest a
 - `0100-arithmetic`, `exponent_lhs_number_exp_rhs_number_005`: a power that is not whole, which the kit gives to
   13 significant digits, where FEEL's numbers have 34 (DMN 1.5, 10.3.2.3.1 and Table 60), as output expressions
   keep them (#71).
-- `1117-feel-date-and-time-function`, error case 068: `date and time("+99999-12-01T11:22:33")`, a year with a
-  leading `+`, which the kit expects to be an error; the engine reads it.
 - `0008-LX-arithmetic`, the three payments: a literal expression over a structured input data
   (`(loan.principal*loan.rate/12)/(1-(1+loan.rate/12)**-loan.termMonths)`), evaluated through the graph since 0.7,
   whose power is not whole: Praecepta computes FEEL's 34 digits (`2778.693549432766768088520383236299`) where the kit

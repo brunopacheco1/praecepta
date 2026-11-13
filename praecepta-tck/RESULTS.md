@@ -24,7 +24,7 @@ only on a regression: a node the baseline lists that no longer passes. Semantics
 and the TCK alone; where both leave a case open, what Praecepta does is recorded in
 [DMN conformance](../docs/DMN-CONFORMANCE.md).
 
-**The whole kit: 454 of 3,511 result nodes pass (12.9 %).** Of the 459 that Praecepta evaluates, 454 pass (98.9 %).
+**The whole kit: 454 of 3,511 result nodes pass (12.9 %).** Of the 458 that Praecepta evaluates, 454 pass (99.1 %).
 
 **Decision tables: 83 of 86 checks pass (96.5 %).**
 
@@ -40,8 +40,8 @@ supported yet. A test file's result nodes that are commented out are not counted
 | Compliance level | Models | Result nodes | Passed | Failed | Not supported |
 |---|---:|---:|---:|---:|---:|
 | 2 | 28 | 126 | 89 | 3 | 34 |
-| 3 | 120 | 3,385 | 365 | 2 | 3,018 |
-| **Total** | **148** | **3,511** | **454** | **5** | **3,052** |
+| 3 | 120 | 3,385 | 365 | 1 | 3,019 |
+| **Total** | **148** | **3,511** | **454** | **4** | **3,053** |
 
 ### By feature area
 
@@ -51,9 +51,9 @@ It does not change as Praecepta grows, so each row shows how far that layer is d
 
 | Feature area | Release | Result nodes | Passed | Failed | Not supported |
 |---|---|---:|---:|---:|---:|
-| Single decision tables and arithmetic | 0.6 | 644 | 405 | 2 | 237 |
+| Single decision tables and arithmetic | 0.6 | 643 | 405 | 1 | 237 |
 | Decision requirement graphs | 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | 0 | 0 | 0 | 0 |
-| FEEL language | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1,288 | 0 | 0 | 1,288 |
+| FEEL language | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1,289 | 0 | 0 | 1,289 |
 | Built-in functions | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1,071 | 49 | 0 | 1,022 |
 | Boxed expressions, business knowledge models and structured values | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 456 | 0 | 3 | 453 |
 | Decision services, imports and the rest | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 52 | 0 | 0 | 52 |
@@ -65,8 +65,8 @@ features, these nodes have all they need once it ships.
 
 | Release | Feature area | Not-supported nodes | Evaluated by then, of all nodes |
 |---|---|---:|---:|
-| 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | Decision requirement graphs | 0 | 459 (13.1 %) |
-| 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | FEEL language | 1,523 | 1,982 (56.5 %) |
+| 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | Decision requirement graphs | 0 | 458 (13.0 %) |
+| 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | FEEL language | 1,524 | 1,982 (56.5 %) |
 | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | Built-in functions | 1,022 | 3,004 (85.6 %) |
 | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | Boxed expressions, business knowledge models and structured values | 453 | 3,457 (98.5 %) |
 | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | Decision services, imports and the rest | 54 | 3,511 (100.0 %) |
@@ -89,7 +89,7 @@ not-supported nodes); *alone* counts those that need nothing else.
 | null for operands of types FEEL does not combine (Praecepta rejects them when the engine is built) | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 218 | 218 | 218 |
 | instance of | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 161 | 78 | 78 |
 | and, or | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 95 | 30 | 22 |
-| null from invalid date and time literals (Praecepta rejects them when the engine is built) | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 79 | 79 | 79 |
+| null from invalid date and time literals (Praecepta rejects them when the engine is built) | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 80 | 80 | 80 |
 | paths | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 62 | 42 | 42 |
 | filters | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 48 | 19 | 4 |
 | between | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 38 | 37 | 0 |
@@ -327,7 +327,7 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-3/1111-feel-matches-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1111-feel-matches-function) | 40 | 0 | 0 | 40 | matches() (0.9); lists (0.8); null (0.8) |
 | [compliance-level-3/1115-feel-date-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1115-feel-date-function) | 52 | 16 | 0 | 36 | null from invalid date and time literals (Praecepta rejects them when the engine is built) (0.8); date() (0.9); null (0.8); … |
 | [compliance-level-3/1116-feel-time-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1116-feel-time-function) | 83 | 31 | 0 | 52 | time() (0.9); null from invalid date and time literals (Praecepta rejects them when the engine is built) (0.8); null (0.8); … |
-| [compliance-level-3/1117-feel-date-and-time-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1117-feel-date-and-time-function) | 88 | 35 | 1 | 52 | null from invalid date and time literals (Praecepta rejects them when the engine is built) (0.8); date and time() (0.9); string() (0.9); … |
+| [compliance-level-3/1117-feel-date-and-time-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1117-feel-date-and-time-function) | 88 | 35 | 0 | 53 | null from invalid date and time literals (Praecepta rejects them when the engine is built) (0.8); date and time() (0.9); string() (0.9); … |
 | [compliance-level-3/1120-feel-duration-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1120-feel-duration-function) | 50 | 35 | 0 | 15 | null from invalid date and time literals (Praecepta rejects them when the engine is built) (0.8); duration() (0.9); lists (0.8); … |
 | [compliance-level-3/1121-feel-years-and-months-duration-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1121-feel-years-and-months-duration-function) | 36 | 0 | 0 | 36 | years and months duration() (0.9); null (0.8); function definitions and lambdas (0.10); … |
 | [compliance-level-3/1130-feel-interval](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1130-feel-interval) | 14 | 0 | 0 | 14 | boxed contexts (0.10); lists (0.8); ranges (0.8); … |
@@ -359,7 +359,6 @@ not-supported nodes); *alone* counts those that need nothing else.
 - `compliance-level-2/0008-LX-arithmetic/0008-LX-arithmetic-test-01.xml #002 payment`: expected 562.707359373292, got 562.7073593732659271562143285576524
 - `compliance-level-2/0008-LX-arithmetic/0008-LX-arithmetic-test-01.xml #003 payment`: expected 2861.03377700389, got 2861.033777003901636716262779605767
 - `compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #exponent_lhs_number_exp_rhs_number_005 exponent_lhs_number_exp_rhs_number_005`: expected 60.58617166606, got 60.58617166606633673745724928244262
-- `compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #068_abaa1c2774 feel-date-and-time-function_ErrorCase_068_abaa1c2774`: expected an error, got +99999-12-01T11:22:33
 
 ## Decision tables
 

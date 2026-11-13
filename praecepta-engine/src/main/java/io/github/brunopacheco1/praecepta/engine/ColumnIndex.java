@@ -8,7 +8,6 @@ package io.github.brunopacheco1.praecepta.engine;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetTime;
 import java.time.Period;
@@ -704,7 +703,7 @@ final class ColumnIndex {
             try {
                 return switch (type) {
                     case NUMBER -> new BigDecimal(value);
-                    case DATE -> LocalDate.parse(value);
+                    case DATE -> FeelTemporals.parseDate(value);
                     case TIME -> FeelTemporals.parseTime(value);
                     case DATE_TIME -> FeelTemporals.parseDateTime(value);
                     case DAY_TIME_DURATION -> Duration.parse(value);

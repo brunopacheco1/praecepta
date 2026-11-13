@@ -7,7 +7,6 @@ package io.github.brunopacheco1.praecepta.tck;
 
 import java.math.BigDecimal;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -137,7 +136,7 @@ sealed interface TckValue {
             return switch (expected.type().toLowerCase(Locale.ROOT)) {
                 case "decimal", "double", "integer", "int", "long", "float" ->
                         new BigDecimal(expected.text().strip()).compareTo(new BigDecimal(actual.strip())) == 0;
-                case "date" -> LocalDate.parse(expected.text().strip()).equals(LocalDate.parse(actual.strip()));
+                case "date" -> FeelTemporals.parseDate(expected.text().strip()).equals(FeelTemporals.parseDate(actual.strip()));
                 case "time" -> sameTemporal(FeelTemporals.parseTime(expected.text().strip()), FeelTemporals.parseTime(actual.strip()));
                 case "datetime" -> sameTemporal(FeelTemporals.parseDateTime(expected.text().strip()),
                         FeelTemporals.parseDateTime(actual.strip()));

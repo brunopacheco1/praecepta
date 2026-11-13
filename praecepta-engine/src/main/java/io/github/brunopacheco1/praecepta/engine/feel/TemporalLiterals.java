@@ -45,7 +45,8 @@ final class TemporalLiterals {
     private static final String DATE_AND_TIME = "date and time";
     /** The functions rule 60 permits, longest name first, so that {@code date and time} is not read as {@code date}. */
     private static final List<String> FUNCTIONS = List.of(DATE_AND_TIME, "duration", "date", "time");
-    private static final Pattern DATE = Pattern.compile("-?\\d{4,}-\\d{2}-\\d{2}");
+    /** A date's syntax, with any sign, so that {@code @"+2012-12-02"} is read, and rejected, as a date. */
+    private static final Pattern DATE = Pattern.compile("[+-]?\\d{4,}-\\d{2}-\\d{2}");
     private static final Pattern YEARS_AND_MONTHS = Pattern.compile("-?P(\\d+Y)?(\\d+M)?");
     private static final Pattern NUMBER = Pattern.compile("-?(\\d+(\\.\\d+)?|\\.\\d+)([eE][+-]?\\d+)?");
     /** Deeper nesting than {@code date and time(date(date and time(...)), ...)} is refused, so that reading never runs out of stack. */
@@ -379,7 +380,7 @@ final class TemporalLiterals {
 
     private LocalDate date(String iso) {
         try {
-            return LocalDate.parse(iso);
+            return FeelTemporals.parseDate(iso);
         } catch (DateTimeParseException e) {
             throw invalid(ColumnType.DATE, iso);
         }

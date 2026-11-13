@@ -7,7 +7,6 @@ package io.github.brunopacheco1.praecepta.engine.dmn;
 
 import java.math.BigDecimal;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -492,7 +491,7 @@ public final class DmnWriter {
             return FeelLiterals.literal(switch (type) {
                 case STRING -> value;
                 case NUMBER -> new BigDecimal(text);
-                case DATE -> LocalDate.parse(text);
+                case DATE -> FeelTemporals.parseDate(text);
                 case TIME -> FeelTemporals.parseTime(text);
                 case DATE_TIME -> FeelTemporals.parseDateTime(text);
                 case DAY_TIME_DURATION -> Duration.parse(text);
