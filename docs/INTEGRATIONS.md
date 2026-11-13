@@ -87,14 +87,20 @@ integrations find their tables at runtime, so their engines take maps instead:
   decision of the file is then a decision of `Decisions`, literal expressions included, and
   `decisions.evaluate(name, inputData)` evaluates it from the model's **input data**, by name, as text, each
   decision it requires once: `"30"`, `["PT", "BR"]` for a list, and a structured input data by its components'
-  paths (`Loan.principal`), as a column of that name reads it; a list of structured values cannot be given as
-  text. Its value comes as the maps a table's engine gives: one map with a table's outputs, a context's
+  paths (`Loan.principal`), as a column of that name reads it, as is an input data without a type that a decision
+  reads by path (`Applicant.age`, each component typed by the column that reads it); a list of structured values
+  cannot be given as text. Blank text is missing, as for a table's inputs, except for a `string` input data, for
+  which it is the empty string, as the engine's `DecisionGraph` has it. Its value comes as the maps a table's engine gives: one map with a table's outputs, a context's
   components, or a literal expression's value under the decision's name; one map per element of a list (RULE
   ORDER, OUTPUT ORDER, COLLECT); none for null. Each decision table is still an engine bean, which evaluates the
   table alone from its columns, the values of the decisions it requires included, as 0.6 did; a literal
-  expression has no engine bean. The graph's report (`DECISION_CYCLE`, `MISSING_REQUIREMENT`, `TYPE_MISMATCH`,
-  all ERRORs) fails loading at `fail-on` like a table's; below it, a decision it concerns throws
-  `InvalidDecisionTableException` when evaluated, and the others evaluate. A file without such decisions loads
+  expression has no engine bean. The graph's report (`DECISION_CYCLE`, `MISSING_REQUIREMENT`, `TYPE_MISMATCH` and
+  `UNSUPPORTED_FEATURE`, ERRORs, and `ALWAYS_NULL`, a WARNING) fails loading at `fail-on` like a table's; below it,
+  a decision an ERROR concerns throws `InvalidDecisionTableException` when evaluated, and the others evaluate. A
+  decision table of the graph is checked against its analysis as the graph evaluates it
+  (`DecisionGraph.validationReport(decision)`, its `Decision.report()`), the report the build plugins check, so a
+  file fails at the same `fail-on` in both. Whether a file is no graph Praecepta evaluates yet is told by the
+  `UnsupportedFeatureException` `DmnReader.readModel` throws, not by its message. A file without such decisions loads
   exactly as before, its decision tables read alone. So does a file that is no graph Praecepta evaluates yet:
   one that uses what later releases bring (business knowledge models, boxed expressions, decision services,
   imports, FEEL beyond the expression subset), or that is not a well-formed decision model (two elements of one
@@ -184,8 +190,8 @@ when there are such graphs, `models` lists each one's `name`, `location`, `decis
 `type`) and `issues`. An issue's `kind` is one of `ValidationReport.Kind`: `OVERLAPPING_RULES`, `CONFLICTING_OUTPUTS`
 and `UNREACHABLE_DEFAULT_OUTPUT` (a default output on a table that every input matches, which DMN 1.5,
 10.3.2.10, forbids) are errors, so they fail the build or the startup at the default `fail-on`;
-`UNREACHABLE_RULE` and `GAP` are warnings; a graph's `DECISION_CYCLE`, `MISSING_REQUIREMENT` and `TYPE_MISMATCH` are
-errors. They only read; nothing is evaluated through them. The descriptions show the rules'
+`UNREACHABLE_RULE` and `GAP` are warnings; a graph's `DECISION_CYCLE`, `MISSING_REQUIREMENT`, `TYPE_MISMATCH` and
+`UNSUPPORTED_FEATURE` are errors, and its `ALWAYS_NULL` a warning. They only read; nothing is evaluated through them. The descriptions show the rules'
 conditions, so expose the endpoints as you would any other that shows configuration.
 
 In Quarkus, the application builds its engines from the DMN the build validated, so it cannot fail

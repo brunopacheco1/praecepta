@@ -18,7 +18,9 @@ says nothing, and the TCK has no test. In those cases Praecepta changes no behav
 reading; it records here what it does, so the case can be settled when a later DMN version or the TCK
 decides. None of these choices should be described as "FEEL's behaviour". The list started with the
 0.4.0 conformance review ([#86](https://github.com/brunopacheco1/praecepta/issues/86)); a case that is
-settled stays here, marked as such, with the release that settled it.
+settled stays here, marked as such, with the release that settled it. Where DMN 1.5 or the TCK does decide
+and Praecepta does otherwise, the case is a [known deviation](#known-deviations), listed apart with the
+release meant to remove it.
 
 | # | Case | Status |
 |---|---|---|
@@ -35,7 +37,7 @@ settled stays here, marked as such, with the release that settled it.
 | 11 | [A date and time moved by months onto a local time its zone skips](#11-a-date-and-time-moved-by-months-onto-a-local-time-its-zone-skips) | open |
 | 12 | [Blank text as a missing value](#12-blank-text-as-a-missing-value) | open |
 | 13 | [A value of another type than the decision table input it feeds](#13-a-value-of-another-type-than-the-decision-table-input-it-feeds) | open |
-| 14 | [The default output of a table with several results](#14-the-default-output-of-a-table-with-several-results) | open |
+| 14 | [The default output of a table with several results](#14-the-default-output-of-a-table-with-several-results) | decided by DMN 1.5; a known deviation where the decision declares no type |
 | 15 | [A name that both a requirement and a path into another could mean](#15-a-name-that-both-a-requirement-and-a-path-into-another-could-mean) | open |
 | 16 | [Input data whose values are not of its type or allowed values](#16-input-data-whose-values-are-not-of-its-type-or-allowed-values) | open |
 | 17 | [An input data without a type](#17-an-input-data-without-a-type) | open |
@@ -206,14 +208,21 @@ integrations alike.
 - **TCK.** No test gives a table an input of another type than its input expression declares.
 - **Praecepta (since 0.7.0, [#14](https://github.com/brunopacheco1/praecepta/issues/14)).** `DecisionGraph` reports
   it when the graph is built, as an ERROR (`TYPE_MISMATCH`), and does not evaluate that decision, nor any that
-  requires it. The same holds for a path into a value whose type has no such component, and for operands a literal
-  expression cannot combine (FEEL gives null there, Tables 57 and 59; output expressions already reject them when a
-  table is built). A column of lists takes a single value as a list of one, the conversion 10.3.2.9.4 calls "to
-  singleton list". Where 10.3.2.9.4 does decide, Praecepta follows it: a literal expression's value is bound to the
-  type its decision declares, a date to a date and time at UTC midnight, a single value to a list as a list of one,
-  and any other value of a type that does not conform as null, which the report also lists as a `TYPE_MISMATCH`.
-  A decision table's value is typed by its outputs, not by its decision's variable; that a variable could declare
-  another type is not checked.
+  requires it. The same holds for a path into a value whose type has no such component. A column of lists takes a
+  single value as a list of one, the conversion 10.3.2.9.4 calls "to singleton list". A column of a model whose input
+  expression declares no `typeRef` is of the type of the input data or decision it reads (7.3.4), so it never
+  mismatches it.
+
+  Where DMN 1.5 decides, Praecepta follows it. A decision's value, a decision table's as well as a literal
+  expression's, is bound to the type its variable declares (10.3.2.9.4): a date to a date and time at UTC midnight, a
+  single value to a list as a list of one, a list of one value to that value, and any other value of a type that does
+  not conform (10.3.2.9.2) as null. A literal expression whose operands FEEL's arithmetic does not combine (a string
+  and a number, a boolean, a list) is null, as the text before Tables 56 and 58 has it ("if input values are not of
+  the listed types, the result is null") and the TCK's `0100-arithmetic` expects; and an untyped table output whose
+  entries are literals of one type has that type (10.3.2.10, step 3c: the entry `10` is the number 10). A decision
+  whose value is therefore always null is evaluated, and reported as a WARNING (`ALWAYS_NULL`). What remains of
+  FEEL's rules that Praecepta does not follow is listed under [known deviations](#known-deviations): table output
+  entries that combine such operands, and untyped outputs whose entries are not literals of one type.
 
 ## 14. The default output of a table with several results
 - **DMN 1.5.** 10.3.2.10, step 2: when no rule matches, "if a default output value d is specified, DTI=FEEL(d)", a
@@ -222,9 +231,12 @@ integrations alike.
   decision whose variable declares no type keeps the single value.
 - **TCK.** `0109-ruleOrder-hitpolicy` (test 003) expects the list of one, its decision's variable being typed by a
   collection.
-- **Praecepta (since 0.7.0, [#14](https://github.com/brunopacheco1/praecepta/issues/14)).** A decision table with
-  several results always has a list type (`list<T>`), so its default output is always a list of one, whether the
-  variable declares a type or not; the engine has always returned it so (`[{Status=Declined, Rate=Standard}]`).
+- **Praecepta (since 0.7.0, [#14](https://github.com/brunopacheco1/praecepta/issues/14)).** DMN 1.5 decides this
+  case, so it is not open. A table with several results gives its default output as a list of one, which binds to a
+  decision whose variable is typed by a list as the TCK expects, and to one whose variable declares a single value as
+  that value ("from singleton list"); the engine has always returned it so (`[{Status=Declined, Rate=Standard}]`).
+  Where the variable declares no type, Praecepta still gives the list of one, where DMN 1.5 gives the single value:
+  a [known deviation](#known-deviations), as the graph types such a decision `list<T>` when it is built.
 
 ## 15. A name that both a requirement and a path into another could mean
 - **DMN 1.5.** A name may hold a dot (10.3.1.6 on ambiguity; grammar rules 27 to 30), so `Pricing.discount` may name
@@ -245,16 +257,44 @@ integrations alike.
   number) throws `InvalidInputException` when the decision is evaluated, as an input of a table does. An item
   definition's allowed values are not checked for input data (a decision table still checks its own input values).
   Blank text is a missing value for every simple type but `string`, for which `""` is passed on as a string, as FEEL
-  has it; a decision table reading it takes it as missing (case 12).
+  has it, by the engine's `DecisionGraph` and by the framework integrations' maps of text alike; a decision table
+  reading it takes it as missing (case 12), as its map-based inputs always have.
 
 ## 17. An input data without a type
 - **DMN 1.5.** An input data's variable "may include a typeRef" (6.3.11); without one, its values are of any type.
 - **TCK.** Every TCK input data has a `typeRef`.
 - **Praecepta (since 0.7.0).** Its type is that of the decision table columns that read it whole, when they agree;
-  where they do not, a `TYPE_MISMATCH` is reported. A literal expression cannot read a name whose type is not known,
-  which is reported too (the subset Praecepta evaluates is typed when the graph is built). Read by path, a value of
-  undeclared type is checked when it is read, and a value of another type than its column throws
-  `InvalidInputException`.
+  where they do not, a `TYPE_MISMATCH` is reported. Read by path, or by a table that types it otherwise, its value is
+  taken when it is read as an input data of the column's type would be (text, an `Integer`, an `OffsetDateTime`...),
+  and a value that is not one throws `InvalidInputException`. A literal expression reading it is typed when it is
+  evaluated: FEEL's arithmetic applies to the values given, and gives null for those it does not combine. The
+  framework integrations take such an input data as text under its name, which is a string, or as text under the
+  paths a decision reads into it (`Applicant.age`), a context of those components.
+
+## Known deviations
+Where DMN 1.5 or the TCK decides and Praecepta does otherwise. Each is reported or documented where it shows,
+and is meant to go with the release named.
+
+- **The default output of a table with several results, bound to a decision of no declared type** (case 14).
+  DMN 1.5 gives the single default value (10.3.2.10, step 2a, then binding to `Any`); Praecepta gives a list of
+  one, as it types every such decision `list<T>` when the graph is built. A decision that declares its type is
+  bound as DMN 1.5 has it. No TCK node shows the difference: every multi-hit table of levels 2 and 3 has a
+  collection-typed variable. To go with the full FEEL language (0.8,
+  [#116](https://github.com/brunopacheco1/praecepta/issues/116)), whose values are typed when evaluated.
+- **Output entries whose operands FEEL does not combine** (since 0.6.0). A decision table's output entry such as
+  `"a" + 1` is rejected when the table is read, where FEEL gives null (the text before Tables 56 and 58); the TCK's
+  `0100-arithmetic` counts 212 such checks. A literal expression decision gives null, as FEEL does (case 13). To go
+  with the full FEEL language (0.8, [#116](https://github.com/brunopacheco1/praecepta/issues/116)).
+- **Untyped table outputs whose entries are not literals of one type.** In a model, an output that declares no
+  type takes its decision's (or its component's), else that of its output entries when they are all literals of one
+  type; one whose entries name an input, compute a value, or mix types stays a string, so its numbers pass to other
+  decisions as text, where FEEL gives each entry its own type (10.3.2.10, step 3c). A table read alone
+  (`DmnReader.read`) keeps 0.6's typing: untyped outputs as strings, and untyped input expressions as strings even
+  where the input data they read declares a type. To go with the full FEEL language (0.8,
+  [#116](https://github.com/brunopacheco1/praecepta/issues/116)).
+- **A context type's conformance, and a literal expression's own `typeRef`.** A value is bound to the type its
+  decision's variable declares; a literal expression's `typeRef` is read only where the variable has none, and one
+  that differs from the variable's (7.3.1 requires them equal) is not reported.
 
 ## How a null result is returned
 DMN 1.5 gives a decision table one result, which may be null; Praecepta's engine returns a list of
@@ -276,3 +316,14 @@ ORDER and OUTPUT ORDER, the result is a list of the matching rules' outputs (10.
 the same `[{fee=null}]` stands for two DMN results the representation does not tell apart: DMN's `[null]`,
 when one rule matches and its entry is `null`, and DMN's null, when no rule matches and the default is
 `null` (step 2a).
+
+A decision of a decision requirements graph (since 0.7.0, [#14](https://github.com/brunopacheco1/praecepta/issues/14))
+has DMN's value itself, so each evaluator tells more of these apart:
+- **`DecisionGraph`** returns Java's `null` for DMN's null, a `List` for a list (`[null]` is a list holding
+  `null`, distinct from `null`), and a `Map` for a context, whose components may be `null`.
+- **The generated decision classes** return what the graph returns, as their Java types: `null` for DMN's null, a
+  `List` whose elements may be `null`, and for a context a record, whose components may be `null`.
+- **The framework integrations** (`Decisions.evaluate`, `GraphModel`) give maps of text, as a table's map-based
+  engine does: no map for DMN's null, one map per element of a list (an element that is null maps the decision's
+  value name to null, so `[null]` is `[{fee=null}]`), and one map of the components for a context. An empty list
+  gives no map, like null.

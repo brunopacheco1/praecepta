@@ -204,10 +204,15 @@ rejects two elements of one name (6.3.7, 6.3.11), and nothing else: a model may 
 item definitions to a `FeelType`: collections, components, nested to `MAX_TYPE_DEPTH` levels, with a check for types
 defined in terms of themselves) and every `decision`: its information requirements, by `href` to an element of the
 model (one to no element is kept as the id it names, which the graph reports as missing), and its logic, a decision
-table read exactly as `read(dmn, decision)` reads it, or a literal expression, typed by the decision variable's
-`typeRef`. What later releases bring is rejected whole, naming the feature and its issue: business knowledge models,
-knowledge requirements and boxed expressions as logic (#118), FEEL beyond the subset (#116, function calls #117),
-decision services, imports and references into other models (#119). Knowledge sources, authority requirements,
+table or a literal expression, each with the type the decision variable's `typeRef` declares (`FeelType.ANY` for
+none), which its value is bound to. A table is read as `read(dmn, decision)` reads it, except that what declares no
+`typeRef` is typed from the model (`ModelTypes`): an input expression by the input data or decision it names (or the
+component a path names), an output by the decision's variable (its component of the output's name, for several
+outputs), else by its output entries when they are all literals of one type. What later releases bring is rejected
+whole with an `UnsupportedFeatureException`, whose `release()` and `issue()` name the release that plans it, so that
+callers fall back by its type, never by its message: business knowledge models, knowledge requirements and boxed
+expressions as logic (#118), FEEL beyond the subset (#116, function calls #117), decision services, imports and
+references into other models (#119). Knowledge sources, authority requirements,
 annotations and diagrams take no part in evaluation and are ignored. `DmnWriter.write(DecisionModel)` writes DMN 1.3
 with ids by position (`input_data_0`, `decision_0`, and `decision_0_` before the ids of a decision's table, so the
 tables of a model never share an id), item definitions for list and context types, and literal expressions as
@@ -219,22 +224,30 @@ input data and decision gets a *slot*: input data first, then decisions, in the 
 1. checks each requirement exists and is of its kind (`MISSING_REQUIREMENT`);
 2. resolves each name a decision's logic reads (a table's columns and the inputs its cells compare with, a literal
    expression's names) among that decision's requirements: the requirement so named, else the one named by its
-   longest part before a dot, the rest being a path into its value (`Pricing.discount`, `Loan.principal`); a name
-   no requirement provides is a `MISSING_REQUIREMENT` (7.3.4);
+   longest part before a dot, the rest being a path into its value (`Pricing.discount`, `Loan.principal`), as
+   `DecisionModel.elementOf` resolves names for every part of Praecepta; a name no requirement provides is a
+   `MISSING_REQUIREMENT` (7.3.4), and a path to a date's, time's or duration's property (`Birth.year`), which the
+   full FEEL language brings, an `UNSUPPORTED_FEATURE`;
 3. finds cycles among required decisions (Tarjan's algorithm with an explicit stack), reported with the cycle's
    path (`DECISION_CYCLE`), and orders the other decisions so each comes after those it requires (Kahn's algorithm);
 4. works out types: an input data without a `typeRef` takes the type of the table columns that read it whole, when
    they agree; a table's value is its one output's type, or a context of its outputs, a list of that under a hit
    policy with several results and no aggregation, a number for COUNT; a literal expression's comes from the types
-   of the names it reads (single strings, numbers, dates, times or durations), bound to the declared type as DMN 1.5,
-   10.3.2.9.4, binds a decision's value (a date to a date and time, a value to a list of one, anything else that does
-   not conform to null, which is also reported);
+   of the names it reads (single strings, numbers, dates, times or durations), or is the type of the one name it is,
+   or is known only when it is evaluated where a name it reads has no type (the expression is then typed from its
+   values, `GraphNodes.LiteralNode`); operands FEEL's arithmetic does not combine make it null (`ALWAYS_NULL`, a
+   WARNING). Either value is then bound to the decision's declared type as DMN 1.5, 10.3.2.9.4, binds it
+   (`GraphValues.Binding`): as it is where it conforms (10.3.2.9.2), a date to a date and time, a value to a list
+   of one, a list of one to its element, checked when evaluated where its type is known only then, and anything
+   else that does not conform to null (`ALWAYS_NULL`);
 5. checks that each value a table reads fits its column (`TYPE_MISMATCH`): the column's type, or for a column of lists
    a list of it or a single value (a list of one); a path must exist in the type it reads; a cell that names a list
    (`Flu Symptoms`) asks whether the value is in it, so such an input is bound as a list of the table;
 6. marks the decisions that cannot be evaluated: those with an issue, in a cycle, or requiring such a decision.
 
-The graph's report lists those issues, all ERRORs; `Builder.failOn(severity)` rejects the graph when its report, or
+The graph's report lists those issues, ERRORs but for `ALWAYS_NULL`, a WARNING, whose decision is evaluated; each
+issue kind is one of `ValidationReport.Kind`, which later layers will extend (a `switch` over it keeps a `default`).
+`Builder.failOn(severity)` rejects the graph when its report, or
 one of its tables', has issues that severe, and `logValidationReport` logs them once, as `PraeceptaEngine` does.
 Each decision table becomes a `PraeceptaEngine<Object[], Object>` (`GraphNodes.TableNode`), whose inputs are the
 graph's slots: each column is bound with a getter that reads its slot and path (`PraeceptaEngine.Builder.valueInput`,
@@ -247,7 +260,9 @@ is parsed once (`GraphNodes.LiteralNode`) and reads its names through resolved s
 the slots of the input data it needs and the decisions it needs, itself last, in dependency order. It fills an
 `Object[]` of slots with the input data, made FEEL values of their declared types (`GraphValues.normalise`: an
 `Integer` becomes a `BigDecimal`, a `Period` a `YearsAndMonths`, text of a simple type its value, a map the declared
-components of a context), then evaluates each decision once into its slot. A path reads a context's component, or of
+components of a context, and a value of no declared type copied, unmodifiable, its numbers `BigDecimal`s), then
+evaluates each decision once into its slot. A column that reads a value of no declared type converts it then, as an
+input data of the column's type is converted, or rejects it. A path reads a context's component, or of
 a list of contexts the list of their components (10.3.2.5), and a column of lists takes a single value as a list of
 one (10.3.2.9.4). No walk over the graph recurses, so a chain of thousands of decisions builds and evaluates on any
 thread's stack. A graph is immutable once built (the plans are cached in a concurrent map) and thread-safe.

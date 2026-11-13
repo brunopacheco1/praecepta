@@ -435,7 +435,8 @@ evaluate identically, which is how the benchmarks feed them.
 ### Decision requirement graphs
 A DMN file with several decisions, some requiring others, is a decision requirement graph (DMN 1.5,
 chapter 6). `DecisionGraph` reads it and evaluates any decision by name from the input data it needs, each
-decision it requires evaluated once, in dependency order, with nothing parsed per call
+decision it requires evaluated once, in dependency order, whatever order the file lists them in, with every
+table, expression and name parsed when the graph is built
 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)):
 
 ```java
@@ -445,28 +446,36 @@ try (var dmn = Files.newInputStream(Path.of("credit.dmn"))) {
 }
 graph.evaluate("Monthly Limit", Map.of("Applicant Age", 30, "Income", 1200));   // 200
 graph.requiredInputData("Monthly Limit");                                      // [Applicant Age, Income]
-graph.validationReport();                                  // cycles, missing requirements, type mismatches
+graph.validationReport();                      // cycles, missing requirements, type mismatches...
 graph.validationReport("Credit Limit");                    // that table's own analysis
 ```
 
 - **Decisions** are decision tables, or literal expressions in the subset output entries take: literals and
   names joined with `+`, `-`, `*`, `/` and `**` (`"Hello " + Full Name`, `Credit Limit / 12`,
-  `Order Total * (1 - Pricing.discount)`, `Start + duration("P14D")`).
+  `Order Total * (1 - Pricing.discount)`, `Start + duration("P14D")`), or a name alone, which gives the value it
+  reads whatever its type. Operands FEEL's arithmetic does not combine (a string and a number, a list) give null,
+  as in FEEL; a name of an input data without a type is typed when the decision is evaluated.
 - **Values.** A table with one output gives its value, with several a context (a `Map` of its outputs), whose
   components a decision reads by path (`Pricing.discount`), and under RULE ORDER, OUTPUT ORDER or COLLECT
   without an aggregation a list of those, which a list column downstream takes (`Checks.code` is the list of
-  each result's `code`); no match without a default output gives null. Input data are given as Java values
+  each result's `code`); no match without a default output gives null. Either value is bound to the type the
+  decision's variable declares (DMN 1.5, 10.3.2.9.4): a single result to a list as a list of one, a list of one
+  result to a single value as that result, a date to a date and time; a value that does not conform is null. An
+  output without a `typeRef`, as DMN 1.5 wants a single output to be, takes the variable's type, or the type of its
+  output entries when they are all literals of one type (`10` is a number). Input data are given as Java values
   (`Integer`, `BigDecimal`, `LocalDate`, `List`, `Map` for a structured type...) or, for simple types, as text.
 - **Input data** are typed by their `typeRef`: a built-in type, or an item definition, which may be a
   collection or have components (`Loan.principal`). One without a `typeRef` takes the type of the decision
-  table columns that read it.
+  table columns that read it; a column whose input expression has no `typeRef` takes the type of what it reads.
 - **Checked when the graph is built**, as ERRORs of its validation report: decisions that require one another in
   a cycle (`DECISION_CYCLE`), a requirement the model does not have or a name no requirement provides
-  (`MISSING_REQUIREMENT`), and a value that does not fit where it goes, such as a string into a number column or
-  a list into a column of single values (`TYPE_MISMATCH`). Such a decision, and every decision that requires it,
-  cannot be evaluated; the others can. (A literal expression whose value does not fit the type its decision
-  declares is reported too, but evaluates to null, as DMN 1.5 binds it, 10.3.2.9.4.)
-  `DecisionGraph.builder().failOn(Severity.ERROR)` rejects the graph instead. Each table keeps its own analysis.
+  (`MISSING_REQUIREMENT`), a value that does not fit where it goes, such as a string into a number column or
+  a list into a column of single values (`TYPE_MISMATCH`), and what Praecepta does not evaluate yet, such as a
+  date's `.year`, naming the release that plans it (`UNSUPPORTED_FEATURE`). Such a decision, and every decision
+  that requires it, cannot be evaluated; the others can. A decision whose value DMN 1.5 defines as null whatever
+  its inputs (operands FEEL does not combine, a value that does not conform to the declared type) is a WARNING
+  (`ALWAYS_NULL`), and evaluates to null. `DecisionGraph.builder().failOn(Severity.ERROR)` rejects the graph
+  instead. Each table keeps its own analysis.
 - **In code**, `DecisionGraph.builder()` assembles a graph from input data, `DecisionTable`s and literal
   expressions, each decision requiring what it reads; `graph.model()` is the `DecisionModel`, which
   `DmnReader.readModel` reads and `DmnWriter.write(model)` writes back.
@@ -480,7 +489,9 @@ Business knowledge models, invocations and boxed expressions (0.10,
 [#116](https://github.com/brunopacheco1/praecepta/issues/116)) and its built-in functions (0.9,
 [#117](https://github.com/brunopacheco1/praecepta/issues/117)), decision services and imports (0.11,
 [#119](https://github.com/brunopacheco1/praecepta/issues/119)) come later: a model that uses them is rejected
-when it is read, with a message that names the feature and its issue.
+when it is read with an `UnsupportedFeatureException`, whose message, `release()` and `issue()` name the feature's
+release and issue. What DMN 1.5 decides and Praecepta does not do yet is listed in
+[docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md#known-deviations).
 
 ## Praecepta Loader
 Loads rules from the first sheet of an Excel file (or a semicolon-separated CSV file), from the
@@ -595,9 +606,14 @@ DecisionGraph graph = CreditModel.graph();     // the whole graph, e.g. to evalu
   its table's own analysis.
 - `<decision>` compiles one decision of the file: its class is named after it (or `<name>`), and its model
   class `<Class>Model`. A decision table that requires no other decision compiles as before, as do files
-  without such decisions, so existing generated classes do not change.
-- The graph's issues fail the build at `<failOn>` (an ERROR each); below it they are logged, and a decision
-  that cannot be evaluated gets no classes. A file with business knowledge models, boxed expressions, decision
+  without such decisions, so their generated classes do not change. **Upgrade note:** a `<decision>` naming a
+  table that requires another decision, and a file without `<decision>` that holds one table and a literal
+  expression, compiled as one table class in 0.6, whose input record held the table's columns; they now compile
+  as a graph, whose input records hold the model's input data, and without `<decision>`, `<name>` names the model
+  class (`<name>Model`). See the [changelog](CHANGELOG.md).
+- The graph's issues fail the build at `<failOn>` (its ERRORs, and at `WARNING` its WARNINGs too, such as a
+  decision that is always null); below it they are logged, and a decision that cannot be evaluated gets no
+  classes. A file with business knowledge models, boxed expressions, decision
   services, imports or FEEL beyond the expression subset is no graph Praecepta evaluates yet: its decision table
   compiles alone, as before, and without one the build fails, naming the release that plans what it uses.
 
@@ -735,10 +751,13 @@ decisions.evaluate("Payment", Map.of("Loan.principal", "600000", "Loan.rate", "0
 A decision's value comes as the maps a table gives: one map with the outputs of a table, a context's
 components, or the value under the decision's name for a literal expression; one map per element of a list
 (RULE ORDER, COLLECT); none for null. A structured input data is given by its components' paths
-(`Loan.principal`). Each decision table is still an engine bean, which evaluates the table alone, from its
-columns (the values of the decisions it requires included); a literal expression has none. The graph's issues
-(a cycle, a missing requirement, a type mismatch, all ERRORs) stop the startup at `praecepta.fail-on`, or are
-logged as `Decision model Credit: ERROR ...`; the endpoint lists each model under `models`, with its input data
+(`Loan.principal`), and so is one without a type that a decision reads by path (`Applicant.age`). Blank text is
+missing, except for a `string` input data, for which it is the empty string, as FEEL and the engine have it. Each
+decision table is still an engine bean, which evaluates the table alone, from its columns (the values of the
+decisions it requires included); a literal expression has none. The graph's issues (a cycle, a missing
+requirement, a type mismatch, what Praecepta does not evaluate yet: ERRORs; a decision always null: a WARNING),
+and each table's analysis as the graph evaluates it, stop the startup at `praecepta.fail-on`, as they fail the
+build plugins, or are logged as `Decision model Credit: ERROR ...`; the endpoint lists each model under `models`, with its input data
 and issues, and gives each of its decisions its `model`, `logic`, `type`, `requiredDecisions`, `inputData` and
 `canEvaluate`. Files without such decisions load exactly as before, and so does a file with what later releases
 bring (business knowledge models, boxed expressions, decision services, imports, FEEL beyond the expression

@@ -35,8 +35,10 @@ with a zone id that no cell names are no longer reported unreachable
 33.8.0 and Groovy 3.0.25 in tests, Jackson 2.23.0 in the benchmarks, the versions-maven-plugin 2.25.1); no published
 module's dependencies changed. Read *Changed* and *Fixed* before upgrading if a framework integration loads DMN files
 in which a decision requires another decision (its decisions now evaluate through the graph, from the model's input
-data, and the graph's errors stop startup), your code switches over `ValidationReport.Kind` exhaustively or
-deconstructs `integration.Decision` with a record pattern, or a map-based time column of yours has cells that name no
+data, and the graph's errors stop startup), a build plugin or the Quarkus extension compiles a DMN file whose named
+decision requires another decision, or that holds a literal expression decision (it now compiles as a graph, with
+other classes), your code switches over `ValidationReport.Kind` exhaustively or deconstructs `integration.Decision`
+with a record pattern, or a map-based time column of yours has cells that name no
 zone id with a changing offset (its report now lists a time in another zone as a gap, a WARNING).
 
 ### Added
@@ -45,40 +47,60 @@ zone id with a changing offset (its report now lists a time in another zone as a
   decision's logic is a decision table or a literal expression in the subset output entries take (literals and names
   joined with `+`, `-`, `*`, `/` and `**`). `DecisionGraph.read(dmn)` reads a file, and
   `evaluate(decision, inputData)` evaluates any decision by name from the input data it needs, each decision it
-  requires once, in dependency order, with nothing parsed per call; `evaluate(decisions, inputData)` evaluates several
-  at once. A decision's value is given to the decisions that require it under its name: a table with one output gives
+  requires once, in dependency order, whatever order the file lists them in, every table, expression and name parsed
+  when the graph is built; `evaluate(decisions, inputData)` evaluates several at once. A decision's value is given to the decisions that require it under its name: a table with one output gives
   that output's value, one with several a context (`Map`) whose components a decision reads by path
   (`Pricing.discount`), and one with several results (RULE ORDER, OUTPUT ORDER, COLLECT without an aggregation) a
   list, which a list input takes (`Checks.code` being the list of each result's `code`, DMN 1.5, 10.3.2.5); no match
-  without a default output gives null. Input data are typed by their `typeRef`, a built-in type or an item definition
-  (a collection, or a structure whose components are read by path, `Loan.principal`), and are given as Java values or,
-  for simple types, as text. `requiredInputData(decision)`, `inputData()`, `type(decision)` and `decisions()` describe
+  without a default output gives null. A table's value, as a literal expression's, is bound to the type its
+  decision's variable declares (10.3.2.9.4): a single result to a list as a list of one, a list of one result to a
+  single value, a date to a date and time at UTC midnight, and a value that does not conform as null. A literal
+  expression that is a name alone gives the value it reads, of any type; one whose operands FEEL's arithmetic does
+  not combine is null, as in FEEL; and one that reads an input data without a type is typed when it is evaluated.
+  Input data are typed by their `typeRef`, a built-in type or an item definition (a collection, or a structure whose
+  components are read by path, `Loan.principal`), and are given as Java values or, for simple types, as text; one
+  without a type is taken as given, and a column or path that reads it converts it as it would a declared input
+  data of the column's type. `requiredInputData(decision)`, `inputData()`, `type(decision)` and `decisions()` describe
   the graph, for the build plugins and framework integrations to build on (see
   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). `DecisionGraph.builder()` assembles a graph in code from input data,
-  `DecisionTable`s and literal expressions, each decision requiring what it reads.
+  `DecisionTable`s (of a declared type or none) and literal expressions, each decision requiring what it reads.
 - **A graph is checked when it is built** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)): its
-  validation report (`DecisionGraph.validationReport()`) has three new issue kinds, all ERRORs:
+  validation report (`DecisionGraph.validationReport()`) has five new issue kinds. Four are ERRORs:
   `ValidationReport.Kind.DECISION_CYCLE` (decisions that require one another, directly or indirectly: "a Decision
   element SHALL not require itself", 6.3.7), `MISSING_REQUIREMENT` (a required decision or input data the model does
-  not have, or a name a decision reads that none of its information requirements provides, 7.3.4) and `TYPE_MISMATCH`
-  (a value of another type than the decision table input it feeds, a path into a value without such a component,
-  operands a literal expression cannot combine, or a literal expression's value of another type than its decision
-  declares). Such a decision, and every decision that requires it, cannot be evaluated
-  (`InvalidDecisionTableException`), and the others can; a literal expression whose value does not conform to its
-  decision's declared type is the exception, as DMN 1.5 defines it to be null (10.3.2.9.4). `Builder.failOn` rejects a
-  graph with issues at a severity, and each decision table keeps its own analysis (`validationReport(decision)`).
+  not have, or a name a decision reads that none of its information requirements provides, 7.3.4), `TYPE_MISMATCH`
+  (a value of another type than the decision table input it feeds, or a path into a value without such a component)
+  and `UNSUPPORTED_FEATURE` (logic DMN 1.5 defines that Praecepta does not evaluate yet, such as a date's `.year`,
+  naming the release that plans it). Such a decision, and every decision that requires it, cannot be evaluated
+  (`InvalidDecisionTableException`), and the others can. The fifth, `ALWAYS_NULL`, a WARNING, is a decision whose
+  value DMN 1.5 defines as null whatever its inputs: a literal expression whose operands FEEL's arithmetic does not
+  combine (the text before Tables 56 and 58), or a value whose type does not conform to the type its decision declares
+  (10.3.2.9.4); it is evaluated, to null. `Builder.failOn` rejects a graph with issues at a severity, and each
+  decision table keeps its own analysis (`validationReport(decision)`).
 - **Decision models in DMN** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)): `DmnReader.readModel(dmn)`
   reads a whole model (`beans.DecisionModel`: its input data, its decisions, their information requirements and their
-  logic, `beans.DecisionLogic.Table` or `LiteralExpression`), and `DmnWriter.write(DecisionModel)` writes one back as
-  DMN 1.3, which reads back as the same model. The types of input data and decisions are `feel.FeelType`: a simple
-  type, a list, a context of components, or any type. What later releases bring is rejected when the model is read,
-  with a message that names the feature and its issue: business knowledge models, knowledge requirements and boxed
+  logic, `beans.DecisionLogic.Table` or `LiteralExpression`, each with the type its decision's variable declares),
+  and `DmnWriter.write(DecisionModel)` writes one back as DMN 1.3, which reads back as the same model. The types of
+  input data and decisions are `feel.FeelType`: a simple type, a list, a context of components, or any type
+  (`component(name)` gives a component's type, as a path reads it). In a model, what declares no `typeRef` is typed
+  from it: a table input expression by the input data or decision it reads, and an output by its decision's variable,
+  else by its output entries when they are all literals of one type (`10` is a number, as FEEL reads it, so it passes
+  to other decisions as a number, not as the text a table read alone keeps). `DecisionModel.needsGraph()` says whether
+  a model needs its graph, and `DecisionModel.elementOf` resolves a name a decision reads, as every part of Praecepta
+  does. Later layers add kinds of logic and of types: a `switch` over `DecisionLogic`, `FeelType` or
+  `ValidationReport.Kind` should keep a `default` branch. What later releases bring is rejected when the model is
+  read, with an `exceptions.UnsupportedFeatureException` (an `InvalidDecisionTableException` whose `release()` and
+  `issue()` name the release that plans it, which callers branch on rather than on its message) whose message names
+  the feature and its issue: business knowledge models, knowledge requirements and boxed
   expressions (0.10, [#118](https://github.com/brunopacheco1/praecepta/issues/118)), FEEL beyond the subset (0.8,
   [#116](https://github.com/brunopacheco1/praecepta/issues/116)) and function calls (0.9,
   [#117](https://github.com/brunopacheco1/praecepta/issues/117)), decision services and imports (0.11,
   [#119](https://github.com/brunopacheco1/praecepta/issues/119)). `DmnReader.read(dmn)`, `read(dmn, decision)` and
   `readAll(dmn)` read single tables as before. What DMN 1.5 and the TCK leave open about graphs, and what Praecepta
-  does there, is recorded in [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md) (cases 13 to 17).
+  does there, is recorded in [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md) (cases 13 to 17), with the known
+  deviations where DMN 1.5 decides and Praecepta does not follow it yet (an untyped decision's default output under a
+  hit policy with several results, output entries whose operands FEEL does not combine, untyped outputs whose entries
+  are not literals of one type).
 - **Generated classes for decision requirement graphs** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)):
   the Maven and Gradle plugins (and `praecepta-compiler`) compile a DMN file whose decisions require other decisions,
   or are literal expressions, into a model class (`CreditModel`, named after the model or `name`) that loads the model
@@ -88,16 +110,18 @@ zone id with a changing offset (its report now lists a time in another zone as a
   for a context (a table with several outputs), a record of the model class for a structured input data
   (`CreditModel.Loan`). `decision` compiles one decision of such a file. The graph's issues fail the build at
   `failOn`. A decision table that requires no other decision, and every file without such decisions, compiles exactly
-  as before. `CompiledTable` gains `model()`, `reports()` (every report by the class it concerns), `classNames()` and
+  as before (see the upgrade note under *Changed* for the files that do not). `CompiledTable` gains `model()`, `reports()` (every report by the class it concerns), `classNames()` and
   `summary()`; its `table()` is null for a model.
 - **Decision requirement graphs in the framework integrations**
   ([#14](https://github.com/brunopacheco1/praecepta/issues/14)): in Spring Boot, Micronaut and Quarkus, and in
   `praecepta-integration`, every decision of a file whose decisions require other decisions, or are literal
   expressions, is a decision of the `Decisions` bean, and `decisions.evaluate(name, inputData)` evaluates it from the
-  model's input data, as text by name (a structured one by its components' paths, `Loan.principal`), through the
-  decisions it requires, giving its value as the maps a table gives. The new `GraphModel` holds a file's graph
-  (`Decisions.models()`, `Decision.model()`); the graph's issues fail startup, or the Quarkus build, at `fail-on`, and
-  are logged once below it (`Decision model Credit: ERROR ...`); the report endpoints and `Decisions.describe()` list
+  model's input data, as text by name (a structured one, or one without a type that a decision reads by path, by its
+  components' paths, `Loan.principal`; blank text missing, but the empty string for a `string`, as the engine has
+  it), through the decisions it requires, giving its value as the maps a table gives. The new `GraphModel` holds a
+  file's graph (`Decisions.models()`, `Decision.model()`); the graph's issues, and each of its tables' analysis as the
+  graph evaluates it (a graph table's `Decision.report()`, which the build plugins check too), fail startup, or the
+  Quarkus build, at `fail-on`, and are logged once below it (`Decision model Credit: ERROR ...`); the report endpoints and `Decisions.describe()` list
   each model under `models` and describe each of its decisions' logic, type, requirements and input data. Each
   decision table is still an engine bean, which evaluates the table alone from its columns; a literal expression has
   no engine bean (`Decision.table()` and `engine()` are null for it).
@@ -115,7 +139,11 @@ zone id with a changing offset (its report now lists a time in another zone as a
   compliance level, by feature area, by feature, by model, and how many nodes each release would complete. The build
   now fails only on a regression, a node that passed in the committed baseline (`praecepta-tck/baseline.txt`) and no
   longer does; a node that fails or is not supported never fails it, and RESULTS.md and the baseline are regenerated
-  together, deliberately, with `-Dtck.update=true`. The run takes about a second. How a model is evaluated is one
+  together, deliberately, with `-Dtck.update=true`. The baseline also tags the nodes that pass through the decision
+  requirements graph itself, and a tagged node that passes only on its own fallback is a regression too; the build
+  workflow runs the kit with `-Dtck.strict=true`, which fails while RESULTS.md or the baseline is out of date, and a
+  missing or empty baseline fails the run. A simple value is compared by its kind as well as its text, so the text
+  `"10"` is not the number 10. The run takes about a second. How a model is evaluated is one
   seam, `ModelEvaluator`, which later layers plug into as graphs do. The run found that the engine reads
   `time("13:20:00+19:00")` as the local time `13:20:00` and accepts `date and time("+99999-12-01T11:22:33")`, where
   the kit expects errors, and that `0008-LX-arithmetic`'s payments, a power that is not whole, which graphs now
@@ -136,9 +164,21 @@ zone id with a changing offset (its report now lists a time in another zone as a
 - **`Decision` has a sixth component, `model`** (#14), the graph the decision belongs to, null for a table read alone;
   the five-component constructor remains. **Upgrade note:** a record pattern over `Decision` needs the sixth
   component.
-- **`ValidationReport.Kind` has three more constants**, `DECISION_CYCLE`, `MISSING_REQUIREMENT` and `TYPE_MISMATCH`
-  (see *Added*). **Upgrade note:** code that switches over `ValidationReport.Kind` exhaustively must handle them;
-  reports of decision tables never hold them, so the results and reports of existing tables are unchanged.
+- **`ValidationReport.Kind` has five more constants**, `DECISION_CYCLE`, `MISSING_REQUIREMENT`, `TYPE_MISMATCH`,
+  `UNSUPPORTED_FEATURE` and `ALWAYS_NULL` (see *Added*). **Upgrade note:** code that switches over
+  `ValidationReport.Kind` exhaustively must handle them, and should keep a `default` branch, as later layers of DMN
+  add kinds; reports of decision tables never hold them, so the results and reports of existing tables are
+  unchanged.
+- **The build plugins and the Quarkus extension compile some 0.6 DMN files as decision requirement graphs** (#14).
+  **Upgrade note:** in 0.6, `DmnReader.read(dmn, decision)` ignored information requirements and literal
+  expressions, so a definition that named a decision table requiring another decision, or that named no decision in
+  a file holding one decision table and a literal expression decision, compiled one table class, whose input record
+  held the table's columns (the required decision's value among them). In 0.7 such a definition compiles as a graph
+  (see *Added*): the decision's class evaluates it through the graph, its input record holds the model's input data
+  the decision needs, not the table's columns, a `<Name>Model` class is added, and where no decision is named,
+  `name` names the model class (`<name>Model`), not the decision's. Code that calls the generated classes of such a
+  file must use the new records; a definition naming a decision table that requires no other decision, and a file of
+  such tables alone, compile as before.
 - **The build plugins check that no two tables generate any one class** (#14), the input and output records included,
   where they compared only the decision classes; and they log `Compiled decision model ...` for a model.
 - **Build and test dependencies**: Guava 33.8.0 and Groovy 3.0.25 (tests only), Jackson 2.23.0 (the benchmarks) and
