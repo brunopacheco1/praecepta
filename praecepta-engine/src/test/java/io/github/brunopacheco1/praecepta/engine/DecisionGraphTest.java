@@ -15,6 +15,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -34,6 +36,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationExc
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
+import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 
 /**
  * Decision requirement graphs read from DMN files and assembled in code: evaluation in dependency order, values passed
@@ -323,6 +326,35 @@ class DecisionGraphTest {
         assertThat(graph.validationReport("Label").isEmpty()).isTrue();
         assertThat(graph.evaluate("Label", Map.of("Age", 30))).isEqualTo("tier adult");
         assertThatThrownBy(() -> graph.evaluate("Label", Map.of("Age", 70))).isInstanceOf(HitPolicyViolationException.class);
+    }
+
+    // ---- times with a zone id passed between decisions ---------------------------------------------
+
+    @Test
+    void a_time_with_a_zone_id_another_decision_gives_reaches_the_rules_that_accept_any_time() {
+        // #114 in a graph: a table's time column reads another decision's value, which may be a time with a zone id its
+        // cells do not name; such a time compares with none of them (FEEL's null, docs/DMN-CONFORMANCE.md case 9)
+        var graph = DecisionGraph.builder()
+                .logValidationReport(false)
+                .inputData("Region", ColumnType.STRING)
+                .decision(Tables.table("Cut Off", "FIRST", List.of("Region:string"), List.of("Cut Off:time"), List.of(
+                        List.of("\"EU\"", "time(\"10:30:00@Europe/Paris\")"), List.of("-", "time(\"13:00:00\")"))))
+                .decision(Tables.table("Shift", "FIRST", List.of("Cut Off:time"), List.of("Shift:string"), List.of(
+                        List.of("< time(\"12:00:00\")", "\"morning\""), List.of(">= time(\"12:00:00\")", "\"afternoon\""),
+                        List.of("!= null", "\"zoned\""))))
+                .decision(Tables.table("Strict Shift", "UNIQUE", List.of("Cut Off:time"), List.of("Strict Shift:string"), List.of(
+                        List.of("< time(\"12:00:00\")", "\"morning\""), List.of(">= time(\"12:00:00\")", "\"afternoon\""))))
+                .build();
+
+        assertThat(graph.validationReport().isEmpty()).as("%s", graph.validationReport()).isTrue();
+        assertThat(graph.evaluate("Cut Off", Map.of("Region", "EU"))).isEqualTo(new ZonedTime(LocalTime.of(10, 30), ZoneId.of("Europe/Paris")));
+        assertThat(graph.evaluate("Shift", Map.of("Region", "EU"))).isEqualTo("zoned");
+        assertThat(graph.evaluate("Shift", Map.of("Region", "US"))).isEqualTo("afternoon");
+        assertThat(graph.evaluate("Strict Shift", Map.of("Region", "EU"))).isNull();
+        // the rule only such a time reaches is reachable, and where no rule takes it, it is a gap
+        assertThat(graph.validationReport("Shift").issues(Kind.UNREACHABLE_RULE)).isEmpty();
+        assertThat(graph.validationReport("Strict Shift").issues(Kind.GAP)).singleElement()
+                .satisfies(gap -> assertThat(gap.detail()).isEqualTo("Cut Off = any time with a zone id no cell names"));
     }
 
     // ---- assembled in code ---------------------------------------------------------------------------

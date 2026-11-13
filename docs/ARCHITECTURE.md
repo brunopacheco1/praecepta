@@ -457,10 +457,12 @@ build, and scores each result node as passed, failed or not supported ([RESULTS.
 Its pieces are meant to outlive the layers of the DMN 1.5 plan (#120):
 - **One seam for evaluation.** `ModelEvaluator` takes a result node (the model, the test case's inputs, what
   it invokes) and returns a value, an error, a failure, or the features it lacks; the runner compares, scores
-  and reports. Today `SingleDecisionEvaluator` evaluates one decision on its own, a decision table through
-  `DmnReader` and the engine and a literal expression as an output expression. A release adds its evaluator
-  in front (`graphs.orElse(single)` for decision requirement graphs, #14), and the nodes it cannot take keep
-  the reasons the others give.
+  and reports. `GraphEvaluator` evaluates a decision through its model's `DecisionGraph` (#14), a decision
+  whose value the test case gives being input data instead; the nodes it does not take (a model `readModel`
+  rejects, a decision the graph's report blocks) go to `SingleDecisionEvaluator`, which evaluates one decision
+  on its own, a decision table through `DmnReader` and the engine and a literal expression as an output
+  expression: `graphs.orElse(single)`. A later release adds its evaluator in front the same way, and the nodes
+  it cannot take keep the reasons the others give.
 - **Reasons by feature, with the release that brings them.** A not-supported node lists every `Feature` it
   needs (a FEEL construct, a built-in function by name, business knowledge models, invocations, boxed
   contexts, decision services, imports, structured inputs...), each in one area of the plan, found in its own

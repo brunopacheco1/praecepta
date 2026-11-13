@@ -13,9 +13,9 @@ import io.github.brunopacheco1.praecepta.tck.TckSuite.Check;
  * returns the node's value, an error, a failure, or the features it lacks. {@link TckRunner} does the rest:
  * comparing with the expected result, scoring, the baseline and RESULTS.md.
  *
- * <p>{@link #praecepta()} is what Praecepta has now. A release that adds a way to evaluate models puts its
- * evaluator in front of it, so the nodes it cannot take still get the reasons the others give; decision
- * requirement graphs (#14), for one: {@code graphs.orElse(new SingleDecisionEvaluator())}.
+ * <p>{@link #praecepta()} is what Praecepta has now: decision requirement graphs (#14) in front of single decisions,
+ * {@code graphs.orElse(single)}. A release that adds a way to evaluate models puts its evaluator in front the same
+ * way, so the nodes it cannot take still get the reasons the others give.
  */
 @FunctionalInterface
 interface ModelEvaluator {
@@ -38,8 +38,13 @@ interface ModelEvaluator {
         };
     }
 
-    /** How the TCK run evaluates models: each decision on its own, a decision table or a literal expression. */
+    /**
+     * How the TCK run evaluates models: through the model's decision requirements graph ({@link GraphEvaluator}) where
+     * Praecepta reads the model as a whole, else each decision on its own, a decision table or a literal expression
+     * ({@link SingleDecisionEvaluator}).
+     */
     static ModelEvaluator praecepta() {
-        return new SingleDecisionEvaluator();
+        var single = new SingleDecisionEvaluator();
+        return new GraphEvaluator(single).orElse(single);
     }
 }

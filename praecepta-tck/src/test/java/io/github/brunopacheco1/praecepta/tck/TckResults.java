@@ -106,10 +106,12 @@ final class TckResults {
 
                 ## The whole kit
 
-                Praecepta evaluates a decision on its own: a decision table with `DmnReader` and the engine, and a
-                literal expression as an output expression, the FEEL subset output entries compute (arithmetic of
-                numbers, strings, dates, times and durations). Everything else is not supported yet. A test file's
-                result nodes that are commented out are not counted.
+                Praecepta evaluates a decision through its model's decision requirement graph, which computes the
+                decisions it requires, where `DmnReader.readModel` reads the model: decision tables, and literal
+                expressions in the FEEL subset output entries compute (arithmetic of numbers, strings, dates, times
+                and durations). In another model it evaluates a decision on its own, a decision table with
+                `DmnReader` and the engine, and a literal expression as an output expression. Everything else is not
+                supported yet. A test file's result nodes that are commented out are not counted.
 
                 | Compliance level | Models | Result nodes | Passed | Failed | Not supported |
                 |---|---:|---:|---:|---:|---:|

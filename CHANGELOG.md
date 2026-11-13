@@ -80,17 +80,19 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   built-in function by name, business knowledge models, invocations, boxed contexts, decision services,
   imports, structured inputs...) and the release of the DMN 1.5 plan
   ([#120](https://github.com/brunopacheco1/praecepta/issues/120)) that brings it. 454 of the 3,511 pass
-  (12.9 %): Praecepta evaluates a decision on its own, a decision table as before and a literal expression as an
-  output expression, and 454 of the 458 nodes it evaluates pass. [RESULTS.md](praecepta-tck/RESULTS.md) keeps
+  (12.9 %): Praecepta evaluates a decision through its model's decision requirement graph
+  ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) where `DmnReader.readModel` reads the model, and
+  otherwise on its own, a decision table as before and a literal expression as an output expression, and 454 of
+  the 461 nodes it evaluates pass; no node of the kit needs graphs alone, so they add no pass. [RESULTS.md](praecepta-tck/RESULTS.md) keeps
   the decision-table checks (still 83 of 86) and adds the totals by compliance level, by feature area, by
   feature, by model, and how many nodes each release would complete. The build now fails only on a regression,
   a node that passed in the committed baseline (`praecepta-tck/baseline.txt`) and no longer does; a node that
   fails or is not supported never fails it, and RESULTS.md and the baseline are regenerated together,
   deliberately, with `-Dtck.update=true`. The run takes about a second. How a model is evaluated is one seam,
-  `ModelEvaluator`, which decision requirement graphs
-  ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) and later layers plug into. The run found that
-  the engine reads `time("13:20:00+19:00")` as the local time `13:20:00` and accepts
-  `date and time("+99999-12-01T11:22:33")`, where the kit expects errors; they are reported as failures.
+  `ModelEvaluator`, which later layers plug into as graphs do. The run found that the engine reads
+  `time("13:20:00+19:00")` as the local time `13:20:00` and accepts `date and time("+99999-12-01T11:22:33")`,
+  where the kit expects errors, and that `0008-LX-arithmetic`'s payments, a power that is not whole, which
+  graphs now evaluate, are computed to FEEL's 34 digits where the kit gives 15; they are reported as failures.
 
 ### Changed
 - **`ValidationReport.Kind` has three more constants**, `DECISION_CYCLE`, `MISSING_REQUIREMENT` and `TYPE_MISMATCH`

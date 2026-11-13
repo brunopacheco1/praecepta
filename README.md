@@ -999,10 +999,11 @@ engine against a naive reference implementation of DMN decision-table semantics 
 # DMN conformance
 `praecepta-tck` runs the whole [DMN Technology Compatibility Kit](https://github.com/dmn-tck/tck) in every
 build: every model of compliance levels 2 and 3 (148 models, 3,511 result nodes at the pinned commit), each
-result node scored as passed, failed or not supported. **454 of the 3,511 pass (12.9 %)**; of the 458 that
-Praecepta evaluates, 454 pass (the four others are
-[known failures](praecepta-tck/README.md#known-failures)), and the other 3,053 need features Praecepta does not
-have yet. Praecepta is a
+result node scored as passed, failed or not supported, each decision evaluated through its model's decision
+requirement graph where Praecepta reads the model. **454 of the 3,511 pass (12.9 %)**; of the 461 that
+Praecepta evaluates, 454 pass (the seven others are
+[known failures](praecepta-tck/README.md#known-failures)), and the other 3,050 need features Praecepta does not
+have yet; no result node of the kit needs decision requirement graphs alone. Praecepta is a
 decision-table engine growing into a full DMN 1.5 engine one layer per release
 ([#120](https://github.com/brunopacheco1/praecepta/issues/120)), so most of the kit (FEEL beyond the arithmetic
 of output entries, built-in functions, boxed expressions, business knowledge models, decision services) is
