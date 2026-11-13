@@ -11,7 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
-## [0.7.0] - 2026-11-13
+## [0.7.0] - 2026-11-14
 
 Decision requirement graphs, the first step of Praecepta's plan to grow from a decision-table engine into a full DMN
 1.5 engine, one layer per release ([#120](https://github.com/brunopacheco1/praecepta/issues/120)): Praecepta now
