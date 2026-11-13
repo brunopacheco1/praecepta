@@ -84,7 +84,7 @@
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.12.0</central-publishing-maven-plugin.version>
-        <versions-maven-plugin.version>2.24.0</versions-maven-plugin.version>
+        <versions-maven-plugin.version>2.25.1</versions-maven-plugin.version>
         <maven-invoker-plugin.version>3.10.1</maven-invoker-plugin.version>
         <!-- native images (#19): only the native-image test project uses them (praecepta-maven-plugin/src/it/native-app) -->
         <native-maven-plugin.version>1.1.18</native-maven-plugin.version>
