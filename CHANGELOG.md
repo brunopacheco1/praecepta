@@ -73,6 +73,24 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   each model under `models` and describe each of its decisions' logic, type, requirements and input data. Each
   decision table is still an engine bean, which evaluates the table alone from its columns; a literal expression has
   no engine bean (`Decision.table()` and `engine()` are null for it).
+- **The whole DMN TCK, scored** ([#115](https://github.com/brunopacheco1/praecepta/issues/115)): `praecepta-tck`
+  now runs every model of compliance levels 2 and 3 at the pinned commit (148 models, 3,511 result nodes; the
+  test files' commented-out nodes are not counted), not only the decision-table checks, and scores each result
+  node as passed, failed or not supported, with every feature an unsupported node needs (a FEEL construct, a
+  built-in function by name, business knowledge models, invocations, boxed contexts, decision services,
+  imports, structured inputs...) and the release of the DMN 1.5 plan
+  ([#120](https://github.com/brunopacheco1/praecepta/issues/120)) that brings it. 454 of the 3,511 pass
+  (12.9 %): Praecepta evaluates a decision on its own, a decision table as before and a literal expression as an
+  output expression, and 454 of the 458 nodes it evaluates pass. [RESULTS.md](praecepta-tck/RESULTS.md) keeps
+  the decision-table checks (still 83 of 86) and adds the totals by compliance level, by feature area, by
+  feature, by model, and how many nodes each release would complete. The build now fails only on a regression,
+  a node that passed in the committed baseline (`praecepta-tck/baseline.txt`) and no longer does; a node that
+  fails or is not supported never fails it, and RESULTS.md and the baseline are regenerated together,
+  deliberately, with `-Dtck.update=true`. The run takes about a second. How a model is evaluated is one seam,
+  `ModelEvaluator`, which decision requirement graphs
+  ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) and later layers plug into. The run found that
+  the engine reads `time("13:20:00+19:00")` as the local time `13:20:00` and accepts
+  `date and time("+99999-12-01T11:22:33")`, where the kit expects errors; they are reported as failures.
 
 ### Changed
 - **`ValidationReport.Kind` has three more constants**, `DECISION_CYCLE`, `MISSING_REQUIREMENT` and `TYPE_MISMATCH`
