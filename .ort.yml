@@ -23,6 +23,11 @@ excludes:
       comment: >-
         Native-image tests of the framework integrations; never published. The applications under src/it
         (Spring Boot, Micronaut, Quarkus) have POMs that maven-invoker-plugin fills in (@quarkus.version@...).
+    - pattern: "praecepta-gradle-plugin/portal/**"
+      reason: "BUILD_TOOL_OF"
+      comment: >-
+        Gradle build that uploads the jars Maven built to the Gradle Plugin Portal; it builds and ships nothing
+        of its own, and only configures with -Ppraecepta.version, which the release workflow passes.
   scopes:
     - pattern: "test"
       reason: "TEST_DEPENDENCY_OF"

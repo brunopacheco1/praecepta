@@ -11,6 +11,7 @@ on:
     # the scan is about dependencies and licences, so only build files and ORT's own config matter
     paths:
       - '**/pom.xml'
+      - '**/*.gradle.kts'
       - '.ort.yml'
       - '.github/workflows/ort.yaml'
 
@@ -44,3 +45,15 @@ jobs:
             evaluator,
             reporter,
             upload-results
+      # The action fails only on the evaluator's violations ('issues' covers the advisor alone) and lets the
+      # analyzer's exit code 2 pass: a build file ORT could not read, whose dependencies then go unchecked,
+      # would show up only in the report. Fail on it here, after the reports are uploaded.
+      - name: Fail on analyzer issues
+        if: ${{ !cancelled() }}
+        run: |
+          if [ "${ORT_CLI_ANALYZE_EXIT_CODE:-0}" != 0 ]; then
+            echo "::error::ORT's analyzer reported issues (exit code ${ORT_CLI_ANALYZE_EXIT_CODE}): see the WebApp report's issues."
+            jq -r '.. | objects | select(has("severity") and has("message") and has("source"))
+              | "\(.severity) \(.source): \(.message | split("\n")[0])"' "${ORT_RESULTS_ANALYZER_PATH}" | sort -u || true
+            exit 1
+          fi
