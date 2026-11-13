@@ -19,6 +19,7 @@ tables and generates typed classes rather than per-rule code.
 | 3 | Benchmarks | Retire the GCP App Engine deployments; benchmark in-process with JMH instead. |
 | 4 | DMN import | In scope (Phase 4). |
 | 5 | Licence | Relicense from MIT to **Apache-2.0** (Phase 5). |
+| 6 | Scope | A decision-table library (the goal above). **Revised for 0.7**: Praecepta grows into a full DMN 1.5 engine, one layer per release, scored against the whole DMN TCK and judged by DMN 1.5 and the TCK only ([#120](https://github.com/brunopacheco1/praecepta/issues/120); the layers are in [ROADMAP.md](ROADMAP.md)). Decision tables keep their validation report and typed generated code; the general engine evaluates everything around them. |
 
 ## Why not generate Java code from the rules
 

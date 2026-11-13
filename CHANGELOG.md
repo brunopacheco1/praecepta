@@ -11,57 +11,85 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-13
+
+Decision requirement graphs, the first step of Praecepta's plan to grow from a decision-table engine into a full DMN
+1.5 engine, one layer per release ([#120](https://github.com/brunopacheco1/praecepta/issues/120)): Praecepta now
+evaluates DMN models whose decisions require other decisions and input data
+([#14](https://github.com/brunopacheco1/praecepta/issues/14)), where each decision is a decision table or a literal
+expression in the arithmetic that output entries compute. `DecisionGraph` evaluates any decision by name from the
+input data it needs, each decision it requires once, in dependency order, and reports cycles, missing requirements and
+type mismatches when it is built; `DmnReader.readModel` and `DmnWriter` read and write whole models; the Maven and
+Gradle plugins generate a typed class per decision; and Spring Boot, Micronaut, Quarkus and `praecepta-integration`
+evaluate a graph's decisions through `Decisions`. A model that uses what later releases bring (the full FEEL
+language, built-in functions, business knowledge models and boxed expressions, decision services and imports) is
+rejected when it is read, naming the release that plans it. The DMN conformance kit (TCK) is now scored whole
+([#115](https://github.com/brunopacheco1/praecepta/issues/115)): of the 3,511 result nodes of its compliance levels 2
+and 3, 454 pass (12.9 %), 7 fail and 3,050 need a feature Praecepta does not have yet, each listed with the release
+that brings it, in [RESULTS.md](praecepta-tck/RESULTS.md). That measures how much of DMN 1.5 Praecepta covers, not how
+well it does what it covers: of the 461 nodes it evaluates, 454 pass. No node of the kit needs graphs alone, so they
+add no pass yet; the decision-table checks still pass 83 of 86 (the other three also invoke business knowledge models,
+0.10), and the build now fails only on a regression from a committed baseline. One fix: rules reached only by a time
+with a zone id that no cell names are no longer reported unreachable
+([#114](https://github.com/brunopacheco1/praecepta/issues/114)). Build and test dependencies were updated (Guava
+33.8.0 and Groovy 3.0.25 in tests, Jackson 2.23.0 in the benchmarks, the versions-maven-plugin 2.25.1); no published
+module's dependencies changed. Read *Changed* and *Fixed* before upgrading if a framework integration loads DMN files
+in which a decision requires another decision (its decisions now evaluate through the graph, from the model's input
+data, and the graph's errors stop startup), your code switches over `ValidationReport.Kind` exhaustively or
+deconstructs `integration.Decision` with a record pattern, or a map-based time column of yours has cells that name no
+zone id with a changing offset (its report now lists a time in another zone as a gap, a WARNING).
+
 ### Added
 - **Decision requirement graphs** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)): `DecisionGraph`
   evaluates a DMN model whose decisions require other decisions and input data (DMN 1.5, chapter 6), where each
   decision's logic is a decision table or a literal expression in the subset output entries take (literals and names
-  joined with `+`, `-`, `*`, `/` and `**`). `DecisionGraph.read(dmn)` reads a file, and `evaluate(decision, inputData)`
-  evaluates any decision by name from the input data it needs, each decision it requires once, in dependency order,
-  with nothing parsed per call; `evaluate(decisions, inputData)` evaluates several at once. A decision's value is
-  given to the decisions that require it under its name: a table with one output gives that output's value, one with
-  several a context (`Map`) whose components a decision reads by path (`Pricing.discount`), and one with several
-  results (RULE ORDER, OUTPUT ORDER, COLLECT without an aggregation) a list, which a list input takes (`Checks.code`
-  being the list of each result's `code`, DMN 1.5, 10.3.2.5); no match without a default output gives null. Input
-  data are typed by their `typeRef`, a built-in type or an item definition (a collection, or a structure whose
-  components are read by path, `Loan.principal`), and are given as Java values or, for simple types, as text.
-  `requiredInputData(decision)`, `inputData()`, `type(decision)` and `decisions()` describe the graph, for the
-  build plugins and framework integrations to build on (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
-  `DecisionGraph.builder()` assembles a graph in code from input data, `DecisionTable`s and literal expressions,
-  each decision requiring what it reads.
+  joined with `+`, `-`, `*`, `/` and `**`). `DecisionGraph.read(dmn)` reads a file, and
+  `evaluate(decision, inputData)` evaluates any decision by name from the input data it needs, each decision it
+  requires once, in dependency order, with nothing parsed per call; `evaluate(decisions, inputData)` evaluates several
+  at once. A decision's value is given to the decisions that require it under its name: a table with one output gives
+  that output's value, one with several a context (`Map`) whose components a decision reads by path
+  (`Pricing.discount`), and one with several results (RULE ORDER, OUTPUT ORDER, COLLECT without an aggregation) a
+  list, which a list input takes (`Checks.code` being the list of each result's `code`, DMN 1.5, 10.3.2.5); no match
+  without a default output gives null. Input data are typed by their `typeRef`, a built-in type or an item definition
+  (a collection, or a structure whose components are read by path, `Loan.principal`), and are given as Java values or,
+  for simple types, as text. `requiredInputData(decision)`, `inputData()`, `type(decision)` and `decisions()` describe
+  the graph, for the build plugins and framework integrations to build on (see
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). `DecisionGraph.builder()` assembles a graph in code from input data,
+  `DecisionTable`s and literal expressions, each decision requiring what it reads.
 - **A graph is checked when it is built** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)): its
   validation report (`DecisionGraph.validationReport()`) has three new issue kinds, all ERRORs:
   `ValidationReport.Kind.DECISION_CYCLE` (decisions that require one another, directly or indirectly: "a Decision
   element SHALL not require itself", 6.3.7), `MISSING_REQUIREMENT` (a required decision or input data the model does
-  not have, or a name a decision reads that none of its information requirements provides, 7.3.4) and
-  `TYPE_MISMATCH` (a value of another type than the decision table input it feeds, a path into a value without such a
-  component, operands a literal expression cannot combine, or a literal expression's value of another type than its
-  decision declares). Such a decision, and every decision that requires it, cannot be evaluated
+  not have, or a name a decision reads that none of its information requirements provides, 7.3.4) and `TYPE_MISMATCH`
+  (a value of another type than the decision table input it feeds, a path into a value without such a component,
+  operands a literal expression cannot combine, or a literal expression's value of another type than its decision
+  declares). Such a decision, and every decision that requires it, cannot be evaluated
   (`InvalidDecisionTableException`), and the others can; a literal expression whose value does not conform to its
   decision's declared type is the exception, as DMN 1.5 defines it to be null (10.3.2.9.4). `Builder.failOn` rejects a
   graph with issues at a severity, and each decision table keeps its own analysis (`validationReport(decision)`).
-- **Decision models in DMN** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)):
-  `DmnReader.readModel(dmn)` reads a whole model (`beans.DecisionModel`: its input data, its decisions, their
-  information requirements and their logic, `beans.DecisionLogic.Table` or `LiteralExpression`), and
-  `DmnWriter.write(DecisionModel)` writes one back as DMN 1.3, which reads back as the same model. The types of input
-  data and decisions are `feel.FeelType`: a simple type, a list, a context of components, or any type. What later
-  releases bring is rejected when the model is read, with a message that names the feature and its issue: business
-  knowledge models, knowledge requirements and boxed expressions (0.10, [#118](https://github.com/brunopacheco1/praecepta/issues/118)),
-  FEEL beyond the subset (0.8, [#116](https://github.com/brunopacheco1/praecepta/issues/116)) and function calls (0.9,
+- **Decision models in DMN** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)): `DmnReader.readModel(dmn)`
+  reads a whole model (`beans.DecisionModel`: its input data, its decisions, their information requirements and their
+  logic, `beans.DecisionLogic.Table` or `LiteralExpression`), and `DmnWriter.write(DecisionModel)` writes one back as
+  DMN 1.3, which reads back as the same model. The types of input data and decisions are `feel.FeelType`: a simple
+  type, a list, a context of components, or any type. What later releases bring is rejected when the model is read,
+  with a message that names the feature and its issue: business knowledge models, knowledge requirements and boxed
+  expressions (0.10, [#118](https://github.com/brunopacheco1/praecepta/issues/118)), FEEL beyond the subset (0.8,
+  [#116](https://github.com/brunopacheco1/praecepta/issues/116)) and function calls (0.9,
   [#117](https://github.com/brunopacheco1/praecepta/issues/117)), decision services and imports (0.11,
   [#119](https://github.com/brunopacheco1/praecepta/issues/119)). `DmnReader.read(dmn)`, `read(dmn, decision)` and
   `readAll(dmn)` read single tables as before. What DMN 1.5 and the TCK leave open about graphs, and what Praecepta
   does there, is recorded in [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md) (cases 13 to 17).
 - **Generated classes for decision requirement graphs** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)):
   the Maven and Gradle plugins (and `praecepta-compiler`) compile a DMN file whose decisions require other decisions,
-  or are literal expressions, into a model class (`CreditModel`, named after the model or `name`) that loads the
-  model once into a `DecisionGraph`, and per decision an input record of the input data it needs, directly or
-  through the decisions it requires (`MonthlyLimitInput`), and a class whose `evaluate` evaluates it through the
-  graph and gives its value as its Java type: `String`, `BigDecimal`, `LocalDate`..., a `List` for a list, a
-  `<Decision>Output` record for a context (a table with several outputs), a record of the model class for a
-  structured input data (`CreditModel.Loan`). `decision` compiles one decision of such a file. The graph's issues
-  fail the build at `failOn`. A decision table that requires no other decision, and every file without such
-  decisions, compiles exactly as before. `CompiledTable` gains `model()`, `reports()` (every report by the class it
-  concerns), `classNames()` and `summary()`; its `table()` is null for a model.
+  or are literal expressions, into a model class (`CreditModel`, named after the model or `name`) that loads the model
+  once into a `DecisionGraph`, and per decision an input record of the input data it needs, directly or through the
+  decisions it requires (`MonthlyLimitInput`), and a class whose `evaluate` evaluates it through the graph and gives
+  its value as its Java type: `String`, `BigDecimal`, `LocalDate`..., a `List` for a list, a `<Decision>Output` record
+  for a context (a table with several outputs), a record of the model class for a structured input data
+  (`CreditModel.Loan`). `decision` compiles one decision of such a file. The graph's issues fail the build at
+  `failOn`. A decision table that requires no other decision, and every file without such decisions, compiles exactly
+  as before. `CompiledTable` gains `model()`, `reports()` (every report by the class it concerns), `classNames()` and
+  `summary()`; its `table()` is null for a model.
 - **Decision requirement graphs in the framework integrations**
   ([#14](https://github.com/brunopacheco1/praecepta/issues/14)): in Spring Boot, Micronaut and Quarkus, and in
   `praecepta-integration`, every decision of a file whose decisions require other decisions, or are literal
@@ -73,68 +101,67 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   each model under `models` and describe each of its decisions' logic, type, requirements and input data. Each
   decision table is still an engine bean, which evaluates the table alone from its columns; a literal expression has
   no engine bean (`Decision.table()` and `engine()` are null for it).
-- **The whole DMN TCK, scored** ([#115](https://github.com/brunopacheco1/praecepta/issues/115)): `praecepta-tck`
-  now runs every model of compliance levels 2 and 3 at the pinned commit (148 models, 3,511 result nodes; the
-  test files' commented-out nodes are not counted), not only the decision-table checks, and scores each result
-  node as passed, failed or not supported, with every feature an unsupported node needs (a FEEL construct, a
-  built-in function by name, business knowledge models, invocations, boxed contexts, decision services,
-  imports, structured inputs...) and the release of the DMN 1.5 plan
-  ([#120](https://github.com/brunopacheco1/praecepta/issues/120)) that brings it. 454 of the 3,511 pass
-  (12.9 %): Praecepta evaluates a decision through its model's decision requirement graph
+- **The whole DMN TCK, scored** ([#115](https://github.com/brunopacheco1/praecepta/issues/115)): `praecepta-tck` now
+  runs every model of compliance levels 2 and 3 at the pinned commit (148 models, 3,511 result nodes; the test files'
+  commented-out nodes are not counted), not only the decision-table checks, and scores each result node as passed,
+  failed or not supported, with every feature an unsupported node needs (a FEEL construct, a built-in function by
+  name, business knowledge models, invocations, boxed contexts, decision services, imports, structured inputs...) and
+  the release of the DMN 1.5 plan ([#120](https://github.com/brunopacheco1/praecepta/issues/120)) that brings it. 454
+  of the 3,511 pass (12.9 %): Praecepta evaluates a decision through its model's decision requirement graph
   ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) where `DmnReader.readModel` reads the model, and
-  otherwise on its own, a decision table as before and a literal expression as an output expression, and 454 of
-  the 461 nodes it evaluates pass; no node of the kit needs graphs alone, so they add no pass. [RESULTS.md](praecepta-tck/RESULTS.md) keeps
-  the decision-table checks (still 83 of 86) and adds the totals by compliance level, by feature area, by
-  feature, by model, and how many nodes each release would complete. The build now fails only on a regression,
-  a node that passed in the committed baseline (`praecepta-tck/baseline.txt`) and no longer does; a node that
-  fails or is not supported never fails it, and RESULTS.md and the baseline are regenerated together,
-  deliberately, with `-Dtck.update=true`. The run takes about a second. How a model is evaluated is one seam,
-  `ModelEvaluator`, which later layers plug into as graphs do. The run found that the engine reads
-  `time("13:20:00+19:00")` as the local time `13:20:00` and accepts `date and time("+99999-12-01T11:22:33")`,
-  where the kit expects errors, and that `0008-LX-arithmetic`'s payments, a power that is not whole, which
-  graphs now evaluate, are computed to FEEL's 34 digits where the kit gives 15; they are reported as failures.
+  otherwise on its own, a decision table as before and a literal expression as an output expression, and 454 of the
+  461 nodes it evaluates pass; no node of the kit needs graphs alone, so they add no pass.
+  [RESULTS.md](praecepta-tck/RESULTS.md) keeps the decision-table checks (still 83 of 86) and adds the totals by
+  compliance level, by feature area, by feature, by model, and how many nodes each release would complete. The build
+  now fails only on a regression, a node that passed in the committed baseline (`praecepta-tck/baseline.txt`) and no
+  longer does; a node that fails or is not supported never fails it, and RESULTS.md and the baseline are regenerated
+  together, deliberately, with `-Dtck.update=true`. The run takes about a second. How a model is evaluated is one
+  seam, `ModelEvaluator`, which later layers plug into as graphs do. The run found that the engine reads
+  `time("13:20:00+19:00")` as the local time `13:20:00` and accepts `date and time("+99999-12-01T11:22:33")`, where
+  the kit expects errors, and that `0008-LX-arithmetic`'s payments, a power that is not whole, which graphs now
+  evaluate, are computed to FEEL's 34 digits where the kit gives 15; they are reported as failures.
 
 ### Changed
-- **`ValidationReport.Kind` has three more constants**, `DECISION_CYCLE`, `MISSING_REQUIREMENT` and `TYPE_MISMATCH`
-  (see *Added*). Upgrading: code that switches over `ValidationReport.Kind` exhaustively must handle them; reports of
-  decision tables never hold them, so the results and reports of existing tables are unchanged.
-- **The framework integrations read each DMN file as a decision model** (#14). Upgrading: in a file where a decision
-  requires another decision, `Decisions.evaluate` and `Decision.evaluate` now evaluate that file's decisions from the
-  model's input data through the graph, where 0.6 evaluated each table alone from its columns, the value of a
+- **The framework integrations read each DMN file as a decision model** (#14). **Upgrade note:** in a file where a
+  decision requires another decision, `Decisions.evaluate` and `Decision.evaluate` now evaluate that file's decisions
+  from the model's input data through the graph, where 0.6 evaluated each table alone from its columns, the value of a
   decision it requires taken as an input; the table's engine bean, `Decision.engine()` and `Decisions.engine(name)`
   still do the latter. Such a file is also checked as a graph (a cycle, a missing requirement, a type mismatch are
   ERRORs, which stop the startup at the default `fail-on`), and its literal expression decisions, which 0.6 ignored,
   are decisions now (a file of literal expressions alone, which 0.6 rejected as having no decision table, loads).
-  Files of decision tables that require no other decision load as before, `Decisions.describe()` included, and so
-  does a file with a business knowledge model, a decision service, an import, a boxed expression or a literal
-  expression beyond the expression subset: its decision tables load alone, as in 0.6; such a file without a decision
-  table fails with a message that names the release planning what it uses, rather than `no decision table`.
-- **`Decision` has a sixth component, `model`** (#14), the graph the decision belongs to, null for a table read
-  alone; the five-component constructor remains. Upgrading: a record pattern over `Decision` needs the sixth
+  Files of decision tables that require no other decision load as before, `Decisions.describe()` included, and so does
+  a file with a business knowledge model, a decision service, an import, a boxed expression or a literal expression
+  beyond the expression subset: its decision tables load alone, as in 0.6; such a file without a decision table fails
+  with a message that names the release planning what it uses, rather than `no decision table`.
+- **`Decision` has a sixth component, `model`** (#14), the graph the decision belongs to, null for a table read alone;
+  the five-component constructor remains. **Upgrade note:** a record pattern over `Decision` needs the sixth
   component.
+- **`ValidationReport.Kind` has three more constants**, `DECISION_CYCLE`, `MISSING_REQUIREMENT` and `TYPE_MISMATCH`
+  (see *Added*). **Upgrade note:** code that switches over `ValidationReport.Kind` exhaustively must handle them;
+  reports of decision tables never hold them, so the results and reports of existing tables are unchanged.
 - **The build plugins check that no two tables generate any one class** (#14), the input and output records included,
   where they compared only the decision classes; and they log `Compiled decision model ...` for a model.
+- **Build and test dependencies**: Guava 33.8.0 and Groovy 3.0.25 (tests only), Jackson 2.23.0 (the benchmarks) and
+  the versions-maven-plugin 2.25.1. No published module's dependencies change.
 
 ### Fixed
 - **Rules reached only by a time with a zone id are no longer reported unreachable**
-  ([#114](https://github.com/brunopacheco1/praecepta/issues/114)): a time column whose inputs can be times
-  with a zone id (map-based inputs, as the framework integrations read them, and the elements of a list) but
-  whose cells name no zone id with a changing offset left such times out of the validation report's
-  overlaps, unreachable rules and gaps, though the completeness search counted them since 0.6.0. Such a
-  time compares with none of those cells, which is FEEL's null, so neither a test nor its `not(...)` matches
-  it (docs/DMN-CONFORMANCE.md, case 9): earlier rules that together matched every other time, such as
-  `< time("12:00:00")` and `>= time("12:00:00")`, made a later rule look unreachable (`UNREACHABLE_RULE`, a
-  WARNING) although `10:30@Europe/Paris` reaches it. The column's index now has a class for a time in a zone no cell names
-  wherever the column takes one, and every analysis visits it as it does the others; the property tests'
-  reference does the same. Evaluation is unchanged, and so are tables bound with typed getters, columns of
-  other types and time columns whose cells name such a zone id, which had the class already. **The report
-  changes** for map-based time columns, and time list columns, whose cells name no such zone id: unless a
-  rule accepts any value there (`-`, `!= null`), a time in another zone is now reported as a gap
-  (`cutOff in {[time("12:00:00")..+inf), any time with a zone id no cell names}`, a WARNING, which stops a
-  startup only where `fail-on` is `WARNING`), and a rule that only such a time reaches is no longer
-  reported unreachable. Overlaps cannot change, as a cell that
-  matches such a time matches every time. Declared input values that rule such times out, such as
-  `[time("00:00:00")..time("23:59:59")]`, leave the report as it was.
+  ([#114](https://github.com/brunopacheco1/praecepta/issues/114)): a time column whose inputs can be times with a zone
+  id (map-based inputs, as the framework integrations read them, and the elements of a list) but whose cells name no
+  zone id with a changing offset left such times out of the validation report's overlaps, unreachable rules and gaps,
+  though the completeness search counted them since 0.6.0. Such a time compares with none of those cells, which is
+  FEEL's null, so neither a test nor its `not(...)` matches it (docs/DMN-CONFORMANCE.md, case 9): earlier rules that
+  together matched every other time, such as `< time("12:00:00")` and `>= time("12:00:00")`, made a later rule look
+  unreachable (`UNREACHABLE_RULE`, a WARNING) although `10:30@Europe/Paris` reaches it. The column's index now has a
+  class for a time in a zone no cell names wherever the column takes one, and every analysis visits it as it does the
+  others; the property tests' reference does the same. Evaluation is unchanged, and so are tables bound with typed
+  getters, columns of other types and time columns whose cells name such a zone id, which had the class already. **The
+  report changes** for map-based time columns, and time list columns, whose cells name no such zone id: unless a rule
+  accepts any value there (`-`, `!= null`), a time in another zone is now reported as a gap
+  (`cutOff in {[time("12:00:00")..+inf), any time with a zone id no cell names}`, a WARNING, which stops a startup
+  only where `fail-on` is `WARNING`), and a rule that only such a time reaches is no longer reported unreachable.
+  Overlaps cannot change, as a cell that matches such a time matches every time. Declared input values that rule such
+  times out, such as `[time("00:00:00")..time("23:59:59")]`, leave the report as it was.
 
 ## [0.6.0] - 2026-11-13
 
@@ -1026,7 +1053,8 @@ Code written against the prototype needs the changes listed under *Changed*.
 - **`MissingOutputException`** (no match now yields an empty result), **`InvalidPraeceptaException`**
   and the trie visitor API.
 
-[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/brunopacheco1/praecepta/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/brunopacheco1/praecepta/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/brunopacheco1/praecepta/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/brunopacheco1/praecepta/compare/v0.3.0...v0.4.0

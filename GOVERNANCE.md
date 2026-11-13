@@ -29,8 +29,11 @@ be invited; the maintainer adds them to CODEOWNERS, gives them write access, and
   issue first.
 - **Compatibility:** versions follow [Semantic Versioning](https://semver.org/). Until 1.0, minor
   versions may change the API; every change is listed in [CHANGELOG.md](CHANGELOG.md).
-- **What the project will not do:** become a full DMN engine (see the README, "What Praecepta is
-  not"). Proposals in that direction are better served by Camunda or Drools.
+- **Scope:** DMN 1.5, judged by its specification and the DMN TCK alone. Since 0.7 the project grows
+  from a decision-table engine into a full DMN 1.5 engine, one layer per release
+  ([#120](https://github.com/brunopacheco1/praecepta/issues/120), [docs/ROADMAP.md](docs/ROADMAP.md)),
+  keeping decision tables' validation and typed generated code. What it will not do: become a process
+  engine, a modeller or a server around the decisions (see the README, "What Praecepta is not").
 
 ## Releases
 The maintainer releases by pushing a signed `v*` tag; CI builds, signs and publishes to Maven
