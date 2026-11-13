@@ -27,7 +27,7 @@
         <camunda-dmn.version>1.12.6</camunda-dmn.version>
         <kie.version>10.2.0</kie.version>
         <!-- Camunda's feel-engine needs Jackson 2.22; Drools would otherwise resolve 2.19 first. -->
-        <jackson.version>2.22.4</jackson.version>
+        <jackson.version>2.23.0</jackson.version>
         <maven.install.skip>true</maven.install.skip>
         <maven.deploy.skip>true</maven.deploy.skip>
         <!-- left out of the Maven Central bundle (central-publishing-maven-plugin) -->
