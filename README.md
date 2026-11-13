@@ -456,6 +456,10 @@ graph.validationReport("Credit Limit");                    // that table's own a
 - **In code**, `DecisionGraph.builder()` assembles a graph from input data, `DecisionTable`s and literal
   expressions, each decision requiring what it reads; `graph.model()` is the `DecisionModel`, which
   `DmnReader.readModel` reads and `DmnWriter.write(model)` writes back.
+- **The build plugins** generate a typed class per decision of such a file, which evaluates it through the
+  graph ([Maven plugin](#decision-requirement-graphs-in-generated-code)), and **the framework integrations**
+  evaluate its decisions from the input data through the same `Decisions` bean as tables
+  ([Spring Boot](#decision-requirement-graphs-in-the-framework-integrations)).
 
 Business knowledge models, invocations and boxed expressions (0.10,
 [#118](https://github.com/brunopacheco1/praecepta/issues/118)), the full FEEL language (0.8,
@@ -546,6 +550,42 @@ is an output whose value is null (`TotalOutput[total=null]`), as in FEEL.
 Generated code belongs to your project, so it carries no Praecepta licence header. Set
 `<fileHeader>` to prepend your own, such as your project's SPDX lines.
 `Discount.validationReport()` gives the build-time findings, and `Discount.engine()` the engine.
+
+### Decision requirement graphs in generated code
+A DMN file whose decisions require other decisions, or are literal expressions
+([decision requirement graphs](#decision-requirement-graphs), #14), compiles to a class per decision that
+evaluates it through the model's `DecisionGraph`, from typed input data:
+
+```xml
+<table>
+  <!-- Risk Category and Credit Limit are tables, Monthly Limit is "Credit Limit / 12" -->
+  <source>src/main/rules/credit.dmn</source>
+</table>
+```
+
+```java
+BigDecimal monthly = MonthlyLimit.evaluate(new MonthlyLimitInput(new BigDecimal(30), new BigDecimal(1200)));  // 200
+String risk = RiskCategory.evaluate(new RiskCategoryInput(new BigDecimal(30)));                              // "Low"
+DecisionGraph graph = CreditModel.graph();     // the whole graph, e.g. to evaluate several decisions at once
+```
+
+- **`CreditModel`**, named after the model (or `<name>`), loads `CreditModel.dmn` once and holds the graph,
+  its `validationReport()` (cycles, missing requirements, type mismatches) and a record for each structured
+  input data (`CreditModel.Loan`).
+- **Per decision**, `<Decision>Input` holds the input data it needs, directly or through the decisions it
+  requires (`graph.requiredInputData`), and `<Decision>.evaluate` gives its value as its Java type: `String`,
+  `BigDecimal`, `Boolean`, `LocalDate`, `Duration`, `Period`; a `TemporalAccessor` for a date and time and an
+  `Object` for a time, as FEEL's values of those types may have a time zone or not; a `List` for a list, as
+  under RULE ORDER or COLLECT; and a `<Decision>Output` record for a context, as a table with several outputs
+  gives. It is null where FEEL's value is (no rule matched and no default). `<Decision>.validationReport()` is
+  its table's own analysis.
+- `<decision>` compiles one decision of the file: its class is named after it (or `<name>`), and its model
+  class `<Class>Model`. A decision table that requires no other decision compiles as before, as do files
+  without such decisions, so existing generated classes do not change.
+- The graph's issues fail the build at `<failOn>` (an ERROR each); below it they are logged, and a decision
+  that cannot be evaluated gets no classes. A file with business knowledge models, boxed expressions, decision
+  services, imports or FEEL beyond the expression subset is no graph Praecepta evaluates yet: its decision table
+  compiles alone, as before, and without one the build fails, naming the release that plans what it uses.
 
 ## Praecepta Gradle Plugin
 Does for Gradle what the Maven plugin does, with the same settings and the same generated files.
@@ -666,6 +706,31 @@ or the [Gradle plugin](#praecepta-gradle-plugin): the DMN resources they write a
 covers their package, such as `classpath*:com/acme/pricing/*.dmn`. Their generated classes are static and
 need no bean.
 
+### Decision requirement graphs in the framework integrations
+In a DMN file whose decisions require other decisions, or are literal expressions
+([decision requirement graphs](#decision-requirement-graphs), #14), every decision is one of the `Decisions`
+bean, in Spring Boot, Micronaut and Quarkus alike, and `decisions.evaluate` evaluates it from the model's
+**input data**, by name, as text, each decision it requires evaluated once:
+
+```java
+decisions.evaluate("Monthly Limit", Map.of("Applicant Age", "30", "Income", "1200"));   // [{Monthly Limit=200}]
+decisions.evaluate("Pricing", Map.of("Customer Type", "Gold"));                       // [{discount=0.2, grade=A}]
+decisions.evaluate("Payment", Map.of("Loan.principal", "600000", "Loan.rate", "0.0375", "Loan.months", "360"));
+```
+
+A decision's value comes as the maps a table gives: one map with the outputs of a table, a context's
+components, or the value under the decision's name for a literal expression; one map per element of a list
+(RULE ORDER, COLLECT); none for null. A structured input data is given by its components' paths
+(`Loan.principal`). Each decision table is still an engine bean, which evaluates the table alone, from its
+columns (the values of the decisions it requires included); a literal expression has none. The graph's issues
+(a cycle, a missing requirement, a type mismatch, all ERRORs) stop the startup at `praecepta.fail-on`, or are
+logged as `Decision model Credit: ERROR ...`; the endpoint lists each model under `models`, with its input data
+and issues, and gives each of its decisions its `model`, `logic`, `type`, `requiredDecisions`, `inputData` and
+`canEvaluate`. Files without such decisions load exactly as before, and so does a file with what later releases
+bring (business knowledge models, boxed expressions, decision services, imports, FEEL beyond the expression
+subset): its decision tables load alone, as in 0.6, and nothing else of it; without one, it fails, naming the
+release that plans what it uses.
+
 ## Praecepta Micronaut
 For Micronaut 4 applications on Java 21+. At startup, the module:
 1. loads every DMN file under `src/main/resources/rules`;
@@ -698,7 +763,9 @@ class Pricing {
 
 - **Names.** Every decision table of every file is one engine, named after the DMN decision's `name`
   (its `id` when it has none). The `Decisions` bean holds them all:
-  `decisions.evaluate("Discount", Map.of("country", "PT"))`.
+  `decisions.evaluate("Discount", Map.of("country", "PT"))`. A file whose decisions require other decisions is
+  evaluated through its graph, from its input data, as in
+  [Spring Boot](#decision-requirement-graphs-in-the-framework-integrations).
 - **Inputs and outputs are maps of text**, keyed by column name. Values are written as a table's cells
   write literals: `42`, `2025-01-31`, `08:30Z`, or `["PT", "BR"]` for a list column. A missing or blank
   value is a missing input. Each output map holds one matching rule's outputs, in the hit policy's order;
@@ -747,7 +814,9 @@ While Quarkus builds the application (`quarkus:build`, dev mode and tests), the 
 2. validates them, failing the build on errors (`quarkus.praecepta.fail-on`: `ERROR` by default,
    `WARNING` or `NONE`) with every problem listed at once, and logging the rest;
 3. registers the application's `Decisions` and one engine per decision, named after the DMN
-   decision's `name` (or, for a spreadsheet, its file name without the extension).
+   decision's `name` (or, for a spreadsheet, its file name without the extension). A file whose decisions
+   require other decisions is validated as a graph and evaluated through it, from its input data, as in
+   [Spring Boot](#decision-requirement-graphs-in-the-framework-integrations).
 
 ```java
 @ApplicationScoped
@@ -839,6 +908,10 @@ PraeceptaEngine<Map<String, String>, Map<String, String>> engine = decisions.eng
 - **Inputs and outputs** are maps of text, as in the framework integrations. `decisions.get("Discount")`
   gives the table, its validation report and its engine; `decisions.names()` and `decisions.describe()`
   list them.
+- **Decision requirement graphs**: a file whose decisions require other decisions, or are literal expressions,
+  becomes a `GraphModel` (`decisions.models()`), and each of its decisions evaluates through it from the input
+  data ([as the frameworks do](#decision-requirement-graphs-in-the-framework-integrations));
+  `model.graph()` is its `DecisionGraph`, for Java values.
 
 ## Native images
 Applications using Praecepta build as GraalVM native executables with no configuration for Praecepta

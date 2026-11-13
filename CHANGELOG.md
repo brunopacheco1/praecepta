@@ -51,11 +51,49 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   [#119](https://github.com/brunopacheco1/praecepta/issues/119)). `DmnReader.read(dmn)`, `read(dmn, decision)` and
   `readAll(dmn)` read single tables as before. What DMN 1.5 and the TCK leave open about graphs, and what Praecepta
   does there, is recorded in [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md) (cases 13 to 17).
+- **Generated classes for decision requirement graphs** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)):
+  the Maven and Gradle plugins (and `praecepta-compiler`) compile a DMN file whose decisions require other decisions,
+  or are literal expressions, into a model class (`CreditModel`, named after the model or `name`) that loads the
+  model once into a `DecisionGraph`, and per decision an input record of the input data it needs, directly or
+  through the decisions it requires (`MonthlyLimitInput`), and a class whose `evaluate` evaluates it through the
+  graph and gives its value as its Java type: `String`, `BigDecimal`, `LocalDate`..., a `List` for a list, a
+  `<Decision>Output` record for a context (a table with several outputs), a record of the model class for a
+  structured input data (`CreditModel.Loan`). `decision` compiles one decision of such a file. The graph's issues
+  fail the build at `failOn`. A decision table that requires no other decision, and every file without such
+  decisions, compiles exactly as before. `CompiledTable` gains `model()`, `reports()` (every report by the class it
+  concerns), `classNames()` and `summary()`; its `table()` is null for a model.
+- **Decision requirement graphs in the framework integrations**
+  ([#14](https://github.com/brunopacheco1/praecepta/issues/14)): in Spring Boot, Micronaut and Quarkus, and in
+  `praecepta-integration`, every decision of a file whose decisions require other decisions, or are literal
+  expressions, is a decision of the `Decisions` bean, and `decisions.evaluate(name, inputData)` evaluates it from the
+  model's input data, as text by name (a structured one by its components' paths, `Loan.principal`), through the
+  decisions it requires, giving its value as the maps a table gives. The new `GraphModel` holds a file's graph
+  (`Decisions.models()`, `Decision.model()`); the graph's issues fail startup, or the Quarkus build, at `fail-on`, and
+  are logged once below it (`Decision model Credit: ERROR ...`); the report endpoints and `Decisions.describe()` list
+  each model under `models` and describe each of its decisions' logic, type, requirements and input data. Each
+  decision table is still an engine bean, which evaluates the table alone from its columns; a literal expression has
+  no engine bean (`Decision.table()` and `engine()` are null for it).
 
 ### Changed
 - **`ValidationReport.Kind` has three more constants**, `DECISION_CYCLE`, `MISSING_REQUIREMENT` and `TYPE_MISMATCH`
   (see *Added*). Upgrading: code that switches over `ValidationReport.Kind` exhaustively must handle them; reports of
   decision tables never hold them, so the results and reports of existing tables are unchanged.
+- **The framework integrations read each DMN file as a decision model** (#14). Upgrading: in a file where a decision
+  requires another decision, `Decisions.evaluate` and `Decision.evaluate` now evaluate that file's decisions from the
+  model's input data through the graph, where 0.6 evaluated each table alone from its columns, the value of a
+  decision it requires taken as an input; the table's engine bean, `Decision.engine()` and `Decisions.engine(name)`
+  still do the latter. Such a file is also checked as a graph (a cycle, a missing requirement, a type mismatch are
+  ERRORs, which stop the startup at the default `fail-on`), and its literal expression decisions, which 0.6 ignored,
+  are decisions now (a file of literal expressions alone, which 0.6 rejected as having no decision table, loads).
+  Files of decision tables that require no other decision load as before, `Decisions.describe()` included, and so
+  does a file with a business knowledge model, a decision service, an import, a boxed expression or a literal
+  expression beyond the expression subset: its decision tables load alone, as in 0.6; such a file without a decision
+  table fails with a message that names the release planning what it uses, rather than `no decision table`.
+- **`Decision` has a sixth component, `model`** (#14), the graph the decision belongs to, null for a table read
+  alone; the five-component constructor remains. Upgrading: a record pattern over `Decision` needs the sixth
+  component.
+- **The build plugins check that no two tables generate any one class** (#14), the input and output records included,
+  where they compared only the decision classes; and they log `Compiled decision model ...` for a model.
 
 ### Fixed
 - **Rules reached only by a time with a zone id are no longer reported unreachable**

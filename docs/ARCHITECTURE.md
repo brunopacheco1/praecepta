@@ -167,7 +167,7 @@ An engine is **immutable** once built: any number of threads may share it withou
   from none: with several outputs, defaults that are all `null` still make a default output, of nulls.
   It uses the JDK's own XML parser (`DocumentBuilderFactory.newDefaultInstance()`, never one JAXP finds
   on the class path) with DTDs and external entities disabled. Anything it does not
-  support (function calls, inputs computed by other decisions) is rejected
+  support (function calls) is rejected
   with an error naming the decision, rule and column. Output entries may be expressions of
   literals (dates, times and durations included) and inputs with `+ - * / **` (`OutputExpression`): they are kept as written, parsed and
   type-checked when the engine is built, and evaluated only for matching rules, like outputs that
@@ -252,7 +252,8 @@ a list of contexts the list of their components (10.3.2.5), and a column of list
 one (10.3.2.9.4). No walk over the graph recurses, so a chain of thousands of decisions builds and evaluates on any
 thread's stack. A graph is immutable once built (the plans are cached in a concurrent map) and thread-safe.
 
-**For the build plugins and the framework integrations.** Everything they need is public API of `DecisionGraph`:
+**For the build plugins and the framework integrations** (how they use it is in the two sections below).
+Everything they need is public API of `DecisionGraph`:
 `decisions()` (names, in model order), `inputData()` (each input data's `FeelType`, declared or worked out),
 `type(decision)` (a decision's `FeelType`), `requiredInputData(decision)` (what a decision reads, directly or
 through the decisions it requires), `canEvaluate(decision)`, `validationReport()` and `validationReport(decision)`,
@@ -298,6 +299,30 @@ Gradle plugin's `GeneratePraecepta` task turn each configured table into a `Tabl
 At runtime, the generated code needs only `praecepta-engine`. The tool writes the result with
 `CompiledTable.write`, so every tool writes the same files.
 
+**Decision requirement graphs** (#14). Before loading a DMN source as a table, `TableCompiler` reads it as a
+decision model (`DmnReader.readModel`); `GraphCompiler` takes over when the decision the definition names, or,
+when it names none, one of the model's decisions, requires another decision or is a literal expression. Anything
+else compiles as before, byte for byte (the golden files of single tables are unchanged): a decision table that
+requires only input data, a model without such decisions, and a file that is not a well-formed model in a way a
+file of tables never had to be (two elements of one name, which `DmnWriter` writes for a table with a column of its
+own name; a decision without logic), and a model that uses what a later release plans (#116 to #119) but has the
+table to compile, which 0.6 compiled; without such a table, the reader's message, which names the release, fails
+the build. `GraphCompiler` builds the graph (`DecisionGraph.Builder.failOn` at the build's `failOn`, without
+logging), writes the model with `DmnWriter.write(model)`, and `GraphSourceGenerator` generates:
+- a model class, `<Model>Model` (or the named decision's class with `Model`), that reads the DMN resource once into
+  a `DecisionGraph` (`graph()`, `validationReport()`), with a record per structured input data, and the helpers the
+  conversions call (lists element by element, `YearsAndMonths` to `Period`);
+- per decision, an input record of `requiredInputData(decision)` and a class whose `evaluate` puts each component in
+  a map by input data name, evaluates the decision through the graph, and converts its value: a cast for simple
+  types, a record's `of(Map)` for a context (a `<Decision>Output` record; contexts within contexts are nested
+  records, depth bounded by the reader's `MAX_TYPE_DEPTH`), the helpers for lists and years and months durations.
+  Times and date-times are typed `Object` and `TemporalAccessor`: the graph keeps a value's zone, or lack of one,
+  as its class, which the model's types do not say (`TimeZones` decides it for a table's own columns from what its
+  cells write, which says nothing of a value one decision passes another).
+Each decision's table keeps its analysis (`CompiledTable.reports()`, by generated class, beside the graph's own
+report by the model class). The generated classes evaluate through the engine's `DecisionGraph`, so they agree with
+it by construction; `GraphCompilerTest` checks them against it and against `praecepta-integration`'s map engine.
+
 The Gradle plugin is built by the Maven reactor like every other module, compiled against the Gradle
 API that gradleplugins.dev redistributes on Maven Central (`dev.gradleplugins:gradle-api`, provided),
 with a hand-written plugin descriptor (`META-INF/gradle-plugins/io.github.brunopacheco1.praecepta.properties`);
@@ -340,6 +365,22 @@ log their reports themselves (`Decisions.load(sources, failOn, false)`, which bu
 its report. At startup, Quarkus builds its engines without logging either, since its build logged the
 issues. Aggregations follow `AggregationOperator.check`, the engine's statement of where DMN defines them,
 and compare values of the output's type (`FeelLiterals.value`, `FeelTemporals.compare`).
+
+**Decision requirement graphs** (#14). `Decisions.load` reads each file as a decision model
+(`DmnReader.readModel`). When one of its decisions requires another decision, or is a literal expression
+(`GraphModel.needed`), the file becomes a `GraphModel`: its `DecisionGraph`, built once, and the conversion of maps
+of text to input data (simple values stay text, which the graph parses with their type; lists are read as a list
+column reads them; a context is gathered from its components' paths, `Loan.principal`) and of a decision's value to
+the maps a table's engine gives (one per element of a list, a context's components as text, any other value under
+the table's one output, or the decision's name; none for null). Every decision of the file is then a `Decision`
+whose `evaluate` goes through the graph; a table's decision keeps its own map-based engine (its report is the one
+the graph's table reports, since the graph binds its columns as map inputs, `Zoning.EITHER`), which the frameworks
+register as its bean, so table beans are what 0.6 registered; a literal expression has no table, no engine and no
+bean. The graph's report is checked at `fail-on` and logged once, as the model's. Any other file is read as before
+with `readAll`, a model the reader rejects included: one with a later release's feature, whose tables 0.6 loaded and
+still loads, alone (the rest of the model is not evaluated, and the file fails with the reader's message, which names
+the release, when it has no table), and one that is not a well-formed model, as a file of tables never had to be. `Decisions.describe()` adds `models` only when there are graphs, so the description of files of tables
+is unchanged.
 
 The Spring Boot starter loads the tables while the context registers its bean definitions (an
 `ImportBeanDefinitionRegistrar`), because each decision becomes a bean of its own, named
