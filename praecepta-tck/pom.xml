@@ -17,8 +17,9 @@
     <packaging>jar</packaging>
     <name>praecepta-tck</name>
     <description>
-        Runs the decision-table test cases of the DMN Technology Compatibility Kit against the engine,
-        and keeps the published results (RESULTS.md) current. Not published.
+        Runs every model of compliance levels 2 and 3 of the DMN Technology Compatibility Kit against Praecepta,
+        scores each result node, fails the build on a regression from the committed baseline, and writes the
+        published results (RESULTS.md). Not published.
     </description>
 
     <properties>

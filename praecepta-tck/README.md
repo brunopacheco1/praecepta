@@ -6,27 +6,94 @@ SPDX-License-Identifier: Apache-2.0
 
 # praecepta-tck
 
-Runs the decision-table test cases of the [DMN Technology Compatibility Kit](https://github.com/dmn-tck/tck)
-(TCK) against `praecepta-engine`. Not published. The results are in [RESULTS.md](RESULTS.md).
+Runs the whole [DMN Technology Compatibility Kit](https://github.com/dmn-tck/tck) (TCK), every model of
+compliance levels 2 and 3, against Praecepta and scores it. Not published. The results are in
+[RESULTS.md](RESULTS.md).
 
 ```
 mvn -pl praecepta-tck -am test
 ```
 
-`TckTest` turns every expected result of every TCK test file into a check:
+`TckTest` turns every result node of every TCK test file into a check (3,511 at the pinned commit: 126 in
+the 28 models of level 2, 3,385 in the 120 models of level 3; result nodes a test file has commented out are
+not counted). The kit runs in about a second; the module's tests, with the kit loaded, in a few.
 
-- **passed**: the engine returns the expected result;
-- **not supported** (JUnit reports it as skipped): the table uses a feature Praecepta does not have
-  (`DmnReader` rejects it), or the inputs are of a kind it does not take. The message names the
-  feature;
-- **failed**: anything else. Every supported check must pass, so a failure fails the build.
+- **passed**: Praecepta gives the expected result, or reports an error where the kit expects one;
+- **failed**: Praecepta gives another result (JUnit reports it as skipped, with what differed);
+- **not supported** (skipped too): the node needs a feature Praecepta does not have yet. The message lists
+  every feature it needs, each with the release of the DMN 1.5 plan
+  ([#120](https://github.com/brunopacheco1/praecepta/issues/120)) that brings it.
 
-Only decisions whose logic is a decision table are checked. RESULTS.md must match the run, so a
-change in the results fails the build until it is regenerated:
+## The baseline: only regressions fail the build
+`baseline.txt` lists every result node that passed when it was last regenerated. The build fails only when one
+of them no longer passes (`no_node_the_baseline_has_passing_regresses`, and the node's own check); a node that
+fails or is not supported never fails it. RESULTS.md and the baseline are regenerated together, deliberately:
 
 ```
 mvn -pl praecepta-tck -am test -Dtck.update=true
 ```
+
+While they differ from the run (a node now passes that the baseline does not list, say), the test that compares
+them is skipped with the number of new passes, so the build stays green and a new pass is recorded only when
+someone regenerates the files and commits them; their diff shows what changed. Regenerating with a node gone
+from the baseline accepts a regression, so do it only when the change is meant (the kit's expectation is wrong
+by DMN 1.5, say), and say why in the pull request.
+
+## How a model is evaluated
+`ModelEvaluator` is the one seam between the kit and Praecepta: given a result node (its model, the test case's
+inputs, and the decision, decision service or business knowledge model it names), it returns the node's value,
+an error, a failure, or the features it lacks. `ModelEvaluator.praecepta()` is what the run uses; today it is
+`SingleDecisionEvaluator`, which evaluates one decision on its own:
+
+- a **decision table** with `DmnReader` and the engine (`DecisionTableEvaluator`), as since 0.1;
+- a **literal expression** as an output expression (`LiteralExpressionEvaluator`), the FEEL subset output entries
+  compute (arithmetic of numbers, strings, dates, times and durations), reading the decision's input data,
+  typed by their `typeRef`, with the test case's values. This is how `OutputExpressionsTckTest` checks the
+  arithmetic test cases (below), but stricter: `string(...)` is the built-in it is, an expression output
+  expressions reject where FEEL gives null is not supported, a null where the kit expects an error is not
+  supported (output expressions report no errors), and a value of another type than the decision's is not
+  supported (DMN's implicit conversions, 10.3.2.9.4).
+
+Everything else is not supported: a decision that needs the value of another decision the test case does not
+give, other boxed expressions, business knowledge models, decision services, imports. A release that adds a way
+to evaluate models puts its evaluator in front: `graphs.orElse(new SingleDecisionEvaluator())` for decision
+requirement graphs ([#14](https://github.com/brunopacheco1/praecepta/issues/14)). Where neither supports a node,
+the first one's reasons are kept; `SingleDecisionEvaluator.needsBesideGraphs` gives a graph evaluator the needs
+of a node without counting graphs among them.
+
+## What a node needs, and its feature area
+A not-supported node lists every feature it needs: what stopped evaluation first, then what the decisions,
+knowledge models and decision services it requires need, but for decisions whose value the test case gives.
+Each is a `Feature` of one area of the plan, named so a release can count what it unlocks:
+
+| Area | Release | Features |
+|---|---|---|
+| Single decision tables and arithmetic | 0.6 | what `DmnReader` rejects in a table |
+| Decision requirement graphs | 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | inputs computed by other decisions |
+| FEEL language | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | a FEEL construct by name: `if then else`, `for loops`, `lists`, `contexts`, `comparisons`, `in`, `instance of`, `paths`, `null`, errors, a decision's type... |
+| Built-in functions | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | each built-in function by its name: `abs()`, `string length()`... |
+| Boxed expressions, business knowledge models and structured values | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | business knowledge models, invocations, function definitions and lambdas, boxed contexts, relations, lists, conditionals, filters and iterators, structured inputs |
+| Decision services, imports and the rest | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | decision services, imports, external functions, decisions without logic |
+
+`FeelScan` names the FEEL a literal expression uses: it drops strings and comments, takes date and time
+functions of literals as the literals output entries read, and finds keywords, operators, brackets and
+invocations, whose name it resolves as a built-in function (DMN 1.5, 10.3.4), a knowledge model or decision
+service of the model, or another function. It is a scanner, not a parser, so its names are a guide to what a
+node needs, not a proof.
+
+A node's **feature area**, in RESULTS.md, is the latest area among the features its content uses, whether
+Praecepta reads them or not, so it does not change as Praecepta grows: the area's row shows how far that layer is
+done. *What each release unlocks* counts the not-supported nodes by the latest area among what they need.
+
+## Known failures
+- `0100-arithmetic`, `exponent_lhs_number_exp_rhs_number_005`: a power that is not whole, which the kit gives to
+  13 significant digits, where FEEL's numbers have 34 (DMN 1.5, 10.3.2.3.1 and Table 60), as output expressions
+  keep them (#71).
+- `1116-feel-time-function`, error cases 067 and 068: `time("13:20:00+19:00")` and `time("13:20:00-19:00")`, an
+  offset beyond the range of a time zone, which the kit expects to be an error; the engine reads them as the
+  local time `13:20:00`, dropping the offset.
+- `1117-feel-date-and-time-function`, error case 068: `date and time("+99999-12-01T11:22:33")`, a year with a
+  leading `+`, which the kit expects to be an error; the engine reads it.
 
 ## How results are compared
 - Inputs are given as text, the way `inputs(...)` takes them; qualified input expressions
@@ -36,7 +103,7 @@ mvn -pl praecepta-tck -am test -Dtck.update=true
   order, other lists in order. Praecepta has no null list, so an empty list matches null.
 - Numbers compare as decimals; dates, times and date-times by value; booleans ignoring case.
 - DMN reports errors (a hit policy violation, an input outside its value list) as a null result
-  flagged `errorResult`; Praecepta throws instead. A check flagged `errorResult` passes when
+  flagged `errorResult`; Praecepta throws instead. A node flagged `errorResult` passes when
   evaluation throws `HitPolicyViolationException` or `InvalidInputException`, and fails otherwise.
 
 ## Output expressions
@@ -49,8 +116,8 @@ Praecepta reads 489: 276 give the kit's result, 212 are rejected where the kit e
 differs (below). An expression in `string(...)` is evaluated without it and compared as FEEL's text of the value.
 Expressions outside Praecepta's subset (functions, lists, contexts, booleans, `null` operands, hour 24)
 are counted as not supported, and one check is known to differ: a power that is not whole, which the kit
-gives to 13 digits where FEEL's numbers have 34. These cases have no decision table, so they do not
-appear in RESULTS.md.
+gives to 13 digits where FEEL's numbers have 34. The whole-kit run scores the same expressions as decisions,
+more strictly (see *How a model is evaluated*), so it counts fewer of them as passed.
 
 ## Decision requirement graphs
 `DecisionGraph` (0.7, [#14](https://github.com/brunopacheco1/praecepta/issues/14)) evaluates whole models whose
@@ -78,10 +145,10 @@ expressions in the subset. The closest are:
   not supported, which invoke business knowledge models (#118) and, for the latter, decision services (#119).
 
 ## The TCK files
-`src/test/resources/tck` holds the TCK test directories that contain a decision table, and the two
-arithmetic test cases above (their DMN models and test files, without the PDFs), copied unchanged from
-[dmn-tck/tck](https://github.com/dmn-tck/tck) at the commit named in `TckSuite.TCK_COMMIT`. They
-are licensed under the Apache License 2.0 by the DMN TCK contributors (see `REUSE.toml`).
+`src/test/resources/tck` holds every test directory of compliance levels 2 and 3 (their DMN models and test
+files, without the PDFs, images and other documents), copied unchanged from
+[dmn-tck/tck](https://github.com/dmn-tck/tck) at the commit named in `TckSuite.TCK_COMMIT`. They are licensed
+under the Apache License 2.0 by the DMN TCK contributors (see `REUSE.toml`).
 
-To update them, copy the same directories (and any new ones with a `decisionTable`) from a newer
-commit, update `TckSuite.TCK_COMMIT`, and regenerate RESULTS.md.
+To update them, copy the `*.dmn` and `*-test-*.xml` files of both levels from a newer commit, update
+`TckSuite.TCK_COMMIT` and the counts in `TckTest`, and regenerate RESULTS.md and the baseline.

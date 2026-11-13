@@ -997,16 +997,25 @@ This runs the unit tests and the property-based tests in `praecepta-engine`, whi
 engine against a naive reference implementation of DMN decision-table semantics on random tables.
 
 # DMN conformance
-`praecepta-tck` runs the decision-table test cases of the
-[DMN Technology Compatibility Kit](https://github.com/dmn-tck/tck) in every build. Every check whose
-table Praecepta can read passes (83 of 86); the other three read inputs computed by other decisions in models
-that also invoke business knowledge models, which come in 0.10
-([#118](https://github.com/brunopacheco1/praecepta/issues/118)).
-The pass rate, the results per test case and what each unsupported check needs are in
-[praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md). The literal expressions of the TCK's arithmetic test
-cases run as output expressions too: of their 1,101 checks, Praecepta reads 489, of which 276 give the kit's
-result, 212 are rejected when the engine is built where the kit expects null (operands of types FEEL does not
-combine), and one differs (see [praecepta-tck/README.md](praecepta-tck/README.md#output-expressions)). Semantics are judged by DMN 1.5 and the TCK alone;
+`praecepta-tck` runs the whole [DMN Technology Compatibility Kit](https://github.com/dmn-tck/tck) in every
+build: every model of compliance levels 2 and 3 (148 models, 3,511 result nodes at the pinned commit), each
+result node scored as passed, failed or not supported. **454 of the 3,511 pass (12.9 %)**; of the 458 that
+Praecepta evaluates, 454 pass (the four others are
+[known failures](praecepta-tck/README.md#known-failures)), and the other 3,053 need features Praecepta does not
+have yet. Praecepta is a
+decision-table engine growing into a full DMN 1.5 engine one layer per release
+([#120](https://github.com/brunopacheco1/praecepta/issues/120)), so most of the kit (FEEL beyond the arithmetic
+of output entries, built-in functions, boxed expressions, business knowledge models, decision services) is
+still ahead; [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md) has the results per model and feature area,
+every feature the unsupported nodes need with the release that brings it, and how many nodes each release
+would complete. The decision-table checks counted since the first release still pass 83 of 86; the other
+three read inputs computed by other decisions in models that also invoke business knowledge models, which come
+in 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)). The build fails only
+on a regression: a node the committed baseline has passing that no longer does. The literal expressions of the
+TCK's arithmetic test cases also run as output expressions on their own terms: of their 1,101 checks,
+Praecepta reads 489, of which 276 give the kit's result, 212 are rejected when the engine is built where the
+kit expects null (operands of types FEEL does not combine), and one differs (see
+[praecepta-tck/README.md](praecepta-tck/README.md#output-expressions)). Semantics are judged by DMN 1.5 and the TCK alone;
 where both leave a case open, what Praecepta does is recorded in
 [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md), to be settled when a later DMN version or the TCK
 decides.

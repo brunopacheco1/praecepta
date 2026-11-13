@@ -25,7 +25,7 @@ around them. It is a library, not a service: an application builds an engine, or
 | `praecepta-quarkus` | integration, Quarkus ArC | Quarkus extension, runtime: builds the `Decisions` bean and one engine bean per decision (`@Identifier("Discount")`) from the DMN the build step validated (`PraeceptaRecorder`). |
 | `praecepta-quarkus-deployment` | runtime, compiler, Quarkus ArC deployment | Quarkus extension, build time: finds DMN files, compiles declared Excel and CSV tables, validates them and fails the build on the configured issues; reloads changed tables in dev mode (`PraeceptaProcessor`). |
 | `praecepta-benchmarks` | engine, Camunda 8, Drools, JMH | Compares Praecepta with other engines; not published. |
-| `praecepta-tck` | engine | Runs the DMN TCK's decision-table cases; not published. |
+| `praecepta-tck` | engine, integration | Runs the whole DMN TCK (compliance levels 2 and 3) and scores every result node against a committed baseline; not published. |
 | `praecepta-native-tests` | the framework modules | A Spring Boot, a Micronaut and a Quarkus application, built as GraalVM native executables and run; in the reactor only with the `native-frameworks` profile; not published. |
 
 The build-tool and framework integrations build on `praecepta-compiler` and `praecepta-integration`, so
@@ -450,6 +450,27 @@ profile, so the default build does not need GraalVM; the `Native frameworks` wor
 application with GraalVM for JDK 25, and Micronaut's with JDK 21 too (Spring Boot 4 and Quarkus 3.40 need
 GraalVM 25; the invoker skips them on an older one). Each takes its framework's defaults, the
 `native-maven-plugin` version included, as its users would.
+
+## Scoring the DMN TCK (#115)
+`praecepta-tck` runs every model of compliance levels 2 and 3 of the DMN TCK, at a pinned commit, in every
+build, and scores each result node as passed, failed or not supported ([RESULTS.md](../praecepta-tck/RESULTS.md)).
+Its pieces are meant to outlive the layers of the DMN 1.5 plan (#120):
+- **One seam for evaluation.** `ModelEvaluator` takes a result node (the model, the test case's inputs, what
+  it invokes) and returns a value, an error, a failure, or the features it lacks; the runner compares, scores
+  and reports. Today `SingleDecisionEvaluator` evaluates one decision on its own, a decision table through
+  `DmnReader` and the engine and a literal expression as an output expression. A release adds its evaluator
+  in front (`graphs.orElse(single)` for decision requirement graphs, #14), and the nodes it cannot take keep
+  the reasons the others give.
+- **Reasons by feature, with the release that brings them.** A not-supported node lists every `Feature` it
+  needs (a FEEL construct, a built-in function by name, business knowledge models, invocations, boxed
+  contexts, decision services, imports, structured inputs...), each in one area of the plan, found in its own
+  logic and in what it requires. RESULTS.md counts them by feature and by the release after which a node has
+  all it needs, so each release can see what it unlocks. A node's feature area comes from its content alone,
+  so it stays put as Praecepta grows.
+- **Only regressions fail the build.** `baseline.txt` lists the nodes that passed when it was last
+  regenerated; one of them no longer passing fails the build, and a node that fails or is not supported never
+  does. RESULTS.md and the baseline are regenerated together, deliberately (`-Dtck.update=true`), so a new pass
+  is recorded by a reviewed change, not silently.
 
 ## Design decisions
 The main decisions and their reasons (strict DMN semantics, bitsets instead of a trie or generated
