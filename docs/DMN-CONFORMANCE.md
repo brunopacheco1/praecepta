@@ -32,6 +32,8 @@ settled stays here, marked as such, with the release that settled it.
 | 8 | [A complete table, and missing inputs](#8-a-complete-table-and-missing-inputs) | open |
 | 9 | [A time with a zone id against a time in another zone, at an offset or without a zone](#9-a-time-with-a-zone-id-against-a-time-in-another-zone-at-an-offset-or-without-a-zone) | open |
 | 10 | [The difference of two times in different zones, or one with a zone and one without](#10-the-difference-of-two-times-in-different-zones-or-one-with-a-zone-and-one-without) | open |
+| 11 | [A date and time moved by months onto a local time its zone skips](#11-a-date-and-time-moved-by-months-onto-a-local-time-its-zone-skips) | open |
+| 12 | [Blank text as a missing value](#12-blank-text-as-a-missing-value) | open |
 
 How Praecepta returns DMN's null result, which is a choice of representation rather than of semantics,
 is [at the end](#how-a-null-result-is-returned).
@@ -119,13 +121,23 @@ integrations alike.
 ## 9. A time with a zone id against a time in another zone, at an offset or without a zone
 - **DMN 1.5.** 10.3.4.1 lets a time name a zone id (`time("10:30:00@Europe/Paris")`), which has no offset
   without a date. Neither 10.3.2.3.4 nor Tables 53 and 54 say how such a time compares with one in another
-  zone, with one at an offset, or with one without a zone.
+  zone, with one at an offset, or with one without a zone. One example decides a narrower case: Table 72, for
+  `time(from)`, has `time("23:59:00z") + duration("PT2M") = time("00:01:00@Etc/UTC")` true, so a time in a
+  zone with one fixed offset (`Etc/UTC`) equals the time at that offset. The TCK points the same way for
+  date-times (`0068-feel-equality`: `date and time("2018-12-08T00:00:00+00:00") = date and
+  time("2018-12-08T00:00:00@Etc/UTC")`).
 - **TCK.** `0068-feel-equality` compares two times in the same zone, and leaves the other cases out
   "pending RTF equality comparisons with zones clarification".
 - **Praecepta (since 0.6.0, [#82](https://github.com/brunopacheco1/praecepta/issues/82)).** Two times in the
   same zone compare by local time. Any other comparison of a time with a zone id is taken as one FEEL does not
   define, which is null (10.3.2.2): neither a test nor its `not(...)` matches, an interval's ends must be in
-  one zone, and a COLLECT MIN or MAX over such times in two zones fails with an `IllegalArgumentException`.
+  one zone, and a COLLECT MIN or MAX over such times in two zones is null (in the framework integrations'
+  map-based engine; the generated classes aggregate numbers only), as FEEL's `min` and `max` take a list of
+  comparable items (Table 75) and a built-in function is null outside its domain (10.3.2.16).
+  **Not yet following Table 72:** a time in a zone with one fixed offset (`Etc/UTC`, `Etc/GMT+1`) is treated as
+  any other zone id, so `time("00:01:00@Etc/UTC")` does not match `00:01:00Z`. Following the example needs such
+  a time to be read as the time at its offset by the index, the input bindings (a `zonedTimeInput` column
+  then takes times at an offset too), the analyses and the generated classes, which is left for a later release.
   A column of map-based inputs whose cells name no zone id still takes such a time, which only the cells that
   accept any value match; the analyses of overlaps, unreachable rules and gaps leave it out, the completeness
   search (case 8) does not.
@@ -139,7 +151,32 @@ integrations alike.
 - **Praecepta (since 0.6.0, [#85](https://github.com/brunopacheco1/praecepta/issues/85)).** Times subtract as
   they compare (cases 4, 5 and 9): by instant when both have an offset, by local time when one has none or
   both have a zone id in one zone, and the result is null for a time with a zone id and any time not in its
-  zone.
+  zone. By instant, two times are taken on one day, so times at offsets far apart can be more than a day
+  apart (`@"00:00:00+14:00" - @"23:59:59-12:00"` is `-PT49H59M59S`), beyond the range 10.3.2.3.4 gives
+  `valuet` ([0..86400]), within which Table 57's `valuet(e1) - valuet(e2)` would stay. Taking each time's
+  seconds since midnight UTC instead would keep that range but break the TCK's subtractions at one offset
+  (`@"10:10:10+11:00" - @"11:10:10+11:00"` is `-PT1H`, where it would give `PT23H`), so neither reading is
+  settled.
+
+## 11. A date and time moved by months onto a local time its zone skips
+- **DMN 1.5.** Table 57 moves a date and time by a years and months duration as
+  `date and time(date(e1.year + ..., e1.month + ..., e1.day), time(e1))`, keeping its time of day and zone.
+  When the zone skips that local time on the new date (a change to daylight saving time), nothing says what
+  the result is.
+- **TCK.** `0100-arithmetic` moves date-times with a zone id by months only where no time is skipped.
+- **Praecepta (since 0.6.0, [#85](https://github.com/brunopacheco1/praecepta/issues/85)).** The local time is
+  moved forward by the length of the gap, as `java.time` does: `date and time("2025-01-30T02:30:00@Europe/Paris")
+  + @"P2M"` is `2025-03-30T03:30:00+02:00`. A days and time duration moves a date and time by instant
+  (10.3.2.3.5), so it never meets this case.
+
+## 12. Blank text as a missing value
+- **DMN 1.5.** `""` is a string (10.3.2.3.2), distinct from null.
+- **TCK.** No decision-table test gives a blank input.
+- **Praecepta.** Blank text is a missing value wherever an input is read from text or a Java value: a single
+  value (since before 0.4.0, as Excel and CSV cells and maps of text have no other way to leave a value out),
+  and, since 0.6.0, an element of a list from a `Collection`
+  ([#84](https://github.com/brunopacheco1/praecepta/issues/84)). So `[""]` is a list holding a missing element,
+  which `list contains(?, null)` matches. A quoted `""` in a cell is still the empty string.
 
 ## How a null result is returned
 DMN 1.5 gives a decision table one result, which may be null; Praecepta's engine returns a list of
@@ -152,5 +189,12 @@ Praecepta's:
   aggregate gives null for an output: a matching rule's `null` entry or an expression with a missing
   operand, a `null` default output value (case 7), and since 0.6.0 a SUM, MIN or MAX over a matching rule
   whose output is missing, as FEEL's `sum`, `min` and `max` are null for a list that holds null (10.3.4.4,
-  10.3.2.16; [#90](https://github.com/brunopacheco1/praecepta/issues/90)). With one output, both mean DMN's
-  null; with several, the second is a context with null entries, which DMN tells from null.
+  10.3.2.16; [#90](https://github.com/brunopacheco1/praecepta/issues/90)), or over values that do not compare
+  (case 9).
+
+With one output and a single-hit policy or an aggregation, both mean DMN's null; with several outputs, the
+second is a context with null entries, which DMN tells from null. Under COLLECT without an operator, RULE
+ORDER and OUTPUT ORDER, the result is a list of the matching rules' outputs (10.3.2.10, steps 3a and 3b), and
+the same `[{fee=null}]` stands for two DMN results the representation does not tell apart: DMN's `[null]`,
+when one rule matches and its entry is `null`, and DMN's null, when no rule matches and the default is
+`null` (step 2a).

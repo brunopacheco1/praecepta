@@ -1150,7 +1150,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         boolean unknown = false;
         for (var test : tests) {
             // a name of an input that holds a list: whether the value is in it (FEEL's ? in list)
-            var outcome = test instanceof Equals(UnaryTests.Name(var name)) && inputs.apply(name) instanceof List<?> list
+            var outcome = test instanceof Equals(UnaryTests.Name(var name), var explicit) && !explicit
+                    && inputs.apply(name) instanceof List<?> list
                     ? in(value, list)
                     : test(resolve(test, inputs), value);
             if (outcome == null) {

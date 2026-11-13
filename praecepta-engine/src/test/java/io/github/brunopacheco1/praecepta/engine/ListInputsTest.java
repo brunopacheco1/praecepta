@@ -378,6 +378,88 @@ class ListInputsTest {
                         + "as 'limits' does");
     }
 
+    /**
+     * {@code = Flu Symptoms} is FEEL's {@code ? = Flu Symptoms}, an equality of a value and a list, which is null (DMN
+     * 1.5, Tables 52 and 53), unlike the bare name, which asks whether the value is in the list (Table 55): rejected
+     * as {@code != Flu Symptoms} is, and written back as it was read.
+     */
+    @Test
+    void an_equality_with_a_list_is_rejected_as_any_other_comparison_with_it() {
+        for (var cell : List.of("= Flu Symptoms", "!= Flu Symptoms", "\"cough\", = Flu Symptoms")) {
+            var table = new DecisionTable("symptoms", HitPolicy.COLLECT, null, List.of(new DecisionTable.InputColumn("Symptom", ColumnType.STRING)),
+                    List.of(new DecisionTable.OutputColumn("id", ColumnType.STRING)), List.of(rule(1, Map.of("Symptom", cell), "flu")),
+                    true, Set.of("Flu Symptoms"));
+            var builder = PraeceptaEngine.<Patient, String>builder()
+                    .table(table)
+                    .input("Symptom", Patient::symptom)
+                    .listInput("Flu Symptoms", Patient::fluSymptoms)
+                    .output(output -> output.values().get("id"));
+            Assertions.assertThatThrownBy(builder::build).as(cell)
+                    .isInstanceOf(InvalidDecisionTableException.class)
+                    .hasMessage("Rule 1, column 'Symptom': compares with 'Flu Symptoms', which holds lists; a cell can only ask whether "
+                            + "the value is in it, as 'Flu Symptoms' does");
+            var xml = DmnWriter.write(table);
+            Assertions.assertThat(xml).contains("<text>" + cell + "</text>");
+            Assertions.assertThat(DmnWriter.write(DmnReader.read(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)))))
+                    .isEqualTo(xml);
+        }
+        // of an input that holds one value, = home is the bare name's test
+        var single = new DecisionTable("t", HitPolicy.FIRST, null, List.of(new DecisionTable.InputColumn("s", ColumnType.STRING)),
+                List.of(new DecisionTable.OutputColumn("id", ColumnType.STRING)), List.of(rule(1, Map.of("s", "= home"), "x")), true);
+        var engine = PraeceptaEngine.<Map<String, String>, String>builder()
+                .table(single)
+                .inputs(PraeceptaInput::new)
+                .output(output -> output.values().get("id"))
+                .build();
+        Assertions.assertThat(engine.evaluate(Map.of("s", "PT", "home", "PT"))).containsExactly("x");
+        Assertions.assertThat(engine.evaluate(Map.of("s", "PT", "home", "ES"))).isEmpty();
+    }
+
+    /**
+     * In Praecepta's syntax, {@code null} on a list column asks whether the list is missing, and the other tests look
+     * at its elements; {@code != null} would be neither the negation of {@code null} nor clearly about the elements,
+     * so it is rejected in favour of {@code not(null)}, a list that is there. A DMN file writes the elements' test
+     * {@code some x in ? satisfies x != null}, which is read as it says.
+     */
+    @Test
+    void not_equal_null_is_rejected_on_a_list_column_in_praeceptas_syntax() {
+        var rules = List.of(rule(1, Map.of("nationalities", "!= null"), "there"));
+        var builder = PraeceptaEngine.<Customer, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .listInput("nationalities", Customer::nationalities)
+                .output(output -> output.values().get("id"))
+                .rules(rules);
+        Assertions.assertThatThrownBy(builder::build)
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Rule 1, column 'nationalities': '!= null' is not a test of a list column, where 'null' tests the list and "
+                        + "other tests its elements; write not(null) for a list that is there");
+
+        var present = PraeceptaEngine.<Customer, String>builder()
+                .listInput("nationalities", Customer::nationalities)
+                .output(output -> output.values().get("id"))
+                .rules(List.of(rule(1, Map.of("nationalities", "not(null)"), "there"), rule(2, Map.of("nationalities", "= null"), "missing")))
+                .hitPolicy(HitPolicy.COLLECT)
+                .build();
+        var withNull = new java.util.ArrayList<String>();
+        withNull.add(null);
+        Assertions.assertThat(present.evaluate(customer())).containsExactly("there");
+        Assertions.assertThat(present.evaluate(new Customer(withNull, null))).containsExactly("there");
+        Assertions.assertThat(present.evaluate(new Customer(null, null))).containsExactly("missing");
+
+        var elements = new DecisionTable("t", HitPolicy.COLLECT, null, List.of(new DecisionTable.InputColumn("nationalities", ColumnType.STRING)),
+                List.of(new DecisionTable.OutputColumn("id", ColumnType.STRING)),
+                List.of(rule(1, Map.of("nationalities", "some x in ? satisfies x != null"), "an element")), true, Set.of("nationalities"));
+        var dmn = PraeceptaEngine.<Customer, String>builder()
+                .table(elements)
+                .listInput("nationalities", Customer::nationalities)
+                .output(output -> output.values().get("id"))
+                .build();
+        Assertions.assertThat(dmn.evaluate(customer("PT"))).containsExactly("an element");
+        Assertions.assertThat(dmn.evaluate(customer())).isEmpty();
+        Assertions.assertThat(dmn.evaluate(new Customer(withNull, null))).isEmpty();
+        Assertions.assertThat(dmn.evaluate(new Customer(null, null))).isEmpty();
+    }
+
     // ---- DMN ---------------------------------------------------------------------------------
 
     @Test

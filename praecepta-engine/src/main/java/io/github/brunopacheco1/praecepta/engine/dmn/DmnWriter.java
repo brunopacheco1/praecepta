@@ -319,7 +319,7 @@ public final class DmnWriter {
         return switch (test) {
             case NullTest() -> "? = null";
             case UnaryTests.NullElement() -> "list contains(?, null)";
-            case Equals(var value) -> "list contains(?, " + literal(value) + ")";
+            case Equals(var value, var explicit) -> "list contains(?, " + literal(value) + ")";
             case Compare c -> "some x in ? satisfies x " + test(c);
             case NotEqual n -> "some x in ? satisfies x " + test(n);
             case Range r -> "some x in ? satisfies x in " + test(r);
@@ -331,7 +331,7 @@ public final class DmnWriter {
             case NullTest() -> "null";
             // only CellParser.parseFeelList reads it, for a list column, whose cells renderList writes
             case UnaryTests.NullElement() -> throw new IllegalArgumentException("list contains(?, null) only tests a list's elements");
-            case Equals(var value) -> literal(value);
+            case Equals(var value, var explicit) -> (explicit ? "= " : "") + literal(value); // = home is not home of a list
             case NotEqual(var negated) -> "!= " + test(negated);
             case Compare(var operator, var value) -> operator.symbol() + " " + literal(value);
             case Range(var low, var lowClosed, var high, var highClosed) -> (lowClosed ? "[" : "(") + literal(low) + ".."

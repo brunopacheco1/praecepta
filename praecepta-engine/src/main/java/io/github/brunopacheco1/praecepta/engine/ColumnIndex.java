@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.Period;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -450,7 +451,7 @@ final class ColumnIndex {
         private static void collectStrings(UnaryTests cell, Set<String> into) {
             for (var test : cell.tests()) {
                 var equality = test instanceof NotEqual(var negated) ? negated : test;
-                if (equality instanceof Equals(var value)) {
+                if (equality instanceof Equals(var value, var explicit)) {
                     into.add((String) value);
                 }
             }
@@ -1121,7 +1122,8 @@ final class ColumnIndex {
             case NullTest n -> false;
             case UnaryTests.NullElement n -> false;
             // literals are boundaries / written values, never inside other classes
-            case Equals(var literal) -> coordinate(valueClass, literal) instanceof ValueClass.Point(var value) && compare(value, literal) == 0;
+            case Equals(var literal, var explicit) ->
+                    coordinate(valueClass, literal) instanceof ValueClass.Point(var value) && compare(value, literal) == 0;
             case Compare(var operator, var literal) -> switch (operator) {
                 case LT -> below(coordinate(valueClass, literal), literal, false);
                 case LE -> below(coordinate(valueClass, literal), literal, true);
@@ -1138,18 +1140,29 @@ final class ColumnIndex {
      * zone, and any other value with anything but such a time ({@link FeelTemporals#comparable}).
      */
     private static boolean comparable(ValueClass valueClass, Test test) {
-        var zone = switch (valueClass) {
-            case ValueClass.InZone(var inZone, var part) -> inZone.getId();
-            case ValueClass.OtherZoneId other -> "";
+        // run for every class and test while the masks are built: no list, and no zone unless a value has one
+        ZoneId zone = switch (valueClass) {
+            case ValueClass.InZone(var inZone, var part) -> inZone;
+            case ValueClass.OtherZoneId other -> OTHER_ZONE;
             default -> null;
         };
-        for (var literal : UnaryTests.values(test)) {
-            var literalZone = literal instanceof ZonedTime time ? time.zone().getId() : null;
-            if (!Objects.equals(zone, literalZone)) {
-                return false;
-            }
+        return switch (test) {
+            case Equals(var literal, var explicit) -> inZone(literal, zone);
+            case Compare(var operator, var literal) -> inZone(literal, zone);
+            case Range(var low, var lowClosed, var high, var highClosed) -> inZone(low, zone) && inZone(high, zone);
+            default -> true; // null, a missing element: no literal ({@code !=} is decided before)
+        };
+    }
+
+    /** Stands for the zone ids no cell names, which no literal is in. */
+    private static final ZoneId OTHER_ZONE = ZoneOffset.UTC;
+
+    /** Whether a literal is a time with a zone id in {@code zone}, or, for a null zone, is not a time with a zone id. */
+    private static boolean inZone(Comparable<?> literal, ZoneId zone) {
+        if (literal instanceof ZonedTime time) {
+            return time.zone().equals(zone);
         }
-        return true;
+        return zone == null;
     }
 
     /**

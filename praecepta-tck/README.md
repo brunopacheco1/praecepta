@@ -42,9 +42,11 @@ mvn -pl praecepta-tck -am test -Dtck.update=true
 ## Output expressions
 `OutputExpressionsTckTest` evaluates the literal expressions of the arithmetic test cases
 (`compliance-level-3/0099-arithmetic-negation` and `0100-arithmetic`) as output expressions, which
-output entries are: every expression Praecepta reads must give the kit's result, and one the engine
-would reject when it is built (operands of types FEEL does not combine) passes when the kit expects
-null. An expression in `string(...)` is evaluated without it and compared as FEEL's text of the value.
+output entries are: every expression Praecepta reads must give the kit's result, or be one the engine
+would reject when it is built (operands of types FEEL does not combine) where the kit expects null; the
+test counts the two apart, as a rejected expression gives no result at all. Of the 1,101 checks,
+Praecepta reads 489: 276 give the kit's result, 212 are rejected where the kit expects null, and one
+differs (below). An expression in `string(...)` is evaluated without it and compared as FEEL's text of the value.
 Expressions outside Praecepta's subset (functions, lists, contexts, booleans, `null` operands, hour 24)
 are counted as not supported, and one check is known to differ: a power that is not whole, which the kit
 gives to 13 digits where FEEL's numbers have 34. These cases have no decision table, so they do not

@@ -31,7 +31,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
  *
  * <p>An expression is <em>rejected</em> when the engine would refuse the table: FEEL gives null for operands of types
  * it does not combine ({@code @"P1D" + 10}), and Praecepta rejects them when the engine is built, so a rejected
- * expression passes when the kit expects null. It is <em>not supported</em> when it is not in Praecepta's subset
+ * expression gives no result, and is counted apart: it agrees with the kit when the kit expects null, and fails the test
+ * otherwise. It is <em>not supported</em> when it is not in Praecepta's subset
  * (functions, lists, contexts, {@code null} operands, hour 24).
  */
 class OutputExpressionsTckTest {
@@ -43,16 +44,24 @@ class OutputExpressionsTckTest {
     private static final Map<String, String> KNOWN = Map.of(
             "exponent_lhs_number_exp_rhs_number_005", "a power to 13 digits, not 34");
 
+    /** What {@link #outcome} returns for an expression rejected where the kit expects null. */
+    private static final String REJECTED = "rejected where the kit expects null";
+
+    /**
+     * @param expectedPassed   the checks whose expression gives the kit's result
+     * @param expectedRejected the checks whose expression is rejected when the engine is built, where the kit expects null
+     */
     @ParameterizedTest
     @CsvSource({
-            "compliance-level-3/0099-arithmetic-negation, 10",
-            "compliance-level-3/0100-arithmetic,          478",
+            "compliance-level-3/0099-arithmetic-negation, 6,   4",
+            "compliance-level-3/0100-arithmetic,          270, 208",
     })
-    void every_expression_praecepta_reads_gives_the_kits_result(String testCase, int expectedPassed) {
+    void every_expression_praecepta_reads_gives_the_kits_result(String testCase, int expectedPassed, int expectedRejected) {
         var directory = TckSuite.root().resolve(Path.of(testCase));
         var name = Path.of(testCase).getFileName().toString();
         var expressions = expressions(directory.resolve(name + ".dmn"));
         var passed = 0;
+        var rejected = 0;
         var notSupported = new TreeMap<String, Integer>();
         var failed = new ArrayList<String>();
         var root = TckXml.parse(directory.resolve(name + "-test-01.xml"));
@@ -63,6 +72,8 @@ class OutputExpressionsTckTest {
                     : outcome(text, expected);
             if (outcome == null) {
                 passed++;
+            } else if (outcome.equals(REJECTED)) {
+                rejected++;
             } else if (outcome.startsWith("not supported: ")) {
                 notSupported.merge(outcome.substring("not supported: ".length()), 1, Integer::sum);
             } else {
@@ -71,9 +82,10 @@ class OutputExpressionsTckTest {
         }
         Assertions.assertThat(failed).as("%s; not supported: %s", testCase, notSupported).isEmpty();
         Assertions.assertThat(passed).as("checks passed in %s; not supported: %s", testCase, notSupported).isEqualTo(expectedPassed);
+        Assertions.assertThat(rejected).as("checks rejected where the kit expects null in %s", testCase).isEqualTo(expectedRejected);
     }
 
-    /** Null if the expression gives the expected value (or is rejected where FEEL gives null); else why not. */
+    /** Null if the expression gives the expected value, {@link #REJECTED} if it is rejected where FEEL gives null; else why not. */
     private static String outcome(String text, TckValue expected) {
         var asString = text.startsWith("string(") && text.endsWith(")");
         var expressionText = asString ? text.substring("string(".length(), text.length() - 1) : text;
@@ -89,7 +101,7 @@ class OutputExpressionsTckTest {
             if (e.getMessage().endsWith("is not an input")) {
                 return "not supported: names";
             }
-            return expected instanceof TckValue.Nil ? null : "rejected (" + e.getMessage() + ")";
+            return expected instanceof TckValue.Nil ? REJECTED : "rejected (" + e.getMessage() + ")";
         }
         var value = expression.evaluate(any -> null);
         if (value == null) {

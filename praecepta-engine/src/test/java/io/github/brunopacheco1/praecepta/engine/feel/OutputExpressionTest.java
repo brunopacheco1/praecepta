@@ -209,6 +209,8 @@ class OutputExpressionTest {
             "a dangling operator  | a +                  | a value is missing at the end",
             "an open string       | \"abc                | a string is not terminated",
             "two dots             | 1.2.3                | '1.2.3' is not a number",
+            "a huge exponent      | a * 1e999999999      | '1e999999999' is beyond FEEL's numbers (decimal128)",
+            "a tiny exponent      | a + 1e-7000          | '1e-7000' is beyond FEEL's numbers (decimal128)",
             "nothing              | `   `                | it is empty",
     })
     void other_feel_is_not_supported(String description, String text, String problem) {

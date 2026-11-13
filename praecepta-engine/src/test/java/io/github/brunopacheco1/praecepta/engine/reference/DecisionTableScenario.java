@@ -197,7 +197,8 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
      * values compares with a column of the same type instead, itself included ({@code > c1},
      * {@code c0}, {@code not(c2)}); a column that holds lists is only named whole ({@code c1},
      * {@code not(c1)}), which asks whether the value is in that list. One cell in three of a column that holds
-     * lists also asks for a missing element ({@code list contains(?, null)}; a {@code -} becomes that alone).
+     * lists also asks for a missing element ({@code list contains(?, null)}; a {@code -} becomes that alone), and one in six
+     * for an element that is there ({@code some x in ? satisfies x != null}).
      */
     public DecisionTableScenario withVariableCells() {
         var rewritten = new ArrayList<Praeceptum>();
@@ -210,7 +211,11 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 var text = rule.input().values().get(column);
                 var cell = CellParser.parse(text, type);
                 if (lists.contains(column)) {
-                    cells.put(column, (r + c) % 3 == 1 ? withNullElement(cell) : DmnWriter.renderList(cell));
+                    cells.put(column, switch ((r + c) % 6) {
+                        case 1, 4 -> withElementTest(cell, new UnaryTests.NullElement());
+                        case 5 -> withElementTest(cell, new UnaryTests.NotEqual(new UnaryTests.NullTest())); // an element is there
+                        default -> DmnWriter.renderList(cell);
+                    });
                 } else {
                     cells.put(column, (r + c) % 3 == 0 ? variableCell(type, r, c) : feelCell(text, cell, type));
                 }
@@ -221,10 +226,13 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 maskForm, defaults, zoneIdColumns);
     }
 
-    /** A list column's cell that also asks for a missing element: {@code ... or list contains(?, null)}, inside its {@code not(...)}. */
-    private static String withNullElement(UnaryTests cell) {
+    /**
+     * A list column's cell that also tests its elements so, inside its {@code not(...)}: {@code ... or list contains(?, null)},
+     * or {@code ... or some x in ? satisfies x != null}.
+     */
+    private static String withElementTest(UnaryTests cell, UnaryTests.Test test) {
         var tests = new ArrayList<>(cell.tests());
-        tests.add(new UnaryTests.NullElement());
+        tests.add(test);
         return DmnWriter.renderList(cell instanceof UnaryTests.Negated ? new UnaryTests.Negated(tests) : new UnaryTests.Positive(tests));
     }
 
@@ -477,7 +485,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     @SuppressWarnings("unchecked")
     private static Arbitrary<String> cell(Column column) {
         Arbitrary<String> single = literal(column);
-        Arbitrary<String> list = Arbitraries.oneOf(single, test(column), equality(single)).list().ofMinSize(2).ofMaxSize(3)
+        Arbitrary<String> list = Arbitraries.oneOf(single, test(column), equality(single, column.list())).list().ofMinSize(2).ofMaxSize(3)
                 .map(parts -> String.join(", ", parts));
         Arbitrary<String> negated = Arbitraries.oneOf(single, list, test(column)).map(inner -> "not(" + inner + ")");
         // FEEL's comments (10.3.1.2), which a string column in Praecepta's syntax keeps as text
@@ -488,7 +496,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 Tuple.of(1, Arbitraries.just("-")),
                 Tuple.of(4, single),
                 Tuple.of(comparisonWeight(column.type()), test(column)),
-                Tuple.of(2, equality(single)),
+                Tuple.of(2, equality(single, column.list())),
                 Tuple.of(2, list),
                 Tuple.of(1, negated),
                 Tuple.of(1, Arbitraries.just("null")),
@@ -497,14 +505,16 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
 
     /**
      * {@code = x} and {@code != x} (DMN 1.5, grammar rule 7.a), {@code = null} and {@code != null}: one test each, so
-     * that a list of tests holds them among others ({@code != 1, > 3}).
+     * that a list of tests holds them among others ({@code != 1, > 3}). A list column takes no {@code != null} in
+     * Praecepta's syntax, where {@code null} tests the list; {@link #withVariableCells} writes the elements' one,
+     * {@code some x in ? satisfies x != null}.
      */
-    private static Arbitrary<String> equality(Arbitrary<String> single) {
+    private static Arbitrary<String> equality(Arbitrary<String> single, boolean list) {
         return Arbitraries.frequencyOf(
                 Tuple.of(2, single.map(value -> "= " + value)),
                 Tuple.of(4, single.map(value -> "!= " + value)),
                 Tuple.of(1, Arbitraries.just("= null")),
-                Tuple.of(2, Arbitraries.just("!= null")));
+                Tuple.of(list ? 0 : 2, Arbitraries.just("!= null")));
     }
 
     private static int comparisonWeight(ColumnType type) {

@@ -12,6 +12,7 @@ import java.util.Map;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Issue;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind;
@@ -211,6 +212,40 @@ class TableAnalysisBehaviourTest {
         // first is searched, as it holds fewer rules; nat, the last, is then decided directly
         Assertions.assertThat(report).hasToString("WARNING no rule matches ages has no element in [18..+inf), nat has no element in \"PT\"");
         Assertions.assertThat(examples(report)).containsExactly("{ages=[], nat=[]}");
+    }
+
+    // ---- large tables ----------------------------------------------------------------------------
+
+    /**
+     * A list column with a value per rule: under FIRST, the analysis takes a few mask operations per rule and element
+     * class (it took one search per pair of rules, which made 2,000 rules take minutes); under UNIQUE, almost every pair
+     * of rules overlaps on a list holding both values, and the report lists the first {@link TableAnalysis#MAX_OVERLAPS}
+     * pairs in rule order.
+     */
+    @Test
+    @Timeout(30)
+    void a_list_column_with_a_value_per_rule_is_analysed_quickly_and_its_overlaps_are_capped() {
+        var rules = new ArrayList<Praeceptum>();
+        for (int i = 0; i < 2000; i++) {
+            rules.add(rule(i + 1, "out", "r" + i, "nat", "\"T" + i + "\"", "n", "> " + i));
+        }
+        Assertions.assertThat(listsAndNumbers(HitPolicy.FIRST, rules).validationReport().isEmpty()).isTrue();
+
+        var overlaps = listsAndNumbers(HitPolicy.UNIQUE, rules).validationReport().issues(Kind.OVERLAPPING_RULES);
+        Assertions.assertThat(overlaps).hasSize(TableAnalysis.MAX_OVERLAPS);
+        Assertions.assertThat(overlaps.getFirst().ruleIds()).containsExactly(1, 2);
+        Assertions.assertThat(overlaps.getLast().ruleIds()).containsExactly(1, 101);
+    }
+
+    private static PraeceptaEngine<Map<String, String>, String> listsAndNumbers(HitPolicy policy, List<Praeceptum> rules) {
+        return PraeceptaEngine.<Map<String, String>, String>builder()
+                .hitPolicy(policy)
+                .inputs(PraeceptaInput::new)
+                .output(output -> output.values().get("out"))
+                .listColumnType("nat", ColumnType.STRING)
+                .columnType("n", ColumnType.NUMBER)
+                .rules(rules)
+                .build();
     }
 
     /** An engine over map inputs whose columns {@code nat} (strings) and {@code ages} (numbers) hold lists. */

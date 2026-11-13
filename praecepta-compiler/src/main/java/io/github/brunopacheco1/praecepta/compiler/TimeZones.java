@@ -5,6 +5,10 @@
  */
 package io.github.brunopacheco1.praecepta.compiler;
 
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -19,6 +23,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
+import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 
@@ -33,7 +38,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
  * same kind, so that they are compared as written (two values with a zone by instant, two without by local time),
  * and the inputs linked by such cells are decided together;</li>
  * <li>an output has values with a zone when its literal values (its default value included) all have one and so do the inputs its
- * rules name, and there is at least one of them.</li>
+ * rules name, and there is at least one of them. An output expression counts by its operands of the output's type, the
+ * inputs it reads and its literals: {@code start + duration("PT8H")} has the kind of {@code start}, as a date and time
+ * or a time plus or minus a duration keeps its zone, or its lack of one.</li>
  * </ul>
  * A column, or a group of linked inputs, whose literals mix kinds is rejected: FEEL compares a value with
  * a zone and one without by local time, so the engine evaluates such a table, but the table does not say which
@@ -156,14 +163,59 @@ final class TimeZones {
         }
         for (var rule : table.rules()) {
             var input = rule.output().references().get(output.name());
+            var expression = rule.output().expressions().get(output.name());
             var text = rule.output().values().get(output.name());
             if (input != null) {
                 kinds.add(inputKinds.getOrDefault(input, Kind.LOCAL));
+            } else if (expression != null) {
+                expressionKinds(OutputExpression.parse(expression), output.type(), inputTypes(table), inputKinds, kinds);
             } else if (text != null) {
                 kinds.add(kind(parse(text, output.type(), table, output.name())));
             }
         }
         return kinds;
+    }
+
+    /**
+     * Adds the kinds of an expression's operands of the output's type, which give the kind of its value: FEEL adds a
+     * duration to a time or a date and time without changing its zone (DMN 1.5, Table 57), and no other operation of
+     * Praecepta's expressions gives a time or a date and time.
+     */
+    private static void expressionKinds(OutputExpression expression, ColumnType type, Map<String, ColumnType> inputTypes,
+            Map<String, Kind> inputKinds, Set<Kind> kinds) {
+        switch (expression) {
+            case OutputExpression.Literal(var value) -> {
+                if (typeOf(value) == type) {
+                    kinds.add(kind(value));
+                }
+            }
+            case OutputExpression.Name(var name) -> {
+                if (inputTypes.get(name) == type) {
+                    kinds.add(inputKinds.getOrDefault(name, Kind.LOCAL));
+                }
+            }
+            case OutputExpression.Negation(var operand) -> expressionKinds(operand, type, inputTypes, inputKinds, kinds);
+            case OutputExpression.Arithmetic(var operator, var left, var right) -> {
+                expressionKinds(left, type, inputTypes, inputKinds, kinds);
+                expressionKinds(right, type, inputTypes, inputKinds, kinds);
+            }
+        }
+    }
+
+    /** The time or date-and-time type of a literal; null for any other. */
+    private static ColumnType typeOf(Object value) {
+        if (value instanceof LocalTime || value instanceof OffsetTime || value instanceof ZonedTime) {
+            return ColumnType.TIME;
+        }
+        return value instanceof LocalDateTime || value instanceof ZonedDateTime ? ColumnType.DATE_TIME : null;
+    }
+
+    /** The type of every input: the table's columns, then the other inputs its cells or outputs name. */
+    private static Map<String, ColumnType> inputTypes(DecisionTable table) {
+        var types = new HashMap<String, ColumnType>();
+        table.inputs().forEach(column -> types.put(column.name(), column.type()));
+        table.namedInputs().forEach(types::putIfAbsent);
+        return types;
     }
 
     private static Object parse(String text, ColumnType type, DecisionTable table, String output) {

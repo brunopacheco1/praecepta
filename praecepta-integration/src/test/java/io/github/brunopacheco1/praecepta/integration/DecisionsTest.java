@@ -9,6 +9,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -278,13 +279,28 @@ class DecisionsTest {
     }
 
     @Test
-    void min_and_max_of_times_dmn_does_not_compare_fail() {
-        // DMN 1.5 does not say how times with a zone id in two zones compare, and the TCK leaves it out
-        var zones = Decision.of("zones", typed("MIN", "time", "time(\"10:00:00@Europe/Paris\")", "time(\"09:00:00@Asia/Dhaka\")")).engine();
-        Assertions.assertThat(zones.evaluate(Map.of("zone", "mainland"))).containsExactly(Map.of("out", "10:00:00@Europe/Paris"));
-        Assertions.assertThatThrownBy(() -> zones.evaluate(Map.of("zone", "islands")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("FEEL does not define how");
+    void min_and_max_of_times_that_do_not_compare_are_null() {
+        // DMN 1.5 does not say how times with a zone id in two zones compare, and the TCK leaves it out; min and max
+        // take "comparable items" (Table 75), and a built-in function is null outside its domain (10.3.2.16)
+        var nothing = Collections.singletonMap("out", (String) null);
+        for (var operator : List.of("MIN", "MAX")) {
+            var zones = Decision.of("zones", typed(operator, "time", "time(\"10:00:00@Europe/Paris\")", "time(\"09:00:00@Asia/Dhaka\")"))
+                    .engine();
+            Assertions.assertThat(zones.evaluate(Map.of("zone", "mainland"))).containsExactly(Map.of("out", "10:00:00@Europe/Paris"));
+            Assertions.assertThat(zones.evaluate(Map.of("zone", "islands"))).containsExactly(nothing);
+        }
+        // null once two values do not compare, whatever comes after: the third time is in the first one's zone
+        var three = DmnReader.readAll(stream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="out" name="Out"><decisionTable hitPolicy="COLLECT" aggregation="MAX">
+                    <input><inputExpression typeRef="string"><text>zone</text></inputExpression></input>
+                    <output name="out" typeRef="time"/>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>@"10:00:00@Europe/Paris"</text></outputEntry></rule>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>@"09:00:00@Asia/Dhaka"</text></outputEntry></rule>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>@"11:00:00@Europe/Paris"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""")).getFirst();
+        Assertions.assertThat(Decision.of("three", three).engine().evaluate(Map.of("zone", "any"))).containsExactly(nothing);
     }
 
     @Test

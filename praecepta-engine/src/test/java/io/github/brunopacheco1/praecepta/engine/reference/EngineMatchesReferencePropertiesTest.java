@@ -7,11 +7,15 @@ package io.github.brunopacheco1.praecepta.engine.reference;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BinaryOperator;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.assertj.core.api.Assertions;
 
@@ -238,6 +242,25 @@ class EngineMatchesReferencePropertiesTest {
         assertSameFindings(s, priority, perColumn);
     }
 
+    /** The validation report lists at most this many pairs of overlapping rules, or of rules with conflicting outputs. */
+    private static final int MAX_OVERLAPS = 100;
+
+    /**
+     * Of the reference's findings, those the report lists: every unreachable rule, and the first {@link #MAX_OVERLAPS}
+     * pairs in rule order, which a wide table of overlapping rules goes beyond.
+     */
+    private static List<Finding> reported(Collection<Finding> findings, List<Praeceptum> rules) {
+        var order = new HashMap<Integer, Integer>();
+        for (int r = 0; r < rules.size(); r++) {
+            order.put(rules.get(r).priority(), r);
+        }
+        var pairs = findings.stream().filter(finding -> finding.ruleIds().size() == 2)
+                .sorted(Comparator.<Finding>comparingInt(finding -> order.get(finding.ruleIds().get(0)))
+                        .thenComparingInt(finding -> order.get(finding.ruleIds().get(1))))
+                .limit(MAX_OVERLAPS);
+        return Stream.concat(findings.stream().filter(finding -> finding.ruleIds().size() != 2), pairs).toList();
+    }
+
     private static void assertSameFindings(DecisionTableScenario s, List<String> priority, boolean perColumn) {
         for (var policy : List.of(HitPolicy.UNIQUE, HitPolicy.ANY, HitPolicy.FIRST, HitPolicy.PRIORITY)) {
             var rules = policy == HitPolicy.ANY ? DecisionTableScenario.outOnly(s.rules()) : s.rules();
@@ -248,7 +271,7 @@ class EngineMatchesReferencePropertiesTest {
                     .map(issue -> new Finding(issue.kind().name(), issue.ruleIds()))
                     .collect(Collectors.toSet());
             Assertions.assertThat(actual).as("policy %s", policy)
-                    .containsExactlyInAnyOrderElementsOf(reference.expectedFindings(s.columns()));
+                    .containsExactlyInAnyOrderElementsOf(reported(reference.expectedFindings(s.columns()), rules));
             // not logging the report (as the integrations build their engines) leaves it as it is
             var quiet = PraeceptaEngine.<Map<String, Object>, PraeceptaOutput>builder()
                     .table(s.table(rules, policy, priority))

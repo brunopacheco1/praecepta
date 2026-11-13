@@ -68,7 +68,7 @@ final class VariableCells {
                 var equal = test(negated, value, inputs); // != is not(=), so unknown stays unknown
                 yield equal == null ? null : !equal;
             }
-            case Equals(var literal) -> {
+            case Equals(var literal, var explicit) -> {
                 var other = resolve(literal, inputs);
                 if (other instanceof List<?> list) {
                     yield in(value, list);

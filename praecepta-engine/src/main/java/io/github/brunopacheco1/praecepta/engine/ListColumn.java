@@ -254,7 +254,7 @@ final class ListColumn {
                     && (bracketed || tests.stream().anyMatch(ListColumn::isLiteral))
                     && tests.stream().allMatch(test -> test instanceof UnaryTests.NullTest || isLiteral(test))) {
                 var values = new ArrayList<Comparable<?>>(tests.size()); // null for a missing element
-                tests.forEach(test -> values.add(test instanceof UnaryTests.Equals(var value) ? value : null));
+                tests.forEach(test -> values.add(test instanceof UnaryTests.Equals(var value, var explicit) ? value : null));
                 return values;
             }
         } catch (CellSyntaxException e) {
@@ -264,7 +264,7 @@ final class ListColumn {
     }
 
     private static boolean isLiteral(UnaryTests.Test test) {
-        return test instanceof UnaryTests.Equals(var value) && !(value instanceof UnaryTests.Name);
+        return test instanceof UnaryTests.Equals(var value, var explicit) && !(value instanceof UnaryTests.Name);
     }
 
     private String example() {

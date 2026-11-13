@@ -142,6 +142,11 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
    how a gap there is described (`nationalities has no element in "PT", nationalities has an element
    in "ES"`). The searches fix list columns after the others; any list column before the last
    branches on the minimal sets of rules its lists leave, at most `ListAnalysis.MAX_OUTCOMES` of them.
+   Which earlier rules cover a rule on the last list column, by themselves, is found for all of them at once
+   with a few mask operations per element class (`ListAnalysis.covering`), so the cost grows with rules times
+   classes, not with pairs of rules. Overlapping pairs (UNIQUE) and pairs with conflicting outputs (ANY)
+   are listed up to `TableAnalysis.MAX_OVERLAPS` (100), the first in rule order, as gaps are up to 100: a
+   list column with a value per rule makes almost every pair of rules overlap.
 
 An engine is **immutable** once built: any number of threads may share it without locks.
 
@@ -185,7 +190,9 @@ Gradle plugin's `GeneratePraecepta` task turn each configured table into a `Tabl
    once and evaluates it. `JavaNames` turns table, column and value names into safe identifiers.
    `TimeZones` decides which time and date-time columns become `OffsetTime` and `ZonedDateTime`:
    those whose written values all have a zone, together with the inputs their cells compare with; a time
-   column whose written values all have a zone id becomes the engine's `ZonedTime`.
+   column whose written values all have a zone id becomes the engine's `ZonedTime`. An output expression
+   counts by its operands of the output's type, the inputs it reads and its literals, since adding a
+   duration keeps a time's or a date and time's zone.
 
 At runtime, the generated code needs only `praecepta-engine`. The tool writes the result with
 `CompiledTable.write`, so every tool writes the same files.

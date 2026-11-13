@@ -219,7 +219,16 @@ final class TemporalLiterals {
             return null;
         }
         if (NUMBER.matcher(word).matches()) {
-            return new BigDecimal(word);
+            BigDecimal number;
+            try {
+                number = new BigDecimal(word);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("'" + word + "' is not a number", e);
+            }
+            if (!FeelNumbers.isDecimal128(number)) {
+                throw new IllegalArgumentException("'" + word + "' is beyond FEEL's numbers (decimal128)");
+            }
+            return number;
         }
         throw new IllegalArgumentException("'" + word + "' is not a string, a number or a date time literal");
     }

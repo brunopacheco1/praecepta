@@ -150,7 +150,7 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 |---|---|---|
 | blank or `-` | any value, including a missing one | all |
 | `"PT","ES"` or `PT,ES` | one of the values (unquoted words are string literals) | STRING |
-| `18`, `2.5`, `.5`, `1.2e3` | that number (`1.0` equals `1`) | NUMBER |
+| `18`, `2.5`, `.5`, `1.2e3` | that number (`1.0` equals `1`), within FEEL's decimal128 (exponents up to 6144) | NUMBER |
 | `date("2025-01-31")` or `2025-01-31` | that date | DATE |
 | `true`, `false` | that boolean | BOOLEAN |
 | `time("08:30:00")` or `08:30:00` | that time of day | TIME |
@@ -164,10 +164,10 @@ Cells are DMN FEEL simple unary tests, parsed according to the column's type:
 | `date(2025, 1, 31)`, `time(8, 30, 0)`, `time(8, 30, 0, duration("PT1H"))`, `date and time(date("2025-01-31"), time("08:30:00"))`, `date and time("2025-01-31")` | the other forms of the date and time functions (DMN 1.5, Table 72); a date and time without a time is at midnight | its type |
 | `< 18`, `<= 18`, `> 18`, `>= 18`, `< "N"` | comparisons | all but BOOLEAN |
 | `[18..65)`, `(0..1]`, `]a..b[`, `["A".."M"]` | intervals: `[`/`]` closed, `(`/`)` or outward brackets open | all but BOOLEAN |
-| `= 18`, `= "PT"` | the same as `18`, `"PT"` | all |
+| `= 18`, `= "PT"` | the same as `18`, `"PT"` (in a DMN file, `= home` of an input that holds a list is rejected: unlike `home`, which asks whether the value is in the list, it compares the value with the list) | all |
 | `!= "PT"`, `!= 18` | any value but that one, a missing one included (`!=` is `not(=)`, DMN 1.5, 10.3.2.15) | all |
 | `null`, `= null` | only a missing value | all |
-| `!= null` | any value that is not missing | all |
+| `!= null` | any value that is not missing (not on a list column, where `null` tests the list: write `not(null)` for a list that is there) | all |
 | `not(...)` | anything the list inside does not match | all |
 
 FEEL's comments are ignored: `< 18 // minors`, `/* adults */ >= 18` (DMN 1.5, 10.3.1.2), in cells and in
@@ -207,7 +207,10 @@ does not say, and the TCK leaves those cases out "pending RTF equality compariso
 Praecepta takes such a comparison as one FEEL does not define, which is null: neither the test nor its
 `not(...)` matches (`time("08:00:00@Europe/Paris")` and `not(time("08:00:00@Europe/Paris"))` both miss
 `08:00@Asia/Dhaka`, `08:00Z` and `08:00`), an interval's ends must be in one zone, and a COLLECT MIN or MAX
-over such times in two zones fails. A column whose cells name no zone id still takes such a time read from
+over such times in two zones is null, as FEEL's `min` and `max` take comparable items (Table 75) and a
+built-in function is null outside its domain (10.3.2.16). DMN 1.5's own example of `time(from)` (Table 72)
+has `time("00:01:00@Etc/UTC")` equal `time("00:01:00Z")`, a zone with one fixed offset; Praecepta does not
+yet follow it (see [DMN conformance](docs/DMN-CONFORMANCE.md)). A column whose cells name no zone id still takes such a time read from
 text: only the cells that accept any value (`-`, `!= null`) match it.
 
 ### Typed columns and input value lists
@@ -287,7 +290,8 @@ var engine = PraeceptaEngine.<Customer, String>builder()
 These are the semantics of FEEL's `list contains`: a missing list makes every test unknown, while an
 empty one passes none. Elements must be values of the element type (as its single-value getter
 returns them, or text), and declared input values apply to each element. An element may also be
-missing (null or blank), with FEEL's answers for it (DMN 1.5, Tables 49, 50 and 75): a literal is
+missing (null, or by Praecepta's convention blank text, as for single values; FEEL's `""` is a string), with
+FEEL's answers for a missing one (DMN 1.5, Tables 49, 50 and 75): a literal is
 false, a comparison or an interval unknown, and a cell's tests are joined over the elements with FEEL's
 three-valued `or`. So a cell holds when some element passes, whatever the others, and its `not(...)`
 only when every element fails every test:
@@ -315,7 +319,9 @@ that a single value cannot: rules `"PT"` and `"BR"` overlap (on `["PT", "BR"]`),
 missing ones and ones holding missing elements included; gaps are looked for among lists of declared
 values and described by the elements such lists hold, as in
 `nationalities has no element in "PT", nationalities has an element in "ES"` (lists without `"PT"`
-that hold `"ES"`), with an example list.
+that hold `"ES"`), with an example list. Under UNIQUE or ANY, rules that each name another value of a
+list column all overlap, so the report lists the first 100 pairs of overlapping rules, in rule order, as
+it lists the first 100 gaps.
 
 ### DMN
 `DmnReader` loads a decision table from a DMN file (DMN 1.1 to 1.5), including its hit policy,
@@ -431,8 +437,9 @@ A string column with a value list becomes an enum in the input record, using the
 Numbers are `BigDecimal` and dates `LocalDate`. Times and date-times are `LocalTime` and
 `LocalDateTime`, or `OffsetTime` and `ZonedDateTime` when every value written for the column has a
 time zone (an input compared with such a column in a cell, as in `> limit`, takes a zone too), and a
-time is the engine's `ZonedTime` when every value written for it has a zone id; a column that mixes
-kinds fails the build. An input declared with `<list>true</list>` (or typed
+time is the engine's `ZonedTime` when every value written for it has a zone id; an output whose entry
+is an expression counts by its operands of the output's type (`start + duration("PT8H")` has the kind of
+`start`); a column that mixes kinds fails the build. An input declared with `<list>true</list>` (or typed
 by a collection in a DMN file) becomes a `java.util.List` of its type. At runtime the generated code
 needs only `praecepta-engine`; Apache POI stays a build-time dependency.
 
@@ -860,8 +867,9 @@ table Praecepta can read passes (83 of 86); the other three need inputs computed
 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)), which Praecepta does not have yet.
 The pass rate, the results per test case and what each unsupported check needs are in
 [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md). The literal expressions of the TCK's arithmetic test
-cases run as output expressions too: of their 1,101 checks, Praecepta reads 489 and gives the kit's result
-for all but one (see [praecepta-tck/README.md](praecepta-tck/README.md#output-expressions)). Semantics are judged by DMN 1.5 and the TCK alone;
+cases run as output expressions too: of their 1,101 checks, Praecepta reads 489, of which 276 give the kit's
+result, 212 are rejected when the engine is built where the kit expects null (operands of types FEEL does not
+combine), and one differs (see [praecepta-tck/README.md](praecepta-tck/README.md#output-expressions)). Semantics are judged by DMN 1.5 and the TCK alone;
 where both leave a case open, what Praecepta does is recorded in
 [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md), to be settled when a later DMN version or the TCK
 decides.

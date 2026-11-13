@@ -14,11 +14,12 @@ import java.util.stream.Collectors;
 
 /**
  * Static analysis of a decision table, computed when the engine is built. It is exact: every issue
- * corresponds to inputs that actually occur, and every input region is examined (gaps are capped at
- * 100 entries), except where the analysis cannot decide, which it leaves unreported rather than report
- * wrongly: rules whose cells compare with another input are judged only as rules that may be unreachable,
- * and in a table with several list columns a rule, or the table's gaps, go unreported when a list column
- * can leave more than 1024 different sets of rules.
+ * corresponds to inputs that actually occur, and every input region is examined (gaps, and pairs of
+ * overlapping rules or of rules with conflicting outputs, are each capped at 100 entries), except where
+ * the analysis cannot decide, which it leaves unreported rather than report wrongly: rules whose cells
+ * compare with another input are judged only as rules that may be unreachable, and in a table with several
+ * list columns a rule, or the table's gaps, go unreported when a list column can leave more than 1024
+ * different sets of rules.
  *
  * @param issues findings, most severe first
  */
@@ -55,9 +56,12 @@ public record ValidationReport(List<Issue> issues) {
     public enum Kind {
         /** No input ever selects this rule: earlier or higher-priority rules always win (FIRST, PRIORITY). */
         UNREACHABLE_RULE(Severity.WARNING),
-        /** Two rules that some inputs match together (UNIQUE): evaluating those inputs raises a violation. */
+        /**
+         * Two rules that some inputs match together (UNIQUE): evaluating those inputs raises a violation. At most 100
+         * pairs are listed, the first in rule order: rules that each name another value of a list column all overlap.
+         */
         OVERLAPPING_RULES(Severity.ERROR),
-        /** Two rules with different outputs that some inputs match together (ANY): a violation. */
+        /** Two rules with different outputs that some inputs match together (ANY): a violation. At most 100 pairs are listed. */
         CONFLICTING_OUTPUTS(Severity.ERROR),
         /**
          * Declared input values that no rule matches (evaluation returns the default output, or none). Only reported

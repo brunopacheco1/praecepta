@@ -422,12 +422,13 @@ public final class PraeceptaEngine<I, O> {
     /**
      * A cell may name an input that holds a list only as a whole test, {@code Flu Symptoms} or
      * {@code not(Flu Symptoms)}, which asks whether the value is in the list: FEEL compares no value with a
-     * list, so {@code > limits} or {@code [low..limits]} would never hold.
+     * list, so {@code > limits}, {@code [low..limits]}, {@code = limits} or {@code != limits} would never hold
+     * (an equality of a value and a list is null, DMN 1.5, Tables 52 and 53).
      */
     private static void rejectComparisonsWithLists(Praeceptum rule, String column, UnaryTests cell, Set<String> lists) {
         for (var test : cell.tests()) {
-            if (test instanceof UnaryTests.Equals) {
-                continue;
+            if (test instanceof UnaryTests.Equals equals && !equals.explicit()) {
+                continue; // a bare name: list contains(Flu Symptoms, ?), DMN 1.5, Table 55
             }
             for (var name : UnaryTests.names(test)) {
                 if (lists.contains(name)) {
@@ -922,7 +923,13 @@ public final class PraeceptaEngine<I, O> {
         try {
             var cell = rule.input().values().get(column);
             if (!feel) {
-                return CellParser.parse(cell, type);
+                var parsed = CellParser.parse(cell, type);
+                if (list && parsed.tests().stream().anyMatch(test -> test instanceof UnaryTests.NotEqual(UnaryTests.NullTest n))) {
+                    throw new InvalidDecisionTableException(("Rule %s, column '%s': '!= null' is not a test of a list column, "
+                            + "where 'null' tests the list and other tests its elements; write not(null) for a list that is there")
+                            .formatted(rule.priority(), column));
+                }
+                return parsed;
             }
             return list ? CellParser.parseFeelList(cell, type) : CellParser.parseFeel(cell, type);
         } catch (CellSyntaxException e) {
@@ -1286,8 +1293,10 @@ public final class PraeceptaEngine<I, O> {
          * cell holds when some element passes one of its tests: {@code "PT","ES"} matches a list holding
          * {@code "PT"} or {@code "ES"}, and {@code not("PT")} a list without {@code "PT"}. A missing (null)
          * list matches only {@code -} and {@code null}; an empty one matches no test, so every
-         * {@code not(...)}. An element may be missing (null or blank), as in FEEL: a literal is false for it
-         * ({@code not("PT")} matches {@code ["BR", null]}) and a comparison unknown, so {@code >= 18} matches
+         * {@code not(...)}. An element may be missing: null, or blank text by Praecepta's convention for missing
+         * values (FEEL's {@code ""} is a string). FEEL answers for a missing element as for a missing value: a
+         * literal is false for it ({@code not("PT")} matches {@code ["BR", null]}) and a comparison unknown, so
+         * {@code >= 18} matches
          * {@code [20, null]} but {@code not(>= 18)} does not match {@code [10, null]}; in a DMN table,
          * {@code list contains(?, null)} asks for one. Input values, if declared, apply to the elements that are
          * there. A cell of another column that names this input ({@code Flu Symptoms}, in a DMN table)

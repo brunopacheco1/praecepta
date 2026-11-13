@@ -27,16 +27,16 @@ CI builds a Spring Boot, a Micronaut and a Quarkus application as native executa
 fixed, with `@Named` engines under Spring AOT. The DMN conformance kit (TCK) still passes 83 of its 86
 decision-table checks; the other three need decision requirement graphs
 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)). Its arithmetic test cases are now run as
-output expressions too: of their 1,101 checks Praecepta reads 489, and gives the kit's result for all but
-one. Read *Changed* and *Fixed* before upgrading if your tables have unquoted string cells that start with
+output expressions too: of their 1,101 checks Praecepta reads 489, of which 276 give the kit's result, 212
+are rejected when the engine is built where the kit expects null, and one differs. Read *Changed* and *Fixed* before upgrading if your tables have unquoted string cells that start with
 `=` or `!=` (now tests, not text), declare a default output although every input matches a rule (now an
 ERROR, which fails builds and startups), test list columns (their overlaps are now found, and are errors
 under UNIQUE and ANY), receive lists holding null elements (now evaluated, not rejected), declare `null`
 default output values (no match now gives an output of nulls instead of none), or aggregate with SUM, MIN or
 MAX over rules whose output may be missing (now null, not the aggregate of the others); and if another XML
 parser on the class path read your DMN files (`DmnReader` now always uses the JDK's), or your code
-deconstructs `DecisionTable.OutputColumn`, switches over `UnaryTests.Test` or `ValidationReport.Kind`, or
-assigns `FeelTemporals.parseTime` to a `Temporal`.
+deconstructs `DecisionTable.OutputColumn` or `UnaryTests.Equals`, switches over `UnaryTests.Test` or
+`ValidationReport.Kind`, or assigns `FeelTemporals.parseTime` to a `Temporal`.
 
 ### Added
 - **`=` and `!=` tests in cells** ([#81](https://github.com/brunopacheco1/praecepta/issues/81)): DMN 1.5
@@ -45,7 +45,14 @@ assigns `FeelTemporals.parseTime` to a `Temporal`.
   `not(= x)` for one value (10.3.2.15: "FEEL(e1 != e2) is FEEL(not(e1 = e2))"), so it holds for a missing
   value, which does not equal `x`, and `!= null` holds for any value that is not missing; unlike `not(...)`,
   which goes around a whole cell, it is one test among others (`!= 0, > 10`), and it may name another input
-  in a DMN file (`!= home`). On a list column it holds when some element differs. `UnaryTests.NotEqual`
+  in a DMN file (`!= home`). On a list column it holds when some element differs; `!= null` is rejected
+  there in Praecepta's syntax, where `null` tests the list itself and the other tests its elements (write
+  `not(null)` for a list that is there; a DMN file writes the elements' test
+  `some x in ? satisfies x != null`). In a DMN file, `= home` of an input that holds a list is rejected when
+  the engine is built, as `!= home` is: it is FEEL's `? = home`, an equality of a value and a list, which is
+  null (Tables 52 and 53), while the bare `home` asks whether the value is in the list
+  (`list contains(home, ?)`, Table 55); `UnaryTests.Equals.explicit` tells the two apart (see *Changed*), and
+  `DmnWriter` writes `= home` back as written. `UnaryTests.NotEqual`
   holds it; `DmnWriter` writes it back as `!= x` (on a list column, `some x in ? satisfies x != "PT"`, which
   `DmnReader` reads), and the index, the validation report and every integration treat it as the engine
   does.
@@ -65,7 +72,11 @@ assigns `FeelTemporals.parseTime` to a `Temporal`.
   ([#81](https://github.com/brunopacheco1/praecepta/issues/81)): a number in a cell, a value list or a DMN
   entry may be written `.5` or `1.2e3` (`1E-2`, `2.5E+1`), as FEEL's numeric literal allows (grammar rule
   35; 10.3.2.3.1: "FEEL supports literal scientific notation, e.g., 1.2e3"), as output expressions already
-  read them. `DmnWriter` writes such a number as plain digits (`1200`).
+  read them. `DmnWriter` writes such a number as plain digits (`1200`). A number beyond FEEL's decimal128
+  (an exponent past 6144 or -6176, 10.3.2.3.1) has no FEEL value and is rejected, in cells, value lists, DMN
+  entries, the arguments of the date and time functions and output expressions alike
+  (`'1e999999999' is beyond FEEL's numbers (decimal128)`): written out digit by digit, as the validation
+  report and `DmnWriter` write numbers, `< 1e999999999` would exhaust the heap.
 - **Comments** ([#81](https://github.com/brunopacheco1/praecepta/issues/81)): `//` to the end of the line
   and `/* ... */`, which DMN 1.5 allows in FEEL (10.3.1.2: "Java-style comments can be used"), are ignored
   outside string literals, in cells, value lists, DMN entries, default output values (`null // no fee` is a
@@ -85,8 +96,11 @@ assigns `FeelTemporals.parseTime` to a `Temporal`.
   other comparison of one, with a time in another zone, at an offset or without a zone, is left open by DMN
   1.5 and by the TCK ("pending RTF equality comparisons with zones clarification"); Praecepta does not
   invent one: such a comparison is FEEL's null, so neither a test nor its `not(...)` holds, an interval's
-  ends must be in one zone, and a COLLECT MIN or MAX of such times in two zones fails
-  (`IllegalArgumentException`). This choice is recorded in [DMN conformance](docs/DMN-CONFORMANCE.md). The
+  ends must be in one zone, and a COLLECT MIN or MAX of such times in two zones is null (FEEL's `min` and
+  `max` take comparable items, Table 75, and a built-in function is null outside its domain, 10.3.2.16). This
+  choice is recorded in [DMN conformance](docs/DMN-CONFORMANCE.md), as is one case it does not follow yet:
+  DMN 1.5's example of `time(from)` (Table 72) has `time("00:01:00@Etc/UTC")`, in a zone with one fixed
+  offset, equal `time("00:01:00Z")`, which Praecepta does not compare. The
   index gives each zone id the cells name a line of local times and the other zone ids one class; a
   map-based column whose cells name no zone id takes such a time too, matching only the cells that accept
   any value, and keeps the validation report it had. `FeelTemporals.comparable(a, b)` says whether two
@@ -105,15 +119,19 @@ assigns `FeelTemporals.parseTime` to a `Temporal`.
   of range. A years and months duration scaled by a number keeps whole months, toward zero, and a date
   meeting a date and time counts as UTC midnight (10.3.2.3.5), as the DMN TCK's `0100-arithmetic` expects.
   Times subtract as they compare: by instant when both have an offset, by local time when one has none or
-  both have a zone id in one zone, and not at all for a time with a zone id and any other; DMN 1.5 leaves
-  those cases open, so they are recorded in [DMN conformance](docs/DMN-CONFORMANCE.md). Types FEEL does not
+  both have a zone id in one zone, and not at all for a time with a zone id and any other (so two times at
+  offsets far apart can be more than a day apart), and a date and time with a zone id moved by months onto a
+  local time its zone skips moves forward by the gap; DMN 1.5 leaves those cases open, so they are recorded
+  in [DMN conformance](docs/DMN-CONFORMANCE.md). Types FEEL does not
   combine (`due + 1`, `elapsed + tenure`) are still rejected when the engine is built, now naming both types
   (`+ combines a date and a number, which gives null in FEEL`). The engine, the classes the build plugins
-  generate (which evaluate through it), `praecepta-integration`'s map engines and `DmnWriter`, which writes
-  the entries back as read, agree. `praecepta-tck` now also evaluates the TCK's `0099-arithmetic-negation`
+  generate (which evaluate through it, with a component that has the zone of the expression's operands:
+  `start + duration("PT8H")` of a `ZonedDateTime` input is a `ZonedDateTime`), `praecepta-integration`'s map
+  engines and `DmnWriter`, which writes the entries back as read, agree. `praecepta-tck` now also evaluates the TCK's `0099-arithmetic-negation`
   and `0100-arithmetic` literal expressions as output expressions (`OutputExpressionsTckTest`): of their
-  1,101 checks, Praecepta reads 489 and gives the kit's result for all but one, a power that is not whole,
-  which the kit gives to 13 digits where FEEL's numbers have 34; the other 612 use functions, lists,
+  1,101 checks, Praecepta reads 489: 276 give the kit's result, 212 are rejected when the engine is built
+  where the kit expects null (operands of types FEEL does not combine, counted apart, as they give no result),
+  and one differs, a power that is not whole, which the kit gives to 13 digits where FEEL's numbers have 34; the other 612 use functions, lists,
   contexts, booleans, `null` operands or hour 24. The decision-table results in `RESULTS.md` are unchanged.
 - **Missing elements in list inputs** ([#84](https://github.com/brunopacheco1/praecepta/issues/84)): a list
   may hold missing (null) elements, as FEEL lists may, where 0.4 and 0.5 threw `InvalidInputException`
@@ -125,8 +143,9 @@ assigns `FeelTemporals.parseTime` to a `Temporal`.
   null). A DMN cell may ask for a missing element with `list contains(?, null)`, read by
   `CellParser.parseFeelList` as the new test `UnaryTests.NullElement` and written back by `DmnWriter`;
   Praecepta's syntax has no form for it, as `null` there asks whether the list itself is missing
-  (`? = null`), which it still does. A null or blank element of a `Collection`, and `null` in a list's text
-  (`["PT", null]`, `BR, null`), is a missing element; the text `null` alone is still no list. Declared input
+  (`? = null`), which it still does. A null element of a `Collection`, a blank one (by Praecepta's convention
+  that blank text is missing, as for single values, though FEEL's `""` is a string), and `null` in a list's
+  text (`["PT", null]`, `BR, null`), is a missing element; the text `null` alone is still no list. Declared input
   values apply to the elements that are there. A cell naming a list input (`Flu Symptoms`) is
   `list contains(Flu Symptoms, Symptom)` (Table 55), so a missing value is in a list that holds a missing
   element. The engine, the classes the Maven and Gradle plugins generate and the framework integrations' map
@@ -144,7 +163,12 @@ assigns `FeelTemporals.parseTime` to a `Temporal`.
   (`{nationalities=[ES]}`). No bound on the length of lists is needed: each question is decided per rule and
   element class. A table with several list columns branches on the minimal sets of rules the lists of each
   but the last can leave; past 1024 of them a rule is not reported unreachable, or the table's gaps are not
-  reported, rather than reported wrongly. Tables without list columns get the same report as before.
+  reported, rather than reported wrongly. The report lists the first 100 overlapping pairs, in rule order,
+  as it lists the first 100 gaps: rules that each name another value of a list column all overlap, so a UNIQUE
+  table of 2,000 such rules has nearly 2,000,000 pairs. Which earlier rules cover a rule on the last list
+  column is found with a few mask operations per rule and element class, so a list column with a value per
+  rule builds as quickly as a string column. Tables without list columns get the same report as before, but
+  for the cap on overlapping pairs (see *Changed*).
 - **A default output on a complete table is reported**
   ([#91](https://github.com/brunopacheco1/praecepta/issues/91)): DMN 1.5, 10.3.2.10, "A complete decision
   table SHALL NOT specify a default output value", since no input could reach it. The validation report has
@@ -191,8 +215,9 @@ assigns `FeelTemporals.parseTime` to a `Temporal`.
   Boot's `native` profile, with Spring AOT; Micronaut's `-Dpackaging=native-image`; Quarkus' `-Dnative`,
   with a DMN file under `src/main/resources/rules/` and a CSV table declared in `application.properties`),
   started, and made to evaluate decisions through the engines and the `Decisions` bean it injects, whose
-  answers it checks. The `Native frameworks` workflow runs them weekly and on pull requests that change a
-  framework module, the integration core or the applications, with GraalVM for JDK 25, and the Micronaut one
+  answers it checks. The `Native frameworks` workflow runs them on main, weekly, and on pull requests that
+  change a framework module, the integration core, the compiler or the loader (with which the Quarkus build
+  compiles its CSV table), the engine's native-image metadata or the applications, with GraalVM for JDK 25, and the Micronaut one
   with JDK 21 too (Spring Boot 4 and Quarkus 3.40 need GraalVM for JDK 25).
 
 ### Changed
@@ -213,6 +238,15 @@ assigns `FeelTemporals.parseTime` to a `Temporal`.
   engine built with `failOn(Severity.ERROR)`, a Maven or Gradle build, a Quarkus build or a Spring Boot or
   Micronaut application at the default `fail-on` stops on such a table where it did not; the rules involved
   are named in the report.
+- **The report lists at most 100 pairs of overlapping rules (UNIQUE) or of rules with conflicting outputs
+  (ANY)** ([#78](https://github.com/brunopacheco1/praecepta/issues/78)), the first in rule order, as it lists at
+  most 100 gaps; 0.5 listed every pair. The report's severity, and so whether a build or a startup fails, is
+  unchanged; code that counts these issues sees at most 100.
+- `UnaryTests.Equals` has a second component, `explicit`
+  ([#81](https://github.com/brunopacheco1/praecepta/issues/81)): whether a name is written after `=`
+  (`= home`), which FEEL reads as an equality rather than as the bare name's membership test of a list. It
+  is false for literals, for which `= x` and `x` are the same test, and the constructor with one argument
+  remains; a record pattern that deconstructs `Equals` needs the new component.
 - **Upgrade note:** a list input holding a missing element is evaluated rather than rejected
   ([#84](https://github.com/brunopacheco1/praecepta/issues/84)); code that relied on the
   `InvalidInputException` to catch such lists must check them itself.

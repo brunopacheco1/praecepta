@@ -215,11 +215,16 @@ final class ExpressionParser {
         }
         skipExponent();
         var digits = text.substring(start, position);
+        BigDecimal number;
         try {
-            return new BigDecimal(digits.startsWith(".") ? "0" + digits : digits);
+            number = new BigDecimal(digits.startsWith(".") ? "0" + digits : digits);
         } catch (NumberFormatException e) {
             throw unsupported("'" + digits + "' is not a number");
         }
+        if (!FeelNumbers.isDecimal128(number)) {
+            throw unsupported("'" + digits + "' is beyond FEEL's numbers (decimal128)");
+        }
+        return number;
     }
 
     /** Moves past an exponent ({@code e3}, {@code E-2}) if one follows; an {@code e} without digits is not one. */

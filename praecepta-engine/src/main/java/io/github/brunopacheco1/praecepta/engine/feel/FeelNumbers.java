@@ -95,6 +95,18 @@ final class FeelNumbers {
         return number.abs().movePointLeft(number.precision() - number.scale() - 1).doubleValue();
     }
 
+    /**
+     * Whether a number written as a literal ({@code 1.2e3}) is one FEEL holds: rounded to {@link #PRECISION}, within
+     * the exponents of a decimal128 (10.3.2.3.1), as a zero's exponent must be too. Cells, value lists, DMN entries
+     * and output expressions reject any other, since {@code 1e999999999} would be written out as a billion digits.
+     */
+    static boolean isDecimal128(BigDecimal literal) {
+        if (literal.signum() == 0) {
+            return -literal.scale() <= MAX_MAGNITUDE && -literal.scale() >= MIN_MAGNITUDE;
+        }
+        return inRange(literal.round(PRECISION)) != null;
+    }
+
     /** A result, or null if it is beyond what a decimal128 holds. */
     private static BigDecimal inRange(BigDecimal result) {
         if (result.signum() == 0) {

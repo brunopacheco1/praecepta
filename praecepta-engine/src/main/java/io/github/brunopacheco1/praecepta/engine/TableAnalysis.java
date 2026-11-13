@@ -32,7 +32,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
  * <ul>
  * <li>Overlaps are reported as rule pairs: two rules overlap exactly when some input (a missing value
  * included) matches both, and a UNIQUE (or ANY) violation occurs exactly when such a pair (with
- * different outputs) exists.</li>
+ * different outputs) exists. The first {@link #MAX_OVERLAPS} pairs, in rule order, are reported.</li>
  * <li>A rule is unreachable under FIRST or PRIORITY when it matches no valid input, or when every input
  * it matches is also matched by a rule with a lower bit (earlier, or higher priority): a search over
  * the rule's own classes, pruned as soon as a candidate covers what is left.</li>
@@ -54,6 +54,8 @@ final class TableAnalysis {
 
     /** At most this many gaps are reported. */
     static final int MAX_GAPS = 100;
+    /** At most this many pairs of overlapping rules (UNIQUE) or of rules with conflicting outputs (ANY) are reported. */
+    static final int MAX_OVERLAPS = 100;
 
     private final BitsetIndex index;
     private final List<Praeceptum> rules;
@@ -132,28 +134,41 @@ final class TableAnalysis {
 
     // ---- overlaps -------------------------------------------------------------------------------
 
+    /**
+     * The overlapping pairs in rule order, at most {@link #MAX_OVERLAPS}: a list column with a value per rule makes
+     * almost every pair of rules overlap, and a report of millions of pairs helps no one.
+     */
     private List<Issue> overlaps(Kind kind, boolean onlyConflictingOutputs) {
-        var pairs = new ArrayList<int[]>();
+        var bitOf = new int[index.ruleCount()];
         for (int bit = 0; bit < index.ruleCount(); bit++) {
+            bitOf[index.ruleAt(bit)] = bit;
+        }
+        var issues = new ArrayList<Issue>();
+        for (int first = 0; first < index.ruleCount() && issues.size() < MAX_OVERLAPS; first++) {
+            int bit = bitOf[first];
             if (BitsetIndex.get(variableRules, bit)) {
                 continue;
             }
             var overlapping = overlapping(bit);
             BitsetIndex.andNot(overlapping, variableRules);
-            // only the bits after this one, so each pair is found once
-            for (int other = BitsetIndex.next(overlapping, bit + 1); other >= 0; other = BitsetIndex.next(overlapping, other + 1)) {
-                int first = Math.min(index.ruleAt(bit), index.ruleAt(other));
-                int second = Math.max(index.ruleAt(bit), index.ruleAt(other));
+            var seconds = new ArrayList<Integer>();
+            for (int other = BitsetIndex.next(overlapping, 0); other >= 0; other = BitsetIndex.next(overlapping, other + 1)) {
+                if (index.ruleAt(other) > first) { // each pair once, from its first rule
+                    seconds.add(index.ruleAt(other));
+                }
+            }
+            seconds.sort(null);
+            for (int second : seconds) {
+                if (issues.size() == MAX_OVERLAPS) {
+                    break;
+                }
                 if (!onlyConflictingOutputs || !Objects.equals(comparableOutput.apply(rules.get(first).output()),
                         comparableOutput.apply(rules.get(second).output()))) {
-                    pairs.add(new int[] {first, second});
+                    issues.add(new Issue(kind, List.of(rules.get(first).priority(), rules.get(second).priority())));
                 }
             }
         }
-        pairs.sort(Arrays::compare); // rule order
-        return pairs.stream()
-                .map(pair -> new Issue(kind, List.of(rules.get(pair[0]).priority(), rules.get(pair[1]).priority())))
-                .toList();
+        return issues;
     }
 
     // ---- unreachable rules ----------------------------------------------------------------------
@@ -227,7 +242,7 @@ final class TableAnalysis {
                 var masks = new ArrayList<long[]>();
                 var rest = coversRest[c + 1].clone();
                 if (c == columns - 1 && lastLists != null) {
-                    Masks.and(rest, coveringLists(candidates));
+                    Masks.and(rest, lastLists.covering(candidates, bit));
                 } else if (lists(c) != null) {
                     var outcomes = lists(c).outcomes(candidates, bit, true);
                     if (outcomes == null) {
@@ -247,19 +262,6 @@ final class TableAnalysis {
                 acceptedMasks[c] = masks.toArray(long[][]::new);
                 coversRest[c] = rest;
             }
-        }
-
-        /** Of the candidates, those that match every list this rule matches in the last column, which holds lists. */
-        private long[] coveringLists(long[] candidates) {
-            var covering = new long[index.words()];
-            for (int other = BitsetIndex.next(candidates, 0); other >= 0; other = BitsetIndex.next(candidates, other + 1)) {
-                var alone = new long[index.words()];
-                BitsetIndex.set(alone, other);
-                if (lastLists.escape(alone, bit, true) == null) {
-                    BitsetIndex.set(covering, other);
-                }
-            }
-            return covering;
         }
 
         /**

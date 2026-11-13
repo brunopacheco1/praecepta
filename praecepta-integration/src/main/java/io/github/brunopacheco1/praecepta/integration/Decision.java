@@ -154,8 +154,10 @@ public record Decision(String name, String location, DecisionTable table, Praece
      * 10.3.2.10): SUM adds numbers with FEEL's precision (34 significant digits, 10.3.2.3.1) and keeps their
      * scale ({@code 10.50} and {@code 1.50} give {@code 12.00}), as the generated code of the build plugins
      * does; MIN and MAX keep the smallest or the largest value as written, ordered as FEEL orders values of the
-     * output's type ({@link FeelTemporals#compare}), and fail on times with a zone id in two zones, which DMN 1.5
-     * does not order; COUNT gives the number of matches. None of them sees a missing value: where the output is
+     * output's type ({@link FeelTemporals#compare}), and give the output mapped to null when two of the values do
+     * not compare (times with a zone id in two zones, which DMN 1.5 does not order: FEEL's {@code min} and
+     * {@code max} take a list of comparable items, and a built-in function is null outside its domain, 10.3.2.16);
+     * COUNT gives the number of matches. None of them sees a missing value: where the output is
      * missing in a matching rule, the engine gives that rule's map, the output mapped to null, as FEEL's
      * {@code sum}, {@code min} and {@code max} are null for a list that holds null (10.3.4.4). None is called when
      * no rule matches: the engine then gives the default output, or none (10.3.2.10, step 2).
@@ -176,12 +178,28 @@ public record Decision(String name, String location, DecisionTable table, Praece
 
         @Override
         public Map<String, String> min(Map<String, String> a, Map<String, String> b) {
-            return FeelTemporals.compare(value(a), value(b)) <= 0 ? a : b;
+            return extreme(a, b, -1);
         }
 
         @Override
         public Map<String, String> max(Map<String, String> a, Map<String, String> b) {
-            return FeelTemporals.compare(value(a), value(b)) >= 0 ? a : b;
+            return extreme(a, b, 1);
+        }
+
+        /**
+         * The smaller ({@code sign} -1) or the larger (1) of two outputs; the output mapped to null if they do not
+         * compare, and then for every output after, as the result is null once two values are outside FEEL's order.
+         */
+        private Map<String, String> extreme(Map<String, String> a, Map<String, String> b, int sign) {
+            if (a.get(aggregated.name()) == null) {
+                return a; // two values before did not compare
+            }
+            var x = value(a);
+            var y = value(b);
+            if (!FeelTemporals.comparable(x, y)) {
+                return Collections.singletonMap(aggregated.name(), null);
+            }
+            return Integer.signum(FeelTemporals.compare(x, y)) != -sign ? a : b;
         }
 
         @Override

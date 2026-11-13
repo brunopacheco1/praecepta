@@ -944,6 +944,82 @@ class TableCompilerTest {
         Assertions.assertThat(out.resolve("default/Fees.dmn")).exists();
     }
 
+    /**
+     * An output expression has the zone of its operands of the output's type (#85): {@code start + duration("PT8H")}
+     * of a date and time with an offset is one too, a time with a zone id plus a duration keeps its zone id, and a
+     * local time stays local. The generated components follow, and give what the map-based engine gives.
+     */
+    @Test
+    void output_expressions_give_generated_components_the_zone_of_their_operands() throws Exception {
+        var dmn = out.resolve("shift.dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="shift" name="shift"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="dateTime"><text>start</text></inputExpression></input>
+                    <input><inputExpression typeRef="time"><text>opens</text></inputExpression></input>
+                    <input><inputExpression typeRef="time"><text>noon</text></inputExpression></input>
+                    <output name="ends" typeRef="dateTime"/>
+                    <output name="closes" typeRef="time"/>
+                    <output name="lunch" typeRef="time"/>
+                    <rule><inputEntry><text>&gt;= date and time("2025-01-01T00:00:00Z")</text></inputEntry>
+                      <inputEntry><text>&gt;= @"08:00:00@Europe/Paris"</text></inputEntry>
+                      <inputEntry><text>&lt;= time("12:00:00")</text></inputEntry>
+                      <outputEntry><text>start + duration("PT8H")</text></outputEntry>
+                      <outputEntry><text>opens + @"PT9H"</text></outputEntry>
+                      <outputEntry><text>noon + duration("PT1H")</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var result = compile(new TableDefinition(dmn, "Shift", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("ShiftOutput")).contains("public record ShiftOutput(java.time.ZonedDateTime ends, "
+                + "io.github.brunopacheco1.praecepta.engine.feel.ZonedTime closes, java.time.LocalTime lunch)");
+        var decision = Decision.of("shift", DmnReader.read(Files.newInputStream(dmn)));
+        var expected = decision.evaluate(Map.of("start", "2025-03-01T08:00:00Z", "opens", "09:00:00@Europe/Paris", "noon", "11:30:00"))
+                .getFirst();
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".ShiftInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Shift").getMethod("evaluate", input);
+            var parse = loader.loadClass("io.github.brunopacheco1.praecepta.engine.feel.ZonedTime").getMethod("parse", String.class);
+            var start = ZonedDateTime.of(2025, 3, 1, 8, 0, 0, 0, ZoneOffset.UTC);
+            var output = ((Optional<?>) evaluate.invoke(null, input.getDeclaredConstructors()[0]
+                    .newInstance(start, parse.invoke(null, "09:00:00@Europe/Paris"), LocalTime.of(11, 30)))).orElseThrow();
+            Assertions.assertThat(output.getClass().getMethod("ends").invoke(output))
+                    .isEqualTo(ZonedDateTime.of(2025, 3, 1, 16, 0, 0, 0, ZoneOffset.UTC))
+                    .isEqualTo(ZonedDateTime.parse(expected.get("ends")));
+            Assertions.assertThat(output.getClass().getMethod("closes").invoke(output)).hasToString("18:00:00@Europe/Paris")
+                    .hasToString(expected.get("closes"));
+            Assertions.assertThat(output.getClass().getMethod("lunch").invoke(output)).isEqualTo(LocalTime.of(12, 30))
+                    .isEqualTo(LocalTime.parse(expected.get("lunch")));
+        }
+    }
+
+    /** An output whose rules give a value with a zone and one without, through an expression or a literal, is rejected. */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        "dateTime | start + duration(\"PT8H\")       | date and time(\"2025-01-01T00:00:00\") | date and time values both with and without a time zone",
+        "time     | opens + @\"PT9H\"                | time(\"10:00:00Z\")                    | time values both with a zone id and without one",
+        "time     | time(\"09:00:00@Europe/Paris\")  | time(\"09:00:00\")                     | time values both with a zone id and without one",
+    })
+    void an_output_whose_rules_mix_kinds_of_time_is_rejected(String type, String first, String second, String kinds) throws IOException {
+        var dmn = out.resolve("mixed-output.dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="mixed" name="mixed"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="dateTime"><text>start</text></inputExpression></input>
+                    <input><inputExpression typeRef="time"><text>opens</text></inputExpression></input>
+                    <output name="out" typeRef="%s"/>
+                    <rule><inputEntry><text>&gt;= date and time("2025-01-01T00:00:00Z")</text></inputEntry>
+                      <inputEntry><text>&gt;= @"08:00:00@Europe/Paris"</text></inputEntry><outputEntry><text>%s</text></outputEntry></rule>
+                    <rule><inputEntry><text>-</text></inputEntry><inputEntry><text>-</text></inputEntry>
+                      <outputEntry><text>%s</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""".formatted(type, first, second));
+        var definition = new TableDefinition(dmn, "Mixed", null, null, null, List.of(), List.of());
+        Assertions.assertThatThrownBy(() -> compile(definition, PACKAGE, Severity.ERROR))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Table 'mixed': output 'out' takes " + kinds + ", but its generated record component holds one kind");
+    }
+
     // ---- helpers -------------------------------------------------------------------------------
 
     /** Compiles as the Maven plugin does, so messages name settings as pom elements. */

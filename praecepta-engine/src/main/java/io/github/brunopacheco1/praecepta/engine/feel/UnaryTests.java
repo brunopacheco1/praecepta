@@ -34,7 +34,7 @@ public sealed interface UnaryTests {
      */
     default Optional<List<Comparable<?>>> values() {
         if (!(this instanceof Positive(var tests))
-                || !tests.stream().allMatch(test -> test instanceof Equals(var value) && !(value instanceof Name))) {
+                || !tests.stream().allMatch(test -> test instanceof Equals(var value, var explicit) && !(value instanceof Name))) {
             return Optional.empty();
         }
         return Optional.of(tests.stream().<Comparable<?>>map(test -> ((Equals) test).value()).toList());
@@ -83,9 +83,25 @@ public sealed interface UnaryTests {
 
     /**
      * A literal such as {@code "PT"}, {@code 18} or {@code date("2025-01-31")}, or {@code = 18}: true when the value
-     * equals it.
+     * equals it. In strict FEEL it may be a {@link Name} instead, {@code home} or {@code = home}: true when the value
+     * equals that input's.
+     *
+     * @param value    the literal, or the name of the input compared with
+     * @param explicit whether a name is written after {@code =} ({@code = home}), which FEEL reads as the equality
+     *                 {@code ? = home}, null when that input holds a list (DMN 1.5, Tables 52 and 53), while a bare
+     *                 name of such an input asks whether the value is in it ({@code list contains(home, ?)}, Table 55);
+     *                 so the engine rejects {@code = home} of a list input when it is built. Always false for a
+     *                 literal, for which {@code = x} and {@code x} are the same test
      */
-    record Equals(Comparable<?> value) implements Test {
+    record Equals(Comparable<?> value, boolean explicit) implements Test {
+        public Equals {
+            explicit = explicit && value instanceof Name;
+        }
+
+        /** A literal, or a bare name ({@code home}). */
+        public Equals(Comparable<?> value) {
+            this(value, false);
+        }
     }
 
     /**
@@ -153,7 +169,7 @@ public sealed interface UnaryTests {
         return switch (test) {
             case NullTest n -> List.of();
             case NullElement n -> List.of();
-            case Equals(var value) -> List.of(value);
+            case Equals(var value, var explicit) -> List.of(value);
             case NotEqual(var negated) -> values(negated);
             case Compare(var operator, var value) -> List.of(value);
             case Range(var low, var lowClosed, var high, var highClosed) -> List.of(low, high);
@@ -169,8 +185,8 @@ public sealed interface UnaryTests {
             boolean names = switch (test) {
                 case NullTest n -> false;
                 case NullElement n -> false;
-                case Equals(var value) -> value instanceof Name;
-                case NotEqual(var negated) -> negated instanceof Equals(var value) && value instanceof Name;
+                case Equals(var value, var explicit) -> value instanceof Name;
+                case NotEqual(var negated) -> negated instanceof Equals(var value, var explicit) && value instanceof Name;
                 case Compare(var operator, var value) -> value instanceof Name;
                 case Range(var low, var lowClosed, var high, var highClosed) -> low instanceof Name || high instanceof Name;
             };

@@ -63,6 +63,8 @@ final class ListAnalysis {
     private final long[][] passes;
     /** Per entry of {@link #classes}: the negated rules whose inside it leaves true or unknown, which no list holding it matches. */
     private final long[][] rulesOut;
+    /** The positive rules some element passes: the union of {@link #passes}. */
+    private final long[] anyPasses;
     /**
      * For an element that is a time with a zone id the element index has no class for ({@link ColumnIndex#hiddenZoneIdMask}):
      * the positive rules it passes and the negated rules it rules out; null if the column takes no such element. Only
@@ -89,6 +91,7 @@ final class ListAnalysis {
         classes = occurring.stream().mapToInt(Integer::intValue).toArray();
         passes = new long[classes.length][];
         rulesOut = new long[classes.length][];
+        anyPasses = new long[words];
         for (int i = 0; i < classes.length; i++) {
             var mask = Masks.dense(elements.masks[classes[i]], words);
             passes[i] = new long[words];
@@ -96,6 +99,7 @@ final class ListAnalysis {
             for (int w = 0; w < words; w++) {
                 passes[i][w] = mask[w] & positiveRules[w];
                 rulesOut[i][w] = ~mask[w] & negatedRules[w];
+                anyPasses[w] |= passes[i][w];
             }
         }
         var hidden = elements.hiddenZoneIdMask();
@@ -132,9 +136,7 @@ final class ListAnalysis {
         if (BitsetIndex.get(anyRules, bit)) {
             BitsetIndex.or(result, anyRules);
             BitsetIndex.or(result, negatedRules); // the empty list
-            for (var passed : passes) {
-                BitsetIndex.or(result, passed);
-            }
+            BitsetIndex.or(result, anyPasses);
         } else if (BitsetIndex.get(negatedRules, bit)) {
             BitsetIndex.or(result, anyRules);
             BitsetIndex.or(result, negatedRules); // the empty list
@@ -155,9 +157,7 @@ final class ListAnalysis {
             }
             if (matches) { // one element for this rule, another for each other positive rule
                 BitsetIndex.or(result, anyRules);
-                for (var passed : passes) {
-                    BitsetIndex.or(result, passed);
-                }
+                BitsetIndex.or(result, anyPasses);
             }
         }
         return result;
@@ -189,6 +189,43 @@ final class ListAnalysis {
         }
         boolean missingMatchesRequired = required < 0 || BitsetIndex.get(missingRules, required);
         return missingMatchesRequired && !BitsetIndex.intersects(missingRules, rules) ? new Region(true, List.of(), List.of(), List.of()) : null;
+    }
+
+    /**
+     * Of {@code candidates}, those that each match, alone, every list the rule owning {@code required} matches, a
+     * missing list and lists holding missing elements included: the rules {@code c} for which
+     * {@code escape({c}, required, true)} is null. They are found together, a few mask operations per element class,
+     * rather than one escape per candidate, which made a table's build quadratic in its rules.
+     */
+    long[] covering(long[] candidates, int required) {
+        boolean requiredPositive = BitsetIndex.get(positiveRules, required);
+        boolean requiredNegated = BitsetIndex.get(negatedRules, required);
+        var passRequired = new long[words]; // rules c with an element allowed beside c that passes required
+        var ruleOut = new long[words]; // rules c with an element allowed beside c that rules c out
+        for (int i = 0; i < classes.length; i++) {
+            if (requiredNegated && BitsetIndex.get(rulesOut[i], required)) {
+                continue; // no list required matches holds it
+            }
+            boolean passesRequired = requiredPositive && BitsetIndex.get(passes[i], required);
+            for (int w = 0; w < words; w++) {
+                long allowedBeside = ~passes[i][w]; // the rules an element of this class does not make match
+                if (passesRequired) {
+                    passRequired[w] |= allowedBeside;
+                }
+                ruleOut[w] |= allowedBeside & rulesOut[i][w];
+            }
+        }
+        boolean missingMatchesRequired = BitsetIndex.get(missingRules, required);
+        var covering = new long[words];
+        for (int w = 0; w < words; w++) {
+            // as escapeWithElements: no "-", the required rule's group, and a group for a negated rule
+            long escapes = ~anyRules[w] & (requiredPositive ? passRequired[w] : -1L) & (~negatedRules[w] | ruleOut[w]);
+            if (missingMatchesRequired) {
+                escapes |= ~missingRules[w]; // the missing list
+            }
+            covering[w] = candidates[w] & ~escapes;
+        }
+        return covering;
     }
 
     private Region escapeWithElements(long[] rules, int required, boolean withMissing) {

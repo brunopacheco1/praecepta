@@ -74,6 +74,31 @@ class CellParserTest {
                 .hasSize(2);
     }
 
+    /**
+     * FEEL's numbers are decimal128s (DMN 1.5, 10.3.2.3.1), whose exponents end at 6144 and -6176: a cell beyond
+     * them is rejected, as {@code < 1e999999999} would be written out with a billion digits by the validation report
+     * and {@code DmnWriter}. A zero's exponent counts too.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"1e999999999", "< 1e100000", "1e6145", "1e-6177", "-9.9e9999", "0e999999999", "0e-7000", "[1..1e7000]"})
+    void numbers_beyond_feels_decimal128_are_rejected(String cell) {
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel(cell, ColumnType.NUMBER))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining("is beyond FEEL's numbers (decimal128)");
+        Assertions.assertThatThrownBy(() -> CellParser.parse(cell, ColumnType.NUMBER)).isInstanceOf(CellSyntaxException.class);
+        // the date and time functions' numbers too
+        Assertions.assertThatThrownBy(() -> CellParser.parseFeel("date(1e999999999, 1, 1)", ColumnType.DATE))
+                .isInstanceOf(CellSyntaxException.class)
+                .hasMessageContaining("is beyond FEEL's numbers (decimal128)");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1e6144", "9.999999999999999999999999999999999e6144", "1e-6176", "0e6144", "-1.5E+100"})
+    void numbers_within_feels_decimal128_are_read(String cell) {
+        Assertions.assertThat(CellParser.parseFeel(cell, ColumnType.NUMBER).values().orElseThrow())
+                .containsExactly(new BigDecimal(cell));
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"1.", ".", "1e", "1.2.3", "--1", "1e1.5", "1e9999999999", "+1"})
     void numbers_follow_feels_numeric_literal(String literal) {

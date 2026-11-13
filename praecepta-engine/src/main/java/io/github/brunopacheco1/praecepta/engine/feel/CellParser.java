@@ -398,10 +398,10 @@ public final class CellParser {
                 }
             }
             if (text.startsWith("!=")) {
-                return new NotEqual(equality(text.substring("!=".length()).strip()));
+                return new NotEqual(equality(text.substring("!=".length()).strip(), false));
             }
             if (text.startsWith("=")) {
-                return equality(text.substring("=".length()).strip());
+                return equality(text.substring("=".length()).strip(), true);
             }
             if (isBracketed(text)) {
                 int dots = topLevelDots(text);
@@ -415,10 +415,11 @@ public final class CellParser {
         /**
          * The value after {@code =} or {@code !=}: {@code null}, which {@code = null} tests as the cell {@code null}
          * does (DMN 1.5, 10.3.2.15: "e = null" is "FEEL(e) is null"), or a value, which {@code = x} tests as the cell
-         * {@code x} does.
+         * {@code x} does; a name after {@code =} is kept {@linkplain Equals#explicit explicit}, as a bare name of a list
+         * input is not an equality.
          */
-        private Test equality(String text) {
-            return text.equals("null") ? new NullTest() : new Equals(literal(text));
+        private Test equality(String text, boolean afterEquals) {
+            return text.equals("null") ? new NullTest() : new Equals(literal(text), afterEquals);
         }
 
         /** Whether a test opens with {@code [}, {@code (} or {@code ]} and closes with {@code ]}, {@code )} or {@code [}. */
@@ -546,11 +547,16 @@ public final class CellParser {
 
         private BigDecimal number(String text) {
             if (NUMBER.matcher(text).matches()) {
+                BigDecimal number;
                 try {
-                    return new BigDecimal(text);
+                    number = new BigDecimal(text);
                 } catch (NumberFormatException e) {
-                    // an exponent beyond what a BigDecimal holds
+                    throw new CellSyntaxException(cell, "'" + text + "' is not a number"); // beyond what a BigDecimal holds
                 }
+                if (!FeelNumbers.isDecimal128(number)) {
+                    throw new CellSyntaxException(cell, "'" + text + "' is beyond FEEL's numbers (decimal128)");
+                }
+                return number;
             }
             throw new CellSyntaxException(cell, "'" + text + "' is not a number");
         }
