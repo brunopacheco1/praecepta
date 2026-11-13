@@ -175,6 +175,7 @@ jobs:
             -e "s/@REUSE_STATE@/${REUSE_STATE}/g" -e "s/@REUSE_NAME@/${REUSE_NAME}/g" -e "s/@REUSE@/${REUSE}/g" \
             -e "s/@REPRODUCIBLE_STATE@/${REPRODUCIBLE_STATE}/g" -e "s/@REPRODUCIBLE_OK@/${REPRODUCIBLE_OK}/g" \
             -e "s/@REPRODUCIBLE_ALL@/${REPRODUCIBLE_ALL}/g" _site/index.html
+          sed -i -e "s/@VERSION@/${VERSION}/g" _site/gradle-plugin/index.html
           # every published module's API documentation, at api/<module without "praecepta-">
           # (praecepta-engine at api/engine; a nested module a/b would be at api/a-b), so a new
           # module needs no change here

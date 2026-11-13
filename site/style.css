@@ -375,3 +375,13 @@ h3 { font-size: 1.02rem; letter-spacing: .03em; margin: 0 0 .45rem; }
 .foot ul { display: flex; flex-wrap: wrap; gap: 18px; list-style: none; margin: 0; padding: 0; }
 .foot a { color: var(--muted); }
 .foot a:hover { color: var(--accent); }
+
+/* settings tables (the Gradle plugin page) */
+.settings-wrap { overflow-x: auto; margin: 0 0 24px; }
+.settings { width: 100%; border-collapse: collapse; font-size: .98rem; }
+.settings caption { text-align: left; font: 500 .85rem var(--display); letter-spacing: .08em; color: var(--second); padding: 0 0 8px; }
+.settings th, .settings td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+.settings th { font: 500 .85rem var(--display); letter-spacing: .05em; color: var(--muted); }
+.settings td:first-child { white-space: nowrap; }
+.prose p, .prose li { color: var(--muted); max-width: 46em; }
+.prose h3 { margin-top: 28px; }
