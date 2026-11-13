@@ -143,16 +143,17 @@ class ZonedTimesTest {
             Assertions.assertThat(cutOff.toLocalTime()).isAfterOrEqualTo(LocalTime.NOON);
             Assertions.assertThat(engine.evaluate(new Delivery(cutOff, null))).isEmpty();
         });
-        // a time before 05:00 on the clock is at most 18 hours behind offset zero, so it is not after 23:00 there: no gap
+        // a time before 05:00 on the clock is at most 14 hours behind offset zero (FEEL's offsets lie in -14:00..+14:00,
+        // #123), so it is not after 19:00 there: no gap, where 0.6 took Java's -18:00 and reported one up to 23:00
         var covered = deliveries(HitPolicy.FIRST, List.of(delivery(1, ">= time(\"05:00:00\")", "-", "day"),
-                delivery(2, "<= time(\"23:00:00Z\")", "-", "not too late")));
+                delivery(2, "<= time(\"19:00:00Z\")", "-", "not too late")));
         Assertions.assertThat(covered.validationReport().issues(Kind.GAP)).isEmpty();
-        // a second earlier, the times just before 05:00 at -18:00 are left
+        // a second earlier, the times just before 05:00 at -14:00 are left
         var uncovered = deliveries(HitPolicy.FIRST, List.of(delivery(1, ">= time(\"05:00:00\")", "-", "day"),
-                delivery(2, "<= time(\"22:59:59Z\")", "-", "not too late")));
+                delivery(2, "<= time(\"18:59:59Z\")", "-", "not too late")));
         Assertions.assertThat(uncovered.validationReport().issues(Kind.GAP)).singleElement().satisfies(gap -> {
             var cutOff = (OffsetTime) gap.example().get("cutOff");
-            Assertions.assertThat(cutOff.getOffset()).isEqualTo(ZoneOffset.MIN);
+            Assertions.assertThat(cutOff.getOffset()).isEqualTo(ZoneOffset.ofHours(-14));
             Assertions.assertThat(cutOff.toLocalTime()).isBetween(LocalTime.of(4, 59, 59), LocalTime.of(5, 0));
             Assertions.assertThat(uncovered.evaluate(new Delivery(cutOff, null))).isEmpty();
         });

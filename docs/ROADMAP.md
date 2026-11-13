@@ -29,7 +29,7 @@ Released in November 2026 (see the [changelog](../CHANGELOG.md)):
   Boot, Micronaut and Quarkus evaluate them by name.
 - **The whole DMN TCK, scored** ([#115](https://github.com/brunopacheco1/praecepta/issues/115)):
   every model of compliance levels 2 and 3. 454 of its 3,511 result nodes pass (12.9 %), and 454
-  of the 461 that Praecepta evaluates; every other node is listed with the release that brings what
+  of the 459 that Praecepta evaluates; every other node is listed with the release that brings what
   it needs. The decision-table checks still pass 83 of 86, and the build fails only on a
   regression.
 - **A fix**: rules reached only by a time with a zone id that no cell names are no longer reported

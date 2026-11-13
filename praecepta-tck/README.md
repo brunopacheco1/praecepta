@@ -109,9 +109,6 @@ done. *What each release unlocks* counts the not-supported nodes by the latest a
 - `0100-arithmetic`, `exponent_lhs_number_exp_rhs_number_005`: a power that is not whole, which the kit gives to
   13 significant digits, where FEEL's numbers have 34 (DMN 1.5, 10.3.2.3.1 and Table 60), as output expressions
   keep them (#71).
-- `1116-feel-time-function`, error cases 067 and 068: `time("13:20:00+19:00")` and `time("13:20:00-19:00")`, an
-  offset beyond the range of a time zone, which the kit expects to be an error; the engine reads them as the
-  local time `13:20:00`, dropping the offset.
 - `1117-feel-date-and-time-function`, error case 068: `date and time("+99999-12-01T11:22:33")`, a year with a
   leading `+`, which the kit expects to be an error; the engine reads it.
 - `0008-LX-arithmetic`, the three payments: a literal expression over a structured input data

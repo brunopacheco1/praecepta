@@ -243,39 +243,39 @@ class ColumnIndexBehaviourTest {
     }
 
     @Test
-    void no_time_has_an_instant_and_a_local_time_more_than_18_hours_apart() {
-        var column = columnTaking(ColumnType.TIME, Zoning.ZONED, null, "< time(\"05:00:00\")", "> time(\"23:00:00Z\")", "< time(\"01:00:00Z\")");
-        // before 05:00 on the clock and after 23:00 at offset zero would be more than 18 hours behind it
+    void no_time_has_an_instant_and_a_local_time_more_than_14_hours_apart() {
+        var column = columnTaking(ColumnType.TIME, Zoning.ZONED, null, "< time(\"05:00:00\")", "> time(\"19:00:00Z\")", "< time(\"01:00:00Z\")");
+        // before 05:00 on the clock and after 19:00 at offset zero would be more than 14 hours behind it, beyond FEEL's offsets
         Assertions.assertThat(column.describe(3)).isEqualTo("time(\"01:00:00Z\") at local time (-inf..time(\"05:00:00\"))");
         Assertions.assertThat(column.empty[3]).isFalse();
-        Assertions.assertThat(column.describe(12)).isEqualTo("(time(\"23:00:00Z\")..+inf) at local time (-inf..time(\"05:00:00\"))");
+        Assertions.assertThat(column.describe(12)).isEqualTo("(time(\"19:00:00Z\")..+inf) at local time (-inf..time(\"05:00:00\"))");
         Assertions.assertThat(column.empty[12]).isTrue();
-        Assertions.assertThat(column.describe(13)).isEqualTo("(time(\"23:00:00Z\")..+inf) at local time time(\"05:00:00\")");
+        Assertions.assertThat(column.describe(13)).isEqualTo("(time(\"19:00:00Z\")..+inf) at local time time(\"05:00:00\")");
         Assertions.assertThat(column.empty[13]).isTrue();
-        // 05:00:00.000000001-18:00 is 23:00:00.000000001Z
+        // 05:00:00.000000001-14:00 is 19:00:00.000000001Z
         Assertions.assertThat(column.empty[14]).isFalse();
         Assertions.assertThat(column.representative(14)).isInstanceOfSatisfying(OffsetTime.class, time -> {
             Assertions.assertThat(time.toLocalTime()).isAfter(LocalTime.of(5, 0));
-            Assertions.assertThat(PrimitiveKeys.utcNanos(time)).isGreaterThan(LocalTime.of(23, 0).toNanoOfDay());
+            Assertions.assertThat(PrimitiveKeys.utcNanos(time)).isGreaterThan(LocalTime.of(19, 0).toNanoOfDay());
         });
-        // on the clock at 05:00 exactly and at 23:00 at offset zero exactly: 05:00-18:00
-        Assertions.assertThat(column.representative(10)).isEqualTo(OffsetTime.of(5, 0, 0, 0, ZoneOffset.MIN));
+        // on the clock at 05:00 exactly and at 19:00 at offset zero exactly: 05:00-14:00
+        Assertions.assertThat(column.representative(10)).isEqualTo(OffsetTime.of(5, 0, 0, 0, ZoneOffset.ofHours(-14)));
     }
 
     @Test
-    void times_with_an_offset_span_from_minus_18_to_42_hours_by_instant() {
-        var column = columnTaking(ColumnType.TIME, Zoning.ZONED, null, "<= time(\"00:00:00+18:00\")", ">= time(\"23:59:59.999999999-18:00\")",
+    void times_with_an_offset_span_from_minus_14_to_38_hours_by_instant() {
+        var column = columnTaking(ColumnType.TIME, Zoning.ZONED, null, "<= time(\"00:00:00+14:00\")", ">= time(\"23:59:59.999999999-14:00\")",
                 "[time(\"01:00:00+02:00\")..time(\"23:00:00-02:00\")]");
         Assertions.assertThat(dump(column)).isEqualTo("""
-                0 (-inf..time("00:00:00+18:00")) empty rules=[]
-                1 time("00:00:00+18:00") rules=[0] example=00:00+18:00 (OffsetTime)
-                2 (time("00:00:00+18:00")..time("01:00:00+02:00")) rules=[] example=08:30+18:00 (OffsetTime)
+                0 (-inf..time("00:00:00+14:00")) empty rules=[]
+                1 time("00:00:00+14:00") rules=[0] example=00:00+14:00 (OffsetTime)
+                2 (time("00:00:00+14:00")..time("01:00:00+02:00")) rules=[] example=06:30+14:00 (OffsetTime)
                 3 time("01:00:00+02:00") rules=[2] example=01:00+02:00 (OffsetTime)
                 4 (time("01:00:00+02:00")..time("23:00:00-02:00")) rules=[2] example=14:00+02:00 (OffsetTime)
                 5 time("23:00:00-02:00") rules=[2] example=23:00-02:00 (OffsetTime)
-                6 (time("23:00:00-02:00")..time("23:59:59.999999999-18:00")) rules=[] example=23:29:59.999999999-10:00 (OffsetTime)
-                7 time("23:59:59.999999999-18:00") rules=[1] example=23:59:59.999999999-18:00 (OffsetTime)
-                8 (time("23:59:59.999999999-18:00")..+inf) empty rules=[]
+                6 (time("23:00:00-02:00")..time("23:59:59.999999999-14:00")) rules=[] example=23:29:59.999999999-08:00 (OffsetTime)
+                7 time("23:59:59.999999999-14:00") rules=[1] example=23:59:59.999999999-14:00 (OffsetTime)
+                8 (time("23:59:59.999999999-14:00")..+inf) empty rules=[]
                 9 null missing rules=[] example=-
                 """);
     }

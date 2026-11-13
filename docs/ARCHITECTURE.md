@@ -79,7 +79,8 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
      coordinate of its literal's kind (an interval with an end of each kind reads both). When the
      cells of a column are all of one kind, one coordinate has a single class and the pairs are as
      many as the classes of the other. A pair is empty when no value has both coordinates: an
-     instant and a local time are a whole number of seconds apart, at most 18 hours. A column has
+     instant and a local time are a whole number of seconds apart, at most 14 hours, as FEEL's offsets
+     lie in -14:00..+14:00 (#123; a getter may give a Java value beyond, which is no FEEL value). A column has
      only the classes its input can reach (`Zoning`): `timeInput` and `dateTimeInput` give values
      without a zone, `offsetTimeInput` and `zonedDateTimeInput` with one, `zonedTimeInput` times with a
      zone id or, in a zone with one fixed offset, at an offset, and map-based inputs, read from text, any of

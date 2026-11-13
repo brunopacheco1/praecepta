@@ -326,8 +326,9 @@ final class TemporalLiterals {
                     return time;
                 }
                 var offset = (Duration) arguments.get(3);
-                if (offset.getNano() != 0) {
-                    throw new ArithmeticException("an offset is a whole number of seconds");
+                // a time offset is a whole number of seconds in [duration("-PT14H")..duration("PT14H")] (Table 66)
+                if (offset.getNano() != 0 || !FeelTemporals.isOffsetInRange(offset.getSeconds())) {
+                    throw new ArithmeticException("an offset is a whole number of seconds in -14:00..+14:00");
                 }
                 return OffsetTime.of(time, ZoneOffset.ofTotalSeconds(Math.toIntExact(offset.getSeconds())));
             } catch (DateTimeException | ArithmeticException e) {

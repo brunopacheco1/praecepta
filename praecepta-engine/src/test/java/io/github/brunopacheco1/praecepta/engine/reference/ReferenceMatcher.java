@@ -936,8 +936,8 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
 
     private static final long NANOS_PER_SECOND = 1_000_000_000L;
     private static final long NANOS_PER_DAY = 86_400 * NANOS_PER_SECOND;
-    /** A zone offset is a whole number of seconds from -18:00 to +18:00. */
-    private static final long MAX_OFFSET_SECONDS = 18 * 3600;
+    /** A FEEL time's or date-time's offset is a whole number of seconds from -14:00 to +14:00 (DMN 1.5, Table 66; #123). */
+    private static final long MAX_OFFSET_SECONDS = 14 * 3600;
 
     /**
      * Times or date-times with a time zone that visit every region the cells distinguish among them. FEEL
@@ -946,7 +946,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * times (on or between those without). A value is an instant and an offset, and its local time their
      * sum; for each offset, every region that has a value at it has one whose instant, or local time, is
      * on or a nanosecond beside a literal, and a region with values has one at its lowest offset, which is
-     * -18:00 or among the first that bring a literal's local time past a literal's instant. So those instants at
+     * -14:00 or among the first that bring a literal's local time past a literal's instant. So those instants at
      * those offsets are tried, and one value is kept for each set of cells that accept it: to the cells,
      * which do not name other inputs where the analysis looks, values accepted by the same ones are alike.
      */

@@ -15,6 +15,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoField;
 import java.time.temporal.Temporal;
 
 /**
@@ -46,23 +47,50 @@ import java.time.temporal.Temporal;
  */
 public final class FeelTemporals {
 
+    /**
+     * The largest offset from UTC a time or date and time may have, either way: 14:00. DMN 1.5 takes times and date-times
+     * in XML Schema's lexical forms (10.3.4.1, time string and date time string), whose offsets lie in -14:00..+14:00,
+     * and bounds the time offset property the same way, {@code [duration("-PT14H")..duration("PT14H")]} (Table 66).
+     */
+    private static final int MAX_OFFSET_SECONDS = 14 * 60 * 60;
+
     private FeelTemporals() {
     }
 
     /**
      * Parses a time: {@code hh:mm[:ss[.fffffffff]]}, optionally followed by an offset ({@code Z},
-     * {@code +01:00}) or a zone id as FEEL writes it ({@code @Europe/Paris}).
+     * {@code +01:00}) in -14:00..+14:00 or a zone id as FEEL writes it
+     * ({@code @Europe/Paris}).
      *
      * @return a {@link LocalTime}, an {@link OffsetTime} if the text has an offset or a zone id with one fixed offset
      *         ({@code 00:01:00@Etc/UTC} is {@code 00:01Z}, DMN 1.5, Table 72), or a {@link ZonedTime} if it has another
      *         zone id
-     * @throws DateTimeParseException if the text is not such a time, or names an unknown zone
+     * @throws DateTimeParseException if the text is not such a time, has an offset beyond -14:00..+14:00 (which
+     *                                {@code 13:20:00+19:00} has: it is not read as {@code 13:20:00}), or names an
+     *                                unknown zone
      */
     public static Object parseTime(String text) {
         if (text.indexOf('@') >= 0) {
             return withFixedOffset(ZonedTime.parse(text));
         }
-        return DateTimeFormatter.ISO_TIME.parseBest(text, OffsetTime::from, LocalTime::from);
+        var parsed = DateTimeFormatter.ISO_TIME.parse(text);
+        if (!parsed.isSupported(ChronoField.OFFSET_SECONDS)) {
+            return LocalTime.from(parsed);
+        }
+        // read before Java checks it against its own range (-18:00..+18:00), beyond which it would drop the offset
+        requireOffsetInRange(parsed.getLong(ChronoField.OFFSET_SECONDS), text);
+        return OffsetTime.from(parsed);
+    }
+
+    /** Whether an offset from UTC, in seconds, is one FEEL takes: in -14:00..+14:00 ({@link #MAX_OFFSET_SECONDS}). */
+    static boolean isOffsetInRange(long seconds) {
+        return Math.abs(seconds) <= MAX_OFFSET_SECONDS;
+    }
+
+    private static void requireOffsetInRange(long seconds, String text) {
+        if (!isOffsetInRange(seconds)) {
+            throw new DateTimeParseException("an offset beyond -14:00..+14:00", text, 0);
+        }
     }
 
     /**
@@ -134,11 +162,14 @@ public final class FeelTemporals {
 
     /**
      * Parses a date and time: {@code yyyy-mm-ddThh:mm[:ss[.fffffffff]]}, optionally followed by an
-     * offset ({@code Z}, {@code +01:00}), a zone id as FEEL writes it ({@code @Europe/Paris}), or an
-     * offset and a zone id as {@link ZonedDateTime#toString()} writes them ({@code +02:00[Europe/Paris]}).
+     * offset ({@code Z}, {@code +01:00}) in -14:00..+14:00, a zone id as FEEL writes it
+     * ({@code @Europe/Paris}), or an offset and a zone id as {@link ZonedDateTime#toString()} writes them
+     * ({@code +02:00[Europe/Paris]}). A zone id gives the offset its rules have at that date and time, which before
+     * 1900 may be a local mean time beyond 14:00 ({@code America/Sitka}'s +14:58:47 in 1800).
      *
      * @return a {@link LocalDateTime}, or a {@link ZonedDateTime} if the text has an offset or a zone id
-     * @throws DateTimeParseException if the text is not such a date and time, or names an unknown zone
+     * @throws DateTimeParseException if the text is not such a date and time, has an offset beyond -14:00..+14:00, or
+     *                                names an unknown zone
      */
     public static Temporal parseDateTime(String text) {
         int at = text.indexOf('@');
@@ -150,7 +181,11 @@ public final class FeelTemporals {
                 throw new DateTimeParseException("unknown zone id: " + e.getMessage(), text, at + 1, e);
             }
         }
-        return (Temporal) DateTimeFormatter.ISO_DATE_TIME.parseBest(text, ZonedDateTime::from, LocalDateTime::from);
+        var dateTime = (Temporal) DateTimeFormatter.ISO_DATE_TIME.parseBest(text, ZonedDateTime::from, LocalDateTime::from);
+        if (dateTime instanceof ZonedDateTime zoned && zoned.getZone() instanceof ZoneOffset offset) {
+            requireOffsetInRange(offset.getTotalSeconds(), text);
+        }
+        return dateTime;
     }
 
     /**

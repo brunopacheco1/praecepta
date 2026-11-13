@@ -234,12 +234,12 @@ class ReferenceMatcherTest {
                 .map(value -> String.join("", ids(reference.matches(Map.of("t", value)))))
                 .toList();
         Assertions.assertThat(regions).containsExactlyInAnyOrder("13", "14", "1", "23", "24", "2", "3", "4", "");
-        // before 05:00 on the clock and after 23:00Z would be more than 18 hours behind: that region has no value
-        var apart = List.of(cell(1, "t", "< time(\"05:00:00\")"), cell(2, "t", "> time(\"23:00:00Z\")"));
+        // before 05:00 on the clock and after 19:00Z would be more than 14 hours behind: that region has no value
+        var apart = List.of(cell(1, "t", "< time(\"05:00:00\")"), cell(2, "t", "> time(\"19:00:00Z\")"));
         var none = new ReferenceMatcher(apart, HitPolicy.COLLECT, Map.of(), Map.of("t", ColumnType.TIME), Map.of(), false, Set.of("t"), Set.of());
         Assertions.assertThat(none.representativeValues("t", false).stream().map(value -> ids(none.matches(Map.of("t", value)))))
                 .contains(List.of("1"), List.of("2"), List.of()).doesNotContain(List.of("1", "2"));
-        var near = List.of(cell(1, "t", "< time(\"05:00:00\")"), cell(2, "t", "> time(\"22:59:59Z\")"));
+        var near = List.of(cell(1, "t", "< time(\"05:00:00\")"), cell(2, "t", "> time(\"18:59:59Z\")"));
         var some = new ReferenceMatcher(near, HitPolicy.COLLECT, Map.of(), Map.of("t", ColumnType.TIME), Map.of(), false, Set.of("t"), Set.of());
         Assertions.assertThat(some.representativeValues("t", false).stream().map(value -> ids(some.matches(Map.of("t", value)))))
                 .contains(List.of("1", "2"));

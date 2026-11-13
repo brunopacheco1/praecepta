@@ -1040,8 +1040,8 @@ build, and gives two numbers:
 - **The whole kit: 454 of 3,511 result nodes pass (12.9 %).** Every model of compliance levels 2 and 3
   (148 models at the pinned commit), each result node scored as passed, failed or not supported, each
   decision evaluated through its model's decision requirement graph where Praecepta reads the model. This
-  measures how much of DMN 1.5 Praecepta covers: of the 461 nodes it evaluates, 454 pass (the seven others
-  are [known failures](praecepta-tck/README.md#known-failures)), and the other 3,050 need features it does
+  measures how much of DMN 1.5 Praecepta covers: of the 459 nodes it evaluates, 454 pass (the five others
+  are [known failures](praecepta-tck/README.md#known-failures)), and the other 3,052 need features it does
   not have yet. No result node of the kit needs decision requirement graphs alone, so they add no pass yet.
 
 Praecepta is a decision-table engine growing into a full DMN 1.5 engine one layer per release

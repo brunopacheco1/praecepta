@@ -36,14 +36,21 @@ final class OpenIntervals {
 
     private static final long NANOS_PER_HOUR = Duration.ofHours(1).toNanos();
     private static final long NANOS_PER_DAY = Duration.ofDays(1).toNanos();
-    /** The earliest time with an offset, by instant: {@code 00:00+18:00}, as {@link PrimitiveKeys#utcNanos} keys it. */
-    private static final long EARLIEST_ZONED_TIME = -18 * NANOS_PER_HOUR;
-    /** The latest time with an offset, by instant: {@code 23:59:59.999999999-18:00}. */
-    private static final long LATEST_ZONED_TIME = NANOS_PER_DAY - 1 + 18 * NANOS_PER_HOUR;
+    /**
+     * The largest offset of a time or date-time, in hours, either way: FEEL's times and date-times have offsets in
+     * -14:00..+14:00 (DMN 1.5, 10.3.4.1 and Table 66), and text beyond them is not one (#123). A getter may give a Java
+     * value beyond them, up to 18 hours, which is not a FEEL value: the analyses leave it out, as they look for gaps
+     * among the values FEEL has.
+     */
+    private static final int MAX_OFFSET_HOURS = 14;
+    /** The earliest time with an offset, by instant: {@code 00:00+14:00}, as {@link PrimitiveKeys#utcNanos} keys it. */
+    private static final long EARLIEST_ZONED_TIME = -MAX_OFFSET_HOURS * NANOS_PER_HOUR;
+    /** The latest time with an offset, by instant: {@code 23:59:59.999999999-14:00}. */
+    private static final long LATEST_ZONED_TIME = NANOS_PER_DAY - 1 + MAX_OFFSET_HOURS * NANOS_PER_HOUR;
     private static final BigInteger NANOS_PER_SECOND = BigInteger.valueOf(1_000_000_000L);
     private static final BigInteger NANOS_IN_A_DAY = BigInteger.valueOf(NANOS_PER_DAY);
-    /** Offsets run from -18:00 to +18:00, in whole seconds. */
-    private static final BigInteger MAX_OFFSET_SECONDS = BigInteger.valueOf(ZoneOffset.MAX.getTotalSeconds());
+    /** Offsets run from -14:00 to +14:00, in whole seconds. */
+    private static final BigInteger MAX_OFFSET_SECONDS = BigInteger.valueOf(MAX_OFFSET_HOURS * 3600L);
     /** Offsets an example is given at when it can be: whole hours, else quarters of an hour, in seconds. */
     private static final List<BigInteger> ROUND_OFFSETS = List.of(BigInteger.valueOf(3600), BigInteger.valueOf(900));
 
@@ -57,7 +64,7 @@ final class OpenIntervals {
      * empty string, or the one-character string U+0000, there is no non-blank string, and blank ones
      * count as missing. On the line of times and date-times with a time zone ({@code zoned}), an interval
      * is empty when no instant lies in it: between instants a nanosecond apart, or for times, outside the
-     * instants that times of day with an offset from -18:00 to +18:00 denote.
+     * instants that times of day with an offset from -14:00 to +14:00 denote.
      */
     static boolean isEmpty(ColumnType type, Comparable<?> low, Comparable<?> high, boolean zoned) {
         if (zoned) {
@@ -115,7 +122,7 @@ final class OpenIntervals {
     /**
      * Whether no time or date-time with a time zone has its instant in {@code instants} and its local time
      * in {@code localTimes}. A value's local time is its instant plus its offset, a whole number of seconds
-     * from -18:00 to +18:00, so the two spans must hold an instant and a local time that far apart.
+     * from -14:00 to +14:00, so the two spans must hold an instant and a local time that far apart.
      */
     static boolean isEmpty(ColumnType type, Span instants, Span localTimes) {
         return new ZonedBox(type, instants, localTimes).offsetSeconds() == null;

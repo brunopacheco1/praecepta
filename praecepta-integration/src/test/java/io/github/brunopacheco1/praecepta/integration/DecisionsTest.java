@@ -620,6 +620,47 @@ class DecisionsTest {
         Assertions.assertThat(Decision.of("offer", table).describe().get("issues").toString()).contains("UNREACHABLE_DEFAULT_OUTPUT");
     }
 
+    /** A table of a time input and output, holding literals in its cell, output entry and default. */
+    private static final String SLOT = """
+            <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+              <decision id="slot" name="Slot"><decisionTable hitPolicy="FIRST">
+                <input><inputExpression typeRef="%1$s"><text>at</text></inputExpression></input>
+                <output name="until" typeRef="%1$s"><defaultOutputEntry><text>%4$s</text></defaultOutputEntry></output>
+                <rule><inputEntry><text>%2$s</text></inputEntry><outputEntry><text>%3$s</text></outputEntry></rule>
+              </decisionTable></decision>
+            </definitions>""";
+
+    /**
+     * Times and date-times take XML Schema's lexical forms (DMN 1.5, 10.3.4.1): an offset beyond -14:00..+14:00 (#123)
+     * fails loading wherever a table holds it, and given as an input it is rejected, as any text that is not of the
+     * column's type is ({@code InvalidInputException}).
+     */
+    @ParameterizedTest(name = "{0} {2}")
+    @CsvSource(delimiter = ';', value = {
+            "time;     08:00:00+14:00;            08:00:00+19:00",
+            "time;     08:00:00-14:00;            08:00:00-14:01",
+            "dateTime; 2025-01-31T08:00:00+14:00; 2025-01-31T08:00:00+15:00",
+    })
+    void a_value_beyond_xml_schemas_lexical_forms_is_rejected(String type, String valid, String invalid) {
+        var function = type.equals("time") ? "time" : "date and time";
+        var good = "%s(\"%s\")".formatted(function, valid);
+        var bad = "@\"%s\"".formatted(invalid);
+        var decisions = Decisions.load(List.of(TableSource.of("slot.dmn", SLOT.formatted(type, good, good, good).getBytes(StandardCharsets.UTF_8))),
+                Severity.ERROR);
+        Assertions.assertThat(decisions.evaluate("Slot", Map.of("at", valid))).containsExactly(Map.of("until", valid));
+        var beyond = Map.of("at", invalid);
+        Assertions.assertThatThrownBy(() -> decisions.evaluate("Slot", beyond)).isInstanceOf(InvalidInputException.class)
+                .hasMessageContaining(invalid);
+
+        for (var file : List.of(SLOT.formatted(type, bad, good, good), SLOT.formatted(type, good, bad, good),
+                SLOT.formatted(type, good, good, bad))) {
+            var sources = List.of(TableSource.of("slot.dmn", file.getBytes(StandardCharsets.UTF_8)));
+            Assertions.assertThatThrownBy(() -> Decisions.load(sources, Severity.ERROR)).as(file)
+                    .isInstanceOfSatisfying(DecisionsException.class, e -> Assertions.assertThat(e.problems()).singleElement()
+                            .asString().startsWith("slot.dmn: ").contains(invalid));
+        }
+    }
+
     private static InputStream stream(String dmn) {
         return new ByteArrayInputStream(dmn.getBytes(StandardCharsets.UTF_8));
     }

@@ -131,6 +131,35 @@ class FeelTemporalsTest {
         Assertions.assertThatThrownBy(() -> FeelTemporals.parseDateTime(text)).isInstanceOf(DateTimeParseException.class);
     }
 
+    /**
+     * XML Schema's offsets, which DMN 1.5 takes (10.3.4.1; Table 66 bounds the time offset to
+     * {@code [duration("-PT14H")..duration("PT14H")]}), lie in -14:00..+14:00 (#123): one beyond is no time, as the DMN
+     * TCK has {@code time("13:20:00+19:00")} and {@code date and time("2017-12-31T13:20:00+19:00")} null
+     * ({@code 1116-feel-time-function}, {@code ErrorCase_067}; {@code 1117-feel-date-and-time-function},
+     * {@code ErrorCase_078}). Java takes -18:00..+18:00, and dropped from a time an offset beyond them.
+     */
+    @Test
+    void offsets_lie_in_minus_to_plus_fourteen_hours() {
+        Assertions.assertThat(FeelTemporals.parseTime("13:20:00+14:00")).isEqualTo(OffsetTime.of(13, 20, 0, 0, ZoneOffset.ofHours(14)));
+        Assertions.assertThat(FeelTemporals.parseTime("13:20:00-14:00")).isEqualTo(OffsetTime.of(13, 20, 0, 0, ZoneOffset.ofHours(-14)));
+        Assertions.assertThat(FeelTemporals.parseDateTime("2017-12-31T13:20:00+14:00"))
+                .isEqualTo(ZonedDateTime.of(2017, 12, 31, 13, 20, 0, 0, ZoneOffset.ofHours(14)));
+        for (var offset : List.of("+19:00", "-19:00", "+14:01", "-14:00:01", "+15:00", "+18:00")) {
+            Assertions.assertThatThrownBy(() -> FeelTemporals.parseTime("13:20:00" + offset)).as(offset)
+                    .isInstanceOf(DateTimeParseException.class);
+            Assertions.assertThatThrownBy(() -> FeelTemporals.parseDateTime("2017-12-31T13:20:00" + offset)).as(offset)
+                    .isInstanceOf(DateTimeParseException.class);
+            // as generated code reads the outputs of a time column with a zone
+            Assertions.assertThatThrownBy(() -> FeelTemporals.parseOffsetTime("13:20:00" + offset)).isInstanceOf(DateTimeParseException.class);
+            Assertions.assertThatThrownBy(() -> FeelTemporals.parseZonedTime("13:20:00" + offset)).isInstanceOf(DateTimeParseException.class);
+            Assertions.assertThatThrownBy(() -> FeelTemporals.parseZonedDateTime("2017-12-31T13:20:00" + offset))
+                    .isInstanceOf(DateTimeParseException.class);
+        }
+        // a zone id gives the offset its rules have, a local mean time beyond 14:00 before 1900 included
+        Assertions.assertThat(FeelTemporals.parseDateTime("1800-01-01T00:00:00@America/Sitka"))
+                .isEqualTo(ZonedDateTime.of(1800, 1, 1, 0, 0, 0, 0, ZoneId.of("America/Sitka")));
+    }
+
     @Test
     void a_zoned_date_time_is_required_where_one_is_expected() {
         Assertions.assertThatThrownBy(() -> FeelTemporals.parseZonedDateTime("2018-07-30T16:12:00"))

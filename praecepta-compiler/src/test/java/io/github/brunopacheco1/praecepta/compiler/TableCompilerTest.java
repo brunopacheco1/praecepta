@@ -1243,6 +1243,53 @@ class TableCompilerTest {
         Assertions.assertThat(decision.evaluate(Map.of("zone", "mainland"))).containsExactly(nothing);
     }
 
+    /** A table of a time or date and time input and output, holding literals in its value list, cell, output entry and default. */
+    private static final String LEXICAL = """
+            <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+              <decision id="slot" name="slot"><decisionTable hitPolicy="FIRST">
+                <input><inputExpression typeRef="%1$s"><text>at</text></inputExpression><inputValues><text>%2$s</text></inputValues></input>
+                <output name="until" typeRef="%1$s"><defaultOutputEntry><text>%5$s</text></defaultOutputEntry></output>
+                <rule><inputEntry><text>%3$s</text></inputEntry><outputEntry><text>%4$s</text></outputEntry></rule>
+              </decisionTable></decision>
+            </definitions>""";
+
+    /**
+     * Times and date-times take XML Schema's lexical forms (DMN 1.5, 10.3.4.1): an offset beyond -14:00..+14:00 (#123)
+     * fails the build wherever the table holds it, as the engine rejects it, and the generated code reads back the
+     * outputs at the edge the engine writes.
+     */
+    @ParameterizedTest(name = "{0} {2}")
+    @CsvSource(delimiter = ';', value = {
+            "time;     time(\"08:00:00+14:00\");                     time(\"08:00:00+19:00\")",
+            "time;     time(\"08:00:00-14:00\");                     @\"08:00:00-14:01\"",
+            "dateTime; date and time(\"2025-01-31T08:00:00+14:00\"); date and time(\"2025-01-31T08:00:00+15:00\")",
+    })
+    void a_literal_beyond_xml_schemas_lexical_forms_fails_the_build(String type, String valid, String invalid) throws Exception {
+        var dmn = out.resolve("slot.dmn");
+        Files.writeString(dmn, LEXICAL.formatted(type, valid, valid, valid, valid));
+        var result = compile(new TableDefinition(dmn, "Slot", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        var decision = Decision.of("slot", DmnReader.read(Files.newInputStream(dmn)));
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".SlotInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Slot").getMethod("evaluate", input);
+            var text = valid.substring(valid.indexOf('"') + 1, valid.lastIndexOf('"'));
+            var at = type.equals("time") ? FeelTemporals.parseOffsetTime(text) : FeelTemporals.parseZonedDateTime(text);
+            var expected = decision.evaluate(Map.of("at", text)).getFirst().get("until");
+            Assertions.assertThat(expected).isEqualTo(text);
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, input.getDeclaredConstructors()[0].newInstance(at)))
+                    .get().hasToString("SlotOutput[until=" + at + "]");
+        }
+
+        for (int slot = 0; slot < 4; slot++) {
+            var literals = new String[] {valid, valid, valid, valid};
+            literals[slot] = invalid;
+            Files.writeString(dmn, LEXICAL.formatted(type, literals[0], literals[1], literals[2], literals[3]));
+            var definition = new TableDefinition(dmn, "Slot", null, null, null, List.of(), List.of());
+            Assertions.assertThatThrownBy(() -> compile(definition, PACKAGE, Severity.ERROR)).as("slot %d", slot)
+                    .hasMessageContaining(invalid.substring(invalid.indexOf('"') + 1, invalid.lastIndexOf('"')));
+        }
+    }
+
     // ---- helpers -------------------------------------------------------------------------------
 
     /** Compiles as the Maven plugin does, so messages name settings as pom elements. */

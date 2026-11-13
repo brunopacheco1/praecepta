@@ -71,7 +71,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
  * has two coordinates: its instant, on a line split by the boundaries with a zone, and its local time, on
  * a line split by the boundaries without one; its class is the pair of their classes, and a test looks at
  * the coordinate of its literal's kind. A pair is empty when no value has both coordinates: a local time
- * and an instant are a whole number of seconds apart, from -18:00 to +18:00. The classes of values
+ * and an instant are a whole number of seconds apart, from -14:00 to +14:00, the offsets of FEEL's times and
+ * date-times (a getter's value beyond them is no FEEL value, and no class's example). The classes of values
  * without a zone come first, then the pairs, instant by instant.</li>
  * <li>TIME columns also take times with a zone id ({@link ZonedTime}), which compare only with a time in the same
  * zone, by local time; any other comparison of them is one FEEL does not define, so unknown. Each zone id the
