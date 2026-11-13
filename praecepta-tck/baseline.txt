@@ -3,38 +3,40 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # The DMN TCK result nodes that passed when this file was last regenerated, one per line: the test case
-# directory, the test file, the test case id and the result node's name. TckTest fails the build when one of
-# them no longer passes. Regenerate it, with RESULTS.md, only to record a deliberate change:
+# directory, the test file, the test case id and the result node's name, then, after a tab, "graph" if the
+# node passed through the decision requirements graph. TckTest fails the build when one of them no longer
+# passes, or no longer passes through the graph. Regenerate it, with RESULTS.md, only to record a deliberate
+# change:
 #
 #     mvn -pl praecepta-tck -am test -Dtck.update=true
-compliance-level-2/0001-input-data-string/0001-input-data-string-test-01.xml #001 Greeting Message
-compliance-level-2/0002-input-data-number/0002-input-data-number-test-01.xml #001 Yearly Salary
-compliance-level-2/0003-input-data-string-allowed-values/0003-input-data-string-allowed-values-test-01.xml #001 Employment Status Statement
-compliance-level-2/0004-simpletable-U/0004-simpletable-U-test-01.xml #001 Approval Status
-compliance-level-2/0004-simpletable-U/0004-simpletable-U-test-01.xml #002 Approval Status
-compliance-level-2/0004-simpletable-U/0004-simpletable-U-test-01.xml #003 Approval Status
-compliance-level-2/0005-simpletable-A/0005-simpletable-A-test-01.xml #001 Approval Status
-compliance-level-2/0005-simpletable-A/0005-simpletable-A-test-01.xml #002 Approval Status
-compliance-level-2/0005-simpletable-A/0005-simpletable-A-test-01.xml #003 Approval Status
-compliance-level-2/0006-simpletable-P1/0006-simpletable-P1-test-01.xml #001 Approval Status
-compliance-level-2/0006-simpletable-P1/0006-simpletable-P1-test-01.xml #002 Approval Status
-compliance-level-2/0006-simpletable-P1/0006-simpletable-P1-test-01.xml #003 Approval Status
-compliance-level-2/0007-simpletable-P2/0007-simpletable-P2-test-01.xml #001 Approval Status
-compliance-level-2/0007-simpletable-P2/0007-simpletable-P2-test-01.xml #002 Approval Status
-compliance-level-2/0007-simpletable-P2/0007-simpletable-P2-test-01.xml #003 Approval Status
-compliance-level-2/0010-multi-output-U/0010-multi-output-U-test-01.xml #001 Approval
-compliance-level-2/0010-multi-output-U/0010-multi-output-U-test-01.xml #002 Approval
-compliance-level-2/0010-multi-output-U/0010-multi-output-U-test-01.xml #003 Approval
-compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #001 Decision1
-compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #002 Decision2
-compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #004 Decision4
-compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #005 Decision5
-compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #007 Decision7
-compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #008 Decision8
-compliance-level-2/0102-feel-constants/0102-feel-constants-test-01.xml #001 Decision1
-compliance-level-2/0102-feel-constants/0102-feel-constants-test-01.xml #002 Decision2
-compliance-level-2/0102-feel-constants/0102-feel-constants-test-01.xml #003 Decision3
-compliance-level-2/0102-feel-constants/0102-feel-constants-test-01.xml #004 Decision4
+compliance-level-2/0001-input-data-string/0001-input-data-string-test-01.xml #001 Greeting Message	graph
+compliance-level-2/0002-input-data-number/0002-input-data-number-test-01.xml #001 Yearly Salary	graph
+compliance-level-2/0003-input-data-string-allowed-values/0003-input-data-string-allowed-values-test-01.xml #001 Employment Status Statement	graph
+compliance-level-2/0004-simpletable-U/0004-simpletable-U-test-01.xml #001 Approval Status	graph
+compliance-level-2/0004-simpletable-U/0004-simpletable-U-test-01.xml #002 Approval Status	graph
+compliance-level-2/0004-simpletable-U/0004-simpletable-U-test-01.xml #003 Approval Status	graph
+compliance-level-2/0005-simpletable-A/0005-simpletable-A-test-01.xml #001 Approval Status	graph
+compliance-level-2/0005-simpletable-A/0005-simpletable-A-test-01.xml #002 Approval Status	graph
+compliance-level-2/0005-simpletable-A/0005-simpletable-A-test-01.xml #003 Approval Status	graph
+compliance-level-2/0006-simpletable-P1/0006-simpletable-P1-test-01.xml #001 Approval Status	graph
+compliance-level-2/0006-simpletable-P1/0006-simpletable-P1-test-01.xml #002 Approval Status	graph
+compliance-level-2/0006-simpletable-P1/0006-simpletable-P1-test-01.xml #003 Approval Status	graph
+compliance-level-2/0007-simpletable-P2/0007-simpletable-P2-test-01.xml #001 Approval Status	graph
+compliance-level-2/0007-simpletable-P2/0007-simpletable-P2-test-01.xml #002 Approval Status	graph
+compliance-level-2/0007-simpletable-P2/0007-simpletable-P2-test-01.xml #003 Approval Status	graph
+compliance-level-2/0010-multi-output-U/0010-multi-output-U-test-01.xml #001 Approval	graph
+compliance-level-2/0010-multi-output-U/0010-multi-output-U-test-01.xml #002 Approval	graph
+compliance-level-2/0010-multi-output-U/0010-multi-output-U-test-01.xml #003 Approval	graph
+compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #001 Decision1	graph
+compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #002 Decision2	graph
+compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #004 Decision4	graph
+compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #005 Decision5	graph
+compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #007 Decision7	graph
+compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #008 Decision8	graph
+compliance-level-2/0102-feel-constants/0102-feel-constants-test-01.xml #001 Decision1	graph
+compliance-level-2/0102-feel-constants/0102-feel-constants-test-01.xml #002 Decision2	graph
+compliance-level-2/0102-feel-constants/0102-feel-constants-test-01.xml #003 Decision3	graph
+compliance-level-2/0102-feel-constants/0102-feel-constants-test-01.xml #004 Decision4	graph
 compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #001 Decision1
 compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #002 Decision2
 compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #003 Decision3
@@ -60,83 +62,83 @@ compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #022 Decision22
 compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #031 Decision31
 compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #032 Decision32
 compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #033 Decision33
-compliance-level-2/0108-first-hitpolicy/0108-first-hitpolicy-test-01.xml #001 Approval
-compliance-level-2/0108-first-hitpolicy/0108-first-hitpolicy-test-01.xml #002 Approval
-compliance-level-2/0108-first-hitpolicy/0108-first-hitpolicy-test-01.xml #003 Approval
-compliance-level-2/0109-ruleOrder-hitpolicy/0109-ruleOrder-hitpolicy-test-01.xml #001 Approval
-compliance-level-2/0109-ruleOrder-hitpolicy/0109-ruleOrder-hitpolicy-test-01.xml #002 Approval
-compliance-level-2/0109-ruleOrder-hitpolicy/0109-ruleOrder-hitpolicy-test-01.xml #003 Approval
-compliance-level-2/0110-outputOrder-hitpolicy/0110-outputOrder-hitpolicy-test-01.xml #001 Approval Status
-compliance-level-2/0110-outputOrder-hitpolicy/0110-outputOrder-hitpolicy-test-01.xml #002 Approval Status
-compliance-level-2/0110-outputOrder-hitpolicy/0110-outputOrder-hitpolicy-test-01.xml #003 Approval Status
-compliance-level-2/0111-first-hitpolicy-singleoutputcol/0111-first-hitpolicy-singleoutputcol-test-01.xml #001 Advertisement
-compliance-level-2/0111-first-hitpolicy-singleoutputcol/0111-first-hitpolicy-singleoutputcol-test-01.xml #002 Advertisement
-compliance-level-2/0111-first-hitpolicy-singleoutputcol/0111-first-hitpolicy-singleoutputcol-test-01.xml #003 Advertisement
-compliance-level-2/0112-ruleOrder-hitpolicy-singleinoutcol/0112-ruleOrder-hitpolicy-singleinoutcol-test-01.xml #001 Approval
-compliance-level-2/0112-ruleOrder-hitpolicy-singleinoutcol/0112-ruleOrder-hitpolicy-singleinoutcol-test-01.xml #002 Approval
-compliance-level-2/0112-ruleOrder-hitpolicy-singleinoutcol/0112-ruleOrder-hitpolicy-singleinoutcol-test-01.xml #003 Approval
-compliance-level-2/0113-outputOrder-hitpolicy-singleinoutcol/0113-outputOrder-hitpolicy-singleinoutcol-test-01.xml #001 Approval Status
-compliance-level-2/0113-outputOrder-hitpolicy-singleinoutcol/0113-outputOrder-hitpolicy-singleinoutcol-test-01.xml #002 Approval Status
-compliance-level-2/0113-outputOrder-hitpolicy-singleinoutcol/0113-outputOrder-hitpolicy-singleinoutcol-test-01.xml #003 Approval Status
-compliance-level-2/0114-min-collect-hitpolicy/0114-min-collect-hitpolicy-test-01.xml #001 CarInsurance
-compliance-level-2/0114-min-collect-hitpolicy/0114-min-collect-hitpolicy-test-01.xml #002 CarInsurance
-compliance-level-2/0114-min-collect-hitpolicy/0114-min-collect-hitpolicy-test-01.xml #003 CarInsurance
-compliance-level-2/0115-sum-collect-hitpolicy/0115-sum-collect-hitpolicy-test-01.xml #001 Salary
-compliance-level-2/0115-sum-collect-hitpolicy/0115-sum-collect-hitpolicy-test-01.xml #002 Salary
-compliance-level-2/0115-sum-collect-hitpolicy/0115-sum-collect-hitpolicy-test-01.xml #003 Salary
-compliance-level-2/0116-count-collect-hitpolicy/0116-count-collect-hitpolicy-test-01.xml #001 Salary
-compliance-level-2/0116-count-collect-hitpolicy/0116-count-collect-hitpolicy-test-01.xml #002 Salary
-compliance-level-2/0116-count-collect-hitpolicy/0116-count-collect-hitpolicy-test-01.xml #003 Salary
-compliance-level-2/0117-multi-any-hitpolicy/0117-multi-any-hitpolicy-test-01.xml #001 Approval
-compliance-level-2/0117-multi-any-hitpolicy/0117-multi-any-hitpolicy-test-01.xml #002 Approval
-compliance-level-2/0117-multi-any-hitpolicy/0117-multi-any-hitpolicy-test-01.xml #003 Approval
-compliance-level-2/0118-multi-priority-hitpolicy/0118-multi-priority-hitpolicy-test-01.xml #001 Approval Status
-compliance-level-2/0118-multi-priority-hitpolicy/0118-multi-priority-hitpolicy-test-01.xml #002 Approval Status
-compliance-level-2/0118-multi-priority-hitpolicy/0118-multi-priority-hitpolicy-test-01.xml #003 Approval Status
-compliance-level-2/0119-multi-collect-hitpolicy/0119-multi-collect-hitpolicy-test-01.xml #001 Approval Status
-compliance-level-2/0119-multi-collect-hitpolicy/0119-multi-collect-hitpolicy-test-01.xml #002 Approval Status
-compliance-level-2/0119-multi-collect-hitpolicy/0119-multi-collect-hitpolicy-test-01.xml #003 Approval Status
+compliance-level-2/0108-first-hitpolicy/0108-first-hitpolicy-test-01.xml #001 Approval	graph
+compliance-level-2/0108-first-hitpolicy/0108-first-hitpolicy-test-01.xml #002 Approval	graph
+compliance-level-2/0108-first-hitpolicy/0108-first-hitpolicy-test-01.xml #003 Approval	graph
+compliance-level-2/0109-ruleOrder-hitpolicy/0109-ruleOrder-hitpolicy-test-01.xml #001 Approval	graph
+compliance-level-2/0109-ruleOrder-hitpolicy/0109-ruleOrder-hitpolicy-test-01.xml #002 Approval	graph
+compliance-level-2/0109-ruleOrder-hitpolicy/0109-ruleOrder-hitpolicy-test-01.xml #003 Approval	graph
+compliance-level-2/0110-outputOrder-hitpolicy/0110-outputOrder-hitpolicy-test-01.xml #001 Approval Status	graph
+compliance-level-2/0110-outputOrder-hitpolicy/0110-outputOrder-hitpolicy-test-01.xml #002 Approval Status	graph
+compliance-level-2/0110-outputOrder-hitpolicy/0110-outputOrder-hitpolicy-test-01.xml #003 Approval Status	graph
+compliance-level-2/0111-first-hitpolicy-singleoutputcol/0111-first-hitpolicy-singleoutputcol-test-01.xml #001 Advertisement	graph
+compliance-level-2/0111-first-hitpolicy-singleoutputcol/0111-first-hitpolicy-singleoutputcol-test-01.xml #002 Advertisement	graph
+compliance-level-2/0111-first-hitpolicy-singleoutputcol/0111-first-hitpolicy-singleoutputcol-test-01.xml #003 Advertisement	graph
+compliance-level-2/0112-ruleOrder-hitpolicy-singleinoutcol/0112-ruleOrder-hitpolicy-singleinoutcol-test-01.xml #001 Approval	graph
+compliance-level-2/0112-ruleOrder-hitpolicy-singleinoutcol/0112-ruleOrder-hitpolicy-singleinoutcol-test-01.xml #002 Approval	graph
+compliance-level-2/0112-ruleOrder-hitpolicy-singleinoutcol/0112-ruleOrder-hitpolicy-singleinoutcol-test-01.xml #003 Approval	graph
+compliance-level-2/0113-outputOrder-hitpolicy-singleinoutcol/0113-outputOrder-hitpolicy-singleinoutcol-test-01.xml #001 Approval Status	graph
+compliance-level-2/0113-outputOrder-hitpolicy-singleinoutcol/0113-outputOrder-hitpolicy-singleinoutcol-test-01.xml #002 Approval Status	graph
+compliance-level-2/0113-outputOrder-hitpolicy-singleinoutcol/0113-outputOrder-hitpolicy-singleinoutcol-test-01.xml #003 Approval Status	graph
+compliance-level-2/0114-min-collect-hitpolicy/0114-min-collect-hitpolicy-test-01.xml #001 CarInsurance	graph
+compliance-level-2/0114-min-collect-hitpolicy/0114-min-collect-hitpolicy-test-01.xml #002 CarInsurance	graph
+compliance-level-2/0114-min-collect-hitpolicy/0114-min-collect-hitpolicy-test-01.xml #003 CarInsurance	graph
+compliance-level-2/0115-sum-collect-hitpolicy/0115-sum-collect-hitpolicy-test-01.xml #001 Salary	graph
+compliance-level-2/0115-sum-collect-hitpolicy/0115-sum-collect-hitpolicy-test-01.xml #002 Salary	graph
+compliance-level-2/0115-sum-collect-hitpolicy/0115-sum-collect-hitpolicy-test-01.xml #003 Salary	graph
+compliance-level-2/0116-count-collect-hitpolicy/0116-count-collect-hitpolicy-test-01.xml #001 Salary	graph
+compliance-level-2/0116-count-collect-hitpolicy/0116-count-collect-hitpolicy-test-01.xml #002 Salary	graph
+compliance-level-2/0116-count-collect-hitpolicy/0116-count-collect-hitpolicy-test-01.xml #003 Salary	graph
+compliance-level-2/0117-multi-any-hitpolicy/0117-multi-any-hitpolicy-test-01.xml #001 Approval	graph
+compliance-level-2/0117-multi-any-hitpolicy/0117-multi-any-hitpolicy-test-01.xml #002 Approval	graph
+compliance-level-2/0117-multi-any-hitpolicy/0117-multi-any-hitpolicy-test-01.xml #003 Approval	graph
+compliance-level-2/0118-multi-priority-hitpolicy/0118-multi-priority-hitpolicy-test-01.xml #001 Approval Status	graph
+compliance-level-2/0118-multi-priority-hitpolicy/0118-multi-priority-hitpolicy-test-01.xml #002 Approval Status	graph
+compliance-level-2/0118-multi-priority-hitpolicy/0118-multi-priority-hitpolicy-test-01.xml #003 Approval Status	graph
+compliance-level-2/0119-multi-collect-hitpolicy/0119-multi-collect-hitpolicy-test-01.xml #001 Approval Status	graph
+compliance-level-2/0119-multi-collect-hitpolicy/0119-multi-collect-hitpolicy-test-01.xml #002 Approval Status	graph
+compliance-level-2/0119-multi-collect-hitpolicy/0119-multi-collect-hitpolicy-test-01.xml #003 Approval Status	graph
 compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Adjudication
 compliance-level-3/0008-listGen/0008-listGen-test-01.xml #004 listGen4
 compliance-level-3/0008-listGen/0008-listGen-test-01.xml #005 listGen5
-compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #001 priceGt10
-compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #002 priceInRange
-compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #003 dateCompare1
-compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #004 dateCompare2
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Boolean
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Date
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Date and Time
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Days and Time Duration
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Number
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare String
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Time
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Years and Months Duration
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Boolean
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Date
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Date and Time
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Days and Time Duration
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Number
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare String
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Time
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Years and Months Duration
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Boolean
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Date
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Date and Time
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Days and Time Duration
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Number
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare String
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Time
-compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Years and Months Duration
-compliance-level-3/0039-dt-list-semantics/0039-dt-list-semantics-test-01.xml #_07726176-a1a0-4e9e-9de2-16dba51556e2 Symptom Analysis
-compliance-level-3/0039-dt-list-semantics/0039-dt-list-semantics-test-01.xml #_a217c840-6ead-4cb7-a3e1-ad9df9c0c584 Symptom Analysis
-compliance-level-3/0073-feel-comments/0073-feel-comments-test-01.xml #decision_001 decision_001
-compliance-level-3/0073-feel-comments/0073-feel-comments-test-01.xml #decision_002 decision_002
-compliance-level-3/0073-feel-comments/0073-feel-comments-test-01.xml #decision_003 decision_003
+compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #001 priceGt10	graph
+compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #002 priceInRange	graph
+compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #003 dateCompare1	graph
+compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #004 dateCompare2	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Boolean	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Date	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Date and Time	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Days and Time Duration	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Number	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare String	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Time	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Years and Months Duration	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Boolean	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Date	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Date and Time	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Days and Time Duration	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Number	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare String	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Time	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Years and Months Duration	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Boolean	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Date	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Date and Time	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Days and Time Duration	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Number	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare String	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Time	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Years and Months Duration	graph
+compliance-level-3/0039-dt-list-semantics/0039-dt-list-semantics-test-01.xml #_07726176-a1a0-4e9e-9de2-16dba51556e2 Symptom Analysis	graph
+compliance-level-3/0039-dt-list-semantics/0039-dt-list-semantics-test-01.xml #_a217c840-6ead-4cb7-a3e1-ad9df9c0c584 Symptom Analysis	graph
+compliance-level-3/0073-feel-comments/0073-feel-comments-test-01.xml #decision_001 decision_001	graph
+compliance-level-3/0073-feel-comments/0073-feel-comments-test-01.xml #decision_002 decision_002	graph
+compliance-level-3/0073-feel-comments/0073-feel-comments-test-01.xml #decision_003 decision_003	graph
 compliance-level-3/0075-feel-exponent/0075-feel-exponent-test-01.xml #decision_001 decision_001
 compliance-level-3/0075-feel-exponent/0075-feel-exponent-test-01.xml #decision_001_a decision_001_a
-compliance-level-3/0077-feel-nan/0077-feel-nan-test-01.xml #decision_001 decision_001
-compliance-level-3/0078-feel-infinity/0078-feel-infinity-test-01.xml #decision_001 decision_001
-compliance-level-3/0078-feel-infinity/0078-feel-infinity-test-01.xml #decision_002 decision_002
+compliance-level-3/0077-feel-nan/0077-feel-nan-test-01.xml #decision_001 decision_001	graph
+compliance-level-3/0078-feel-infinity/0078-feel-infinity-test-01.xml #decision_001 decision_001	graph
+compliance-level-3/0078-feel-infinity/0078-feel-infinity-test-01.xml #decision_002 decision_002	graph
 compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #literal_001 literal_001
 compliance-level-3/0093-feel-at-literals/0093-feel-at-literals-test-01.xml #date_002 date_002
 compliance-level-3/0093-feel-at-literals/0093-feel-at-literals-test-01.xml #datetime_002 datetime_002

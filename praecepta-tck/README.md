@@ -25,17 +25,23 @@ not counted). The kit runs in about a second; the module's tests, with the kit l
   ([#120](https://github.com/brunopacheco1/praecepta/issues/120)) that brings it.
 
 ## The baseline: only regressions fail the build
-`baseline.txt` lists every result node that passed when it was last regenerated. The build fails only when one
-of them no longer passes (`no_node_the_baseline_has_passing_regresses`, and the node's own check); a node that
-fails or is not supported never fails it. RESULTS.md and the baseline are regenerated together, deliberately:
+`baseline.txt` lists every result node that passed when it was last regenerated, those that passed through the
+decision requirements graph itself (`GraphEvaluator`) tagged `graph` after a tab. The build fails only when one
+of them no longer passes, or a tagged one passes only through the evaluator the graph falls back to, which would
+hide a graph that stopped taking it (`no_node_the_baseline_has_passing_regresses`, and the node's own check); a
+node that fails or is not supported never fails it. The baseline is read from the module's directory, and a run
+without it, or with an empty one, fails rather than catch nothing. RESULTS.md and the baseline are regenerated
+together, deliberately:
 
 ```
 mvn -pl praecepta-tck -am test -Dtck.update=true
 ```
 
 While they differ from the run (a node now passes that the baseline does not list, say), the test that compares
-them is skipped with the number of new passes, so the build stays green and a new pass is recorded only when
-someone regenerates the files and commits them; their diff shows what changed. Regenerating with a node gone
+them is skipped with the number of new passes, so a local build stays green; with `-Dtck.strict=true`, as the build
+workflow runs it, it fails, so a pull request that changes what passes regenerates and commits them, and their
+diff shows what changed. A simple value passes only if it is of the kind the kit expects (a number, a string, a
+boolean, a date, a time, a date and time or a duration), so the text `"10"` is not the number 10. Regenerating with a node gone
 from the baseline accepts a regression, so do it only when the change is meant (the kit's expectation is wrong
 by DMN 1.5, say), and say why in the pull request.
 

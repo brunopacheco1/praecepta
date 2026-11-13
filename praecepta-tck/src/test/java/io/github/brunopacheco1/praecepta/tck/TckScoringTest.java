@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.tck;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.Map;
@@ -78,21 +79,48 @@ class TckScoringTest {
 
     @Test
     void a_regression_is_a_node_of_the_baseline_that_no_longer_passes() {
-        var baseline = Set.of("a", "b", "c");
-        assertThat(Baseline.regressions(baseline, List.of("a", "c", "d"))).containsExactly("b");
-        assertThat(Baseline.regressions(baseline, List.of("c", "b", "a", "e"))).isEmpty();
-        assertThat(Baseline.regressions(Set.of(), List.of())).isEmpty();
+        var baseline = Map.of("a", "", "b", "", "c", "");
+        assertThat(Baseline.regressions(baseline, List.of("a", "c", "d"), Set.of())).containsExactly("b");
+        assertThat(Baseline.regressions(baseline, List.of("c", "b", "a", "e"), Set.of())).isEmpty();
+        assertThat(Baseline.regressions(Map.of(), List.of(), Set.of())).isEmpty();
     }
 
     @Test
-    void the_baseline_lists_the_passing_keys_sorted_under_its_header() {
-        var text = Baseline.render(List.of("b x", "a y"));
-        assertThat(text).startsWith("# SPDX-FileCopyrightText: Bruno Pacheco\n").endsWith("\na y\nb x\n");
+    void a_regression_is_also_a_node_that_passed_through_the_graph_and_now_passes_only_on_its_own() {
+        var baseline = Map.of("a", Baseline.GRAPH, "b", "");
+        assertThat(Baseline.regressions(baseline, List.of("a", "b"), Set.of("a"))).isEmpty();
+        assertThat(Baseline.regressions(baseline, List.of("a", "b"), Set.of()))
+                .containsExactly("a (no longer through the decision requirements graph)");
+    }
+
+    @Test
+    void the_baseline_lists_the_passing_keys_sorted_under_its_header_tagging_those_through_the_graph() {
+        var text = Baseline.render(List.of("b x", "a y"), Set.of("b x"));
+        assertThat(text).startsWith("# SPDX-FileCopyrightText: Bruno Pacheco\n").endsWith("\na y\nb x\tgraph\n");
     }
 
     @Test
     void the_committed_baseline_reads_without_its_comments() {
-        assertThat(Baseline.read(Baseline.FILE)).isNotEmpty().allSatisfy(key -> assertThat(key).startsWith("compliance-level-"));
+        assertThat(Baseline.read(Baseline.FILE, false)).isNotEmpty()
+                .allSatisfy((key, tag) -> assertThat(key).startsWith("compliance-level-"))
+                .containsValue(Baseline.GRAPH);
+    }
+
+    @Test
+    void a_missing_baseline_fails_unless_it_is_being_regenerated() {
+        var missing = Baseline.MODULE.resolve("target/no-such-baseline.txt");
+        assertThatThrownBy(() -> Baseline.read(missing, false)).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no regression is caught");
+        assertThat(Baseline.read(missing, true)).isEmpty();
+    }
+
+    @Test
+    void a_text_value_is_not_the_number_it_spells() {
+        var expected = new TckValue.Simple("decimal", "10");
+        assertThat(expected.matches(new TckValue.Simple("string", "10"), true)).isFalse();
+        assertThat(expected.matches(new TckValue.Simple("decimal", "10.0"), true)).isTrue();
+        assertThat(expected.matches(new TckValue.Simple("number", "10"), true)).isTrue();
+        assertThat(expected.matches(new TckValue.Simple("", "10"), true)).as("a value that names no type").isTrue();
     }
 
     private static TckRunner.Outcome score(Check check, Evaluation evaluation) {

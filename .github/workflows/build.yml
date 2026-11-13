@@ -43,8 +43,9 @@ jobs:
           cache: maven
       - name: Build & test
         # also checks SPDX headers (license-maven-plugin), runs the plugin's integration tests and
-        # writes SBOMs (target/bom.json)
-        run: mvn -B verify
+        # writes SBOMs (target/bom.json); on the LTS, the TCK fails when RESULTS.md or its baseline is
+        # out of date, so a pull request that changes what passes regenerates them (tck.strict)
+        run: mvn -B verify -Dtck.strict=${{ env.PRIMARY }}
       - name: Test the workflow scripts
         if: ${{ env.PRIMARY == 'true' }}
         # their release-only paths (published_modules.py jars) would otherwise first run on a release tag
