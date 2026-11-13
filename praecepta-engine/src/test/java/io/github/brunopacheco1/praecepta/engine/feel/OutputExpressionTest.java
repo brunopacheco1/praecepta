@@ -144,6 +144,11 @@ class OutputExpressionTest {
         Assertions.assertThat(number("1.2e3")).isEqualByComparingTo("1200");
         Assertions.assertThat(number("1.2E+3 + .5e-1")).isEqualByComparingTo("1200.05");
         Assertions.assertThat(number("5e-1 * 4")).isEqualByComparingTo("2");
+        // as its plain form reads, with no negative scale (BigDecimal.equals compares scales)
+        Assertions.assertThat(OutputExpression.parse("5E65")).isEqualTo(OutputExpression.parse("5" + "0".repeat(65)));
+        Assertions.assertThat(OutputExpression.parse("1.2e3")).isEqualTo(new Literal(new BigDecimal("1200")));
+        Assertions.assertThat(OutputExpression.parse(".5")).isEqualTo(new Literal(new BigDecimal("0.5")));
+        Assertions.assertThat(OutputExpression.parse("time(1.2e1, 0, 0)")).isEqualTo(OutputExpression.parse("time(12, 0, 0)"));
         // not an exponent: a name cannot follow a number
         Assertions.assertThatThrownBy(() -> OutputExpression.parse("2e")).isInstanceOf(ExpressionSyntaxException.class);
         Assertions.assertThatThrownBy(() -> OutputExpression.parse("2e+")).isInstanceOf(ExpressionSyntaxException.class);

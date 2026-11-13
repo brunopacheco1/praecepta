@@ -228,7 +228,7 @@ final class TemporalLiterals {
             if (!FeelNumbers.isDecimal128(number)) {
                 throw new IllegalArgumentException("'" + word + "' is beyond FEEL's numbers (decimal128)");
             }
-            return number;
+            return FeelNumbers.plain(number);
         }
         throw new IllegalArgumentException("'" + word + "' is not a string, a number or a date time literal");
     }

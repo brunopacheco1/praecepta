@@ -557,7 +557,7 @@ public final class CellParser {
                 if (!FeelNumbers.isDecimal128(number)) {
                     throw new CellSyntaxException(cell, "'" + text + "' is beyond FEEL's numbers (decimal128)");
                 }
-                return number;
+                return FeelNumbers.plain(number);
             }
             throw new CellSyntaxException(cell, "'" + text + "' is not a number");
         }

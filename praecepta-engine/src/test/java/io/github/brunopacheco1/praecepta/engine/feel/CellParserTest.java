@@ -24,6 +24,7 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
+import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.NotEqual;
@@ -95,8 +96,30 @@ class CellParserTest {
     @ParameterizedTest
     @ValueSource(strings = {"1e6144", "9.999999999999999999999999999999999e6144", "1e-6176", "0e6144", "-1.5E+100"})
     void numbers_within_feels_decimal128_are_read(String cell) {
-        Assertions.assertThat(CellParser.parseFeel(cell, ColumnType.NUMBER).values().orElseThrow())
-                .containsExactly(new BigDecimal(cell));
+        Assertions.assertThat(CellParser.parseFeel(cell, ColumnType.NUMBER).values().orElseThrow()).singleElement()
+                .satisfies(number -> Assertions.assertThat((BigDecimal) number).isEqualByComparingTo(new BigDecimal(cell)));
+    }
+
+    /**
+     * {@code DmnWriter} writes a number in its plain form ({@code 1.2e3} as {@code 1200}), which must read back as the
+     * same test: an exponent must not leave the number with a scale its plain form does not have, as
+     * {@code BigDecimal.equals} would tell them apart (found by fuzzing {@code 5E65}).
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"5E65", "1.2e3", ".5", "-2.50E+1", "0e5", "1e-3", "< 1E2", "[1e2..5E65]", "date(2.025e3, 1, 31)"})
+    void a_number_with_an_exponent_reads_as_its_plain_form_does(String cell) {
+        var type = cell.startsWith("date") ? ColumnType.DATE : ColumnType.NUMBER;
+        var parsed = CellParser.parse(cell, type);
+        Assertions.assertThat(CellParser.parse(DmnWriter.render(parsed), type)).isEqualTo(parsed);
+    }
+
+    @Test
+    void an_exponent_leaves_no_negative_scale() {
+        Assertions.assertThat(CellParser.parseFeel("5E65", ColumnType.NUMBER).values().orElseThrow())
+                .containsExactly(new BigDecimal("5" + "0".repeat(65)));
+        Assertions.assertThat(CellParser.parseFeel("1.2e3", ColumnType.NUMBER).values().orElseThrow()).containsExactly(new BigDecimal("1200"));
+        Assertions.assertThat(CellParser.parseFeel(".5", ColumnType.NUMBER).values().orElseThrow()).containsExactly(new BigDecimal("0.5"));
+        Assertions.assertThat(CellParser.parseFeel("1E-2", ColumnType.NUMBER).values().orElseThrow()).containsExactly(new BigDecimal("0.01"));
     }
 
     @ParameterizedTest

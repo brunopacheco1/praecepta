@@ -246,7 +246,7 @@ final class ExpressionParser {
         if (!FeelNumbers.isDecimal128(number)) {
             throw unsupported("'" + digits + "' is beyond FEEL's numbers (decimal128)");
         }
-        return number;
+        return FeelNumbers.plain(number);
     }
 
     /** Moves past an exponent ({@code e3}, {@code E-2}) if one follows; an {@code e} without digits is not one. */

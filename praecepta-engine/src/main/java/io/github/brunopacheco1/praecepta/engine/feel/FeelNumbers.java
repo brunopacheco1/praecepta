@@ -107,6 +107,17 @@ final class FeelNumbers {
         return inRange(literal.round(PRECISION)) != null;
     }
 
+    /**
+     * A number literal without the negative scale an exponent leaves on a {@code BigDecimal}: {@code 5E65} as 5
+     * followed by 65 zeros, {@code 1.2e3} as {@code 1200}. The value is the same, which is all FEEL compares
+     * (10.3.2.3.1), but {@code BigDecimal.equals} compares the scale too: rescaled, a literal equals what its plain
+     * written form reads as, the form {@code FeelLiterals} writes, so a cell and the FEEL written for it parse to
+     * equal tests. A literal written without an exponent never has a negative scale, so it is left as it is.
+     */
+    static BigDecimal plain(BigDecimal literal) {
+        return literal.scale() < 0 ? literal.setScale(0) : literal;
+    }
+
     /** A result, or null if it is beyond what a decimal128 holds. */
     private static BigDecimal inRange(BigDecimal result) {
         if (result.signum() == 0) {
