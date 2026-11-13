@@ -10,6 +10,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.assertj.core.api.Assertions;
 
@@ -97,12 +99,7 @@ class DmnRoundTripPropertiesTest {
                 .containsExactlyElementsOf(original.inputs().stream()
                         .map(input -> Assertions.tuple(input.name(), input.type())).toList());
 
-        var builder = PraeceptaEngine.<Map<String, Object>, PraeceptaOutput>builder()
-                .table(read)
-                .output(output -> output);
-        s.bindColumns(builder);
-        s.applyMaskForm(builder);
-        var engine = builder.build();
+        var engine = engine(s, read);
 
         var outputs = original.outputs().stream().map(DecisionTable.OutputColumn::name).toList();
         var reference = s.reference(rules, policy, DecisionTableScenario.outputPriority(policy, priority), true, outputs);
@@ -119,7 +116,46 @@ class DmnRoundTripPropertiesTest {
                         .isInstanceOf(InvalidInputException.class);
             }
         }
+
+        // the same file in the other forms DMN 1.5 allows, which DmnWriter does not write, evaluates the same
+        var variant = variant(xml);
+        var variantEngine = engine(s, DmnReader.read(new ByteArrayInputStream(variant.getBytes(StandardCharsets.UTF_8))));
+        for (var input : s.inputs()) {
+            Assertions.assertThat(outcome(variantEngine, input)).as("%s, input %s\n%s", policy, input, variant)
+                    .isEqualTo(outcome(engine, input));
+        }
     }
+
+    private static PraeceptaEngine<Map<String, Object>, PraeceptaOutput> engine(DecisionTableScenario s, DecisionTable table) {
+        var builder = PraeceptaEngine.<Map<String, Object>, PraeceptaOutput>builder()
+                .table(table)
+                .output(output -> output);
+        s.bindColumns(builder);
+        s.applyMaskForm(builder);
+        return builder.build();
+    }
+
+    /** What an engine gives for an input: its outputs, or the class of the exception it throws. */
+    private static Object outcome(PraeceptaEngine<Map<String, Object>, PraeceptaOutput> engine, Map<String, Object> input) {
+        try {
+            return engine.evaluate(input);
+        } catch (RuntimeException e) {
+            return e.getClass();
+        }
+    }
+
+    /**
+     * A DMN file as {@link DmnWriter} writes it, in the forms it does not write: at-literals for the date and time
+     * functions in every entry, value list and default (DMN 1.5, grammar rule 65), and comments around every input
+     * entry (10.3.1.2).
+     */
+    private static String variant(String xml) {
+        var atLiterals = DecisionTableScenario.atLiterals(xml);
+        return INPUT_ENTRY.matcher(atLiterals).replaceAll(entry -> Matcher.quoteReplacement(
+                entry.group(1) + "/* entry */ " + entry.group(2) + " // " + entry.group(2).length() + entry.group(3)));
+    }
+
+    private static final Pattern INPUT_ENTRY = Pattern.compile("(<inputEntry[^>]*>\\s*<text>)([^<]*)(</text>)");
 
     private static DecisionTable table(DecisionTableScenario s, List<Praeceptum> rules, HitPolicy policy, List<String> priority) {
         var inputs = s.columns().stream()

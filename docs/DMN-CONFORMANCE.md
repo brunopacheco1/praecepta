@@ -165,8 +165,8 @@ integrations alike.
   the result is.
 - **TCK.** `0100-arithmetic` moves date-times with a zone id by months only where no time is skipped.
 - **Praecepta (since 0.6.0, [#85](https://github.com/brunopacheco1/praecepta/issues/85)).** The local time is
-  moved forward by the length of the gap, as `java.time` does: `date and time("2025-01-30T02:30:00@Europe/Paris")
-  + @"P2M"` is `2025-03-30T03:30:00+02:00`. A days and time duration moves a date and time by instant
+  moved forward by the length of the gap, as `java.time` does:
+  `date and time("2025-01-30T02:30:00@Europe/Paris") + @"P2M"` is `2025-03-30T03:30:00+02:00`. A days and time duration moves a date and time by instant
   (10.3.2.3.5), so it never meets this case.
 
 ## 12. Blank text as a missing value

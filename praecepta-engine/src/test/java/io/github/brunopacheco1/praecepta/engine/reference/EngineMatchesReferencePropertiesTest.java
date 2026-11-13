@@ -9,11 +9,15 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BinaryOperator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -24,12 +28,16 @@ import io.github.brunopacheco1.praecepta.engine.OutputStrategy;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind;
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
+import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
+import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
+import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.reference.ReferenceMatcher.Aggregator;
 import io.github.brunopacheco1.praecepta.engine.reference.ReferenceMatcher.Finding;
 import io.github.brunopacheco1.praecepta.engine.reference.ReferenceMatcher.Outcome;
@@ -317,7 +325,118 @@ class EngineMatchesReferencePropertiesTest {
                 var noMatch = reference.defaultOutput() == null ? List.<PraeceptaOutput>of() : List.of(reference.defaultOutput());
                 Assertions.assertThat(engine.evaluate(input)).as("gap %s, input %s", gap.detail(), input).isEqualTo(noMatch);
             }
+            assertListStepsHoldNoMatch(gap.detail(), gap.example(), s, reference);
         }
+    }
+
+    /** A list column's step of a gap's description: {@code c1 has no element in S}, {@code c1 has an element in S}, {@code c1 = []}. */
+    private static final Pattern LIST_STEP = Pattern.compile("(c\\d+) (has no element in|has an element in|=) (.*?)(?=, c\\d+ |$)");
+
+    /**
+     * Every list a gap's description names, not only its example, matches no rule (#78): for each column of strings
+     * or numbers that holds lists, lists of an element of each "has an element in" set, alone and with every other
+     * representative element outside the "has no element in" sets, with the example's other columns and any value
+     * of the columns it leaves out. A description too broad, one that leaves out a set of excluded elements or names
+     * an element some rule matches, fails here though its example passes.
+     */
+    private static void assertListStepsHoldNoMatch(String detail, Map<String, Object> example, DecisionTableScenario s,
+            ReferenceMatcher reference) {
+        var steps = new LinkedHashMap<String, List<Matcher>>();
+        var matcher = LIST_STEP.matcher(detail);
+        while (matcher.find()) {
+            if (s.lists().contains(matcher.group(1))) {
+                steps.computeIfAbsent(matcher.group(1), any -> new ArrayList<>()).add(LIST_STEP.matcher(matcher.group()));
+            }
+        }
+        for (var step : steps.entrySet()) {
+            var column = step.getKey();
+            var type = s.types().get(column);
+            if (type != ColumnType.STRING && type != ColumnType.NUMBER) {
+                continue; // runs of times with and without a zone are written in forms a cell does not read
+            }
+            var pool = reference.representativeValues(column, false).stream()
+                    .flatMap(list -> ((List<?>) list).stream()).distinct().toList();
+            var excluded = new ArrayList<UnaryTests>();
+            var groups = new ArrayList<List<UnaryTests>>();
+            boolean empty = false;
+            for (var part : step.getValue()) {
+                Assertions.assertThat(part.matches()).isTrue();
+                switch (part.group(2)) {
+                    case "has no element in" -> excluded.addAll(classes(part.group(3), type));
+                    case "has an element in" -> groups.add(classes(part.group(3), type));
+                    default -> empty = part.group(3).equals("[]");
+                }
+            }
+            var allowed = pool.stream().filter(element -> excluded.stream().noneMatch(test -> holds(test, element))).toList();
+            var lists = new ArrayList<List<Object>>();
+            if (empty) {
+                lists.add(List.of());
+            } else {
+                var oneEach = new ArrayList<Object>();
+                for (var group : groups) {
+                    var inGroup = allowed.stream().filter(element -> group.stream().anyMatch(test -> holds(test, element))).toList();
+                    Assertions.assertThat(inGroup).as("gap %s: elements of a group outside the excluded ones", detail).isNotEmpty();
+                    oneEach.add(inGroup.getLast());
+                    inGroup.forEach(element -> lists.add(List.of(element)));
+                }
+                lists.add(oneEach);
+                var everything = new ArrayList<Object>(oneEach);
+                everything.addAll(allowed);
+                lists.add(everything);
+            }
+            for (var list : lists) {
+                if (groups.size() > 1 && list.size() == 1) {
+                    continue; // one element need not be in every group
+                }
+                var partial = new HashMap<>(example);
+                partial.put(column, list);
+                for (var input : completions(partial, s, reference)) {
+                    Assertions.assertThat(reference.matches(input)).as("gap %s, input %s", detail, input).isEmpty();
+                }
+            }
+        }
+    }
+
+    /**
+     * The element classes of a set in a gap's description, as cells: {@code "PT"}, {@code {"PT", "BR"}},
+     * {@code [1..2)}; an end at infinity becomes a comparison ({@code (-inf..1)} is {@code < 1}).
+     */
+    private static List<UnaryTests> classes(String set, ColumnType type) {
+        var inner = set.startsWith("{") && set.endsWith("}") ? set.substring(1, set.length() - 1) : set;
+        var tests = new ArrayList<UnaryTests>();
+        for (var part : inner.split(", (?=[\"\\[(\\]\\d-])")) {
+            var text = part.strip();
+            if (text.equals("(-inf..+inf)")) {
+                text = "-";
+            } else if (text.startsWith("(-inf..")) {
+                text = (text.endsWith("]") ? "<= " : "< ") + text.substring("(-inf..".length(), text.length() - 1);
+            } else if (text.endsWith("..+inf)")) {
+                text = (text.startsWith("[") ? ">= " : "> ") + text.substring(1, text.length() - "..+inf)".length());
+            }
+            tests.add(CellParser.parseFeel(text, type));
+        }
+        return tests;
+    }
+
+    /** Whether a cell of single values holds for an element: one of its tests is true. */
+    private static boolean holds(UnaryTests cell, Object element) {
+        if (cell instanceof UnaryTests.Any) {
+            return true;
+        }
+        var value = element instanceof Number number && !(element instanceof BigDecimal) ? new BigDecimal(number.toString()) : element;
+        return cell.tests().stream().anyMatch(test -> switch (test) {
+            case UnaryTests.Equals(var literal, var explicit) -> FeelTemporals.compare(value, literal) == 0;
+            case UnaryTests.Compare(var operator, var literal) -> switch (operator) {
+                case LT -> FeelTemporals.compare(value, literal) < 0;
+                case LE -> FeelTemporals.compare(value, literal) <= 0;
+                case GT -> FeelTemporals.compare(value, literal) > 0;
+                case GE -> FeelTemporals.compare(value, literal) >= 0;
+            };
+            case UnaryTests.Range(var low, var lowClosed, var high, var highClosed) ->
+                    (lowClosed ? FeelTemporals.compare(value, low) >= 0 : FeelTemporals.compare(value, low) > 0)
+                    && (highClosed ? FeelTemporals.compare(value, high) <= 0 : FeelTemporals.compare(value, high) < 0);
+            default -> throw new IllegalArgumentException("not an element class: " + test);
+        });
     }
 
     /**

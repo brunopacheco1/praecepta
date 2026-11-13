@@ -263,6 +263,15 @@ class DefaultOutputsTest {
             "dateTime                  | date and time(\"2025-01-31T08:30:00@Europe/Paris\") | 2025-01-31T08:30:00@Europe/Paris",
             "dayTimeDuration           | duration(\"P1DT2H\")                       | P1DT2H",
             "yearMonthDuration         | duration(\"P1Y2M\")                        | P1Y2M",
+            // the other literal forms (#81): at-literals, the functions' other forms, numbers as FEEL writes them
+            "date                      | @\"2025-01-31\"                             | 2025-01-31",
+            "date                      | date(2025, 1, 31)                           | 2025-01-31",
+            "time                      | time(8, 30, 0)                              | 08:30:00",
+            "time                      | @\"10:30:00@Europe/Paris\"                  | 10:30:00@Europe/Paris",
+            "dateTime                  | date and time(date(2025, 1, 31), time(8, 30, 0)) | 2025-01-31T08:30:00",
+            "dayTimeDuration           | @\"P1D\"                                   | P1D",
+            "yearMonthDuration         | @\"P1Y2M\" // a comment                     | P1Y2M",
+            "number                    | .5e1                                        | 5",
     })
     void a_default_of_every_type_is_read_written_and_read_back(String typeRef, String text, String value) {
         var table = read(typedDefault(typeRef, text));
@@ -304,6 +313,55 @@ class DefaultOutputsTest {
         var fees = FEES.formatted("MAX", "1.5").replace("<output typeRef=\"number\">",
                 "<output typeRef=\"number\"><outputValues><text>1.50, 10, 20</text></outputValues>");
         Assertions.assertThat(read(fees).outputs().getFirst().defaultValue()).isEqualTo("1.5");
+    }
+
+    /**
+     * Output entries, output value lists and defaults take the literal forms cells do (#81): at-literals, the date and
+     * time functions' other forms, numbers with an exponent. The engine gives their values, the default must be one of
+     * the output values by value (Table 46), and DmnWriter writes them as it writes any literal, which reads back the same.
+     */
+    @Test
+    void output_entries_value_lists_and_defaults_take_every_literal_form() {
+        var xml = """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="due" name="Due">
+                    <decisionTable hitPolicy="FIRST">
+                      <input><inputExpression typeRef="number"><text>score</text></inputExpression></input>
+                      <output name="Due" typeRef="date">
+                        <outputValues><text>@"2025-01-31", date(2025, 2, 28), date("2025-03-31")</text></outputValues>
+                        <defaultOutputEntry><text>date(2025, 3, 31) // the quarter's end</text></defaultOutputEntry>
+                      </output>
+                      <output name="Rate" typeRef="number">
+                        <outputValues><text>1e0, 2.5, .5</text></outputValues>
+                        <defaultOutputEntry><text>5E-1</text></defaultOutputEntry>
+                      </output>
+                      <output name="Opens" typeRef="time"/>
+                      <rule><inputEntry><text>&gt; 5</text></inputEntry><outputEntry><text>@"2025-01-31"</text></outputEntry>
+                        <outputEntry><text>1E0</text></outputEntry><outputEntry><text>@"10:30:00@Europe/Paris"</text></outputEntry></rule>
+                      <rule><inputEntry><text>&gt; 2</text></inputEntry><outputEntry><text>date(2025, 2, 28) /* February */</text></outputEntry>
+                        <outputEntry><text>.25e1</text></outputEntry><outputEntry><text>time(8, 30, 0)</text></outputEntry></rule>
+                    </decisionTable>
+                  </decision>
+                </definitions>""";
+        var table = read(xml);
+        Assertions.assertThat(table.outputs()).extracting(OutputColumn::defaultValue).containsExactly("2025-03-31", "0.5", null);
+        var engine = mapEngine(table);
+        Assertions.assertThat(engine.evaluate(Map.of("score", "6")))
+                .containsExactly(values("Due", "2025-01-31", "Rate", "1", "Opens", "10:30:00@Europe/Paris"));
+        Assertions.assertThat(engine.evaluate(Map.of("score", "3")))
+                .containsExactly(values("Due", "2025-02-28", "Rate", "2.5", "Opens", "08:30:00"));
+        Assertions.assertThat(engine.evaluate(Map.of("score", "1"))).containsExactly(values("Due", "2025-03-31", "Rate", "0.5", "Opens", null));
+
+        var written = DmnWriter.write(table);
+        var again = read(written);
+        Assertions.assertThat(again.outputs()).isEqualTo(table.outputs());
+        Assertions.assertThat(DmnWriter.write(again)).isEqualTo(written);
+        Assertions.assertThat(mapEngine(again).evaluate(Map.of("score", "3"))).isEqualTo(engine.evaluate(Map.of("score", "3")));
+
+        // a default outside the output values, in any form, is still rejected
+        Assertions.assertThatThrownBy(() -> read(xml.replace("date(2025, 3, 31) // the quarter's end", "@\"2025-04-30\"")))
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessageContaining("is not in its output values");
     }
 
     /** A table whose one output, Out, of a type, has a default; its one rule matches scores above 5. */

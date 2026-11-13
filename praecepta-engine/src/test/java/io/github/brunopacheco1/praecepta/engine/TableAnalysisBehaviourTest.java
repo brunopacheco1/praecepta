@@ -214,6 +214,92 @@ class TableAnalysisBehaviourTest {
         Assertions.assertThat(examples(report)).containsExactly("{ages=[], nat=[]}");
     }
 
+    // ---- past ListAnalysis.MAX_OUTCOMES: left unreported, never reported wrongly ------------------
+
+    /**
+     * Rules {@code i} and {@code not(i)} on {@code ages} for every {@code i < n}, with {@code nat} as given: a list of
+     * each set {@code S} of those numbers matches the first rule of each number in {@code S} and the second of each
+     * number outside it, so the lists leave {@code 2^n} sets of rules, none inside another. Past 10 numbers, that is
+     * more than {@link ListAnalysis#MAX_OUTCOMES}.
+     */
+    private static List<Praeceptum> eachNumberAndItsNegation(int n, String nat) {
+        var rules = new ArrayList<Praeceptum>();
+        for (int i = 0; i < n; i++) {
+            rules.add(rule(rules.size() + 1, "out", "is " + i, "ages", String.valueOf(i), "nat", nat));
+            rules.add(rule(rules.size() + 1, "out", "not " + i, "ages", "not(" + i + ")", "nat", nat));
+        }
+        return rules;
+    }
+
+    @Test
+    void past_the_bound_on_outcomes_a_list_columns_gaps_are_not_reported() {
+        // ages comes before nat, the last: lists without "PT" match no rule, whatever ages holds
+        var few = lists(HitPolicy.COLLECT, eachNumberAndItsNegation(3, "\"PT\""), Map.of("nat", "\"PT\",\"BR\"")).validationReport();
+        Assertions.assertThat(few.issues(Kind.GAP)).isNotEmpty()
+                .allSatisfy(gap -> Assertions.assertThat(gap.detail()).endsWith("nat has no element in \"PT\""));
+        var many = lists(HitPolicy.COLLECT, eachNumberAndItsNegation(11, "\"PT\""), Map.of("nat", "\"PT\",\"BR\"")).validationReport();
+        Assertions.assertThat(many.issues(Kind.GAP)).isEmpty();
+    }
+
+    @Test
+    void past_the_bound_on_outcomes_an_unreachable_rule_is_not_reported() {
+        // a missing list, the empty one and every other list of ages match a rule before the last, which so never wins
+        // (nor do the rules after the first number's two, but they are judged on fewer rules, within the bound)
+        for (int n : new int[] {3, 11}) {
+            var rules = new ArrayList<Praeceptum>();
+            rules.add(rule(100, "out", "none", "ages", "null", "nat", "-"));
+            rules.addAll(eachNumberAndItsNegation(n, "-"));
+            rules.add(rule(200, "out", "last", "ages", "-", "nat", "\"PT\""));
+            var unreachable = lists(HitPolicy.FIRST, rules, Map.of()).validationReport().issues(Kind.UNREACHABLE_RULE).stream()
+                    .map(issue -> issue.ruleIds().getFirst()).toList();
+            Assertions.assertThat(unreachable).as("%d numbers", n).contains(3, 4).doesNotContain(100, 1, 2);
+            if (n == 3) {
+                Assertions.assertThat(unreachable).contains(200);
+            } else {
+                Assertions.assertThat(unreachable).doesNotContain(200);
+            }
+        }
+        // as the last column, a list column is decided directly, whatever the number of outcomes
+        var last = new ArrayList<Praeceptum>();
+        last.add(rule(100, "out", "none", "ages", "null"));
+        for (int i = 0; i < 11; i++) {
+            last.add(rule(last.size() + 1, "out", "is " + i, "ages", String.valueOf(i)));
+            last.add(rule(last.size() + 1, "out", "not " + i, "ages", "not(" + i + ")"));
+        }
+        last.add(rule(200, "out", "last", "ages", "-"));
+        Assertions.assertThat(lists(HitPolicy.FIRST, last, Map.of()).validationReport().issues(Kind.UNREACHABLE_RULE))
+                .extracting(issue -> issue.ruleIds().getFirst()).contains(200);
+    }
+
+    @Test
+    void past_the_bound_on_outcomes_a_table_is_not_reported_complete() {
+        for (int n : new int[] {3, 11}) {
+            // complete: a missing list matches the first rule, every other list one of the others
+            var complete = new ArrayList<Praeceptum>();
+            complete.add(rule(100, "out", "none", "ages", "null"));
+            for (int i = 0; i < n; i++) {
+                complete.add(rule(complete.size() + 1, "out", "is " + i, "ages", String.valueOf(i)));
+                complete.add(rule(complete.size() + 1, "out", "not " + i, "ages", "not(" + i + ")"));
+            }
+            var report = withDefault(complete).validationReport();
+            Assertions.assertThat(report.issues(Kind.UNREACHABLE_DEFAULT_OUTPUT)).as("%d numbers", n).hasSize(n == 3 ? 1 : 0);
+            // without the first rule, a missing list matches none: never complete, whatever the number of outcomes
+            var incomplete = withDefault(complete.subList(1, complete.size())).validationReport();
+            Assertions.assertThat(incomplete.issues(Kind.UNREACHABLE_DEFAULT_OUTPUT)).as("%d numbers", n).isEmpty();
+        }
+    }
+
+    private static PraeceptaEngine<Map<String, String>, String> withDefault(List<Praeceptum> rules) {
+        return PraeceptaEngine.<Map<String, String>, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .inputs(PraeceptaInput::new)
+                .output(output -> output.values().get("out"))
+                .listColumnType("ages", ColumnType.NUMBER)
+                .defaultOutput(new PraeceptaOutput(Map.of("out", "default")))
+                .rules(rules)
+                .build();
+    }
+
     // ---- large tables ----------------------------------------------------------------------------
 
     /**

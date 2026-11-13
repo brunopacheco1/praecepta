@@ -25,6 +25,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.ForcedMaskForm;
@@ -111,6 +113,12 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     static final LocalDate DAY0 = LocalDate.of(2025, 1, 1);
     static final LocalTime TIME0 = LocalTime.of(8, 0);
     static final LocalDateTime MOMENT0 = DAY0.atTime(6, 0);
+    /**
+     * Inputs on the last day of a month, beyond the cells' dates: a month or a year later has no such day for some of
+     * them (DMN 1.5, Table 57), as {@link #TEMPORAL_FORMS}' {@code $ + @"P1M"} and {@code @"P1Y" + $} then find.
+     */
+    private static final List<LocalDateTime> MONTH_ENDS = List.of(LocalDateTime.of(2024, 2, 29, 10, 0),
+            LocalDateTime.of(2025, 1, 31, 22, 0), LocalDateTime.of(2025, 3, 31, 0, 30));
     /** Rules of a scenario: few, so that the reference's brute force stays quick and rules overlap often. */
     private static final int MAX_RULES = 8;
     /** Rules of a {@link #wide()} scenario: enough for masks of up to four words. */
@@ -214,10 +222,10 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                     cells.put(column, switch ((r + c) % 6) {
                         case 1, 4 -> withElementTest(cell, new UnaryTests.NullElement());
                         case 5 -> withElementTest(cell, new UnaryTests.NotEqual(new UnaryTests.NullTest())); // an element is there
-                        default -> DmnWriter.renderList(cell);
+                        default -> listVariant(DmnWriter.renderList(cell), type, r + c);
                     });
                 } else {
-                    cells.put(column, (r + c) % 3 == 0 ? variableCell(type, r, c) : feelCell(text, cell, type));
+                    cells.put(column, (r + c) % 3 == 0 ? variableCell(type, r, c) : feelCell(text, cell, type, r + c));
                 }
             }
             rewritten.add(new Praeceptum(rule.priority(), new PraeceptaInput(cells), rule.output()));
@@ -237,20 +245,51 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     }
 
     /**
-     * A cell as strict FEEL: as written, where strict FEEL reads it the same (as it reads quoted strings with
-     * escape sequences, so they are read by both parsers), else as {@link DmnWriter#render} writes it.
+     * A cell as strict FEEL, so that DMN's parser ({@link CellParser#parseFeel}) meets every form the generator
+     * writes: as written, where strict FEEL reads it the same (at-literals, {@code date(2025, 1, 31)}, {@code .5} and
+     * {@code 1e1}, {@code = x}, comments, quoted strings with escape sequences), else, one time in two, as
+     * {@link DmnWriter#render} writes it with at-literals for its date and time functions, else as it writes it.
      */
-    private static String feelCell(String text, UnaryTests cell, ColumnType type) {
-        if (text.indexOf('\\') >= 0) {
-            try {
-                if (CellParser.parseFeel(text, type).equals(cell)) {
-                    return text;
-                }
-            } catch (CellSyntaxException e) {
-                // not strict FEEL as written
+    private static String feelCell(String text, UnaryTests cell, ColumnType type, int variant) {
+        var rendered = DmnWriter.render(cell);
+        for (var form : variant % 2 == 0 ? List.of(text, atLiterals(rendered)) : List.of(text)) {
+            if (readsAs(form, cell, type, false)) {
+                return form;
             }
         }
-        return DmnWriter.render(cell);
+        return rendered;
+    }
+
+    /**
+     * A list column's cell as {@link DmnWriter#renderList} writes it, or a variant DMN's parser reads the same: with
+     * at-literals ({@code list contains(?, @"2025-01-01")}), a comment after it, or both.
+     */
+    private static String listVariant(String rendered, ColumnType type, int variant) {
+        var form = switch (variant % 4) {
+            case 0 -> atLiterals(rendered);
+            case 2 -> atLiterals(rendered) + " // a list";
+            case 3 -> "/* a list */ " + rendered;
+            default -> rendered;
+        };
+        return readsAs(form, CellParser.parseFeelList(rendered, type), type, true) ? form : rendered;
+    }
+
+    private static boolean readsAs(String text, UnaryTests cell, ColumnType type, boolean list) {
+        try {
+            return (list ? CellParser.parseFeelList(text, type) : CellParser.parseFeel(text, type)).equals(cell);
+        } catch (CellSyntaxException e) {
+            return false; // not strict FEEL as written
+        }
+    }
+
+    private static final Pattern DATE_TIME_FUNCTION = Pattern.compile("(date and time|date|time|duration)\\(\"([^\"\\\\]*)\"\\)");
+
+    /**
+     * FEEL text with each {@code date("...")}, {@code time("...")}, {@code date and time("...")} and
+     * {@code duration("...")} written as the at-literal of its string ({@code @"..."}, DMN 1.5, grammar rule 65).
+     */
+    static String atLiterals(String feel) {
+        return DATE_TIME_FUNCTION.matcher(feel).replaceAll(match -> Matcher.quoteReplacement("@\"" + match.group(2) + "\""));
     }
 
     private String variableCell(ColumnType type, int r, int c) {
@@ -791,7 +830,9 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                 yield Arbitraries.of(options);
             }
             case NUMBER -> Arbitraries.integers().between(-2, 12).<Object>map(half -> BigDecimal.valueOf(half).divide(BigDecimal.TWO));
-            case DATE -> Arbitraries.integers().between(-1, 6).<Object>map(DAY0::plusDays);
+            // now and then a month's last day, 29 February included, which a month or a year later does not have
+            case DATE -> Arbitraries.integers().between(-1, 6 + MONTH_ENDS.size())
+                    .<Object>map(d -> d > 6 ? MONTH_ENDS.get(d - 7).toLocalDate() : DAY0.plusDays(d));
             case BOOLEAN -> Arbitraries.<Object>of(true, false);
             // quarter steps: on every boundary and halfway between them; with a zone, the same instants in various zones
             // with a zone id, in the zones the cells name and in one they do not
@@ -803,10 +844,11 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
                         var time = TIME0.plusMinutes(15L * q);
                         return zone < 0 ? time : OffsetTime.of(time, ZoneOffset.UTC).withOffsetSameInstant(INPUT_OFFSETS.get(zone));
                     });
-            case DATE_TIME -> Combinators.combine(Arbitraries.integers().between(-2, 12), zone(ColumnType.DATE_TIME, column.zoned()),
+            case DATE_TIME -> Combinators.combine(Arbitraries.integers().between(-2, 12 + MONTH_ENDS.size()),
+                            zone(ColumnType.DATE_TIME, column.zoned()),
                             Arbitraries.integers().between(0, 5 * DAYLIGHT_SAVING_CHANGES.size() - 1))
                     .<Object>as((q, zone, change) -> {
-                        var moment = MOMENT0.plusHours(6L * q);
+                        var moment = q > 12 ? MONTH_ENDS.get(q - 13) : MOMENT0.plusHours(6L * q);
                         if (zone < 0) {
                             return moment;
                         }

@@ -1020,6 +1020,120 @@ class TableCompilerTest {
                 .hasMessage("Table 'mixed': output 'out' takes " + kinds + ", but its generated record component holds one kind");
     }
 
+    /**
+     * Output entries and defaults in the other literal forms (#81), at-literals and the functions' other forms, give
+     * the generated components their kind as the plain forms do: a time with a zone id is a {@code ZonedTime}.
+     */
+    @Test
+    void output_literals_in_every_form_give_the_component_their_kind() throws Exception {
+        var dmn = out.resolve("desks.dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="desks" name="desks"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="string"><text>desk</text></inputExpression></input>
+                    <output name="opens" typeRef="time"><defaultOutputEntry><text>@"12:00:00@Europe/Paris"</text></defaultOutputEntry></output>
+                    <output name="since" typeRef="date"/>
+                    <rule><inputEntry><text>"Paris"</text></inputEntry><outputEntry><text>@"09:00:00@Europe/Paris"</text></outputEntry>
+                      <outputEntry><text>date(2025, 1, 31)</text></outputEntry></rule>
+                    <rule><inputEntry><text>"Lyon"</text></inputEntry><outputEntry><text>time("10:30:00@Europe/Paris")</text></outputEntry>
+                      <outputEntry><text>@"2024-02-29"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var result = compile(new TableDefinition(dmn, "Desks", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("DesksOutput"))
+                .contains("public record DesksOutput(io.github.brunopacheco1.praecepta.engine.feel.ZonedTime opens, java.time.LocalDate since)");
+        var decision = Decision.of("desks", DmnReader.read(Files.newInputStream(dmn)));
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".DesksInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Desks").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            for (var desk : List.of("Paris", "Lyon", "Nice")) {
+                var expected = decision.evaluate(Map.of("desk", desk)).getFirst();
+                Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(desk))).as(desk)
+                        .get().hasToString("DesksOutput[opens=" + expected.get("opens") + ", since=" + expected.get("since") + "]");
+            }
+        }
+    }
+
+    /** A time input whose cells name a zone id and an offset, or no zone, has no one Java type, and is rejected. */
+    @ParameterizedTest
+    @CsvSource({"'time(\"10:00:00Z\")'", "'time(\"10:00:00\")'"})
+    void a_time_column_mixing_a_zone_id_with_other_times_is_rejected(String other) throws IOException {
+        var dmn = out.resolve("mixed-zone-ids.dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="calls" name="calls"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="time"><text>at</text></inputExpression></input>
+                    <output name="desk" typeRef="string"/>
+                    <rule><inputEntry><text>&lt; @"10:00:00@Europe/Paris"</text></inputEntry><outputEntry><text>"Paris"</text></outputEntry></rule>
+                    <rule><inputEntry><text>&lt; %s</text></inputEntry><outputEntry><text>"elsewhere"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""".formatted(other));
+        var definition = new TableDefinition(dmn, "Calls", null, null, null, List.of(), List.of());
+        Assertions.assertThatThrownBy(() -> compile(definition, PACKAGE, Severity.ERROR))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Table 'calls': input 'at' takes time values both with a zone id and without one, "
+                        + "but its generated record component holds one kind");
+    }
+
+    /** {@code != home} names an input (#81): the generated input record gets it, and evaluates as the map-based engine. */
+    @Test
+    void a_not_equal_test_naming_an_input_becomes_an_input_component() throws Exception {
+        var dmn = out.resolve("abroad.dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="abroad" name="abroad"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="string"><text>country</text></inputExpression></input>
+                    <output name="fee" typeRef="number"/>
+                    <rule><inputEntry><text>!= home</text></inputEntry><outputEntry><text>5</text></outputEntry></rule>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>0</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var result = compile(new TableDefinition(dmn, "Abroad", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("AbroadInput")).contains("public record AbroadInput(String country, String home)");
+        var decision = Decision.of("abroad", DmnReader.read(Files.newInputStream(dmn)));
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".AbroadInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Abroad").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            // != is not(=): a missing value differs from any value there, and two missing values are equal
+            var cases = new String[][] {{"PT", "PT", "0"}, {"ES", "PT", "5"}, {null, "PT", "5"}, {"PT", null, "5"}, {null, null, "0"}};
+            for (var row : cases) {
+                Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(row[0], row[1])))
+                        .as("%s", Arrays.toString(row)).get().hasToString("AbroadOutput[fee=" + row[2] + "]");
+                var values = new HashMap<String, String>();
+                values.put("country", row[0]);
+                values.put("home", row[1]);
+                Assertions.assertThat(decision.evaluate(values)).as("%s", Arrays.toString(row)).containsExactly(Map.of("fee", row[2]));
+            }
+        }
+    }
+
+    /**
+     * A {@code null} default under an aggregation (#92) is the result when no rule matches, COUNT's too, in the
+     * generated class and in the map-based engine alike: DMN 1.5, 10.3.2.10, step 2, comes before any aggregation.
+     */
+    @ParameterizedTest
+    @CsvSource({"SUM", "MIN", "MAX", "COUNT"})
+    void a_null_default_is_an_aggregations_result_when_no_rule_matches(String aggregation) throws Exception {
+        var dmn = totals(aggregation);
+        Files.writeString(dmn, Files.readString(dmn).replace("<text>9.90</text>", "<text>null</text>"));
+        var result = compile(new TableDefinition(dmn, "Total", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        var decision = Decision.of("total", DmnReader.read(Files.newInputStream(dmn)));
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".TotalInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Total").getMethod("evaluate", input);
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, input.getDeclaredConstructors()[0].newInstance("mainland")))
+                    .get().hasToString("TotalOutput[total=null]");
+        }
+        var nothing = new HashMap<String, String>();
+        nothing.put("total", null);
+        Assertions.assertThat(decision.evaluate(Map.of("zone", "mainland"))).containsExactly(nothing);
+    }
+
     // ---- helpers -------------------------------------------------------------------------------
 
     /** Compiles as the Maven plugin does, so messages name settings as pom elements. */

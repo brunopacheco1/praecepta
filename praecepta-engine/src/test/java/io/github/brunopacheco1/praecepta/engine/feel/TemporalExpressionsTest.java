@@ -75,6 +75,52 @@ class TemporalExpressionsTest {
         Assertions.assertThat(OutputExpression.parse(text).evaluate(inputs()::get)).isNull();
     }
 
+    /**
+     * Months and years move the date's fields and keep its day (DMN 1.5, Table 57: {@code date(e1.year + ..., e1.month
+     * + ..., e1.day)}), which is null where the month does not have that day, 29 February included; days and times
+     * move a date and time with a zone by instant ({@code valuedt}, 10.3.2.3.5), across a change of offset too.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', nullValues = "null", value = {
+            "date(\"2024-02-29\") + @\"P1Y\"                                        | DATE      | null",
+            "date(\"2024-02-29\") - @\"P12M\"                                       | DATE      | null",
+            "@\"P4Y\" + date(\"2024-02-29\")                                        | DATE      | 2028-02-29",
+            "date(\"2024-02-29\") - @\"P48M\"                                       | DATE      | 2020-02-29",
+            "date(\"2024-02-28\") + @\"P1D\"                                        | DATE      | 2024-02-29",
+            "date(\"2025-02-28\") + @\"P1D\"                                        | DATE      | 2025-03-01",
+            "date(\"2024-01-31\") + @\"P1M\"                                        | DATE      | null",
+            "date(\"2024-01-29\") + @\"P1M\"                                        | DATE      | 2024-02-29",
+            "date and time(\"2025-01-31T10:00:00\") + @\"P1M\"                      | DATE_TIME | null",
+            "date and time(\"2025-03-31T10:00:00\") - @\"P1M\"                      | DATE_TIME | null",
+            "date and time(\"2024-03-31T10:00:00Z\") - @\"P1M\"                     | DATE_TIME | null",
+            "date and time(\"2024-02-29T10:00:00\") + @\"P1Y\"                      | DATE_TIME | null",
+            "date and time(\"2025-12-31T23:30:00\") + @\"P1M\"                      | DATE_TIME | 2026-01-31T23:30",
+            // a day later by instant: 24 hours, which the spring change of offset in Paris shows as 13:00
+            "date and time(\"2025-03-29T12:00:00@Europe/Paris\") + @\"P1D\"         | DATE_TIME | 2025-03-30T13:00:00+02:00",
+            "date and time(\"2025-10-26T12:00:00@Europe/Paris\") - @\"PT24H\"       | DATE_TIME | 2025-10-25T13:00:00+02:00",
+    })
+    void months_keep_the_day_and_days_move_by_instant(String text, ColumnType type, String value) {
+        var result = OutputExpression.parse(text).evaluate(any -> null);
+        if (value == null) {
+            Assertions.assertThat(result).isNull();
+        } else if (type == ColumnType.DATE_TIME && value.length() > 16) {
+            Assertions.assertThat(FeelTemporals.compare(result, FeelTemporals.parseDateTime(value))).as("%s", result).isZero();
+        } else {
+            Assertions.assertThat(result).isEqualTo(FeelLiterals.value(value, type));
+        }
+    }
+
+    /**
+     * A month later in a zone can land on a local time the zone skips (02:30 on 30 March 2025 in Paris). DMN 1.5 builds
+     * the result with {@code date and time(date(...), time(e1))} (Table 57), and does not say what such a time is;
+     * Praecepta moves it forward by the length of the gap, as {@code ZonedDateTime.of} does, recorded in DMN conformance.
+     */
+    @Test
+    void a_month_later_on_a_skipped_local_time_moves_forward_by_the_gap() {
+        var result = OutputExpression.parse("date and time(\"2025-01-30T02:30:00@Europe/Paris\") + @\"P2M\"").evaluate(any -> null);
+        Assertions.assertThat(result).hasToString("2025-03-30T03:30+02:00[Europe/Paris]");
+    }
+
     @Test
     void a_missing_operand_gives_null() {
         var missing = new HashMap<>(inputs());

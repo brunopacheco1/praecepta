@@ -611,10 +611,39 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * for removing an element never makes a positive cell match or a {@code not(...)} cell fail.
      */
     private void representativeLists(String column, boolean withMissing, boolean hidden, Consumer<Object> sink) {
-        var pool = listPool(column, withMissing, hidden);
-        subLists(pool.elements(), 0, new ArrayList<>(), pool.size(), sink);
+        var exhaustive = EXHAUSTIVE_LISTS.get();
+        if (exhaustive != null) {
+            var allowed = allowedValues.containsKey(column) ? CellParser.parse(allowedValues.get(column), type(column)) : null;
+            var elements = representativeElements(column, withMissing, true, hidden).stream()
+                    .filter(element -> element == null || allowed == null || accepts(allowed, single(element), name -> null))
+                    .toList();
+            multisets(elements, 0, new ArrayList<>(), Math.min(exhaustive, elements.size()), sink);
+        } else {
+            var pool = listPool(column, withMissing, hidden);
+            subLists(pool.elements(), 0, new ArrayList<>(), pool.size(), sink);
+        }
         if (withMissing) {
             sink.accept(null);
+        }
+    }
+
+    /**
+     * When set, for the self-test of the reduction {@link #representativeLists} makes ({@code ListReductionPropertiesTest}):
+     * a list column's lists are instead every list of at most this many of its representative elements, none merged
+     * with another and each as often as wanted, the missing one included.
+     */
+    static final ThreadLocal<Integer> EXHAUSTIVE_LISTS = new ThreadLocal<>();
+
+    /** Every list of at most {@code size} elements of {@code pool}, repeats included, from {@code from} on, after {@code prefix}. */
+    private static void multisets(List<Object> pool, int from, List<Object> prefix, int size, Consumer<Object> sink) {
+        sink.accept(Collections.unmodifiableList(new ArrayList<>(prefix)));
+        if (prefix.size() == size) {
+            return;
+        }
+        for (int i = from; i < pool.size(); i++) {
+            prefix.add(pool.get(i));
+            multisets(pool, i, prefix, size, sink);
+            prefix.removeLast();
         }
     }
 
