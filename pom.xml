@@ -106,7 +106,7 @@
              (its last release); the plugin uses only API that Gradle 8.5 to 9 share -->
         <gradle-api.version>8.11.1</gradle-api.version>
         <!-- the Groovy that Gradle ${gradle-api.version} bundles; its in-process tests need more of it than the API -->
-        <groovy.version>3.0.22</groovy.version>
+        <groovy.version>3.0.25</groovy.version>
         <!-- the Gradle version the functional tests run (-P gradle-functional); gradle-versions.yml sets others -->
         <gradle-functional.version>9.8.2</gradle-functional.version>
     </properties>
