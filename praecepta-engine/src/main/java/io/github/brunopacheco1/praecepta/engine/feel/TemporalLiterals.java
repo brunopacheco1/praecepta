@@ -307,10 +307,10 @@ final class TemporalLiterals {
                 case String iso -> time(iso.strip());
                 case LocalTime time -> time;
                 case OffsetTime time -> time;
-                case ZonedTime time -> time;
+                case ZonedTime time -> FeelTemporals.withFixedOffset(time);
                 case LocalDateTime dateTime -> dateTime.toLocalTime();
-                case ZonedDateTime dateTime when dateTime.getZone() instanceof ZoneOffset offset -> OffsetTime.of(dateTime.toLocalTime(), offset);
-                case ZonedDateTime dateTime -> new ZonedTime(dateTime.toLocalTime(), dateTime.getZone());
+                // at an offset, or in a zone with one fixed offset (Etc/UTC), the time at that offset (Table 72)
+                case ZonedDateTime dateTime -> FeelTemporals.timeIn(dateTime.toLocalTime(), dateTime.getZone());
                 case null, default -> throw takes("time", "a time string, a time or a date and time");
             };
         }

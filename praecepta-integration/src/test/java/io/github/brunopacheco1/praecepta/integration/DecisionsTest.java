@@ -278,6 +278,44 @@ class DecisionsTest {
         Assertions.assertThat(paris.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "10:00:00@Europe/Paris"));
     }
 
+    /**
+     * A time in a zone with one fixed offset is the time at that offset (DMN 1.5, Table 72: {@code time("23:59:00z") +
+     * duration("PT2M") = time("00:01:00@Etc/UTC")}), so min and max order it with times at an offset.
+     */
+    @Test
+    void min_and_max_take_a_time_in_a_zone_with_one_fixed_offset_as_the_time_at_that_offset() {
+        // 10:00@Etc/GMT-2 is 08:00Z, before 09:00Z
+        var latest = Decision.of("latest", typed("MAX", "time", "time(\"10:00:00@Etc/GMT-2\")", "time(\"09:00:00Z\")")).engine();
+        Assertions.assertThat(latest.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "09:00:00Z"));
+        var earliest = Decision.of("earliest", typed("MIN", "time", "time(\"10:00:00@Etc/GMT-2\")", "time(\"09:00:00Z\")")).engine();
+        Assertions.assertThat(earliest.evaluate(Map.of("zone", "islands"))).containsExactly(Map.of("out", "10:00:00+02:00"));
+        // outputs given as text keep it, and order the same way, as do outputs that compute such a time
+        var rules = List.of(output(1, "-", "10:00:00@Etc/GMT-2", null), output(2, "islands", "09:00:00@Etc/UTC", null),
+                output(3, "islands", null, "time(\"23:59:00@Etc/UTC\") + duration(\"PT2M\")"));
+        for (var operator : List.of(AggregationOperator.MIN, AggregationOperator.MAX)) {
+            var table = new DecisionTable("Out", HitPolicy.COLLECT, operator, List.of(new InputColumn("zone", ColumnType.STRING)),
+                    List.of(new OutputColumn("out", ColumnType.TIME)), rules);
+            var engine = Decision.of("text", table).engine();
+            Assertions.assertThat(engine.evaluate(Map.of("zone", "islands"))).as("%s", operator)
+                    .containsExactly(Map.of("out", operator == AggregationOperator.MIN ? "00:01:00Z" : "09:00:00@Etc/UTC"));
+            Assertions.assertThat(engine.evaluate(Map.of("zone", "mainland"))).as("%s", operator)
+                    .containsExactly(Map.of("out", "10:00:00@Etc/GMT-2"));
+        }
+        // with a time in a zone whose offset changes, it does not compare
+        var nothing = Collections.singletonMap("out", (String) null);
+        var paris = Decision.of("paris", typed("MAX", "time", "time(\"10:00:00@Etc/UTC\")", "time(\"10:00:00@Europe/Paris\")")).engine();
+        Assertions.assertThat(paris.evaluate(Map.of("zone", "islands"))).containsExactly(nothing);
+    }
+
+    private static Praeceptum output(int id, String zone, String value, String expression) {
+        var values = new HashMap<String, String>();
+        if (value != null) {
+            values.put("out", value);
+        }
+        return new Praeceptum(id, new PraeceptaInput(Map.of("zone", zone)),
+                new PraeceptaOutput(values, Map.of(), expression == null ? Map.of() : Map.of("out", expression)));
+    }
+
     @Test
     void min_and_max_of_times_that_do_not_compare_are_null() {
         // DMN 1.5 does not say how times with a zone id in two zones compare, and the TCK leaves it out; min and max

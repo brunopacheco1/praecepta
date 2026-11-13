@@ -90,17 +90,27 @@ deconstructs `DecisionTable.OutputColumn` or `UnaryTests.Equals`, switches over 
   files and map-based inputs rejected it. Such a time is a `feel.ZonedTime` (a local time and a zone id:
   `OffsetTime` cannot hold a zone without its offset, which a zone id has only on a date), bound with
   `PraeceptaEngine.Builder.zonedTimeInput`, written back by `FeelLiterals` and `DmnWriter`, and generated as
-  a `ZonedTime` component by the Maven and Gradle plugins and the Quarkus extension when every value written
-  for a time column has a zone id. Two such times in the same zone compare by local time, which is all the
-  TCK asks (`0068-feel-equality`: `time("10:30:00@Europe/Paris") = time("10:30:00@Europe/Paris")`). Every
-  other comparison of one, with a time in another zone, at an offset or without a zone, is left open by DMN
-  1.5 and by the TCK ("pending RTF equality comparisons with zones clarification"); Praecepta does not
-  invent one: such a comparison is FEEL's null, so neither a test nor its `not(...)` holds, an interval's
-  ends must be in one zone, and a COLLECT MIN or MAX of such times in two zones is null (FEEL's `min` and
-  `max` take comparable items, Table 75, and a built-in function is null outside its domain, 10.3.2.16). This
-  choice is recorded in [DMN conformance](docs/DMN-CONFORMANCE.md), as is one case it does not follow yet:
-  DMN 1.5's example of `time(from)` (Table 72) has `time("00:01:00@Etc/UTC")`, in a zone with one fixed
-  offset, equal `time("00:01:00Z")`, which Praecepta does not compare. The
+  a `ZonedTime` component by the Maven and Gradle plugins and the Quarkus extension when the values written
+  for a time column have zone ids (some of them may instead have an offset, or a zone with one fixed offset).
+  Two such times in the same zone compare by local time, which is all the TCK asks (`0068-feel-equality`:
+  `time("10:30:00@Europe/Paris") = time("10:30:00@Europe/Paris")`). A time in a zone with one fixed offset
+  (`Etc/UTC`, `Etc/GMT-2`, `UTC`) is the time at that offset, as DMN 1.5's example of `time(from)` has it
+  (Table 72: `time("23:59:00z") + duration("PT2M") = time("00:01:00@Etc/UTC")` is true), and as the TCK has it
+  for date-times (`0068-feel-equality`: `date and time("2018-12-08T00:00:00+00:00") = date and
+  time("2018-12-08T00:00:00@Etc/UTC")`): read from text, a cell, an output entry or a date and time, it is an
+  `OffsetTime` (`FeelTemporals.parseTime("00:01:00@Etc/UTC")` is `00:01Z`), and a `ZonedTime` in such a zone
+  that a getter gives is matched, compared and subtracted as one, so a `zonedTimeInput` column also takes
+  times at an offset, among which the validation report looks for overlaps and gaps. Such a time is written at
+  its offset (`DmnWriter` writes `time("00:01:00Z")`, which reads back equal, and an output that names or
+  computes it gives `00:01:00Z`), and the generated component of a time column whose zone ids all have a fixed
+  offset is an `OffsetTime`. `FeelTemporals.timeIn` and `withFixedOffset` make such a time, and generated code
+  reads time outputs back with `FeelTemporals.parseOffsetTime` and `parseZonedTime`, which take either form.
+  Every other comparison of a time with a zone id whose offset changes, with a time in another zone, at an
+  offset or without a zone, is left open by DMN 1.5 and by the TCK ("pending RTF equality comparisons with
+  zones clarification"); Praecepta does not invent one: such a comparison is FEEL's null, so neither a test
+  nor its `not(...)` holds, an interval's ends must be in one zone, and a COLLECT MIN or MAX of such times in
+  two zones is null (FEEL's `min` and `max` take comparable items, Table 75, and a built-in function is null
+  outside its domain, 10.3.2.16). This choice is recorded in [DMN conformance](docs/DMN-CONFORMANCE.md). The
   index gives each zone id the cells name a line of local times and the other zone ids one class; a
   map-based column whose cells name no zone id takes such a time too, matching only the cells that accept
   any value, and keeps the validation report it had. `FeelTemporals.comparable(a, b)` says whether two
@@ -120,7 +130,8 @@ deconstructs `DecisionTable.OutputColumn` or `UnaryTests.Equals`, switches over 
   meeting a date and time counts as UTC midnight (10.3.2.3.5), as the DMN TCK's `0100-arithmetic` expects.
   Times subtract as they compare: by instant when both have an offset, by local time when one has none or
   both have a zone id in one zone, and not at all for a time with a zone id and any other (so two times at
-  offsets far apart can be more than a day apart), and a date and time with a zone id moved by months onto a
+  offsets far apart can be more than a day apart; a time in a zone with one fixed offset is a time at that
+  offset, [#82](https://github.com/brunopacheco1/praecepta/issues/82)), and a date and time with a zone id moved by months onto a
   local time its zone skips moves forward by the gap; DMN 1.5 leaves those cases open, so they are recorded
   in [DMN conformance](docs/DMN-CONFORMANCE.md). Types FEEL does not
   combine (`due + 1`, `elapsed + tenure`) are still rejected when the engine is built, now naming both types
@@ -272,9 +283,10 @@ deconstructs `DecisionTable.OutputColumn` or `UnaryTests.Equals`, switches over 
   `IllegalArgumentException`; `renderList` writes it.
 - **`FeelTemporals.parseTime` returns `Object`**
   ([#82](https://github.com/brunopacheco1/praecepta/issues/82)), where it returned `Temporal`, since a time
-  with a zone id is a `ZonedTime`; a caller that assigned the result to a `Temporal` casts it.
-  `FeelTemporals.compare` throws an `IllegalArgumentException` for two values that are not `comparable`,
-  which only a time with a zone id makes.
+  with a zone id is a `ZonedTime` (one in a zone with one fixed offset, such as `Etc/UTC`, is the `OffsetTime`
+  at that offset); a caller that assigned the result to a `Temporal` casts it. `FeelTemporals.compare` throws an
+  `IllegalArgumentException` for two values that are not `comparable`, which only a time with a zone id whose
+  offset changes makes.
 - **The published POMs no longer import the JUnit BOM**
   ([#98](https://github.com/brunopacheco1/praecepta/issues/98)): the parent POM, which every published
   module inherits, imported `org.junit:junit-bom` in its `dependencyManagement`, as did the Spring Boot

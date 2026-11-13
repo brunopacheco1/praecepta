@@ -66,7 +66,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
  * comparisons and intervals (unknown), equals only {@code null}, and so satisfies {@code not("A")}.
  * Blank strings count as missing. Times and date-times with a time zone compare by the instant they
  * denote, and one without a zone takes the offset of the value it is compared with (DMN 1.5, Table 54),
- * equality included. The engine
+ * equality included. A time in a zone with one fixed offset ({@code 00:01:00@Etc/UTC}) is the time at that
+ * offset (DMN 1.5, Table 72), wherever it is written or given ({@link #fixed}). The engine
  * instead precomputes value classes and bitmasks.
  *
  * @param rules          rules in table order (DMN "rule order")
@@ -295,7 +296,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      */
     private static Object evaluate(OutputExpression expression, Function<String, Object> inputs) {
         return switch (expression) {
-            case OutputExpression.Literal literal -> literal.value();
+            case OutputExpression.Literal literal -> fixed(literal.value());
             case OutputExpression.Name name -> inputs.apply(name.name());
             case OutputExpression.Negation negation -> {
                 var operand = evaluate(negation.operand(), inputs);
@@ -731,6 +732,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
                 }
                 if (eitherKind || zonedColumns.contains(column)) {
                     values.addAll(orderedRepresentatives(type, cells, true));
+                } else if (zoneIds) {
+                    // a getter of times with a zone id may give one in a zone with one fixed offset, the time at that offset
+                    orderedRepresentatives(type, cells, true).forEach(time -> values.add(inFixedZone((OffsetTime) time)));
                 }
                 // read from text, or as a list's element, a time with a zone id counts only where a cell names one (the
                 // engine's analyses leave it out elsewhere, but its completeness search does not)
@@ -746,6 +750,11 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             values.add(null);
         }
         return values;
+    }
+
+    /** A time at an offset as a getter of times with a zone id gives it: in the zone id that has that offset fixed. */
+    private static ZonedTime inFixedZone(OffsetTime time) {
+        return new ZonedTime(time.toLocalTime(), ZoneId.ofOffset("UTC", time.getOffset()));
     }
 
     /**
@@ -1224,7 +1233,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * FEEL on concrete values: a comparison with a missing value is unknown; null equals only null; {@code !=} is
      * {@code not(=)} (DMN 1.5, 10.3.2.15), so it holds for a missing value unless it is {@code != null}.
      */
-    private static Boolean test(Test test, Object value) {
+    private static Boolean test(Test written, Object given) {
+        var test = fixedLiterals(written);
+        var value = fixed(given);
         if (test instanceof NotEqual(var negated)) {
             var equal = test(negated, value);
             return equal == null ? null : !equal;
@@ -1302,6 +1313,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             }
         }
         values.removeIf(UnaryTests.Name.class::isInstance); // known only when evaluating
+        values.replaceAll(ReferenceMatcher::fixed);
         return values;
     }
 
@@ -1345,7 +1357,32 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
         return switch (value) {
             case String s when s.isBlank() -> null;
             case Period period -> YearsAndMonths.of(period);
+            case ZonedTime time -> fixed(time);
             case null, default -> value;
+        };
+    }
+
+    /**
+     * A time in a zone with one fixed offset ({@code Etc/UTC}, {@code Etc/GMT-1}) as the time at that offset, which
+     * DMN 1.5's example of {@code time(from)} takes it to be (Table 72: {@code time("23:59:00z") + duration("PT2M") =
+     * time("00:01:00@Etc/UTC")}); any other value as it is.
+     */
+    static Object fixed(Object value) {
+        if (value instanceof ZonedTime time && time.zone().getRules().isFixedOffset()) {
+            return OffsetTime.of(time.time(), time.zone().getRules().getOffset(Instant.EPOCH));
+        }
+        return value;
+    }
+
+    /** A test with each of its literals {@link #fixed}. */
+    private static Test fixedLiterals(Test test) {
+        return switch (test) {
+            case NullTest n -> n;
+            case UnaryTests.NullElement n -> n;
+            case NotEqual n -> new NotEqual(fixedLiterals(n.test()));
+            case Equals e -> new Equals((Comparable<?>) fixed(e.value()), e.explicit());
+            case Compare c -> new Compare(c.operator(), (Comparable<?>) fixed(c.value()));
+            case Range r -> new Range((Comparable<?>) fixed(r.low()), r.lowClosed(), (Comparable<?>) fixed(r.high()), r.highClosed());
         };
     }
 
@@ -1356,7 +1393,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * UTF-16 code unit as {@link String#compareTo} does; values of the other types by their natural order.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static int compare(Object a, Object b) {
+    private static int compare(Object first, Object second) {
+        var a = fixed(first);
+        var b = fixed(second);
         return switch (a) {
             case ZonedTime time -> time.time().compareTo(((ZonedTime) b).time());
             case OffsetTime time -> instant(time)
@@ -1371,7 +1410,9 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     }
 
     /** Whether FEEL compares two values: a time with a zone id only with one in the same zone. */
-    private static boolean comparable(Object a, Object b) {
+    private static boolean comparable(Object first, Object second) {
+        var a = fixed(first);
+        var b = fixed(second);
         if (a instanceof ZonedTime x) {
             return b instanceof ZonedTime y && x.zone().equals(y.zone());
         }

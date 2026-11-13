@@ -42,12 +42,63 @@ class FeelTemporalsTest {
 
     @Test
     void a_zone_id_must_name_a_region() {
-        Assertions.assertThat(FeelTemporals.parseTime("10:30:00@Etc/UTC")).isEqualTo(new ZonedTime(LocalTime.of(10, 30), ZoneId.of("Etc/UTC")));
+        Assertions.assertThat(FeelTemporals.parseTime("10:30:00@Asia/Dhaka")).isEqualTo(new ZonedTime(LocalTime.of(10, 30), ZoneId.of("Asia/Dhaka")));
         Assertions.assertThatThrownBy(() -> FeelTemporals.parseTime("10:30:00@Mars/Olympus")).isInstanceOf(DateTimeParseException.class);
         Assertions.assertThatThrownBy(() -> FeelTemporals.parseTime("10:30:00@+01:00")).isInstanceOf(DateTimeParseException.class);
         Assertions.assertThatThrownBy(() -> new ZonedTime(LocalTime.NOON, ZoneOffset.UTC)).isInstanceOf(IllegalArgumentException.class);
         Assertions.assertThat(new ZonedTime(LocalTime.NOON, ZoneId.of("Europe/Paris")).compareTo(new ZonedTime(LocalTime.MIDNIGHT,
                 ZoneId.of("Asia/Dhaka")))).isPositive(); // a total order for sorting: zone id first
+    }
+
+    @Test
+    void a_time_in_a_zone_with_one_fixed_offset_is_the_time_at_that_offset() {
+        // DMN 1.5, Table 72: time("23:59:00z") + duration("PT2M") = time("00:01:00@Etc/UTC") is true
+        var utc = OffsetTime.of(0, 1, 0, 0, ZoneOffset.UTC);
+        Assertions.assertThat(FeelTemporals.parseTime("00:01:00@Etc/UTC")).isEqualTo(utc);
+        Assertions.assertThat(FeelTemporals.parseTime("00:01@UTC")).isEqualTo(utc);
+        Assertions.assertThat(FeelTemporals.parseTime("02:01:00@Etc/GMT-2")).isEqualTo(OffsetTime.of(2, 1, 0, 0, ZoneOffset.ofHours(2)));
+        Assertions.assertThat(FeelTemporals.parseTime("23:01:00@Etc/GMT+1")).isEqualTo(OffsetTime.of(23, 1, 0, 0, ZoneOffset.ofHours(-1)));
+        // a zone whose offset changes, even one at offset zero today, keeps its zone id
+        Assertions.assertThat(FeelTemporals.parseTime("00:01:00@Africa/Abidjan")).isInstanceOf(ZonedTime.class);
+        Assertions.assertThat(FeelTemporals.timeIn(LocalTime.of(0, 1), ZoneId.of("Etc/UTC"))).isEqualTo(utc);
+        Assertions.assertThat(FeelTemporals.timeIn(LocalTime.of(0, 1), ZoneOffset.UTC)).isEqualTo(utc);
+        Assertions.assertThat(FeelTemporals.timeIn(LocalTime.of(0, 1), ZoneId.of("Europe/Paris")))
+                .isEqualTo(new ZonedTime(LocalTime.of(0, 1), ZoneId.of("Europe/Paris")));
+
+        // a ZonedTime a getter gives in such a zone compares as that offset time, with every time
+        var bound = new ZonedTime(LocalTime.of(0, 1), ZoneId.of("Etc/UTC"));
+        Assertions.assertThat(FeelTemporals.withFixedOffset(bound)).isEqualTo(utc);
+        var paris = new ZonedTime(LocalTime.of(0, 1), ZoneId.of("Europe/Paris"));
+        Assertions.assertThat(FeelTemporals.withFixedOffset(paris)).isSameAs(paris);
+        Assertions.assertThat(FeelTemporals.compare(bound, OffsetTime.of(2, 1, 0, 0, ZoneOffset.ofHours(2)))).isZero();
+        Assertions.assertThat(FeelTemporals.compare(new ZonedTime(LocalTime.of(2, 1), ZoneId.of("Etc/GMT-2")), bound)).isZero();
+        Assertions.assertThat(FeelTemporals.compare(bound, OffsetTime.of(0, 2, 0, 0, ZoneOffset.UTC))).isNegative();
+        Assertions.assertThat(FeelTemporals.compare(bound, LocalTime.of(0, 1))).isZero(); // by local time (Table 54)
+        Assertions.assertThat(FeelTemporals.hasZone(bound)).isTrue();
+        Assertions.assertThat(FeelTemporals.local(bound)).isEqualTo(LocalTime.of(0, 1));
+        Assertions.assertThat(FeelTemporals.comparable(bound, LocalTime.NOON)).isTrue();
+        Assertions.assertThat(FeelTemporals.comparable(utc, bound)).isTrue();
+        Assertions.assertThat(FeelTemporals.comparable(bound, paris)).isFalse();
+        Assertions.assertThat(FeelTemporals.comparable(paris, bound)).isFalse();
+    }
+
+    @Test
+    void generated_code_reads_back_a_time_with_a_zone_written_either_way() {
+        var utc = OffsetTime.of(0, 1, 0, 0, ZoneOffset.UTC);
+        Assertions.assertThat(FeelTemporals.parseOffsetTime("00:01:00Z")).isEqualTo(utc);
+        Assertions.assertThat(FeelTemporals.parseOffsetTime("00:01:00@Etc/UTC")).isEqualTo(utc);
+        Assertions.assertThatThrownBy(() -> FeelTemporals.parseOffsetTime("00:01:00")).isInstanceOf(DateTimeParseException.class);
+        Assertions.assertThatThrownBy(() -> FeelTemporals.parseOffsetTime("00:01:00@Europe/Paris")).isInstanceOf(DateTimeParseException.class);
+
+        Assertions.assertThat(FeelTemporals.parseZonedTime("00:01:00@Europe/Paris")).isEqualTo(new ZonedTime(LocalTime.of(0, 1),
+                ZoneId.of("Europe/Paris")));
+        Assertions.assertThat(FeelTemporals.parseZonedTime("00:01:00@Etc/UTC")).isEqualTo(new ZonedTime(LocalTime.of(0, 1), ZoneId.of("Etc/UTC")));
+        // an offset as the zone id that has it fixed, which reads back as the same time
+        var atOffset = FeelTemporals.parseZonedTime("00:01:00+05:30");
+        Assertions.assertThat(atOffset).isEqualTo(new ZonedTime(LocalTime.of(0, 1), ZoneId.of("UTC+05:30")));
+        Assertions.assertThat(FeelTemporals.withFixedOffset(atOffset)).isEqualTo(OffsetTime.of(0, 1, 0, 0, ZoneOffset.ofHoursMinutes(5, 30)));
+        Assertions.assertThat(FeelTemporals.withFixedOffset(FeelTemporals.parseZonedTime("00:01:00Z"))).isEqualTo(utc);
+        Assertions.assertThatThrownBy(() -> FeelTemporals.parseZonedTime("00:01:00")).isInstanceOf(DateTimeParseException.class);
     }
 
     @Test

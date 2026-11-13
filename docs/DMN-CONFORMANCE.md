@@ -30,7 +30,7 @@ settled stays here, marked as such, with the release that settled it.
 | 6 | [COUNT when no rule matches](#6-count-when-no-rule-matches) | settled in 0.5.0 |
 | 7 | [A `null` default output value beside output values](#7-a-null-default-output-value-beside-output-values) | open |
 | 8 | [A complete table, and missing inputs](#8-a-complete-table-and-missing-inputs) | open |
-| 9 | [A time with a zone id against a time in another zone, at an offset or without a zone](#9-a-time-with-a-zone-id-against-a-time-in-another-zone-at-an-offset-or-without-a-zone) | open |
+| 9 | [A time with a zone id against a time in another zone, at an offset or without a zone](#9-a-time-with-a-zone-id-against-a-time-in-another-zone-at-an-offset-or-without-a-zone) | open; a zone with one fixed offset settled in 0.6.0 |
 | 10 | [The difference of two times in different zones, or one with a zone and one without](#10-the-difference-of-two-times-in-different-zones-or-one-with-a-zone-and-one-without) | open |
 | 11 | [A date and time moved by months onto a local time its zone skips](#11-a-date-and-time-moved-by-months-onto-a-local-time-its-zone-skips) | open |
 | 12 | [Blank text as a missing value](#12-blank-text-as-a-missing-value) | open |
@@ -129,18 +129,27 @@ integrations alike.
 - **TCK.** `0068-feel-equality` compares two times in the same zone, and leaves the other cases out
   "pending RTF equality comparisons with zones clarification".
 - **Praecepta (since 0.6.0, [#82](https://github.com/brunopacheco1/praecepta/issues/82)).** Two times in the
-  same zone compare by local time. Any other comparison of a time with a zone id is taken as one FEEL does not
-  define, which is null (10.3.2.2): neither a test nor its `not(...)` matches, an interval's ends must be in
-  one zone, and a COLLECT MIN or MAX over such times in two zones is null (in the framework integrations'
-  map-based engine; the generated classes aggregate numbers only), as FEEL's `min` and `max` take a list of
-  comparable items (Table 75) and a built-in function is null outside its domain (10.3.2.16).
-  **Not yet following Table 72:** a time in a zone with one fixed offset (`Etc/UTC`, `Etc/GMT+1`) is treated as
-  any other zone id, so `time("00:01:00@Etc/UTC")` does not match `00:01:00Z`. Following the example needs such
-  a time to be read as the time at its offset by the index, the input bindings (a `zonedTimeInput` column
-  then takes times at an offset too), the analyses and the generated classes, which is left for a later release.
-  A column of map-based inputs whose cells name no zone id still takes such a time, which only the cells that
-  accept any value match; the analyses of overlaps, unreachable rules and gaps leave it out, the completeness
-  search (case 8) does not.
+  same zone compare by local time. A time in a zone with one fixed offset (`Etc/UTC`, `Etc/GMT-2`, `UTC`: a zone
+  whose rules never change its offset) follows Table 72: it is the time at that offset, wherever it is written
+  (cells, input value lists, output entries and expressions, map-based inputs, `time(date and time(...))` of a
+  date and time in such a zone) or given (a `ZonedTime` bound with `zonedTimeInput` or held by a list). So
+  `time("00:01:00@Etc/UTC")` matches `00:01:00Z` and `02:01:00+02:00`, compares, subtracts and aggregates as
+  they do, and a column bound with `zonedTimeInput` takes times at an offset too, among which the analyses look
+  for overlaps and gaps. Praecepta writes such a time at its offset: the DMN writer writes `time("00:01:00Z")`,
+  which reads back equal, and an output that names or computes it gives `00:01:00Z` (the TCK's
+  `1116-feel-time-function`, which Praecepta does not run, has `string(time("00:01:00@Etc/UTC"))` keep the zone
+  id; an output written as text keeps it too). The generated classes give a time column whose zone ids all have a
+  fixed offset an `OffsetTime`, and one that mixes zone ids with offsets a `ZonedTime`, which may be in a zone with
+  a fixed offset. Date-times compare by instant, a zone id by the offset it has at the date and time, so
+  `0068-feel-equality`'s case holds for them as it did before.
+  **Still open:** how a time in a zone whose offset changes (`Europe/Paris`) compares with one in another zone, at
+  an offset or without a zone. Such a comparison is taken as one FEEL does not define, which is null (10.3.2.2):
+  neither a test nor its `not(...)` matches, an interval's ends must be in one zone, and a COLLECT MIN or MAX over
+  such times in two zones is null (in the framework integrations' map-based engine; the generated classes
+  aggregate numbers only), as FEEL's `min` and `max` take a list of comparable items (Table 75) and a built-in
+  function is null outside its domain (10.3.2.16). A column of map-based inputs whose cells name no such zone id
+  still takes such a time, which only the cells that accept any value match; the analyses of overlaps, unreachable
+  rules and gaps leave it out, the completeness search (case 8) does not.
 
 ## 10. The difference of two times in different zones, or one with a zone and one without
 - **DMN 1.5.** Table 57 defines `e1 - e2` of two times as the difference of their values (10.3.2.3.4), which
@@ -151,7 +160,7 @@ integrations alike.
 - **Praecepta (since 0.6.0, [#85](https://github.com/brunopacheco1/praecepta/issues/85)).** Times subtract as
   they compare (cases 4, 5 and 9): by instant when both have an offset, by local time when one has none or
   both have a zone id in one zone, and the result is null for a time with a zone id and any time not in its
-  zone. By instant, two times are taken on one day, so times at offsets far apart can be more than a day
+  zone (a zone with one fixed offset aside: such a time is the time at that offset, case 9). By instant, two times are taken on one day, so times at offsets far apart can be more than a day
   apart (`@"00:00:00+14:00" - @"23:59:59-12:00"` is `-PT49H59M59S`), beyond the range 10.3.2.3.4 gives
   `valuet` ([0..86400]), within which Table 57's `valuet(e1) - valuet(e2)` would stay. Taking each time's
   seconds since midnight UTC instead would keep that range but break the TCK's subtractions at one offset

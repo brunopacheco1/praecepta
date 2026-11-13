@@ -10,6 +10,7 @@ import java.math.BigInteger;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetTime;
 import java.time.Period;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -77,7 +78,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
  * cells name has a line of local times, split by its boundaries; after those come a class for every other zone
  * id, then the missing class. A column whose inputs may have a zone id (map-based inputs) but whose cells name
  * none keeps that last class out of the analysis: such a time matches only the rules that accept any value, and
- * every table that names no zone id keeps the report it had.</li>
+ * every table that names no zone id keeps the report it had. A time in a zone with one fixed offset
+ * ({@code Etc/UTC}) is no such time: it is the time at that offset (DMN 1.5, Table 72), in cells as in inputs
+ * ({@link FeelTemporals#withFixedOffset}), so a column bound with {@code zonedTimeInput} also takes times with a zone
+ * that has an offset.</li>
  * </ul>
  *
  * Membership is decided per class with FEEL's three-valued logic: a missing value fails comparisons
@@ -138,6 +142,8 @@ final class ColumnIndex {
     private final boolean hiddenZoneIdAllowed;
     /** Whether the column's input binding takes times with a zone id. */
     private final boolean takesZoneIds;
+    /** Whether the column's getter gives times with a zone id only ({@code zonedTimeInput}): its examples are such times. */
+    private final boolean bindsZoneIds;
     /** The value classes, by class number. */
     private final List<ValueClass> classes;
     final int nullClass;
@@ -193,6 +199,7 @@ final class ColumnIndex {
         zoneIdBase = partition.zoneIdBase();
         otherZoneIdClass = partition.otherZoneIdClass();
         takesZoneIds = type == ColumnType.TIME && zoning.takesZoneIds();
+        bindsZoneIds = type == ColumnType.TIME && zoning == Zoning.ZONE_ID;
 
         this.words = cells.words();
         masks = new long[classes.size()][];
@@ -256,6 +263,7 @@ final class ColumnIndex {
         hiddenZoneIdMask = null;
         hiddenZoneIdAllowed = false;
         takesZoneIds = false;
+        bindsZoneIds = false;
         var all = new long[words];
         for (int bit = 0; bit < rules; bit++) {
             BitsetIndex.set(all, bit);
@@ -734,9 +742,11 @@ final class ColumnIndex {
             }
         }
         // typed getters already return the column's Java type (LocalDate, LocalTime, OffsetTime, ...); numbers vary,
-        // and a years and months duration is bound as a Period
+        // a years and months duration is bound as a Period, and a time in a zone with one fixed offset is the time at
+        // that offset (DMN 1.5, Table 72)
         return switch (type) {
             case NUMBER -> number((Number) raw);
+            case TIME -> FeelTemporals.withFixedOffset(raw);
             // a list's elements read from text are already years and months
             case YEAR_MONTH_DURATION -> raw instanceof YearsAndMonths duration ? duration : yearsAndMonths((Period) raw);
             default -> raw;
@@ -854,7 +864,8 @@ final class ColumnIndex {
         // without boundaries with a zone, the classes with a zone mirror those without: same local times, same rules
         boolean mirrored = bothKinds && zonedLine.boundaries.length == 0 && zoned.equals(local);
         var localWhole = bothKinds && !mirrored ? whole(false) : null;
-        var zonedWhole = bothKinds ? whole(true) : null;
+        // in a column that also takes times with a zone id (zonedTimeInput), "any time with a time zone" too
+        var zonedWhole = bothKinds || zonedLine != null && takesZoneIds ? whole(true) : null;
         var parts = new ArrayList<String>();
         if (!local.isEmpty()) {
             parts.addAll(runs(local, classes::get, k -> empty[k], localLine.classCount(), localWhole));
@@ -1048,7 +1059,7 @@ final class ColumnIndex {
         return switch (classes.get(valueClass)) {
             case ValueClass.Point(var value) -> bindable(value);
             case ValueClass.Between(var low, var high, var zoned) -> bindable(OpenIntervals.valueInside(type, low, high, zoned));
-            case ValueClass.Zoned(var instant, var wall) -> OpenIntervals.valueInside(type, span(instant), span(wall));
+            case ValueClass.Zoned(var instant, var wall) -> zonedBindable(OpenIntervals.valueInside(type, span(instant), span(wall)));
             case ValueClass.InZone(var zone, ValueClass.Point(var value)) -> value;
             case ValueClass.InZone(var zone, ValueClass.Between(var low, var high, var zoned)) ->
                     new ZonedTime((LocalTime) OpenIntervals.valueInside(type, localTime(low), localTime(high), false), zone);
@@ -1060,11 +1071,26 @@ final class ColumnIndex {
         };
     }
 
-    /** A zone id no cell names: the first, by id, of those the JDK knows. */
+    /**
+     * A zone id no cell names: the first, by id, of those the JDK knows whose offset changes (one with a fixed offset
+     * is a time at that offset, DMN 1.5, Table 72).
+     */
     private ZoneId unnamedZone() {
         return ZoneId.getAvailableZoneIds().stream().sorted().map(ZoneId::of)
-                .filter(zone -> !(zone instanceof java.time.ZoneOffset) && !zoneLines.containsKey(zone))
+                .filter(zone -> !zone.getRules().isFixedOffset() && !zoneLines.containsKey(zone))
                 .findFirst().orElseThrow();
+    }
+
+    /**
+     * A time with a time zone as a getter of the column returns it: a {@code zonedTimeInput} getter gives a
+     * {@link ZonedTime}, so a time at an offset is given in the zone id that has that offset fixed, which the engine
+     * reads back as the time at that offset; any other value as it is.
+     */
+    private Object zonedBindable(Object value) {
+        if (bindsZoneIds && value instanceof OffsetTime time) {
+            return new ZonedTime(time.toLocalTime(), ZoneId.ofOffset("UTC", time.getOffset()));
+        }
+        return value;
     }
 
     /** A value as a getter returns it: a years and months duration as the Period {@code periodInput} binds. */

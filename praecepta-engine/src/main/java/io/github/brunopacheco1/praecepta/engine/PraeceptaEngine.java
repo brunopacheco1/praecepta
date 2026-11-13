@@ -1231,7 +1231,10 @@ public final class PraeceptaEngine<I, O> {
          * Binds a TIME column to a getter returning a time of day with a zone id ({@code 08:30@Europe/Paris}). It
          * compares with a cell's time in the same zone by local time; DMN 1.5 does not define how it compares with
          * a time in another zone, at an offset or without a zone, so such a test is unknown: neither it nor its
-         * {@code not(...)} matches.
+         * {@code not(...)} matches. A time in a zone with one fixed offset ({@code 08:30@Etc/UTC},
+         * {@code 08:30@Etc/GMT-2}) is the time at that offset (DMN 1.5, Table 72): it matches as
+         * {@link #offsetTimeInput} matches {@code 08:30Z}, so {@code time("08:30:00Z")}, {@code <= time("09:30:00+01:00")}
+         * and {@code time("08:30:00@Etc/UTC")} all hold for it.
          */
         public Builder<I, O> zonedTimeInput(String column, Function<? super I, ZonedTime> extractor) {
             return bind(column, ColumnType.TIME, extractor, null, Zoning.ZONE_ID, false);

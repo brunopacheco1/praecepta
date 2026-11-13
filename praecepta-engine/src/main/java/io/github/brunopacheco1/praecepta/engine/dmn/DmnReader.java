@@ -53,7 +53,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * {@code string}, {@code number} (or {@code integer}, {@code long}, {@code double}), {@code date},
  * {@code boolean}, {@code time}, {@code dateTime} (or {@code date and time}), {@code dayTimeDuration} and
  * {@code yearMonthDuration} (or their FEEL names) columns, times and date-times with or without a time zone
- * (an offset, or a zone id, with which a time is a {@code ZonedTime}); columns typed by an item definition of one of
+ * (an offset, or a zone id, with which a time is a {@code ZonedTime}, or an {@code OffsetTime} if the zone has one
+ * fixed offset); columns typed by an item definition of one of
  * those types, whose allowed values become the input value list unless the input declares its own;
  * columns typed by a collection of those ({@code isCollection="true"}), which hold lists and whose
  * entries test the elements ({@code list contains(?, "PT")}, see {@link CellParser#parseFeelList}), and

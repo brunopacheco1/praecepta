@@ -25,6 +25,14 @@ import java.util.Objects;
  * ("pending RTF equality comparisons with zones clarification"); Praecepta takes such a comparison as one FEEL does not
  * define, which is null, so neither a test nor its {@code not(...)} holds.
  *
+ * <p>A zone id with one fixed offset ({@code Etc/UTC}, {@code Etc/GMT-2}, {@code UTC}: its rules
+ * {@linkplain java.time.zone.ZoneRules#isFixedOffset() have a fixed offset}) does give one: DMN 1.5's example of
+ * {@code time(from)} (Table 72) has {@code time("23:59:00z") + duration("PT2M") = time("00:01:00@Etc/UTC")} true. Such a
+ * time is the {@link java.time.OffsetTime} at that offset ({@link FeelTemporals#withFixedOffset}): FEEL text in such a
+ * zone reads as one ({@link FeelTemporals#parseTime}), and the engine reads a {@code ZonedTime} in such a zone that
+ * a getter gives as one, so it equals, compares with, matches and subtracts from every time as that offset time does.
+ * This record still holds one, as a getter of a column whose cells mix such zones with others returns it.
+ *
  * <p>{@link #compareTo} orders by zone id, then local time, so that such times can be sorted; it is not FEEL's order.
  *
  * @param time the local time of day

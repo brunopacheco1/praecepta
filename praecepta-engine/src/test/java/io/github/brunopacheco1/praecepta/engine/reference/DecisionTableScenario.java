@@ -69,9 +69,12 @@ import net.jqwik.api.Tuple;
  * instants written differently are frequent. One literal in five of a time or date-time column has the
  * other kind (a zone where the inputs have none, or none where they have one), which FEEL compares with
  * the inputs by local time, and one interval in six has an end of each kind. A third of the time columns hold times
- * with a zone id instead ({@link #zoneIdColumns}, bound with {@code zonedTimeInput}), in two zones the cells name and
- * one they do not; their cells mostly name times in those zones, which compare by local time in their zone only,
- * and now and then times of the other kinds, which FEEL does not compare with them. Some columns declare input
+ * with a zone id instead ({@link #zoneIdColumns}, bound with {@code zonedTimeInput}), in four zones the cells name and
+ * two they do not; their cells mostly name times in those zones, which compare by local time in their zone only,
+ * and now and then times of the other kinds, which FEEL does not compare with them. Two of the zones the cells name,
+ * and one of the others, have one fixed offset ({@code Etc/UTC}, {@code Etc/GMT-1}, {@code Etc/GMT+5}): a time in
+ * such a zone is the time at that offset (DMN 1.5, Table 72), which compares with every time with an offset or
+ * without a zone, so a time at an offset is now and then written in such a zone too. Some columns declare input
  * values, and inputs include values outside them. One column
  * in five holds lists ({@link #lists}): its inputs are lists of zero to three of the values a single
  * input could take (a list of times or date-times now and then mixes values with and without a zone),
@@ -149,8 +152,15 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     /** The zones date-times with a zone are written in: offsets, the farthest ones, and zone ids with daylight saving time. */
     private static final List<ZoneId> ZONES = List.of(ZoneOffset.UTC, ZoneOffset.ofHours(1), ZoneOffset.ofHours(-5),
             ZoneId.of("Europe/Paris"), ZoneId.of("America/New_York"), ZoneOffset.ofHours(-12), ZoneId.of("Pacific/Kiritimati"));
-    /** The zone ids times with a zone id are written in; inputs are also in a third, which no cell names. */
-    private static final List<ZoneId> ZONE_IDS = List.of(ZoneId.of("Europe/Paris"), ZoneId.of("Asia/Dhaka"), ZoneId.of("America/New_York"));
+    /**
+     * The zone ids times with a zone id are written in: the first four in cells and inputs, the last two in inputs
+     * only. {@code Etc/UTC}, {@code Etc/GMT-1} (+01:00) and {@code Etc/GMT+5} (-05:00) have one fixed offset, so a time
+     * in them is the time at that offset (DMN 1.5, Table 72), as {@link #OFFSETS} and {@link #INPUT_OFFSETS} have it.
+     */
+    private static final List<ZoneId> ZONE_IDS = List.of(ZoneId.of("Europe/Paris"), ZoneId.of("Asia/Dhaka"), ZoneId.of("Etc/UTC"),
+            ZoneId.of("Etc/GMT-1"), ZoneId.of("America/New_York"), ZoneId.of("Etc/GMT+5"));
+    /** How many of {@link #ZONE_IDS} cells name. */
+    private static final int CELL_ZONE_IDS = 4;
     /** The zone index of {@link #temporal} for the first of {@link #ZONE_IDS}. */
     private static final int ZONE_ID = 100;
     /**
@@ -636,7 +646,20 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
     private static Arbitrary<String> temporalLiteral(ColumnType type, boolean zoned) {
         return Combinators.combine(Arbitraries.integers().between(0, 5), zone(type, zoned)).as((i, zone) -> temporal(type, i, zone))
                 .flatMap(value -> Arbitraries.of(FeelLiterals.literal(value), zoned ? FeelLiterals.text(value) : value.toString(),
-                        atLiteral(value), componentLiteral(value)));
+                        atLiteral(value), componentLiteral(value), inFixedZone(value)));
+    }
+
+    /**
+     * A time at a whole hour's offset as a time in the zone id that has that offset fixed ({@code 08:00:00@Etc/GMT-1}
+     * for {@code 08:00:00+01:00}), which is the same time (DMN 1.5, Table 72); any other value as its function writes it.
+     */
+    private static String inFixedZone(Comparable<?> value) {
+        if (value instanceof OffsetTime time && time.getOffset().getTotalSeconds() % 3600 == 0) {
+            int hours = time.getOffset().getTotalSeconds() / 3600;
+            var zone = ZoneId.of(hours == 0 ? "Etc/UTC" : "Etc/GMT" + (hours > 0 ? "-" : "+") + Math.abs(hours));
+            return FeelLiterals.literal(new ZonedTime(time.toLocalTime(), zone));
+        }
+        return FeelLiterals.literal(value);
     }
 
     /** A time with a zone id, in each of its forms: its function, an at-literal, the time of a date-time, bare text. */
@@ -647,7 +670,7 @@ public record DecisionTableScenario(List<String> columns, Map<String, ColumnType
 
     /** Which of the zone ids the cells name to write a time in, as {@link #temporal} takes it. */
     private static Arbitrary<Integer> zoneIds() {
-        return Arbitraries.integers().between(ZONE_ID, ZONE_ID + 1);
+        return Arbitraries.integers().between(ZONE_ID, ZONE_ID + CELL_ZONE_IDS - 1);
     }
 
     /** A date, time, date-time or duration as an at-literal: {@code @"2025-01-01"} (DMN 1.5, grammar rule 65). */

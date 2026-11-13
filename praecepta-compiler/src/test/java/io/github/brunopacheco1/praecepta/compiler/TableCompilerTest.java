@@ -49,6 +49,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.integration.Decision;
 
 /**
@@ -623,7 +624,7 @@ class TableCompilerTest {
                 .contains("public record CallsInput(io.github.brunopacheco1.praecepta.engine.feel.ZonedTime at)");
         Assertions.assertThat(result.sources().get("CallsOutput"))
                 .contains("public record CallsOutput(String desk, io.github.brunopacheco1.praecepta.engine.feel.ZonedTime opens)",
-                        "io.github.brunopacheco1.praecepta.engine.feel.ZonedTime.parse(value)");
+                        "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseZonedTime(value)");
         Assertions.assertThat(result.sources().get("Calls")).contains(".zonedTimeInput(\"at\", CallsInput::at)");
         Assertions.assertThat(result.dmn()).contains("[time(\"09:00:00@Europe/Paris\")..time(\"17:00:00@Europe/Paris\"))");
 
@@ -997,7 +998,7 @@ class TableCompilerTest {
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
         "dateTime | start + duration(\"PT8H\")       | date and time(\"2025-01-01T00:00:00\") | date and time values both with and without a time zone",
-        "time     | opens + @\"PT9H\"                | time(\"10:00:00Z\")                    | time values both with a zone id and without one",
+        "time     | opens + @\"PT9H\"                | time(\"10:00:00\")                     | time values both with a zone id and without one",
         "time     | time(\"09:00:00@Europe/Paris\")  | time(\"09:00:00\")                     | time values both with a zone id and without one",
     })
     void an_output_whose_rules_mix_kinds_of_time_is_rejected(String type, String first, String second, String kinds) throws IOException {
@@ -1056,9 +1057,12 @@ class TableCompilerTest {
         }
     }
 
-    /** A time input whose cells name a zone id and an offset, or no zone, has no one Java type, and is rejected. */
+    /**
+     * A time input whose cells name a zone id and no zone has no one Java type, and is rejected; one whose cells name a
+     * zone id and an offset is a {@code ZonedTime}, which a zone with one fixed offset makes a time at that offset.
+     */
     @ParameterizedTest
-    @CsvSource({"'time(\"10:00:00Z\")'", "'time(\"10:00:00\")'"})
+    @CsvSource({"'time(\"10:00:00\")'", "'@\"10:00:00\"'"})
     void a_time_column_mixing_a_zone_id_with_other_times_is_rejected(String other) throws IOException {
         var dmn = out.resolve("mixed-zone-ids.dmn");
         Files.writeString(dmn, """
@@ -1075,6 +1079,111 @@ class TableCompilerTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Table 'calls': input 'at' takes time values both with a zone id and without one, "
                         + "but its generated record component holds one kind");
+    }
+
+    /**
+     * A time in a zone with one fixed offset is the time at that offset (DMN 1.5, Table 72: {@code time("23:59:00z") +
+     * duration("PT2M") = time("00:01:00@Etc/UTC")}): a column whose zone ids all have one takes an {@code OffsetTime},
+     * and the generated code gives what the map-based engine gives.
+     */
+    @Test
+    void times_in_zones_with_one_fixed_offset_are_offset_times_in_generated_code() throws Exception {
+        var dmn = out.resolve("utc.dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="utc" name="utc"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="time"><text>at</text></inputExpression></input>
+                    <output name="desk" typeRef="string"/>
+                    <output name="opens" typeRef="time"/>
+                    <rule><inputEntry><text>time("00:01:00@Etc/UTC")</text></inputEntry><outputEntry><text>"utc"</text></outputEntry>
+                      <outputEntry><text>at + duration("PT1M")</text></outputEntry></rule>
+                    <rule><inputEntry><text>&lt; @"10:00:00@Etc/GMT-2"</text></inputEntry><outputEntry><text>"early"</text></outputEntry>
+                      <outputEntry><text>time("09:00:00@Etc/UTC")</text></outputEntry></rule>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"late"</text></outputEntry>
+                      <outputEntry><text>time("12:00:00Z")</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var result = compile(new TableDefinition(dmn, "Utc", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("UtcInput")).contains("public record UtcInput(java.time.OffsetTime at)");
+        Assertions.assertThat(result.sources().get("UtcOutput")).contains("public record UtcOutput(String desk, java.time.OffsetTime opens)",
+                "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseOffsetTime(value)");
+        Assertions.assertThat(result.sources().get("Utc")).contains(".offsetTimeInput(\"at\", UtcInput::at)");
+        var decision = Decision.of("utc", DmnReader.read(Files.newInputStream(dmn)));
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".UtcInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Utc").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            // 23:59Z + PT2M is 00:01@Etc/UTC; 07:59Z is before 10:00@Etc/GMT-2, which is 08:00Z
+            for (var at : List.of(OffsetTime.of(23, 59, 0, 0, ZoneOffset.UTC).plusMinutes(2), OffsetTime.of(2, 1, 0, 0, ZoneOffset.ofHours(2)),
+                    OffsetTime.of(7, 59, 0, 0, ZoneOffset.UTC), OffsetTime.of(8, 0, 0, 0, ZoneOffset.UTC))) {
+                var expected = decision.evaluate(Map.of("at", at.toString())).getFirst();
+                var output = ((Optional<?>) evaluate.invoke(null, constructor.newInstance(at))).orElseThrow();
+                Assertions.assertThat(output).as("%s", at)
+                        .hasToString("UtcOutput[desk=" + expected.get("desk") + ", opens=" + OffsetTime.parse(expected.get("opens")) + "]");
+            }
+            var utc = ((Optional<?>) evaluate.invoke(null, constructor.newInstance(OffsetTime.of(0, 1, 0, 0, ZoneOffset.UTC)))).orElseThrow();
+            Assertions.assertThat(utc).hasToString("UtcOutput[desk=utc, opens=00:02Z]");
+            Assertions.assertThat(decision.evaluate(Map.of("at", "00:01:00@Etc/UTC"))).containsExactly(Map.of("desk", "utc", "opens", "00:02:00Z"));
+        }
+    }
+
+    /**
+     * A time column whose cells mix zone ids with and without a fixed offset is a {@code ZonedTime}, as before: a time
+     * given in {@code Etc/UTC} matches as the time at offset zero (DMN 1.5, Table 72), and the generated code reads back
+     * the times the engine writes at an offset.
+     */
+    @Test
+    void a_time_column_mixing_fixed_and_changing_zone_ids_is_a_zoned_time_matched_at_the_fixed_offset() throws Exception {
+        var dmn = out.resolve("mixed-zones.dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="zones" name="zones"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="time"><text>at</text></inputExpression></input>
+                    <output name="desk" typeRef="string"/>
+                    <output name="opens" typeRef="time"/>
+                    <rule><inputEntry><text>&lt; @"10:00:00@Europe/Paris"</text></inputEntry><outputEntry><text>"Paris"</text></outputEntry>
+                      <outputEntry><text>@"09:00:00@Europe/Paris"</text></outputEntry></rule>
+                    <rule><inputEntry><text>time("00:01:00@Etc/UTC")</text></inputEntry><outputEntry><text>"utc"</text></outputEntry>
+                      <outputEntry><text>at</text></outputEntry></rule>
+                    <rule><inputEntry><text>[time("07:00:00@Etc/GMT-2")..time("08:00:00@Etc/GMT-2")]</text></inputEntry>
+                      <outputEntry><text>"plus two"</text></outputEntry><outputEntry><text>at + duration("PT1M")</text></outputEntry></rule>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"closed"</text></outputEntry>
+                      <outputEntry><text>null</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var result = compile(new TableDefinition(dmn, "Zones", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("ZonesInput"))
+                .contains("public record ZonesInput(io.github.brunopacheco1.praecepta.engine.feel.ZonedTime at)");
+        Assertions.assertThat(result.sources().get("ZonesOutput"))
+                .contains("public record ZonesOutput(String desk, io.github.brunopacheco1.praecepta.engine.feel.ZonedTime opens)",
+                        "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseZonedTime(value)");
+        Assertions.assertThat(result.sources().get("Zones")).contains(".zonedTimeInput(\"at\", ZonesInput::at)");
+        var decision = Decision.of("zones", DmnReader.read(Files.newInputStream(dmn)));
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".ZonesInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Zones").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            // the generated code's ZonedTime is the engine's, as the loader holds it
+            var parse = loader.loadClass("io.github.brunopacheco1.praecepta.engine.feel.ZonedTime").getMethod("parse", String.class);
+            var expectedOutputs = Map.of(
+                    "00:01:00@Etc/UTC", "ZonesOutput[desk=utc, opens=00:01:00@UTC]",
+                    "07:30:00@Etc/GMT-2", "ZonesOutput[desk=plus two, opens=07:31:00@UTC+02:00]",
+                    "05:30:00@UTC", "ZonesOutput[desk=plus two, opens=05:31:00@UTC]",
+                    "09:00:00@Europe/Paris", "ZonesOutput[desk=Paris, opens=09:00:00@Europe/Paris]",
+                    "11:00:00@Europe/Paris", "ZonesOutput[desk=closed, opens=null]",
+                    "00:01:00@Asia/Dhaka", "ZonesOutput[desk=closed, opens=null]");
+            for (var at : expectedOutputs.entrySet()) {
+                var output = ((Optional<?>) evaluate.invoke(null, constructor.newInstance(parse.invoke(null, at.getKey())))).orElseThrow();
+                Assertions.assertThat(output).as(at.getKey()).hasToString(at.getValue());
+                // the map-based engine writes the same times, at their offset where the zone has a fixed one
+                var expected = decision.evaluate(Map.of("at", at.getKey())).getFirst();
+                var opens = expected.get("opens");
+                Assertions.assertThat(output).as(at.getKey()).hasToString("ZonesOutput[desk=" + expected.get("desk") + ", opens="
+                        + (opens == null ? null : FeelTemporals.parseZonedTime(opens)) + "]");
+            }
+        }
     }
 
     /** {@code != home} names an input (#81): the generated input record gets it, and evaluates as the map-based engine. */

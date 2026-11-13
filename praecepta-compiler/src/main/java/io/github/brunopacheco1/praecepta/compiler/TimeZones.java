@@ -44,7 +44,11 @@ import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
  * </ul>
  * A column, or a group of linked inputs, whose literals mix kinds is rejected: FEEL compares a value with
  * a zone and one without by local time, so the engine evaluates such a table, but the table does not say which
- * kind its generated component should take. A time with a zone id is a kind of its own.
+ * kind its generated component should take. A time with a zone id is a kind of its own, unless its zone has one fixed
+ * offset ({@code Etc/UTC}): such a time is the time at that offset (DMN 1.5, Table 72), so it has a time zone, and
+ * a column whose zone ids all have a fixed offset takes an {@code OffsetTime}. A time column that mixes times with a
+ * zone id and times with an offset (or in such a zone) takes a {@link ZonedTime}, which may be in a zone with one
+ * fixed offset ({@code Etc/UTC}, or {@code UTC+01:00} for an offset), so it holds both.
  */
 final class TimeZones {
 
@@ -126,7 +130,7 @@ final class TimeZones {
                 .addAll(columnKinds));
         var inputKinds = new LinkedHashMap<String, Kind>();
         for (var input : types.entrySet()) {
-            var groupKinds = byGroup.getOrDefault(groups.root(input.getKey()), Set.of());
+            var groupKinds = merged(byGroup.getOrDefault(groups.root(input.getKey()), Set.of()));
             if (groupKinds.size() > 1) {
                 throw mixed(table, "input '" + input.getKey() + "'", input.getValue(), groupKinds);
             }
@@ -143,7 +147,7 @@ final class TimeZones {
             if (!isTemporal(output.type())) {
                 continue;
             }
-            var outputKinds = outputKinds(table, output, inputKinds);
+            var outputKinds = merged(outputKinds(table, output, inputKinds));
             if (outputKinds.size() > 1) {
                 throw mixed(table, "output '" + output.name() + "'", output.type(), outputKinds);
             }
@@ -231,6 +235,19 @@ final class TimeZones {
         var kindsOf = kinds.contains(Kind.ZONE_ID) ? "both with a zone id and without one" : "both with and without a time zone";
         return new IllegalArgumentException(("Table '%s': %s takes %s values %s, but its generated record component holds one kind")
                 .formatted(table.name(), what, feelName(type), kindsOf));
+    }
+
+    /**
+     * The kinds a column's component takes: a time with a zone id and one with an offset (or in a zone with one fixed
+     * offset, which is the same) both fit a {@link ZonedTime}, whose zone may have a fixed offset; others as they are.
+     */
+    private static Set<Kind> merged(Set<Kind> kinds) {
+        if (kinds.contains(Kind.ZONE_ID) && kinds.contains(Kind.ZONED)) {
+            var merged = EnumSet.copyOf(kinds);
+            merged.remove(Kind.ZONED);
+            return merged;
+        }
+        return kinds;
     }
 
     private static boolean isTemporal(ColumnType type) {

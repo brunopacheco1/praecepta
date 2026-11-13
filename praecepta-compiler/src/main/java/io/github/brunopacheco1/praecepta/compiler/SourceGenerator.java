@@ -535,11 +535,14 @@ final class SourceGenerator {
         /** @param zoned for a time or date-time, whether its values have a time zone, or for a time a zone id */
         static Converter of(ColumnType type, TimeZones.Kind zoned) {
             if (zoned == TimeZones.Kind.ZONE_ID && type == ColumnType.TIME) {
+                // the engine writes a time in a zone with one fixed offset, or at an offset, with that offset
                 return new Converter("io.github.brunopacheco1.praecepta.engine.feel.ZonedTime", "zonedTimeInput", "zonedTime",
-                        "io.github.brunopacheco1.praecepta.engine.feel.ZonedTime.parse");
+                        "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseZonedTime");
             }
             if (zoned == TimeZones.Kind.ZONED && type == ColumnType.TIME) {
-                return new Converter("java.time.OffsetTime", "offsetTimeInput", "offsetTime", "java.time.OffsetTime.parse");
+                // an output written as a time in a zone with one fixed offset (00:01:00@Etc/UTC) is the time at that offset
+                return new Converter("java.time.OffsetTime", "offsetTimeInput", "offsetTime",
+                        "io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals.parseOffsetTime");
             }
             if (zoned == TimeZones.Kind.ZONED && type == ColumnType.DATE_TIME) {
                 // FEEL writes a zone id as @Europe/Paris, which ZonedDateTime.parse does not read

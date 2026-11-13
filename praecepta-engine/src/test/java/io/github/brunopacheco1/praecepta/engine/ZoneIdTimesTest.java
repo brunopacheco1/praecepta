@@ -106,7 +106,10 @@ class ZoneIdTimesTest {
         Assertions.assertThat(engine.validationReport().issues(Kind.OVERLAPPING_RULES)).singleElement()
                 .satisfies(issue -> Assertions.assertThat(issue.ruleIds()).containsExactly(1, 2));
         Assertions.assertThat(engine.validationReport().issues(Kind.GAP)).extracting(ValidationReport.Issue::detail)
-                .containsExactly("at in {(time(\"12:00:00@Europe/Paris\")..+inf), any time with a zone id no cell names}");
+                // a time in a zone with one fixed offset (Etc/UTC) is a time at that offset (DMN 1.5, Table 72), which the getter
+                // may give, and which no cell compares with
+                .containsExactly("at in {any time with a time zone, (time(\"12:00:00@Europe/Paris\")..+inf), "
+                        + "any time with a zone id no cell names}");
     }
 
     @Test

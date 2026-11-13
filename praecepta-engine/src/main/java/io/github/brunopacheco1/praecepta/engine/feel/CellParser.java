@@ -64,7 +64,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  * Times and date-times may have a time zone ({@link FeelTemporals}): an offset or a zone id. A value with an
  * offset and one without compare by their local time, so an interval may have one end of each kind. A time with a
  * zone id ({@code time("08:30:00@Europe/Paris")}, a {@link ZonedTime}) compares only with one in the same zone, so
- * an interval's other end must be one.
+ * an interval's other end must be one; one in a zone with one fixed offset ({@code time("08:30:00@Etc/UTC")}) is the
+ * time at that offset (DMN 1.5, Table 72), an {@code OffsetTime}.
  *
  * <p>The same syntax serves columns that hold lists, whose cells test the elements. In strict FEEL such
  * a cell is written with FEEL's list functions instead, as in {@code list contains(?, "PT")}; see

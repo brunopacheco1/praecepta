@@ -26,7 +26,8 @@ public enum ColumnType {
      * ({@link io.github.brunopacheco1.praecepta.engine.feel.ZonedTime}). Cells use {@code time("08:30:00")},
      * {@code time("08:30:00+01:00")} or {@code time("08:30:00@Europe/Paris")}, comparisons and intervals. Two times
      * with an offset compare by instant; a time with an offset and one without compare by local time; a time with a
-     * zone id compares by local time with one in the same zone, and with no other.
+     * zone id compares by local time with one in the same zone, and with no other, unless the zone has one fixed
+     * offset ({@code Etc/UTC}): such a time is the time at that offset (DMN 1.5, Table 72), an {@code OffsetTime}.
      */
     TIME,
     /**

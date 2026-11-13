@@ -82,8 +82,8 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
      instant and a local time are a whole number of seconds apart, at most 18 hours. A column has
      only the classes its input can reach (`Zoning`): `timeInput` and `dateTimeInput` give values
      without a zone, `offsetTimeInput` and `zonedDateTimeInput` with one, `zonedTimeInput` times with a
-     zone id, and map-based inputs, read from text, any of them; so the analysis looks for gaps among the
-     values that can really occur.
+     zone id or, in a zone with one fixed offset, at an offset, and map-based inputs, read from text, any of
+     them; so the analysis looks for gaps among the values that can really occur.
    - **Times with a zone id** (`ZonedTime`, #82). Without a date a zone id has no offset, so such a time
      compares only with a time in the same zone, by local time, which is all the DMN TCK asks; any other
      comparison of it is one DMN 1.5 leaves open, which Praecepta takes as FEEL's null (see
@@ -91,7 +91,12 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
      local times of its own, and one class holds the zone ids no cell names; every test of another kind is
      unknown on them, and theirs on every other class. A column of map-based inputs whose cells name no zone
      id keeps that class out of the analysis, and gives such a time the mask of the rules that accept any
-     value, so that tables without zone ids keep the report they had.
+     value, so that tables without zone ids keep the report they had. A zone with one fixed offset
+     (`Etc/UTC`) is no such zone: DMN 1.5's example of `time(from)` (Table 72) has
+     `time("00:01:00@Etc/UTC")` equal `time("00:01:00Z")`, so the engine reads a time in such a zone as the
+     `OffsetTime` at that offset at its edges (`FeelTemporals.parseTime` for text, cells and output entries,
+     `time(date and time(...))`, `ColumnIndex.convert` for what a getter gives), and the index, the analyses
+     and the arithmetic only ever see an offset time.
    - **Lists** (`ListColumn`): an ordinary column index over the same cells, without their `null`
      tests (`? = null` tests the list, not an element), classifies one element; a missing element
      falls in its class for a missing value, where `list contains(?, null)` is true, a literal false
@@ -190,7 +195,10 @@ Gradle plugin's `GeneratePraecepta` task turn each configured table into a `Tabl
    once and evaluates it. `JavaNames` turns table, column and value names into safe identifiers.
    `TimeZones` decides which time and date-time columns become `OffsetTime` and `ZonedDateTime`:
    those whose written values all have a zone, together with the inputs their cells compare with; a time
-   column whose written values all have a zone id becomes the engine's `ZonedTime`. An output expression
+   column whose written values have zone ids becomes the engine's `ZonedTime`, even if some have an offset
+   (a zone id with one fixed offset counts as one, so a column of only such zone ids is an `OffsetTime`),
+   and the generated code reads such outputs back with `FeelTemporals.parseZonedTime` or `parseOffsetTime`,
+   which take a time written either way. An output expression
    counts by its operands of the output's type, the inputs it reads and its literals, since adding a
    duration keeps a time's or a date and time's zone.
 
@@ -378,8 +386,8 @@ a case open, what Praecepta does is recorded in [DMN-CONFORMANCE.md](DMN-CONFORM
   readings come from the DMN TCK's `0100-arithmetic`, which `praecepta-tck` evaluates in full
   (`OutputExpressionsTckTest`): a years and months duration scaled by a number keeps whole months, toward
   zero, and a date counts as UTC midnight with a zone when it meets a date-time. Times subtract as they
-  compare: by instant with offsets, by local time when one has none, by local time in one zone id, and not
-  at all otherwise, the cases DMN 1.5 leaves open (#86).
+  compare: by instant with offsets (a zone with one fixed offset being one, #82), by local time when one has
+  none, by local time in one zone id, and not at all otherwise, the cases DMN 1.5 leaves open (#86).
 - **ANY compares evaluated outputs**, and compares number outputs by value, as FEEL's `=` does
   (those a table declares as numbers, or that a rule computes as one), so `1.50`, `1.5` and
   `price * 1` agree, at build time as at evaluation; output priority lists find number outputs by

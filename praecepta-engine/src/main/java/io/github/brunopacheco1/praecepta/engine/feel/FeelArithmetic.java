@@ -176,7 +176,7 @@ final class FeelArithmetic {
             case ZonedDateTime dateTime -> dateTime.plus(by);
             case LocalTime time -> time.plus(by);
             case OffsetTime time -> time.plus(by);
-            case ZonedTime time -> new ZonedTime(time.time().plus(by), time.zone());
+            case ZonedTime time -> FeelTemporals.timeIn(time.time().plus(by), time.zone());
             default -> throw new IllegalStateException("not a date or time: " + value);
         };
     }
@@ -211,7 +211,10 @@ final class FeelArithmetic {
     }
 
     /** {@code later - earlier} of two times, as they compare ({@link FeelTemporals#compare}); null if they do not. */
-    private static Duration timeBetween(Object earlier, Object later) {
+    private static Duration timeBetween(Object earlierTime, Object laterTime) {
+        // a time in a zone with one fixed offset subtracts as the time at that offset (Table 72)
+        var earlier = FeelTemporals.withFixedOffset(earlierTime);
+        var later = FeelTemporals.withFixedOffset(laterTime);
         if (!FeelTemporals.comparable(earlier, later)) {
             return null;
         }

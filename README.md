@@ -36,7 +36,8 @@ Quarkus or Micronaut.
   from earlier versions keep working
 - Times and date-times with or without a time zone (an offset, or a zone id such as `@Europe/Paris`):
   two with a zone compare by instant, and one with a zone and one without by local time (DMN 1.5,
-  Table 54); a time with a zone id compares only with times in its zone (see
+  Table 54); a time with a zone id compares only with times in its zone, unless the zone has one fixed
+  offset (`@Etc/UTC`), which makes it the time at that offset (DMN 1.5, Table 72; see
   [DMN conformance](docs/DMN-CONFORMANCE.md) for the cases DMN 1.5 leaves open)
 - List inputs, such as a customer's nationalities, whose elements may be missing: a cell holds when
   some element passes it
@@ -208,10 +209,13 @@ Praecepta takes such a comparison as one FEEL does not define, which is null: ne
 `not(...)` matches (`time("08:00:00@Europe/Paris")` and `not(time("08:00:00@Europe/Paris"))` both miss
 `08:00@Asia/Dhaka`, `08:00Z` and `08:00`), an interval's ends must be in one zone, and a COLLECT MIN or MAX
 over such times in two zones is null, as FEEL's `min` and `max` take comparable items (Table 75) and a
-built-in function is null outside its domain (10.3.2.16). DMN 1.5's own example of `time(from)` (Table 72)
-has `time("00:01:00@Etc/UTC")` equal `time("00:01:00Z")`, a zone with one fixed offset; Praecepta does not
-yet follow it (see [DMN conformance](docs/DMN-CONFORMANCE.md)). A column whose cells name no zone id still takes such a time read from
-text: only the cells that accept any value (`-`, `!= null`) match it.
+built-in function is null outside its domain (10.3.2.16). A zone with one fixed offset (`Etc/UTC`,
+`Etc/GMT-2`, `UTC`) is the exception, as DMN 1.5's own example of `time(from)` has it (Table 72:
+`time("23:59:00z") + duration("PT2M") = time("00:01:00@Etc/UTC")` is true): such a time is the time at that
+offset, an `OffsetTime`, wherever it is written or given, so `time("00:01:00@Etc/UTC")` matches `00:01Z` and
+`02:01+02:00`, and a `ZonedTime` in `Etc/UTC` that `zonedTimeInput` binds matches `time("00:01:00Z")`.
+Praecepta writes it at its offset (`00:01:00Z`). A column whose cells name no zone id still takes a time in
+another zone read from text: only the cells that accept any value (`-`, `!= null`) match it.
 
 ### Typed columns and input value lists
 ```java
@@ -224,7 +228,7 @@ var engine = PraeceptaEngine.<Applicant, String>builder()
         .timeInput("callTime", Applicant::callTime)    // LocalTime
         .dateTimeInput("appliedAt", Applicant::appliedAt) // LocalDateTime
         .offsetTimeInput("cutOff", Applicant::cutOff)  // OffsetTime, compared by instant
-        .zonedTimeInput("callAt", Applicant::callAt)   // ZonedTime: a time with a zone id
+        .zonedTimeInput("callAt", Applicant::callAt)   // ZonedTime: a time with a zone id (Etc/UTC: at offset zero)
         .zonedDateTimeInput("signedAt", Applicant::signedAt) // ZonedDateTime (from an OffsetDateTime: toZonedDateTime())
         .durationInput("waited", Applicant::waited)    // Duration
         .periodInput("tenure", Applicant::tenure)      // Period of years and months
@@ -437,7 +441,9 @@ A string column with a value list becomes an enum in the input record, using the
 Numbers are `BigDecimal` and dates `LocalDate`. Times and date-times are `LocalTime` and
 `LocalDateTime`, or `OffsetTime` and `ZonedDateTime` when every value written for the column has a
 time zone (an input compared with such a column in a cell, as in `> limit`, takes a zone too), and a
-time is the engine's `ZonedTime` when every value written for it has a zone id; an output whose entry
+time is the engine's `ZonedTime` when the values written for it have zone ids, some of them perhaps
+offsets (a zone id with one fixed offset, `@Etc/UTC`, counts as its offset: a column of only such zone ids is
+an `OffsetTime`); an output whose entry
 is an expression counts by its operands of the output's type (`start + duration("PT8H")` has the kind of
 `start`); a column that mixes kinds fails the build. An input declared with `<list>true</list>` (or typed
 by a collection in a DMN file) becomes a `java.util.List` of its type. At runtime the generated code
