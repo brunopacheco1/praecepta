@@ -11,6 +11,52 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+### Added
+- **Decision requirement graphs** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)): `DecisionGraph`
+  evaluates a DMN model whose decisions require other decisions and input data (DMN 1.5, chapter 6), where each
+  decision's logic is a decision table or a literal expression in the subset output entries take (literals and names
+  joined with `+`, `-`, `*`, `/` and `**`). `DecisionGraph.read(dmn)` reads a file, and `evaluate(decision, inputData)`
+  evaluates any decision by name from the input data it needs, each decision it requires once, in dependency order,
+  with nothing parsed per call; `evaluate(decisions, inputData)` evaluates several at once. A decision's value is
+  given to the decisions that require it under its name: a table with one output gives that output's value, one with
+  several a context (`Map`) whose components a decision reads by path (`Pricing.discount`), and one with several
+  results (RULE ORDER, OUTPUT ORDER, COLLECT without an aggregation) a list, which a list input takes (`Checks.code`
+  being the list of each result's `code`, DMN 1.5, 10.3.2.5); no match without a default output gives null. Input
+  data are typed by their `typeRef`, a built-in type or an item definition (a collection, or a structure whose
+  components are read by path, `Loan.principal`), and are given as Java values or, for simple types, as text.
+  `requiredInputData(decision)`, `inputData()`, `type(decision)` and `decisions()` describe the graph, for the
+  build plugins and framework integrations to build on (see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
+  `DecisionGraph.builder()` assembles a graph in code from input data, `DecisionTable`s and literal expressions,
+  each decision requiring what it reads.
+- **A graph is checked when it is built** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)): its
+  validation report (`DecisionGraph.validationReport()`) has three new issue kinds, all ERRORs:
+  `ValidationReport.Kind.DECISION_CYCLE` (decisions that require one another, directly or indirectly: "a Decision
+  element SHALL not require itself", 6.3.7), `MISSING_REQUIREMENT` (a required decision or input data the model does
+  not have, or a name a decision reads that none of its information requirements provides, 7.3.4) and
+  `TYPE_MISMATCH` (a value of another type than the decision table input it feeds, a path into a value without such a
+  component, operands a literal expression cannot combine, or a literal expression's value of another type than its
+  decision declares). Such a decision, and every decision that requires it, cannot be evaluated
+  (`InvalidDecisionTableException`), and the others can; a literal expression whose value does not conform to its
+  decision's declared type is the exception, as DMN 1.5 defines it to be null (10.3.2.9.4). `Builder.failOn` rejects a
+  graph with issues at a severity, and each decision table keeps its own analysis (`validationReport(decision)`).
+- **Decision models in DMN** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)):
+  `DmnReader.readModel(dmn)` reads a whole model (`beans.DecisionModel`: its input data, its decisions, their
+  information requirements and their logic, `beans.DecisionLogic.Table` or `LiteralExpression`), and
+  `DmnWriter.write(DecisionModel)` writes one back as DMN 1.3, which reads back as the same model. The types of input
+  data and decisions are `feel.FeelType`: a simple type, a list, a context of components, or any type. What later
+  releases bring is rejected when the model is read, with a message that names the feature and its issue: business
+  knowledge models, knowledge requirements and boxed expressions (0.10, [#118](https://github.com/brunopacheco1/praecepta/issues/118)),
+  FEEL beyond the subset (0.8, [#116](https://github.com/brunopacheco1/praecepta/issues/116)) and function calls (0.9,
+  [#117](https://github.com/brunopacheco1/praecepta/issues/117)), decision services and imports (0.11,
+  [#119](https://github.com/brunopacheco1/praecepta/issues/119)). `DmnReader.read(dmn)`, `read(dmn, decision)` and
+  `readAll(dmn)` read single tables as before. What DMN 1.5 and the TCK leave open about graphs, and what Praecepta
+  does there, is recorded in [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md) (cases 13 to 17).
+
+### Changed
+- **`ValidationReport.Kind` has three more constants**, `DECISION_CYCLE`, `MISSING_REQUIREMENT` and `TYPE_MISMATCH`
+  (see *Added*). Upgrading: code that switches over `ValidationReport.Kind` exhaustively must handle them; reports of
+  decision tables never hold them, so the results and reports of existing tables are unchanged.
+
 ### Fixed
 - **Rules reached only by a time with a zone id are no longer reported unreachable**
   ([#114](https://github.com/brunopacheco1/praecepta/issues/114)): a time column whose inputs can be times
