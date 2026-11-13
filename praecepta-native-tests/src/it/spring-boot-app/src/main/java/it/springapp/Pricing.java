@@ -48,7 +48,10 @@ public class Pricing {
         check("Discount, no rule", () -> discount.evaluate(Map.of("country", "FR", "customer.age", "30")), List.of());
         // FIRST, an unnamed output named after its decision
         check("Carrier", () -> carrier.evaluate(Map.of("weight", "1.5")), List.of(Map.of("Carrier", "post")));
-        check("Decisions found", decisions::names, Set.of("Carrier", "Discount", "Fee"));
+        // rules/graph/credit.dmn, a decision requirements graph (#14): Monthly Limit = Credit Limit / 12, from the input data
+        check("Monthly Limit, through the graph", () -> decisions.evaluate("Monthly Limit", Map.of("Applicant Age", "30", "Income", "1200")),
+                List.of(Map.of("Monthly Limit", "200")));
+        check("Decisions found", decisions::names, Set.of("Carrier", "Credit Limit", "Discount", "Fee", "Monthly Limit", "Risk Category"));
         // COLLECT SUM: 5 + 12.5
         check("Fee, by name", () -> decisions.evaluate("Fee", Map.of("zone", "islands")), List.of(Map.of("fee", "17.5")));
         System.out.printf("%d checks failed%n", failures.size());

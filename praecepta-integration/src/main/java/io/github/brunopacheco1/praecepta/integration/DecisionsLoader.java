@@ -58,7 +58,10 @@ public final class DecisionsLoader {
         /** One line: {@code Loaded 2 decision(s) from 1 DMN file(s): Discount, Fee}, or that none were found. */
         void info(String message);
 
-        /** One line per validation issue below {@code fail-on}: {@code Discount: WARNING rule 3 can never be selected}. */
+        /**
+         * One line per validation issue below {@code fail-on}: {@code Discount: WARNING rule 3 can never be selected}, or of
+         * a decision requirements graph, {@code Decision model Credit: ERROR ...}.
+         */
         void warn(String message);
     }
 
@@ -141,6 +144,9 @@ public final class DecisionsLoader {
         } else {
             log.info("Loaded %d decision(s) from %d DMN file(s): %s".formatted(decisions.names().size(), sources.size(),
                     String.join(", ", decisions.names())));
+        }
+        for (var model : decisions.models()) {
+            model.report().issues().forEach(issue -> log.warn("Decision model " + model.name() + ": " + issue));
         }
         for (var decision : decisions.all()) {
             decision.report().issues().forEach(issue -> log.warn(decision.name() + ": " + issue));

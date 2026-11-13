@@ -124,7 +124,8 @@ public class PraeceptaProcessor {
 
     /**
      * Writes the validated DMN into the application and registers the beans: the application's
-     * {@link Decisions}, and one engine per decision, qualified by the decision's name.
+     * {@link Decisions}, and one engine per decision table, qualified by the decision's name (a literal expression
+     * of a decision model has none: it is evaluated through {@code Decisions}, as every decision of a model is).
      */
     @BuildStep
     @Record(ExecutionTime.STATIC_INIT)
@@ -149,7 +150,11 @@ public class PraeceptaProcessor {
                 .startup()
                 .runtimeValue(decisions)
                 .done());
-        for (var name : validated.decisions().names()) {
+        for (var decision : validated.decisions().all()) {
+            if (decision.engine() == null) {
+                continue; // a literal expression of a decision model: evaluated through Decisions
+            }
+            var name = decision.name();
             beans.produce(SyntheticBeanBuildItem.create(PraeceptaEngine.class)
                     .addType(ENGINE_TYPE)
                     .addQualifier(AnnotationInstance.builder(Identifier.class).value(name).build())

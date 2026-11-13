@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A chain: Applicant Age -> Risk Category -> Credit Limit (with Income) -> Monthly Limit -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="chain" name="Credit" namespace="https://example.com/credit">
+  <inputData id="age" name="Applicant Age">
+    <variable id="age_variable" name="Applicant Age" typeRef="number"/>
+  </inputData>
+  <inputData id="income" name="Income">
+    <variable id="income_variable" name="Income" typeRef="number"/>
+  </inputData>
+  <decision id="risk" name="Risk Category">
+    <variable id="risk_variable" name="Risk Category" typeRef="string"/>
+    <informationRequirement id="risk_age"><requiredInput href="#age"/></informationRequirement>
+    <decisionTable id="risk_table" hitPolicy="UNIQUE">
+      <input id="risk_input">
+        <inputExpression id="risk_input_expression" typeRef="number"><text>Applicant Age</text></inputExpression>
+      </input>
+      <output id="risk_output" typeRef="string"/>
+      <rule id="risk_young">
+        <inputEntry><text>&lt; 25</text></inputEntry>
+        <outputEntry><text>"High"</text></outputEntry>
+      </rule>
+      <rule id="risk_older">
+        <inputEntry><text>&gt;= 25</text></inputEntry>
+        <outputEntry><text>"Low"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="limit" name="Credit Limit">
+    <variable id="limit_variable" name="Credit Limit" typeRef="number"/>
+    <informationRequirement id="limit_risk"><requiredDecision href="#risk"/></informationRequirement>
+    <informationRequirement id="limit_income"><requiredInput href="#income"/></informationRequirement>
+    <decisionTable id="limit_table" hitPolicy="UNIQUE">
+      <input id="limit_risk_input">
+        <inputExpression id="limit_risk_expression" typeRef="string"><text>Risk Category</text></inputExpression>
+      </input>
+      <input id="limit_income_input">
+        <inputExpression id="limit_income_expression" typeRef="number"><text>Income</text></inputExpression>
+      </input>
+      <output id="limit_output" typeRef="number"/>
+      <rule id="limit_high">
+        <inputEntry><text>"High"</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>Income * 0.5</text></outputEntry>
+      </rule>
+      <rule id="limit_low">
+        <inputEntry><text>"Low"</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>Income * 2</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="monthly" name="Monthly Limit">
+    <variable id="monthly_variable" name="Monthly Limit" typeRef="number"/>
+    <informationRequirement id="monthly_limit"><requiredDecision href="#limit"/></informationRequirement>
+    <literalExpression id="monthly_expression"><text>Credit Limit / 12</text></literalExpression>
+  </decision>
+  <knowledgeSource id="policy" name="Credit Policy"/>
+  <textAnnotation id="note"><text>Knowledge sources and annotations do not take part in evaluation.</text></textAnnotation>
+</definitions>

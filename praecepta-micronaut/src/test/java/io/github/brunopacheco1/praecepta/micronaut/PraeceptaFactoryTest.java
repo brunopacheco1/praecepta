@@ -102,6 +102,26 @@ class PraeceptaFactoryTest {
         }
     }
 
+    /**
+     * A file whose decisions require other decisions (#14): every decision evaluated from the model's input data
+     * through the Decisions bean, and an engine bean per decision table, which evaluates it alone.
+     */
+    @Test
+    void a_decision_requirements_graph_is_evaluated_through_the_decisions_bean() {
+        try (var context = ApplicationContext.run(Map.of("praecepta.locations", "classpath:graphs/*.dmn"))) {
+            var decisions = context.getBean(Decisions.class);
+
+            Assertions.assertThat(decisions.names()).containsExactly("Credit Limit", "Monthly Limit", "Risk Category");
+            Assertions.assertThat(decisions.evaluate("Monthly Limit", Map.of("Applicant Age", "20", "Income", "1200")))
+                    .containsExactly(Map.of("Monthly Limit", "50"));
+            Assertions.assertThat(context.getBeansOfType(PraeceptaFactory.ENGINE)).hasSize(2);
+            var limit = context.getBean(PraeceptaFactory.ENGINE, Qualifiers.byName("Credit Limit"));
+            Assertions.assertThat(limit.evaluate(Map.of("Risk Category", "High", "Income", "1200"))).containsExactly(Map.of("Credit Limit", "600"));
+            Assertions.assertThat(context.findBean(PraeceptaFactory.ENGINE, Qualifiers.byName("Monthly Limit"))).isEmpty();
+            Assertions.assertThat(decisions.describe()).containsKeys("decisions", "models");
+        }
+    }
+
     @Test
     void application_beans_inject_the_engines_by_name() {
         try (var context = ApplicationContext.run(Map.of("praecepta-test.pricing", true))) {
