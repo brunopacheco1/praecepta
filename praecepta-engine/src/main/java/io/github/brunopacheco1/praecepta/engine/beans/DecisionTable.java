@@ -165,9 +165,13 @@ public record DecisionTable(
      *                     default is {@code null} (see {@link DecisionTable#defaultOutput})
      * @param hasDefault   whether the column declares a default value: true for a default of {@code null}, which
      *                     {@code defaultValue} cannot tell from none
-     * @throws IllegalArgumentException if {@code defaultValue} is not null but {@code hasDefault} is false
      */
     public record OutputColumn(String name, ColumnType type, List<String> values, String defaultValue, boolean hasDefault) {
+        /**
+         * A column of the given name, type, output value list and default.
+         *
+         * @throws IllegalArgumentException if {@code defaultValue} is not null but {@code hasDefault} is false
+         */
         public OutputColumn {
             Objects.requireNonNull(name, "name");
             Objects.requireNonNull(type, "type");
