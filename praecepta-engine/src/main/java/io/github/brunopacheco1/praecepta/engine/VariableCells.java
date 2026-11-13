@@ -66,7 +66,7 @@ final class VariableCells {
             case NullTest n -> Truth.of(value == null);
             case UnaryTests.NullElement n -> Truth.of(value == null); // only list columns' cells hold it, and they name no input
             case NotEqual(var negated) -> test(negated, value, inputs).not(); // != is not(=), so unknown stays unknown
-            case Equals(var literal, var explicit) -> equal(value, resolve(literal, inputs));
+            case Equals(var literal, var explicit) -> equalTo(value, resolve(literal, inputs));
             case Compare(var operator, var literal) -> compare(value, operator, resolve(literal, inputs));
             case Range(var low, var lowClosed, var high, var highClosed) -> {
                 var from = resolve(low, inputs);
@@ -82,7 +82,7 @@ final class VariableCells {
     }
 
     /** {@code value = other}: a member of {@code other} if it is a list; true if both are missing, false if one is. */
-    private static Truth equal(Object value, Object other) {
+    private static Truth equalTo(Object value, Object other) {
         if (other instanceof List<?> list) {
             return in(value, list);
         }
