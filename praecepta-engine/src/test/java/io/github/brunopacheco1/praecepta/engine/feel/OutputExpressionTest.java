@@ -8,6 +8,7 @@ package io.github.brunopacheco1.praecepta.engine.feel;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -227,5 +228,30 @@ class OutputExpressionTest {
                 .hasMessageContaining("more than 1000 operators and parentheses");
         var longSum = "1" + " + 1".repeat(1000);
         Assertions.assertThat(OutputExpression.parse(longSum).evaluate(name -> null)).isEqualTo(new BigDecimal(1001));
+    }
+
+    @Test
+    void deep_nesting_is_rejected_on_a_thread_with_a_small_stack() throws InterruptedException {
+        var deep = "-(".repeat(5_000) + "1" + ")".repeat(5_000);
+        var thrown = new AtomicReference<Throwable>();
+        var thread = new Thread(null, () -> thrown.set(Assertions.catchThrowable(() -> OutputExpression.parse(deep))),
+                "small stack", 128 * 1024);
+        thread.start();
+        thread.join();
+        Assertions.assertThat(thrown.get())
+                .isInstanceOf(ExpressionSyntaxException.class)
+                .hasMessageContaining("more than 1000 operators and parentheses");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        "-(1 + 2) ** 2 * 3     | 27",
+        "((2)) ** -(1) ** 2    | 0.25",
+        "- - 3 - -(-(4))       | -1",
+        "(1 - (2 - (3 - 4)))   | -2",
+        "2 * (3 + 4) / (1 + 1) | 7",
+    })
+    void parentheses_and_unary_minus_nest_in_any_order(String expression, BigDecimal value) {
+        Assertions.assertThat((BigDecimal) OutputExpression.parse(expression).evaluate(name -> null)).isEqualByComparingTo(value);
     }
 }

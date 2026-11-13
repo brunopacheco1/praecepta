@@ -6,8 +6,11 @@
 package io.github.brunopacheco1.praecepta.engine.feel;
 
 import java.math.BigDecimal;
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression.Arithmetic;
 import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression.Literal;
@@ -16,7 +19,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression.Negation;
 import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression.Operator;
 
 /**
- * Parses {@link OutputExpression}s by recursive descent, with FEEL's precedence:
+ * Parses {@link OutputExpression}s with FEEL's precedence, as this grammar gives it:
  *
  * <pre>
  *   sum     = product { ("+" | "-") product }
@@ -37,12 +40,16 @@ import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression.Operator;
  *
  * <p>A name is a FEEL name ({@link CellParser#isName}): words of letters, digits, {@code _} and {@code ?},
  * separated by single spaces or dots, as in {@code Credit Score} or {@code Applicant.age}. A name
- * followed by {@code (} is a function call, which is not supported. The number of operators and
- * parentheses is bounded, so that evaluating a parsed expression never runs out of stack.
+ * followed by {@code (} is a function call, which is not supported.
+ *
+ * <p>The parser reads operators and parentheses with a stack of its own (operator precedence, or shunting yard),
+ * not by recursion, so however deep the parentheses nest, reading them takes no more of the thread's stack, and
+ * an expression with too many is refused whatever the stack's size. The number of operators and parentheses is
+ * bounded, and with it the depth of the tree, which evaluating a parsed expression recurses over, one call a level.
  */
 final class ExpressionParser {
 
-    /** At most this many operators and parentheses: the depth of the tree and of every recursion over it. */
+    /** At most this many operators and parentheses: a bound on the depth of the tree and of every recursion over it. */
     private static final int MAX_OPERATIONS = 1000;
     /**
      * FEEL's literals, and keywords that start or join its other expressions ({@code if a then b else c},
@@ -75,87 +82,102 @@ final class ExpressionParser {
         if (position == text.length()) {
             throw unsupported("it is empty");
         }
-        var expression = sum();
-        skipWhitespace();
-        if (position < text.length()) {
-            throw unsupported("unexpected '" + text.substring(position) + "'");
+        var operands = new ArrayDeque<OutputExpression>();
+        var pending = new ArrayDeque<Pending>();
+        int openParentheses = 0;
+        while (true) {
+            openParentheses += prefixes(pending);
+            operands.push(primary());
+            while (true) {
+                skipWhitespace();
+                var operator = binaryOperator();
+                if (operator != null) {
+                    reduceWhile(operands, pending, top -> top.precedence >= operator.precedence);
+                    pending.push(operator);
+                    break;
+                }
+                if (openParentheses == 0) {
+                    if (position < text.length()) {
+                        throw unsupported("unexpected '" + text.substring(position) + "'");
+                    }
+                    reduceWhile(operands, pending, top -> true);
+                    return operands.pop();
+                }
+                if (position == text.length() || text.charAt(position) != ')') {
+                    throw unsupported("a parenthesis is not closed");
+                }
+                position++;
+                reduceWhile(operands, pending, top -> top != Pending.PARENTHESIS);
+                pending.pop();
+                openParentheses--;
+            }
         }
-        return expression;
     }
 
-    private OutputExpression sum() {
-        var expression = product();
+    /**
+     * Pushes the unary minuses and open parentheses before an operand, and returns how many parentheses it opened.
+     * They wait on the stack, not on the call stack, so nesting costs no recursion.
+     */
+    private int prefixes(Deque<Pending> pending) {
+        int opened = 0;
         while (true) {
             skipWhitespace();
-            var operator = next('+', Operator.ADD, '-', Operator.SUBTRACT);
-            if (operator == null) {
-                return expression;
+            if (position < text.length() && text.charAt(position) == '-') {
+                pending.push(Pending.NEGATION);
+            } else if (position < text.length() && text.charAt(position) == '(') {
+                pending.push(Pending.PARENTHESIS);
+                opened++;
+            } else {
+                return opened;
             }
-            expression = new Arithmetic(operator, expression, product());
-        }
-    }
-
-    private OutputExpression product() {
-        var expression = power();
-        while (true) {
-            skipWhitespace();
-            var operator = next('*', Operator.MULTIPLY, '/', Operator.DIVIDE);
-            if (operator == null) {
-                return expression;
-            }
-            expression = new Arithmetic(operator, expression, power());
-        }
-    }
-
-    private OutputExpression power() {
-        var expression = unary();
-        while (true) {
-            skipWhitespace();
-            if (!text.startsWith("**", position)) {
-                return expression;
-            }
-            position += 2;
-            count();
-            expression = new Arithmetic(Operator.POWER, expression, unary());
-        }
-    }
-
-    /** The operator at the current position, consumed, if it is one of the two; else null. */
-    private Operator next(char first, Operator firstOperator, char second, Operator secondOperator) {
-        if (position < text.length() && (text.charAt(position) == first || text.charAt(position) == second)) {
-            count();
-            return text.charAt(position++) == first ? firstOperator : secondOperator;
-        }
-        return null;
-    }
-
-    private OutputExpression unary() {
-        skipWhitespace();
-        if (position < text.length() && text.charAt(position) == '-') {
             position++;
             count();
-            return new Negation(unary());
         }
-        return primary();
     }
 
+    /** The binary operator at the current position, consumed, or null if none is: {@code **} before {@code *}. */
+    private Pending binaryOperator() {
+        if (text.startsWith("**", position)) {
+            position += 2;
+            count();
+            return Pending.POWER;
+        }
+        if (position == text.length()) {
+            return null;
+        }
+        var operator = switch (text.charAt(position)) {
+            case '*' -> Pending.MULTIPLY;
+            case '/' -> Pending.DIVIDE;
+            case '+' -> Pending.ADD;
+            case '-' -> Pending.SUBTRACT;
+            default -> null;
+        };
+        if (operator != null) {
+            position++;
+            count();
+        }
+        return operator;
+    }
+
+    /** Applies the pending operators to their operands, from the top of the stack, while the top one passes the test. */
+    private static void reduceWhile(Deque<OutputExpression> operands, Deque<Pending> pending, Predicate<Pending> test) {
+        while (!pending.isEmpty() && test.test(pending.peek())) {
+            var top = pending.pop();
+            if (top == Pending.NEGATION) {
+                operands.push(new Negation(operands.pop()));
+            } else {
+                var right = operands.pop();
+                operands.push(new Arithmetic(top.operator, operands.pop(), right));
+            }
+        }
+    }
+
+    /** A string, number, date time literal or name. */
     private OutputExpression primary() {
-        skipWhitespace();
         if (position == text.length()) {
             throw unsupported("a value is missing at the end");
         }
         char c = text.charAt(position);
-        if (c == '(') {
-            position++;
-            count();
-            var inner = sum();
-            skipWhitespace();
-            if (position == text.length() || text.charAt(position) != ')') {
-                throw unsupported("a parenthesis is not closed");
-            }
-            position++;
-            return inner;
-        }
         if (c == '"') {
             return new Literal(string());
         }
@@ -293,5 +315,21 @@ final class ExpressionParser {
 
     private ExpressionSyntaxException unsupported(String problem) {
         return new ExpressionSyntaxException("'%s' is not a supported output expression: %s".formatted(text, problem));
+    }
+    /**
+     * What waits on the stack for its operands: a binary operator, with its precedence (operators of equal
+     * precedence associate to the left), a unary minus, which binds tighter than any of them, or an open parenthesis.
+     */
+    private enum Pending {
+        ADD(1, Operator.ADD), SUBTRACT(1, Operator.SUBTRACT), MULTIPLY(2, Operator.MULTIPLY), DIVIDE(2, Operator.DIVIDE),
+        POWER(3, Operator.POWER), NEGATION(4, null), PARENTHESIS(0, null);
+
+        private final int precedence;
+        private final Operator operator;
+
+        Pending(int precedence, Operator operator) {
+            this.precedence = precedence;
+            this.operator = operator;
+        }
     }
 }
