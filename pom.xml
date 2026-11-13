@@ -192,7 +192,7 @@
                      (GHSA-xxph-c9ww-hj94). Tests use it only; no published module depends on it. -->
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
-                <version>33.7.2-jre</version>
+                <version>33.8.0-jre</version>
             </dependency>
             <dependency>
                 <groupId>org.assertj</groupId>
