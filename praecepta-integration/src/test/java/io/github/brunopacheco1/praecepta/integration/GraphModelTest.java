@@ -88,8 +88,10 @@ class GraphModelTest {
         Assertions.assertThat(decisions.get("Monthly Limit").engine()).isNull();
         Assertions.assertThatThrownBy(() -> decisions.engine("Monthly Limit"))
                 .isInstanceOf(NoSuchElementException.class)
-                .hasMessageContaining("literal expression");
-        Assertions.assertThatThrownBy(() -> decisions.evaluate("Risk Category", Map.of("Applicant Age", "old")))
+                .hasMessage("Decision 'Monthly Limit' is a literal expression, which has no engine of its own; evaluate it "
+                        + "with evaluate(\"Monthly Limit\", inputData)");
+        var old = Map.of("Applicant Age", "old");
+        Assertions.assertThatThrownBy(() -> decisions.evaluate("Risk Category", old))
                 .isInstanceOf(InvalidInputException.class);
     }
 
@@ -421,9 +423,11 @@ class GraphModelTest {
         // a path of several components is a context in a context
         Assertions.assertThat(decisions.evaluate("Name", Map.of("A.e.f", "x", "A.d", "1"))).containsExactly(Map.of("Name", "x"));
         Assertions.assertThat(decisions.evaluate("Name", Map.of())).isEmpty();
-        Assertions.assertThatThrownBy(() -> decisions.evaluate("T", Map.of("A.d", "five"))).isInstanceOf(InvalidInputException.class)
+        var five = Map.of("A.d", "five");
+        Assertions.assertThatThrownBy(() -> decisions.evaluate("T", five)).isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("A.d=five is not a valid number");
-        Assertions.assertThatThrownBy(() -> decisions.evaluate("Name", Map.of("A.e", "x", "A.e.f", "y")))
+        var continued = Map.of("A.e", "x", "A.e.f", "y");
+        Assertions.assertThatThrownBy(() -> decisions.evaluate("Name", continued))
                 .isInstanceOf(InvalidInputException.class).hasMessageContaining("continues the path 'A.e'");
     }
 

@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.lang.System.Logger.Level;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -130,6 +131,21 @@ public final class DecisionGraph {
      * @param decisions the indexes of the decisions to evaluate, itself last, each after those it requires
      */
     private record Plan(int decision, int[] inputs, int[] decisions) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Plan(int otherDecision, int[] otherInputs, int[] otherDecisions)
+                    && decision == otherDecision && Arrays.equals(inputs, otherInputs) && Arrays.equals(decisions, otherDecisions);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * (31 * decision + Arrays.hashCode(inputs)) + Arrays.hashCode(decisions);
+        }
+
+        @Override
+        public String toString() {
+            return "Plan[" + decision + ", " + Arrays.toString(inputs) + ", " + Arrays.toString(decisions) + "]";
+        }
     }
 
     private DecisionGraph(DecisionModel model, Severity failOn, boolean log) {
@@ -215,7 +231,7 @@ public final class DecisionGraph {
                 .filter(issue -> issue.severity().compareTo(failOn) >= 0)
                 .forEach(issue -> failing.add("decision '%s': %s".formatted(decision, issue))));
         if (!failing.isEmpty()) {
-            throw new InvalidDecisionTableException("Decision model '%s' has %d validation issue(s) at %s or above:\n%s"
+            throw new InvalidDecisionTableException("Decision model '%s' has %d validation issue(s) at %s or above:%n%s"
                     .formatted(model.name(), failing.size(), failOn, String.join("\n", failing)));
         }
     }

@@ -305,10 +305,7 @@ class EngineMatchesReferencePropertiesTest {
      */
     @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
     void gaps_are_reported_exactly_wherever_gap_analysis_applies(@ForAll("scenarios") DecisionTableScenario s, @ForAll boolean perColumn) {
-        var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of(), perColumn);
-        if (reference.gapAnalysisApplies(s.columns())) {
-            assertGapsMatchUncoveredInputs(s, reference, perColumn);
-        }
+        assertGapsMatchUncoveredInputsWhereGapAnalysisApplies(s, perColumn);
     }
 
     /**
@@ -318,6 +315,10 @@ class EngineMatchesReferencePropertiesTest {
     @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
     void temporal_tables_gaps_are_reported_exactly_wherever_gap_analysis_applies(@ForAll("temporalScenarios") DecisionTableScenario s,
             @ForAll boolean perColumn) {
+        assertGapsMatchUncoveredInputsWhereGapAnalysisApplies(s, perColumn);
+    }
+
+    private static void assertGapsMatchUncoveredInputsWhereGapAnalysisApplies(DecisionTableScenario s, boolean perColumn) {
         var reference = s.reference(s.rules(), HitPolicy.COLLECT, Map.of(), perColumn);
         if (reference.gapAnalysisApplies(s.columns())) {
             assertGapsMatchUncoveredInputs(s, reference, perColumn);

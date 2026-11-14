@@ -278,9 +278,9 @@ final class GraphEvaluator implements ModelEvaluator {
     static Feature rejected(InvalidDecisionTableException rejection) {
         var message = String.valueOf(rejection.getMessage());
         if (!(rejection instanceof UnsupportedFeatureException unsupported)) {
-            return message.contains("item definition")
-                    ? Feature.decisionTable("item definitions Praecepta does not read, elsewhere in the model")
-                    : Feature.decisionTable("models Praecepta does not read as a whole");
+            return Feature.decisionTable(message.contains("item definition")
+                    ? "item definitions Praecepta does not read, elsewhere in the model"
+                    : "models Praecepta does not read as a whole");
         }
         return switch (unsupported.issue()) {
             case 119 -> message.startsWith("DMN model has the decision service") ? Feature.DECISION_SERVICES : Feature.IMPORTS;

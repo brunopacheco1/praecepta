@@ -82,6 +82,11 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 public final class DmnReader {
 
     private static final String TYPE_REF = "typeRef";
+    private static final String INPUT_DATA = "inputData";
+    private static final String DECISION = "decision";
+    private static final String DECISION_TABLE = "decisionTable";
+    private static final String VARIABLE = "variable";
+    private static final String LABEL = "label";
     /** At most this many levels of item definitions and components in the type of an input data or a decision. */
     public static final int MAX_TYPE_DEPTH = 32;
 
@@ -156,25 +161,25 @@ public final class DmnReader {
         rejectUnsupported(root);
         var types = new ItemDefinitions(root);
         var elements = new HashMap<String, Element>();
-        for (var kind : List.of("inputData", "decision")) {
+        for (var kind : List.of(INPUT_DATA, DECISION)) {
             children(root, kind).forEach(element -> elements.putIfAbsent(element.getAttribute("id"), element));
         }
         var inputData = new ArrayList<DecisionModel.InputData>();
         var model = new ModelTypes();
-        for (var input : children(root, "inputData")) {
+        for (var input : children(root, INPUT_DATA)) {
             var name = elementName(input, "an input data");
-            var variable = child(input, "variable");
+            var variable = child(input, VARIABLE);
             var typeRef = variable == null ? "" : variable.getAttribute(TYPE_REF);
             var type = types.feelType(typeRef, "Input data '" + name + "'");
             inputData.add(new DecisionModel.InputData(name, type));
             model.types.putIfAbsent(name, type);
         }
-        for (var decision : children(root, "decision")) {
+        for (var decision : children(root, DECISION)) {
             var name = nameOr(decision, "id");
-            model.types.putIfAbsent(name, declaredTableType(decision, types, "Decision '" + name + "'"));
+            model.types.putIfAbsent(name, declaredTableType(decision, types, decisionWhere(name)));
         }
         var decisions = new ArrayList<DecisionModel.Decision>();
-        for (var decision : children(root, "decision")) {
+        for (var decision : children(root, DECISION)) {
             decisions.add(decision(decision, types, model, elements));
         }
         try {
@@ -227,7 +232,7 @@ public final class DmnReader {
     /** A decision of a model: its information requirements and its logic. */
     private static DecisionModel.Decision decision(Element decision, ItemDefinitions types, ModelTypes model, Map<String, Element> elements) {
         var name = elementName(decision, "a decision");
-        var where = "Decision '" + name + "'";
+        var where = decisionWhere(name);
         if (child(decision, "knowledgeRequirement") != null) {
             throw BOXED.exception(("%s requires business knowledge, which Praecepta does not support yet: business "
                     + "knowledge models and their invocations are planned for 0.10 (#118)").formatted(where));
@@ -286,7 +291,7 @@ public final class DmnReader {
             }
             var element = (Element) node;
             var kind = element.getLocalName();
-            if (kind.equals("decisionTable")) {
+            if (kind.equals(DECISION_TABLE)) {
                 return new DecisionLogic.Table(decisionTable(decision, types, model), declaredTableType(decision, types, where));
             }
             if (kind.equals("literalExpression")) {
@@ -332,7 +337,7 @@ public final class DmnReader {
 
     /** The {@code typeRef} of a decision's variable, blank if it has none. */
     private static String variableTypeRef(Element decision) {
-        var variable = child(decision, "variable");
+        var variable = child(decision, VARIABLE);
         return variable == null ? "" : variable.getAttribute(TYPE_REF);
     }
 
@@ -352,7 +357,7 @@ public final class DmnReader {
 
     /** The model's decisions whose logic is a decision table, in document order. */
     private static List<Element> decisionsWithTables(Element root) {
-        return descendants(root, "decision").stream().filter(decision -> child(decision, "decisionTable") != null).toList();
+        return descendants(root, DECISION).stream().filter(decision -> child(decision, DECISION_TABLE) != null).toList();
     }
 
     /** The named decision, or the model's only decision with a table if no name is given. */
@@ -380,8 +385,8 @@ public final class DmnReader {
      */
     private static DecisionTable decisionTable(Element decision, ItemDefinitions types, ModelTypes model) {
         var name = nameOr(decision, "id");
-        var table = child(decision, "decisionTable");
-        var where = "Decision '" + name + "'";
+        var table = child(decision, DECISION_TABLE);
+        var where = decisionWhere(name);
 
         var hitPolicy = hitPolicy(table.getAttribute("hitPolicy"), where);
         var aggregation = aggregation(table.getAttribute("aggregation"), where);
@@ -450,7 +455,7 @@ public final class DmnReader {
 
         /**
          * The type of an output that declares none ({@link #declaredOutputType}), else that of its literal entries
-         * ({@link DmnReader#literalType}), else a string.
+         * ({@link #literalType}), else a string.
          *
          * @param index the output's position among the table's outputs
          * @param rules the table's rules
@@ -469,7 +474,7 @@ public final class DmnReader {
          * value.
          */
         private Optional<ColumnType> declaredOutputType(Element decision, Element output, ItemDefinitions items, String where) {
-            var table = child(decision, "decisionTable");
+            var table = child(decision, DECISION_TABLE);
             boolean single = children(table, "output").size() == 1;
             if (!output.getAttribute(TYPE_REF).isBlank() || single && "COUNT".equalsIgnoreCase(table.getAttribute("aggregation").strip())) {
                 return Optional.empty();
@@ -481,50 +486,50 @@ public final class DmnReader {
             } catch (InvalidDecisionTableException e) {
                 return Optional.empty();
             }
-            var type = single ? declared : declared.component(nameOr(output, "label"));
+            var type = single ? declared : declared.component(nameOr(output, LABEL));
             return switch (type) {
                 case FeelType.Simple(var simple) -> Optional.of(simple);
                 case FeelType.ListOf(FeelType.Simple(var simple)) -> Optional.of(simple);
                 case null, default -> Optional.empty();
             };
         }
-    }
 
-    /**
-     * The type of an output from its entries, for a table of a model whose output declares no type: the type of its
-     * literal output entries and default, when all of them that are not {@code null} are literals of one type (a quoted
-     * string, or an unquoted number, boolean, date, time or date and time, as FEEL reads {@code 10} as the number 10);
-     * empty when one names an input or computes a value, or they differ.
-     *
-     * @param index the output's position among the table's outputs
-     */
-    private static Optional<ColumnType> literalType(List<Element> rules, int index, Element output) {
-        var texts = new ArrayList<String>();
-        for (var rule : rules) {
-            var entries = children(rule, "outputEntry");
-            if (index >= entries.size()) {
-                return Optional.empty(); // reported when the rule is read
+        /**
+         * The type of an output from its entries, for a table of a model whose output declares no type: the type of its
+         * literal output entries and default, when all of them that are not {@code null} are literals of one type (a quoted
+         * string, or an unquoted number, boolean, date, time or date and time, as FEEL reads {@code 10} as the number 10);
+         * empty when one names an input or computes a value, or they differ.
+         *
+         * @param index the output's position among the table's outputs
+         */
+        private static Optional<ColumnType> literalType(List<Element> rules, int index, Element output) {
+            var texts = new ArrayList<String>();
+            for (var rule : rules) {
+                var entries = children(rule, "outputEntry");
+                if (index >= entries.size()) {
+                    return Optional.empty(); // reported when the rule is read
+                }
+                texts.add(textOf(entries.get(index)));
             }
-            texts.add(textOf(entries.get(index)));
-        }
-        var defaultEntry = nonBlankText(output, "defaultOutputEntry");
-        if (defaultEntry != null) {
-            texts.add(defaultEntry);
-        }
-        var found = new HashSet<ColumnType>();
-        for (var text : texts) {
-            var literal = text.strip();
-            if (literal.isEmpty() || literal.equals("null") || isNull(literal, ColumnType.STRING)) {
-                continue;
+            var defaultEntry = nonBlankText(output, "defaultOutputEntry");
+            if (defaultEntry != null) {
+                texts.add(defaultEntry);
             }
-            var candidates = literal.startsWith("\"") ? List.of(ColumnType.STRING) : UNQUOTED_OUTPUT_TYPES;
-            var type = candidates.stream().filter(candidate -> literalValue(literal, candidate).isPresent()).findFirst();
-            if (type.isEmpty()) {
-                return Optional.empty();
+            var found = new HashSet<ColumnType>();
+            for (var text : texts) {
+                var literal = text.strip();
+                if (literal.isEmpty() || literal.equals("null") || isNull(literal, ColumnType.STRING)) {
+                    continue;
+                }
+                var candidates = literal.startsWith("\"") ? List.of(ColumnType.STRING) : UNQUOTED_OUTPUT_TYPES;
+                var type = candidates.stream().filter(candidate -> literalValue(literal, candidate).isPresent()).findFirst();
+                if (type.isEmpty()) {
+                    return Optional.empty();
+                }
+                found.add(type.get());
             }
-            found.add(type.get());
+            return found.size() == 1 ? Optional.of(found.iterator().next()) : Optional.empty();
         }
-        return found.size() == 1 ? Optional.of(found.iterator().next()) : Optional.empty();
     }
 
     /** An input a cell compares with that is not a column of the table, with the type of the column whose cell names it. */
@@ -555,14 +560,14 @@ public final class DmnReader {
      */
     private static List<String> namedListInputs(Element root, Map<String, ColumnType> named, ItemDefinitions types, String where) {
         var lists = new ArrayList<String>();
-        for (var inputData : descendants(root, "inputData")) {
-            var variable = child(inputData, "variable");
+        for (var inputData : descendants(root, INPUT_DATA)) {
+            var variable = child(inputData, VARIABLE);
             var inputName = inputData.getAttribute("name").strip();
             var typeRef = variable == null ? "" : variable.getAttribute(TYPE_REF);
             if (!named.containsKey(inputName) || typeRef.isBlank()) {
                 continue;
             }
-            var type = typeIfSupported(types, typeRef, where + ", input '" + inputName + "'");
+            var type = typeIfSupported(types, typeRef, inputWhere(where, inputName));
             if (type.isPresent() && type.get().list()) {
                 if (type.get().columnType() != named.get(inputName)) {
                     throw new InvalidDecisionTableException("%s: a %s column compares with '%s', a list of %s".formatted(
@@ -618,7 +623,7 @@ public final class DmnReader {
         var expression = child(input, "inputExpression");
         var column = expression == null ? "" : textOf(expression).strip();
         if (column.isEmpty()) {
-            column = input.getAttribute("label").strip();
+            column = input.getAttribute(LABEL).strip();
         }
         if (!CellParser.isName(column)) {
             throw new InvalidDecisionTableException("%s: input expression '%s' is not supported; it must name an input variable"
@@ -627,8 +632,8 @@ public final class DmnReader {
         var typeRef = expression == null ? "" : expression.getAttribute(TYPE_REF);
         var name = column;
         var type = typeRef.isBlank() && model != null
-                ? model.columnType(column).orElseGet(() -> types.resolve("", where + ", input '" + name + "'"))
-                : types.resolve(typeRef, where + ", input '" + column + "'");
+                ? model.columnType(column).orElseGet(() -> types.resolve("", inputWhere(where, name)))
+                : types.resolve(typeRef, inputWhere(where, column));
         var values = nonBlankText(input, "inputValues");
         if (type.list()) {
             if (values != null) {
@@ -650,7 +655,7 @@ public final class DmnReader {
      *                  {@link #resultType}, else a string
      */
     private static OutputColumn outputColumn(Element output, String unnamed, ColumnType untypedAs, ItemDefinitions types, String where) {
-        var column = nameOr(output, "label");
+        var column = nameOr(output, LABEL);
         if (column.isBlank()) {
             column = unnamed;
         }
@@ -697,7 +702,7 @@ public final class DmnReader {
         }
         var typeRef = table.getAttribute(TYPE_REF);
         if (typeRef.isBlank()) {
-            var variable = child(decision, "variable");
+            var variable = child(decision, VARIABLE);
             typeRef = variable == null ? "" : variable.getAttribute(TYPE_REF);
         }
         if (typeRef.isBlank()) {
@@ -823,6 +828,16 @@ public final class DmnReader {
             }
         }
         return new PraeceptaOutput(values, references, expressions);
+    }
+
+    /** A decision, as errors name it. */
+    private static String decisionWhere(String name) {
+        return "Decision '" + name + "'";
+    }
+
+    /** An input, as errors name it. */
+    private static String inputWhere(String where, String column) {
+        return where + ", input '" + column + "'";
     }
 
     /** An output, as errors name it. */

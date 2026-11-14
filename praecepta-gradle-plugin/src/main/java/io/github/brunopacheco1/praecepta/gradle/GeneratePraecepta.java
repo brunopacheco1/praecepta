@@ -60,13 +60,15 @@ public abstract class GeneratePraecepta extends DefaultTask {
     /** The tool the generated sources name. */
     static final String GENERATOR = "praecepta-gradle-plugin";
 
+    private static final String TABLE = "table";
+
     /**
      * How messages name the settings: quoted, with the Maven plugin's {@code <name>} as {@code 'className'}, since
      * {@code name} is the table's name in its container.
      */
     static final UnaryOperator<String> SETTING_NAMES = setting -> switch (setting) {
         case "name" -> "'className'";
-        case "table" -> "table";
+        case TABLE -> TABLE;
         default -> "'" + setting + "'";
     };
 
@@ -177,7 +179,14 @@ public abstract class GeneratePraecepta extends DefaultTask {
             }
             compiled.reports().forEach((className, report) -> report.issues().forEach(issue -> getLogger().warn(className + ": " + issue)));
             write(compiled, sourceRoot, resourceRoot);
-            getLogger().info("Compiled {} {} ({}) into {}", compiled.table() != null ? "table" : "decision model", table.getName(),
+            logCompiled(compiled, table, packageName);
+        }
+    }
+
+    /** Logs, at info, what a table or a decision model was compiled into. */
+    private void logCompiled(CompiledTable compiled, TableSpec table, String packageName) {
+        if (getLogger().isInfoEnabled()) {
+            getLogger().info("Compiled {} {} ({}) into {}", compiled.table() != null ? TABLE : "decision model", table.getName(),
                     compiled.summary(), packageName.isEmpty() ? compiled.className() : packageName + "." + compiled.className());
         }
     }

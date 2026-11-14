@@ -325,8 +325,8 @@ class GraphCompilerTest {
     void a_compiled_model_writes_its_dmn_and_sources_into_the_package_directories() throws Exception {
         var result = compile(TableDefinition.dmn(table("chain.dmn")), Severity.ERROR);
         var written = result.write(out.resolve("java"), out.resolve("resources"));
-        Assertions.assertThat(written).first().isEqualTo(out.resolve("resources/com/acme/graph/CreditModel.dmn"));
-        Assertions.assertThat(written).hasSize(8).contains(out.resolve("java/com/acme/graph/MonthlyLimit.java"));
+        Assertions.assertThat(written).hasSize(8).contains(out.resolve("java/com/acme/graph/MonthlyLimit.java"))
+                .first().isEqualTo(out.resolve("resources/com/acme/graph/CreditModel.dmn"));
         try (var dmn = Files.newInputStream(written.getFirst())) {
             Assertions.assertThat(DecisionGraph.read(dmn).model()).isEqualTo(result.model());
         }
@@ -372,7 +372,7 @@ class GraphCompilerTest {
         }
     }
 
-    private static Decisions decisions(String name) throws IOException {
+    private static Decisions decisions(String name) {
         return Decisions.load(List.of(TableSource.of(table(name))), Severity.ERROR);
     }
 

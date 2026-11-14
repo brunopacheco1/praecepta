@@ -108,9 +108,11 @@ class DecisionGraphTest {
     void an_input_data_value_not_of_its_type_is_rejected() {
         var graph = graph("chain.dmn");
 
-        assertThatThrownBy(() -> graph.evaluate("Risk Category", Map.of("Applicant Age", "old")))
+        var text = Map.of("Applicant Age", "old");
+        assertThatThrownBy(() -> graph.evaluate("Risk Category", text))
                 .isInstanceOf(InvalidInputException.class).hasMessageContaining("Applicant Age=old is not a valid number");
-        assertThatThrownBy(() -> graph.evaluate("Risk Category", Map.of("Applicant Age", LocalDate.of(2000, 1, 1))))
+        var date = Map.of("Applicant Age", LocalDate.of(2000, 1, 1));
+        assertThatThrownBy(() -> graph.evaluate("Risk Category", date))
                 .isInstanceOf(InvalidInputException.class).hasMessageContaining("is not a number");
     }
 
@@ -303,7 +305,8 @@ class DecisionGraphTest {
         assertThat(graph.validationReport().issues()).allMatch(issue -> issue.severity() == Severity.ERROR);
         assertThat(List.of("A", "B", "C", "D", "E")).map(graph::canEvaluate).containsExactly(false, false, false, true, false);
         assertThat(graph.evaluate("D", Map.of("X", 1))).isEqualTo(new BigDecimal("2"));
-        assertThatThrownBy(() -> graph.evaluate("C", Map.of("X", 1))).isInstanceOf(InvalidDecisionTableException.class)
+        var x = Map.of("X", 1);
+        assertThatThrownBy(() -> graph.evaluate("C", x)).isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageStartingWith("Decision 'C' cannot be evaluated: it requires a decision in a cycle");
         assertThatThrownBy(() -> graph.evaluate("B", Map.of())).isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("'A' -> 'B' -> 'A'");
@@ -321,7 +324,8 @@ class DecisionGraphTest {
                 "ERROR decision 'F' requires decision 'X', which is input data, not a decision");
         assertThat(List.of("A", "B", "C", "D", "E", "F", "G")).map(graph::canEvaluate)
                 .containsExactly(false, false, false, true, false, false, false);
-        assertThatThrownBy(() -> graph.evaluate("G", Map.of("X", 1))).isInstanceOf(InvalidDecisionTableException.class)
+        var x = Map.of("X", 1);
+        assertThatThrownBy(() -> graph.evaluate("G", x)).isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessage("Decision 'G' cannot be evaluated: it requires decision 'F', which cannot be evaluated: "
                         + "decision 'F' requires decision 'X', which is input data, not a decision");
         assertThatThrownBy(() -> graph.evaluate("E", Map.of())).isInstanceOf(InvalidDecisionTableException.class)
@@ -341,9 +345,11 @@ class DecisionGraphTest {
                 "decision 'Path' reads 'Name.first', but 'Name' is a string, which has no component 'first'",
                 "decision 'Compare' reads 'Name', a string, into its cells' comparisons with 'Name', a number");
         assertThat(List.of("Size", "First", "Single", "Path", "Compare", "Downstream")).map(graph::canEvaluate).containsOnly(false);
-        assertThatThrownBy(() -> graph.evaluate("Downstream", Map.of("Name", "x"))).isInstanceOf(InvalidDecisionTableException.class)
+        var name = Map.of("Name", "x");
+        assertThatThrownBy(() -> graph.evaluate("Downstream", name)).isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("it requires decision 'Size'");
-        assertThatThrownBy(() -> graph.evaluate("Compare", Map.of("Name", "x", "Count", 1))).isInstanceOf(InvalidDecisionTableException.class)
+        var nameAndCount = Map.of("Name", "x", "Count", 1);
+        assertThatThrownBy(() -> graph.evaluate("Compare", nameAndCount)).isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("cells' comparisons with 'Name'");
     }
 
@@ -356,7 +362,8 @@ class DecisionGraphTest {
                 "ERROR decision 'Year' reads 'Birth.year', but 'Birth' is a date, whose property 'year' Praecepta does not read yet: "
                         + "the full FEEL language is planned for 0.8 (#116)");
         assertThat(List.of("Year", "After Year")).map(graph::canEvaluate).containsOnly(false);
-        assertThatThrownBy(() -> graph.evaluate("After Year", Map.of("Birth", LocalDate.of(2000, 1, 1))))
+        var birth = Map.of("Birth", LocalDate.of(2000, 1, 1));
+        assertThatThrownBy(() -> graph.evaluate("After Year", birth))
                 .isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("it requires decision 'Year'");
     }
 
@@ -532,7 +539,8 @@ class DecisionGraphTest {
         assertThat(graph.validationReport("Tier").issues(Kind.OVERLAPPING_RULES)).hasSize(1);
         assertThat(graph.validationReport("Label").isEmpty()).isTrue();
         assertThat(graph.evaluate("Label", Map.of("Age", 30))).isEqualTo("tier adult");
-        assertThatThrownBy(() -> graph.evaluate("Label", Map.of("Age", 70))).isInstanceOf(HitPolicyViolationException.class);
+        var age = Map.of("Age", 70);
+        assertThatThrownBy(() -> graph.evaluate("Label", age)).isInstanceOf(HitPolicyViolationException.class);
     }
 
     // ---- times with a zone id passed between decisions ---------------------------------------------
@@ -619,9 +627,11 @@ class DecisionGraphTest {
         // taken as a declared number input data takes it: as text too
         assertThat(graph.evaluate("Adult", Map.of("Applicant", Map.of("age", "30")))).isEqualTo(true);
         assertThat(graph.evaluate("Adult", Map.of("Applicant", Map.of("age", 3L)))).isNull();
-        assertThatThrownBy(() -> graph.evaluate("Adult", Map.of("Applicant", Map.of("age", "thirty"))))
+        var text = Map.of("Applicant", Map.of("age", "thirty"));
+        assertThatThrownBy(() -> graph.evaluate("Adult", text))
                 .isInstanceOf(InvalidInputException.class).hasMessageContaining("Applicant.age=thirty is not a valid number");
-        assertThatThrownBy(() -> graph.evaluate("Adult", Map.of("Applicant", Map.of("age", LocalDate.of(2000, 1, 1)))))
+        var date = Map.of("Applicant", Map.of("age", LocalDate.of(2000, 1, 1)));
+        assertThatThrownBy(() -> graph.evaluate("Adult", date))
                 .isInstanceOf(InvalidInputException.class).hasMessageContaining("is not a number");
     }
 
@@ -644,7 +654,8 @@ class DecisionGraphTest {
         tags.add("y");
         event.put("at", null);
         assertThat(copy).isEqualTo(Map.of("at", at, "tags", List.of("x")));
-        assertThatThrownBy(() -> ((Map<?, ?>) copy).clear()).isInstanceOf(UnsupportedOperationException.class);
+        var copied = (Map<?, ?>) copy;
+        assertThatThrownBy(copied::clear).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
@@ -722,9 +733,10 @@ class DecisionGraphTest {
 
     @Test
     void a_literal_expression_beyond_the_subset_names_the_release_that_plans_it() {
-        assertThatThrownBy(() -> DecisionGraph.builder().literalDecision("Upper", "upper case(Name)"))
+        var builder = DecisionGraph.builder();
+        assertThatThrownBy(() -> builder.literalDecision("Upper", "upper case(Name)"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("built-in functions are planned for 0.9 (#117)");
-        assertThatThrownBy(() -> DecisionGraph.builder().literalDecision("If", "if Age > 18 then 1 else 2"))
+        assertThatThrownBy(() -> builder.literalDecision("If", "if Age > 18 then 1 else 2"))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("the full FEEL language is planned for 0.8 (#116)");
     }
 

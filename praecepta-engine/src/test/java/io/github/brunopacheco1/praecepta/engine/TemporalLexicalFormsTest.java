@@ -102,11 +102,13 @@ class TemporalLexicalFormsTest {
         Assertions.assertThat(engine.evaluate(Map.of("at", valid))).containsExactly(Map.of("until", valid));
         var beyond = Map.of("at", invalid);
         Assertions.assertThatThrownBy(() -> engine.evaluate(beyond)).isInstanceOf(InvalidInputException.class).hasMessageContaining(invalid);
-        Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("at", "noon"))).isInstanceOf(InvalidInputException.class);
+        var noon = Map.of("at", "noon");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(noon)).isInstanceOf(InvalidInputException.class);
 
         var graph = DecisionGraph.read(stream(GRAPH.formatted(type)));
         Assertions.assertThat(graph.evaluate("Echo", Map.of("At", valid))).isEqualTo(FeelLiterals.value(valid, columnType(type)));
-        Assertions.assertThatThrownBy(() -> graph.evaluate("Echo", Map.of("At", invalid)))
+        var beyondInGraph = Map.of("At", invalid);
+        Assertions.assertThatThrownBy(() -> graph.evaluate("Echo", beyondInGraph))
                 .isInstanceOf(InvalidInputException.class).hasMessageContaining(invalid);
     }
 

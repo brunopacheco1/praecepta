@@ -272,8 +272,8 @@ public final class Decisions {
     public PraeceptaEngine<Map<String, String>, Map<String, String>> engine(String name) {
         var decision = get(name);
         if (decision.engine() == null) {
-            throw new NoSuchElementException("Decision '%s' is a literal expression, which has no engine of its own; evaluate it "
-                    + "with evaluate(\"%s\", inputData)".formatted(name, name));
+            throw new NoSuchElementException(("Decision '%s' is a literal expression, which has no engine of its own; evaluate it "
+                    + "with evaluate(\"%s\", inputData)").formatted(name, name));
         }
         return decision.engine();
     }

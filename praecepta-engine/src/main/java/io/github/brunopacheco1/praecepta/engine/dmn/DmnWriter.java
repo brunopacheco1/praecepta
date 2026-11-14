@@ -62,6 +62,11 @@ public final class DmnWriter {
     private static final String INPUT_DATA = "input_data_";
     /** The prefix of the ids of a model's decisions, followed by their position. */
     private static final String DECISION = "decision_";
+    /** The suffix of the name of the item definition of an input data's or a decision's type. */
+    private static final String TYPE_SUFFIX = "_type";
+    private static final String VARIABLE = "    <variable";
+    private static final String TYPE_REF = "typeRef";
+    private static final String TYPE_REF_END = "</typeRef>\n";
 
     private DmnWriter() {
     }
@@ -115,7 +120,7 @@ public final class DmnWriter {
         var inputTypes = new String[inputData.size()];
         for (int i = 0; i < inputData.size(); i++) {
             ids.put(inputData.get(i).name(), INPUT_DATA + i);
-            inputTypes[i] = typeRef(xml, inputData.get(i).type(), INPUT_DATA + i + "_type", "input data '" + inputData.get(i).name() + "'");
+            inputTypes[i] = typeRef(xml, inputData.get(i).type(), INPUT_DATA + i + TYPE_SUFFIX, "input data '" + inputData.get(i).name() + "'");
         }
         var decisionTypes = new String[decisions.size()];
         for (int d = 0; d < decisions.size(); d++) {
@@ -124,16 +129,16 @@ public final class DmnWriter {
             switch (decision.logic()) {
                 case DecisionLogic.Table(var table, var type) -> {
                     listItemDefinitions(xml, table, DECISION + d + "_");
-                    decisionTypes[d] = typeRef(xml, type, DECISION + d + "_type", "decision '" + decision.name() + "'");
+                    decisionTypes[d] = typeRef(xml, type, DECISION + d + TYPE_SUFFIX, "decision '" + decision.name() + "'");
                 }
-                case DecisionLogic.LiteralExpression literal -> decisionTypes[d] = typeRef(xml, literal.type(), DECISION + d + "_type",
+                case DecisionLogic.LiteralExpression literal -> decisionTypes[d] = typeRef(xml, literal.type(), DECISION + d + TYPE_SUFFIX,
                         "decision '" + decision.name() + "'");
             }
         }
         for (int i = 0; i < inputData.size(); i++) {
             var name = inputData.get(i).name();
             xml.append("  <inputData").append(idAndName(INPUT_DATA + i, name)).append(">\n")
-               .append("    <variable").append(idAndName(INPUT_DATA + i + "_variable", name)).append(optionalType(inputTypes[i])).append("/>\n")
+               .append(VARIABLE).append(idAndName(INPUT_DATA + i + "_variable", name)).append(optionalType(inputTypes[i])).append("/>\n")
                .append("  </inputData>\n");
         }
         for (int d = 0; d < decisions.size(); d++) {
@@ -157,7 +162,7 @@ public final class DmnWriter {
     private static void decision(StringBuilder xml, int d, DecisionModel.Decision decision, String type, Map<String, String> ids) {
         var where = "Decision '" + decision.name() + "'";
         xml.append("  <decision").append(idAndName(DECISION + d, decision.name())).append(">\n")
-           .append("    <variable").append(idAndName(DECISION + d + "_variable", decision.name())).append(optionalType(type)).append("/>\n");
+           .append(VARIABLE).append(idAndName(DECISION + d + "_variable", decision.name())).append(optionalType(type)).append("/>\n");
         var requirements = decision.requirements();
         for (int r = 0; r < requirements.size(); r++) {
             var required = requirements.get(r);
@@ -180,7 +185,7 @@ public final class DmnWriter {
 
     /** The attribute {@code typeRef="..."}, or nothing for a value of any type. */
     private static String optionalType(String typeRef) {
-        return typeRef == null ? "" : attribute("typeRef", typeRef);
+        return typeRef == null ? "" : attribute(TYPE_REF, typeRef);
     }
 
     /**
@@ -212,7 +217,7 @@ public final class DmnWriter {
         }
         xml.append(">\n");
         switch (body) {
-            case FeelType.Simple(var simple) -> xml.append(indent).append("  <typeRef>").append(typeName(simple)).append("</typeRef>\n");
+            case FeelType.Simple(var simple) -> xml.append(indent).append("  <typeRef>").append(typeName(simple)).append(TYPE_REF_END);
             case FeelType.Context(var components) -> components.forEach((component, componentType) ->
                     itemDefinition(xml, "itemComponent", component, componentType, indent + "  ", where));
             default -> xml.append(indent).append("  <typeRef>Any</typeRef>\n");
@@ -272,12 +277,12 @@ public final class DmnWriter {
             items = prefix + INPUT + v + "_item";
             var values = standardFeel(input.allowedValues(), input.type(), false, false, "input values of column '" + input.name() + "'");
             xml.append("  <itemDefinition").append(attribute("name", items)).append(">\n")
-               .append("    <typeRef>").append(typeName(input.type())).append("</typeRef>\n")
+               .append("    <typeRef>").append(typeName(input.type())).append(TYPE_REF_END)
                .append("    <allowedValues><text>").append(escapeText(values)).append("</text></allowedValues>\n")
                .append("  </itemDefinition>\n");
         }
         xml.append("  <itemDefinition").append(attribute("name", listTypeName(v, prefix))).append(attribute("isCollection", "true")).append(">\n")
-           .append("    <typeRef>").append(escapeText(items)).append("</typeRef>\n")
+           .append("    <typeRef>").append(escapeText(items)).append(TYPE_REF_END)
            .append("  </itemDefinition>\n");
     }
 
@@ -288,15 +293,15 @@ public final class DmnWriter {
 
     /** The {@code inputData} of an input, which Drools needs to bind its value. */
     private static void inputData(StringBuilder xml, int v, InputColumn input, DecisionTable table) {
-        xml.append("  <inputData").append(idAndName("input_data_" + v, input.name())).append(">\n")
-           .append("    <variable").append(idAndName("input_variable_" + v, input.name())).append(typed(input, v, table, "")).append("/>\n")
+        xml.append("  <inputData").append(idAndName(INPUT_DATA + v, input.name())).append(">\n")
+           .append(VARIABLE).append(idAndName("input_variable_" + v, input.name())).append(typed(input, v, table, "")).append("/>\n")
            .append("  </inputData>\n");
     }
 
     /** @param variables the number of inputData elements, which the decision requires */
     private static void decision(StringBuilder xml, String id, DecisionTable table, int variables) {
-        xml.append("  <decision").append(idAndName("decision_" + id, table.name())).append(">\n")
-           .append("    <variable").append(idAndName("decision_variable", table.name())).append("/>\n");
+        xml.append("  <decision").append(idAndName(DECISION + id, table.name())).append(">\n")
+           .append(VARIABLE).append(idAndName("decision_variable", table.name())).append("/>\n");
         for (int v = 0; v < variables; v++) {
             xml.append("    <informationRequirement").append(id("requirement_" + v)).append(">")
                .append("<requiredInput").append(attribute("href", "#input_data_" + v)).append("/></informationRequirement>\n");
@@ -533,12 +538,12 @@ public final class DmnWriter {
 
     /** The attribute {@code typeRef="..."} of a column type. */
     private static String typed(ColumnType type) {
-        return attribute("typeRef", typeName(type));
+        return attribute(TYPE_REF, typeName(type));
     }
 
     /** The attribute {@code typeRef="..."} of the input at {@code v}: its list type if it holds lists. */
     private static String typed(InputColumn input, int v, DecisionTable table, String prefix) {
-        return table.listInputs().contains(input.name()) ? attribute("typeRef", listTypeName(v, prefix)) : typed(input.type());
+        return table.listInputs().contains(input.name()) ? attribute(TYPE_REF, listTypeName(v, prefix)) : typed(input.type());
     }
 
     /** A column type's name in DMN. */

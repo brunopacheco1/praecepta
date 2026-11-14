@@ -55,7 +55,7 @@ final class Baseline {
         if (basedir != null) {
             return Path.of(basedir);
         }
-        return Files.isDirectory(Path.of("praecepta-tck")) ? Path.of("praecepta-tck") : Path.of("");
+        return Path.of(Files.isDirectory(Path.of("praecepta-tck")) ? "praecepta-tck" : "");
     }
 
     /**

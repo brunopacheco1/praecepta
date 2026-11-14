@@ -129,7 +129,7 @@ class DecisionGraphPropertiesTest {
             if (expected.stream().allMatch(Value.class::isInstance)) {
                 var all = graph.evaluate(graph.decisions(), inputData);
                 for (int i = 0; i < layers.size(); i++) {
-                    assertThat(all.get("T" + i)).isEqualTo(((Value) expected.get(i)).value());
+                    assertThat(all).containsEntry("T" + i, ((Value) expected.get(i)).value());
                 }
             }
         }

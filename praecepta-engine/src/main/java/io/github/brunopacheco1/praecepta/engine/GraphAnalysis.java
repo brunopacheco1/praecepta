@@ -15,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -52,6 +53,23 @@ final class GraphAnalysis {
 
         Resolution(int slot, String[] path, FeelType type) {
             this(slot, path, type, null, false);
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Resolution(int otherSlot, String[] otherPath, var otherType, var otherError, boolean otherUnsupported)
+                    && slot == otherSlot && Arrays.equals(path, otherPath) && Objects.equals(type, otherType)
+                    && Objects.equals(error, otherError) && unsupported == otherUnsupported;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(slot, Arrays.hashCode(path), type, error, unsupported);
+        }
+
+        @Override
+        public String toString() {
+            return "Resolution[" + slot + ", " + Arrays.toString(path) + ", " + type + ", " + error + ", " + unsupported + "]";
         }
     }
 
@@ -193,13 +211,11 @@ final class GraphAnalysis {
             if (requirement == null) {
                 report(d, Kind.MISSING_REQUIREMENT, ("decision '%s' reads '%s', which none of its information requirements provides "
                         + "(DMN 1.5, 7.3.4)%s").formatted(decision.name(), name, operatorHint(name)));
-                continue;
+            } else if (valid.contains(requirement)) {
+                var path = requirement.length() == name.length() ? new String[0] : name.substring(requirement.length() + 1).split("\\.");
+                resolved.put(name, new Resolution(slots.get(requirement), path, null));
             }
-            if (!valid.contains(requirement)) {
-                continue; // a requirement the model does not have, or of the other kind, which is reported already
-            }
-            var path = requirement.length() == name.length() ? new String[0] : name.substring(requirement.length() + 1).split("\\.");
-            resolved.put(name, new Resolution(slots.get(requirement), path, null));
+            // else a requirement the model does not have, or of the other kind, which is reported already
         }
         reads.add(resolved);
         listedNamedInputs.add(new LinkedHashSet<>());
@@ -390,8 +406,7 @@ final class GraphAnalysis {
                     cycle.add(start);
                     return cycle;
                 }
-                if (component.contains(r) && !previous.containsKey(r)) {
-                    previous.put(r, d);
+                if (component.contains(r) && previous.putIfAbsent(r, d) == null) {
                     queue.add(r);
                 }
             }
@@ -499,14 +514,14 @@ final class GraphAnalysis {
         reads.get(d).replaceAll((name, resolution) -> {
             var path = resolution.path();
             var type = types[resolution.slot()];
-            var at = rootName(name, path);
+            var at = new StringBuilder(rootName(name, path));
             for (var component : path) {
                 var next = type.component(component);
                 if (next == null) {
-                    return missingComponent(resolution, at, type, component);
+                    return missingComponent(resolution, at.toString(), type, component);
                 }
                 type = next;
-                at = at + "." + component;
+                at.append('.').append(component);
             }
             return new Resolution(resolution.slot(), path, type);
         });

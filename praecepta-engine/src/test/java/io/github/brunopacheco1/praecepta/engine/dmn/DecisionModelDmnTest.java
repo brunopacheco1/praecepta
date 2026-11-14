@@ -28,6 +28,8 @@ import io.github.brunopacheco1.praecepta.engine.DecisionGraph;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
@@ -81,12 +83,12 @@ class DecisionModelDmnTest {
     void reading_one_table_of_a_model_with_several_decisions_works_as_before() {
         try (var dmn = file("chain.dmn")) {
             var table = DmnReader.read(dmn, "Credit Limit");
-            assertThat(table.inputs()).extracting(column -> column.name()).containsExactly("Risk Category", "Income");
+            assertThat(table.inputs()).extracting(InputColumn::name).containsExactly("Risk Category", "Income");
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         try (var dmn = file("chain.dmn")) {
-            assertThat(DmnReader.readAll(dmn)).extracting(table -> table.name()).containsExactly("Risk Category", "Credit Limit");
+            assertThat(DmnReader.readAll(dmn)).extracting(DecisionTable::name).containsExactly("Risk Category", "Credit Limit");
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -120,17 +122,20 @@ class DecisionModelDmnTest {
     void a_type_nested_beyond_the_limit_or_defined_in_terms_of_itself_is_rejected() {
         var deep = new StringBuilder("<itemDefinition name=\"t0\"><typeRef>string</typeRef></itemDefinition>\n");
         for (int i = 1; i <= DmnReader.MAX_TYPE_DEPTH + 1; i++) {
-            deep.append("<itemDefinition name=\"t%d\"><itemComponent name=\"c\"><typeRef>t%d</typeRef></itemComponent></itemDefinition>\n"
-                    .formatted(i, i - 1));
+            deep.append("<itemDefinition name=\"t%d\"><itemComponent name=\"c\"><typeRef>t%d</typeRef></itemComponent></itemDefinition>"
+                    .formatted(i, i - 1)).append('\n');
         }
         deep.append("<inputData id=\"x\" name=\"X\"><variable name=\"X\" typeRef=\"t%d\"/></inputData>".formatted(DmnReader.MAX_TYPE_DEPTH + 1));
 
-        assertThatThrownBy(() -> read(dmn(deep.toString()))).isInstanceOf(InvalidDecisionTableException.class)
+        var tooDeep = dmn(deep.toString());
+        assertThatThrownBy(() -> read(tooDeep)).isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("nests more than 32 levels");
-        assertThatThrownBy(() -> read(dmn("""
+        var recursive = dmn("""
                 <itemDefinition name="tNode"><itemComponent name="next"><typeRef>tNode</typeRef></itemComponent></itemDefinition>
                 <inputData id="x" name="X"><variable name="X" typeRef="tNode"/></inputData>
-                """))).isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("'tNode' is defined in terms of itself");
+                """);
+        assertThatThrownBy(() -> read(recursive)).isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessageContaining("'tNode' is defined in terms of itself");
     }
 
     @Test
@@ -163,36 +168,44 @@ class DecisionModelDmnTest {
     })
     void what_praecepta_does_not_evaluate_yet_is_rejected_naming_the_issue_that_plans_it(String row) {
         var parts = row.split("\\|");
+        var xml = dmn(parts[0]);
 
-        assertThatThrownBy(() -> read(dmn(parts[0]))).isInstanceOf(InvalidDecisionTableException.class)
+        assertThatThrownBy(() -> read(xml)).isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining(parts[1]).hasMessageContaining(parts[2]);
     }
 
     @Test
     void a_decision_without_logic_an_empty_literal_and_another_expression_language_are_rejected() {
-        assertThatThrownBy(() -> read(dmn("<decision id=\"d\" name=\"D\"><variable name=\"D\"/></decision>")))
+        var noLogic = dmn("<decision id=\"d\" name=\"D\"><variable name=\"D\"/></decision>");
+        assertThatThrownBy(() -> read(noLogic))
                 .isInstanceOf(InvalidDecisionTableException.class).hasMessage("Decision 'D' has no decision logic; Praecepta evaluates "
                         + "decisions whose logic is a decision table or a literal expression");
-        assertThatThrownBy(() -> read(dmn("<decision id=\"d\" name=\"D\"><literalExpression><text> </text></literalExpression></decision>")))
+        var empty = dmn("<decision id=\"d\" name=\"D\"><literalExpression><text> </text></literalExpression></decision>");
+        assertThatThrownBy(() -> read(empty))
                 .isInstanceOf(InvalidDecisionTableException.class).hasMessage("Decision 'D': its literal expression is empty");
-        assertThatThrownBy(() -> read(dmn("<decision id=\"d\" name=\"D\"><literalExpression expressionLanguage=\"https://www.w3.org/TR/xpath\">"
-                + "<text>1</text></literalExpression></decision>")))
+        var xpath = dmn("<decision id=\"d\" name=\"D\"><literalExpression expressionLanguage=\"https://www.w3.org/TR/xpath\">"
+                + "<text>1</text></literalExpression></decision>");
+        assertThatThrownBy(() -> read(xpath))
                 .isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("Praecepta reads FEEL");
     }
 
     @Test
     void two_elements_of_the_same_name_are_rejected() {
-        assertThatThrownBy(() -> read(dmn("""
+        var xml = dmn("""
                 <inputData id="a" name="X"/>
                 <decision id="b" name="X"><literalExpression><text>1</text></literalExpression></decision>
-                """))).isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("'X' names two elements of the decision model");
+                """);
+        assertThatThrownBy(() -> read(xml)).isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessageContaining("'X' names two elements of the decision model");
     }
 
     @Test
     void an_information_requirement_must_name_one_required_element() {
-        assertThatThrownBy(() -> read(dmn("""
+        var xml = dmn("""
                 <decision id="b" name="B"><informationRequirement/><literalExpression><text>1</text></literalExpression></decision>
-                """))).isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("either a required decision or a required input");
+                """);
+        assertThatThrownBy(() -> read(xml)).isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessageContaining("either a required decision or a required input");
     }
 
     // ---- writing -----------------------------------------------------------------------------------

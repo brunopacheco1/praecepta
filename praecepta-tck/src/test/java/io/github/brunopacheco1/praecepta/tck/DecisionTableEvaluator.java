@@ -64,7 +64,7 @@ final class DecisionTableEvaluator {
     Evaluation evaluate(Check check) {
         try {
             var table = table(check.model(), check.decision());
-            return evaluate(check, table, inputValues(check, table));
+            return evaluate(table, inputValues(check, table));
         } catch (Unsupported e) {
             return new Evaluation.Unsupported(e.feature);
         }
@@ -90,7 +90,7 @@ final class DecisionTableEvaluator {
     }
 
     /** Builds an engine and evaluates the inputs. */
-    private static Evaluation evaluate(Check check, DecisionTable table, Map<String, String> inputs) {
+    private static Evaluation evaluate(DecisionTable table, Map<String, String> inputs) {
         PraeceptaEngine<Map<String, String>, PraeceptaOutput> engine;
         try {
             engine = PraeceptaEngine.<Map<String, String>, PraeceptaOutput>builder()

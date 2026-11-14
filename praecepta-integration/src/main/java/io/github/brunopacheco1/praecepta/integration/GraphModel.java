@@ -206,9 +206,9 @@ public final class GraphModel {
             throw new InvalidInputException(name, null, "nests more than %d components".formatted(MAX_DEPTH));
         }
         return switch (type) {
-            case FeelType.Context(var components) -> context(name, components, text, depth);
-            case FeelType.ListOf(FeelType.Simple(var element)) -> list(name, element, text.get(name));
-            case FeelType.ListOf(FeelType.Any any) -> list(name, ColumnType.STRING, text.get(name));
+            case FeelType.Context(var components) -> contextValue(name, components, text, depth);
+            case FeelType.ListOf(FeelType.Simple(var element)) -> listValue(name, element, text.get(name));
+            case FeelType.ListOf(FeelType.Any any) -> listValue(name, ColumnType.STRING, text.get(name));
             case FeelType.ListOf list -> {
                 if (text.get(name) != null && !text.get(name).isBlank()) {
                     throw new InvalidInputException(name, text.get(name), "is a %s, which cannot be given as text".formatted(type.feelName()));
@@ -264,29 +264,33 @@ public final class GraphModel {
         return text == null || text.isBlank() ? null : text;
     }
 
-    /** A context from the text under its components' paths; missing if none of them is given. */
-    private static Map<String, Object> context(String name, Map<String, FeelType> components, Map<String, String> text, int depth) {
+    /** A context's value: missing (null) if none of its components' paths is given, else the context of them. */
+    private static Object contextValue(String name, Map<String, FeelType> components, Map<String, String> text, int depth) {
         if (text.get(name) != null && !text.get(name).isBlank()) {
             throw new InvalidInputException(name, text.get(name), "is a context; give its components by path, such as '%s.%s'"
                     .formatted(name, components.keySet().stream().findFirst().orElse("component")));
         }
         var prefix = name + ".";
-        if (text.keySet().stream().noneMatch(key -> key.startsWith(prefix))) {
-            return null;
-        }
+        return text.keySet().stream().anyMatch(key -> key.startsWith(prefix)) ? context(prefix, components, text, depth) : null;
+    }
+
+    /** A context from the text under its components' paths, each starting with {@code prefix}. */
+    private static Map<String, Object> context(String prefix, Map<String, FeelType> components, Map<String, String> text, int depth) {
         var values = new HashMap<String, Object>();
         components.forEach((component, type) -> values.put(component, value(prefix + component, type, text, depth + 1)));
         return values;
     }
 
+    /** A list's value: missing (null) for null or blank text, else the list the text gives ({@link #list}). */
+    private static Object listValue(String name, ColumnType type, String text) {
+        return text == null || text.isBlank() ? null : list(name, type, text);
+    }
+
     /**
      * A list as a list column takes it as text: {@code ["PT", "BR"]}, {@code PT, BR} or {@code []}, {@code null} for a
-     * missing element; missing for null or blank text.
+     * missing element.
      */
     private static List<Object> list(String name, ColumnType type, String text) {
-        if (text == null || text.isBlank()) {
-            return null;
-        }
         var elements = text.strip();
         boolean bracketed = elements.startsWith("[") && elements.endsWith("]");
         if (bracketed) {

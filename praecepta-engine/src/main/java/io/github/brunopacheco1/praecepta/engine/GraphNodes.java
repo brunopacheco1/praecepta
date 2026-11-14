@@ -56,11 +56,6 @@ final class GraphNodes {
         return path.length == 0 ? values -> values[slot] : values -> GraphValues.read(values[slot], path);
     }
 
-    /** Whether values of this type may be of any type, so a column checks what it is given. */
-    private static boolean unchecked(FeelType type) {
-        return type instanceof FeelType.Any || type instanceof FeelType.ListOf(FeelType.Any any);
-    }
-
     // ---- decision tables ---------------------------------------------------------------------------
 
     /** A decision table, evaluated by a {@link PraeceptaEngine} whose inputs are the graph's slots. */
@@ -124,6 +119,11 @@ final class GraphNodes {
                 return values -> asList(read.apply(values), column, check);
             }
             return check ? values -> checked(read.apply(values), column) : read;
+        }
+
+        /** Whether values of this type may be of any type, so a column checks what it is given. */
+        private static boolean unchecked(FeelType type) {
+            return type instanceof FeelType.Any || type instanceof FeelType.ListOf(FeelType.Any any);
         }
 
         private static Object asList(Object value, ColumnRead column, boolean check) {

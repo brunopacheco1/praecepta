@@ -50,6 +50,8 @@ final class GraphSourceGenerator {
     private static final String GRAPH_TYPE = "io.github.brunopacheco1.praecepta.engine.DecisionGraph";
     private static final String REPORT_TYPE = "io.github.brunopacheco1.praecepta.engine.ValidationReport";
     private static final String EXCEPTIONS = "io.github.brunopacheco1.praecepta.engine.exceptions.";
+    /** The suffix of the name of a decision's input record, and the template slot of that name. */
+    private static final String INPUT = "Input";
 
     // ---- templates ------------------------------------------------------------------------------
 
@@ -214,7 +216,7 @@ final class GraphSourceGenerator {
         decisionClasses.forEach((decision, className) -> {
             var output = className + "Output";
             var value = type(graph.type(decision), new Name(output, output, null), 0);
-            sources.put(className + "Input", header() + inputRecord(decision, className));
+            sources.put(className + INPUT, header() + inputRecord(decision, className));
             if (!value.records().isEmpty()) {
                 sources.put(output, header() + value.records().strip() + "\n");
             }
@@ -251,11 +253,11 @@ final class GraphSourceGenerator {
     private String inputRecord(String decision, String className) {
         var components = new StringJoiner(", ");
         var needed = graph.requiredInputData(decision);
-        var members = members(needed, "Decision '" + decision + "' input data");
+        var members = members(needed, inputDataWhere(decision));
         for (int i = 0; i < needed.size(); i++) {
             components.add(inputType(needed.get(i)).javaType() + " " + members.get(i));
         }
-        return fill(INPUT_RECORD, Map.of("Decision", className, "Input", className + "Input", "components", components.toString()));
+        return fill(INPUT_RECORD, Map.of("Decision", className, INPUT, className + INPUT, "components", components.toString()));
     }
 
     /** The Java type of an input data, whose records the model class holds. */
@@ -265,9 +267,14 @@ final class GraphSourceGenerator {
         return type(graph.inputData().get(inputData), new Name(name, modelClass + "." + name, List.of(modelClass)), 1);
     }
 
+    /** A decision's input data, as errors name them. */
+    private static String inputDataWhere(String decision) {
+        return "Decision '" + decision + "' input data";
+    }
+
     private String decisionClass(String decision, String className, TypeCode value) {
         var needed = graph.requiredInputData(decision);
-        var members = members(needed, "Decision '" + decision + "' input data");
+        var members = members(needed, inputDataWhere(decision));
         var puts = new StringBuilder();
         for (int i = 0; i < needed.size(); i++) {
             var getter = "input." + members.get(i) + "()";
@@ -287,7 +294,7 @@ final class GraphSourceGenerator {
         slots.put("logic", logic);
         slots.put("Model", modelClass);
         slots.put("Decision", className);
-        slots.put("Input", className + "Input");
+        slots.put(INPUT, className + INPUT);
         slots.put("name", SourceGenerator.stringLiteral(decision));
         slots.put("type", "a {@code " + SourceGenerator.javadoc(graph.type(decision).feelName()) + "}");
         slots.put("noMatch", noMatch);
@@ -400,7 +407,7 @@ final class GraphSourceGenerator {
         var typeNames = JavaNames.distinct(componentNames, JavaNames::type, where + " components");
         int level = nestedIn.size() - 1;
         var indent = "    ".repeat(level);
-        var record = new StringJoiner(", ");
+        var recordComponents = new StringJoiner(", ");
         var arguments = new StringJoiner(", ");
         var puts = new StringBuilder();
         var records = new StringBuilder();
@@ -409,7 +416,7 @@ final class GraphSourceGenerator {
             var nested = nested(typeNames.get(i), nestedIn);
             var code = type(component.getValue(), new Name(nested, name.qualified() + "." + nested, List.copyOf(nestedIn)), depth + 1);
             var member = members.get(i++);
-            record.add(code.javaType() + " " + member);
+            recordComponents.add(code.javaType() + " " + member);
             arguments.add(code.fromValue("context.get(" + SourceGenerator.stringLiteral(component.getKey()) + ")", 0));
             puts.append('\n').append(indent).append("        context.put(").append(SourceGenerator.stringLiteral(component.getKey()))
                 .append(", ").append(code.toValue(member, 0)).append(");");
@@ -420,7 +427,7 @@ final class GraphSourceGenerator {
                 "description", "The context {@code " + SourceGenerator.javadoc(name.simple())
                         + "}: its components, as the graph gives and takes them.",
                 "Record", name.simple(),
-                "components", record.toString(),
+                "components", recordComponents.toString(),
                 "arguments", arguments.toString(),
                 "puts", puts.toString(),
                 "records", records.toString()));
@@ -429,11 +436,11 @@ final class GraphSourceGenerator {
 
     /** A nested record's name, which Java requires to differ from the classes it is nested in. */
     private static String nested(String name, List<String> enclosing) {
-        var nested = name;
-        while (enclosing.contains(nested)) {
-            nested = nested + "Value";
+        var nested = new StringBuilder(name);
+        while (enclosing.contains(nested.toString())) {
+            nested.append("Value");
         }
-        return nested;
+        return nested.toString();
     }
 
     // ---- helpers --------------------------------------------------------------------------------
