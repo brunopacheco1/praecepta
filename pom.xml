@@ -95,7 +95,7 @@
 
         <!-- Micronaut module (#77): the Micronaut 4 platform BOM, imported by praecepta-micronaut alone
              (Micronaut 5 needs Java 25, above the project's Java 21 baseline) -->
-        <micronaut-platform.version>4.10.24</micronaut-platform.version>
+        <micronaut-platform.version>5.2.5</micronaut-platform.version>
 
         <!-- Quarkus extension (#76): the BOM, imported by praecepta-quarkus and praecepta-quarkus-deployment
              only, and the extension's build plugin and annotation processor, released with it -->
