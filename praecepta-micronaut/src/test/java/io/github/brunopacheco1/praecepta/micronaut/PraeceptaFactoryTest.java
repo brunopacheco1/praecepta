@@ -102,6 +102,38 @@ class PraeceptaFactoryTest {
         }
     }
 
+    /**
+     * A file whose decisions require other decisions (#14): every decision evaluated from the model's input data
+     * through the Decisions bean, and an engine bean per decision table, which evaluates it alone.
+     */
+    @Test
+    void a_decision_requirements_graph_is_evaluated_through_the_decisions_bean() {
+        try (var context = ApplicationContext.run(Map.of("praecepta.locations", "classpath:graphs/*.dmn"))) {
+            var decisions = context.getBean(Decisions.class);
+
+            Assertions.assertThat(decisions.names()).containsExactly("Credit Limit", "Monthly Limit", "Risk Category");
+            Assertions.assertThat(decisions.evaluate("Monthly Limit", Map.of("Applicant Age", "20", "Income", "1200")))
+                    .containsExactly(Map.of("Monthly Limit", "50"));
+            Assertions.assertThat(context.getBeansOfType(PraeceptaFactory.ENGINE)).hasSize(2);
+            var limit = context.getBean(PraeceptaFactory.ENGINE, Qualifiers.byName("Credit Limit"));
+            Assertions.assertThat(limit.evaluate(Map.of("Risk Category", "High", "Income", "1200"))).containsExactly(Map.of("Credit Limit", "600"));
+            Assertions.assertThat(context.findBean(PraeceptaFactory.ENGINE, Qualifiers.byName("Monthly Limit"))).isEmpty();
+            Assertions.assertThat(decisions.describe()).containsKeys("decisions", "models");
+        }
+    }
+
+    @Test
+    void a_decision_requirements_graph_with_a_cycle_stops_startup_naming_it_unless_fail_on_is_none() {
+        var locations = "classpath:broken-graphs/cycle.dmn";
+
+        Assertions.assertThat(startupFailure(Map.of("praecepta.locations", locations)).problems()).singleElement().asString()
+                .contains("cycle.dmn: decision model 'Cycle' has validation issues at ERROR or above")
+                .contains("decisions 'A' -> 'B' -> 'A' require one another in a cycle");
+        try (var context = ApplicationContext.run(Map.of("praecepta.locations", locations, "praecepta.fail-on", "NONE"))) {
+            Assertions.assertThat(context.getBean(Decisions.class).evaluate("D", Map.of("X", "1"))).containsExactly(Map.of("D", "2"));
+        }
+    }
+
     @Test
     void application_beans_inject_the_engines_by_name() {
         try (var context = ApplicationContext.run(Map.of("praecepta-test.pricing", true))) {

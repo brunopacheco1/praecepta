@@ -31,13 +31,15 @@ import io.micronaut.core.util.StringUtils;
  * <ul>
  * <li>one {@link Decisions}, created with the application context ({@code @Context}), before the
  * application's own context-scoped beans;</li>
- * <li>for each decision, its engine, a singleton of type
+ * <li>for each decision table, its engine, a singleton of type
  * {@code PraeceptaEngine<Map<String, String>, Map<String, String>>} ({@link #ENGINE}) named after the
  * decision, injected with {@code @Named("Discount")}.</li>
  * </ul>
  *
  * The DMN files are those {@code praecepta.locations} finds with the application's class loader; every
- * decision table in them becomes one decision. A file that cannot be read, a table the engine cannot build,
+ * decision table in them becomes one decision, and in a file whose decisions require other decisions, every
+ * decision, evaluated through the file's decision requirements graph with {@link Decisions#evaluate} (a literal
+ * expression has no engine bean; a table's engine evaluates it alone). A file that cannot be read, a table the engine cannot build,
  * two decisions with one name, a location set explicitly that finds no file, a {@code praecepta.fail-on}
  * that is not a severity, and validation issues at {@code praecepta.fail-on} or above stop the application
  * from starting, with every problem listed in one {@link DecisionsException}. Issues below it are logged as
@@ -53,7 +55,7 @@ public class PraeceptaFactory {
     private static final Logger LOG = LoggerFactory.getLogger(PraeceptaFactory.class);
 
     /**
-     * Loads the decisions and registers an engine bean per decision. Created first among the context-scoped
+     * Loads the decisions and registers an engine bean per decision table. Created first among the context-scoped
      * beans, so that every bean of the application can inject the engines.
      *
      * @throws DecisionsException listing every problem with the settings, the locations or the tables
@@ -63,6 +65,9 @@ public class PraeceptaFactory {
     public Decisions decisions(PraeceptaConfiguration configuration, BeanContext context) {
         var decisions = load(configuration, context.getClassLoader());
         for (var decision : decisions.all()) {
+            if (decision.engine() == null) {
+                continue; // a literal expression of a decision model: evaluated through Decisions
+            }
             context.registerBeanDefinition(RuntimeBeanDefinition.builder(ENGINE, decision::engine)
                     .named(decision.name())
                     .singleton(true)

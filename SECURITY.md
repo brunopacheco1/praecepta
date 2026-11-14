@@ -28,7 +28,8 @@ Include what is affected, how to reproduce it, and the impact you see. What to e
   credit in the advisory unless you prefer otherwise.
 
 ## Scope
-Of particular interest: the DMN reader (`DmnReader`, which parses untrusted XML), the cell parser,
+Of particular interest: the DMN reader (`DmnReader`, which parses untrusted XML, whole decision models
+included) and the decision requirement graphs built from what it reads (`DecisionGraph`), the cell parser,
 the Excel and CSV loaders, the code generation that the Maven and Gradle plugins and the Quarkus
 extension share (`praecepta-compiler`), and the framework integrations' report endpoints. What users can
 expect, the threat model and how each threat is countered are in the

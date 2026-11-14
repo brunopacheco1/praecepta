@@ -208,6 +208,49 @@ class PraeceptaAutoConfigurationTest {
                 .singleElement().asString().contains("decision 'Grade' has validation issues at WARNING or above"));
     }
 
+    /**
+     * A file whose decisions require other decisions (#14): every decision evaluated from the model's input data
+     * through the Decisions bean, an engine bean per decision table, and the graph described by the endpoint.
+     */
+    @Test
+    void a_decision_requirements_graph_is_evaluated_through_the_decisions_bean_and_described_by_the_endpoint() {
+        runner.withConfiguration(AutoConfigurations.of(EndpointAutoConfiguration.class))
+                .withPropertyValues("praecepta.locations=classpath:graphs/*.dmn", "management.endpoints.web.exposure.include=praecepta")
+                .run(context -> {
+                    Assertions.assertThat(context).hasNotFailed();
+                    var decisions = context.getBean(Decisions.class);
+                    Assertions.assertThat(decisions.names()).containsExactly("Credit Limit", "Monthly Limit", "Risk Category");
+                    Assertions.assertThat(decisions.evaluate("Monthly Limit", Map.of("Applicant Age", "30", "Income", "1200")))
+                            .containsExactly(Map.of("Monthly Limit", "200"));
+                    // a table's engine evaluates it alone; the literal expression has no engine
+                    Assertions.assertThat(context.getBeanNamesForType(DecisionsRegistrar.ENGINE_TYPE))
+                            .containsExactlyInAnyOrder("praecepta.Credit Limit", "praecepta.Risk Category");
+                    var limit = BeanFactoryAnnotationUtils.qualifiedBeanOfType(context.getBeanFactory(), PraeceptaEngine.class, "Credit Limit");
+                    Assertions.assertThat(limit).isSameAs(decisions.engine("Credit Limit"));
+
+                    var endpoint = context.getBean(PraeceptaEndpoint.class);
+                    Assertions.assertThat(endpoint.decisions()).containsKeys("decisions", "models");
+                    Assertions.assertThat(endpoint.decision("Monthly Limit"))
+                            .containsEntry("model", "Credit")
+                            .containsEntry("logic", "literalExpression")
+                            .containsEntry("inputData", List.of("Applicant Age", "Income"));
+                });
+        runner.withPropertyValues("praecepta.locations=classpath:graphs/*.dmn", "praecepta.fail-on=WARNING").run(context ->
+                Assertions.assertThat(context).hasNotFailed());
+    }
+
+    @Test
+    void a_decision_requirements_graph_with_a_cycle_stops_startup_naming_it_unless_fail_on_is_none() {
+        var cycle = "praecepta.locations=classpath:broken-graphs/cycle.dmn";
+        runner.withPropertyValues(cycle).run(context -> Assertions.assertThat(problems(context)).singleElement().asString()
+                .contains("cycle.dmn: decision model 'Cycle' has validation issues at ERROR or above")
+                .contains("decisions 'A' -> 'B' -> 'A' require one another in a cycle"));
+        runner.withPropertyValues(cycle, "praecepta.fail-on=NONE").run(context -> {
+            Assertions.assertThat(context).hasNotFailed();
+            Assertions.assertThat(context.getBean(Decisions.class).evaluate("D", Map.of("X", "1"))).containsExactly(Map.of("D", "2"));
+        });
+    }
+
     @Test
     void the_actuator_endpoint_reports_the_decisions_when_exposed() {
         var withActuator = runner.withConfiguration(AutoConfigurations.of(EndpointAutoConfiguration.class));

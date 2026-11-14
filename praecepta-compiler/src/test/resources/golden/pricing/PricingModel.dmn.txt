@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_Pricing" name="Pricing" namespace="https://github.com/brunopacheco1/praecepta/Pricing">
+  <itemDefinition name="decision_0_type">
+    <itemComponent name="discount">
+      <typeRef>number</typeRef>
+    </itemComponent>
+    <itemComponent name="grade">
+      <typeRef>string</typeRef>
+    </itemComponent>
+  </itemDefinition>
+  <inputData id="input_data_0" name="Order Total">
+    <variable id="input_data_0_variable" name="Order Total" typeRef="number"/>
+  </inputData>
+  <inputData id="input_data_1" name="Customer Type">
+    <variable id="input_data_1_variable" name="Customer Type" typeRef="string"/>
+  </inputData>
+  <decision id="decision_0" name="Pricing">
+    <variable id="decision_0_variable" name="Pricing" typeRef="decision_0_type"/>
+    <informationRequirement id="decision_0_requirement_0"><requiredInput href="#input_data_1"/></informationRequirement>
+    <decisionTable id="decision_0_table" hitPolicy="UNIQUE">
+      <input id="decision_0_input_0" label="Customer Type">
+        <inputExpression id="decision_0_input_expression_0" typeRef="string"><text>Customer Type</text></inputExpression>
+      </input>
+      <output id="decision_0_output_0" name="discount" typeRef="number"/>
+      <output id="decision_0_output_1" name="grade" typeRef="string"/>
+      <rule id="decision_0_rule_0">
+        <inputEntry id="decision_0_input_entry_0_0"><text>"Gold"</text></inputEntry>
+        <outputEntry id="decision_0_output_entry_0_0"><text>0.2</text></outputEntry>
+        <outputEntry id="decision_0_output_entry_0_1"><text>"A"</text></outputEntry>
+      </rule>
+      <rule id="decision_0_rule_1">
+        <inputEntry id="decision_0_input_entry_1_0"><text>"Silver"</text></inputEntry>
+        <outputEntry id="decision_0_output_entry_1_0"><text>0.1</text></outputEntry>
+        <outputEntry id="decision_0_output_entry_1_1"><text>"B"</text></outputEntry>
+      </rule>
+      <rule id="decision_0_rule_2">
+        <inputEntry id="decision_0_input_entry_2_0"><text>not("Gold", "Silver")</text></inputEntry>
+        <outputEntry id="decision_0_output_entry_2_0"><text>0</text></outputEntry>
+        <outputEntry id="decision_0_output_entry_2_1"><text>"C"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_1" name="Shipping">
+    <variable id="decision_1_variable" name="Shipping" typeRef="string"/>
+    <informationRequirement id="decision_1_requirement_0"><requiredDecision href="#decision_0"/></informationRequirement>
+    <decisionTable id="decision_1_table" hitPolicy="UNIQUE">
+      <input id="decision_1_input_0" label="Pricing.grade">
+        <inputExpression id="decision_1_input_expression_0" typeRef="string"><text>Pricing.grade</text></inputExpression>
+      </input>
+      <output id="decision_1_output_0" name="Shipping" typeRef="string"/>
+      <rule id="decision_1_rule_0">
+        <inputEntry id="decision_1_input_entry_0_0"><text>"A"</text></inputEntry>
+        <outputEntry id="decision_1_output_entry_0_0"><text>"Free"</text></outputEntry>
+      </rule>
+      <rule id="decision_1_rule_1">
+        <inputEntry id="decision_1_input_entry_1_0"><text>"B", "C"</text></inputEntry>
+        <outputEntry id="decision_1_output_entry_1_0"><text>"Standard"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_2" name="Total">
+    <variable id="decision_2_variable" name="Total" typeRef="number"/>
+    <informationRequirement id="decision_2_requirement_0"><requiredDecision href="#decision_0"/></informationRequirement>
+    <informationRequirement id="decision_2_requirement_1"><requiredInput href="#input_data_0"/></informationRequirement>
+    <literalExpression id="decision_2_literal"><text>Order Total * (1 - Pricing.discount)</text></literalExpression>
+  </decision>
+</definitions>

@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 
 import io.github.brunopacheco1.praecepta.engine.OutputStrategy;
@@ -19,6 +20,7 @@ import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Issue;
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
@@ -27,11 +29,11 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 
 /**
- * One decision table loaded by a framework integration, with a map-based engine: inputs and outputs are the
+ * One decision loaded by a framework integration, with a map-based engine: inputs and outputs are the
  * columns' values as text, keyed by column name, as {@code PraeceptaEngine.Builder.inputs(...)} reads them.
  *
  * <pre>{@code
- * List<Map<String, String>> outputs = decision.engine().evaluate(Map.of("country", "PT", "age", "42"));
+ * List<Map<String, String>> outputs = decision.evaluate(Map.of("country", "PT", "age", "42"));
  * }</pre>
  *
  * Values are written as the table's cells write literals: numbers as {@code 42} or {@code 2.5}, dates as
@@ -43,22 +45,51 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
  * rule matches, the list holds the table's default output values, if it declares any, or is empty, whatever
  * the hit policy or aggregation (DMN 1.5, 10.3.2.10, step 2): a COUNT is then empty, not zero.
  *
+ * <p><b>A decision of a decision requirements graph</b> (#14): when its file holds decisions that require other
+ * decisions, or literal expressions, every decision of the file belongs to its {@link GraphModel}, and
+ * {@link #evaluate(Map)} evaluates it from the model's <em>input data</em>, by name, through the decisions it requires,
+ * each once, giving its value as maps of text ({@link GraphModel#evaluate}). Its {@link #engine()} still evaluates its
+ * table alone, from its columns, the values of the decisions it requires included, as in 0.6; a literal expression
+ * has neither table nor engine.
+ *
  * @param name     the decision's name: the DMN decision's {@code name} (or {@code id}); engines are named and
  *                 injected by it
- * @param location where the table was read from ({@link TableSource#location()})
- * @param table    the table as read
- * @param engine   the engine, built once; immutable and thread-safe
- * @param report   the table's static analysis (overlaps, unreachable rules, gaps)
+ * @param location where the decision was read from ({@link TableSource#location()})
+ * @param table    the table as read; null for a decision of a model whose logic is a literal expression
+ * @param engine   the table's engine, built once, immutable and thread-safe; null where {@code table} is
+ * @param report   the table's static analysis (overlaps, unreachable rules, gaps); empty for a literal expression.
+ *                 For a decision of a model, the analysis of its table as the graph evaluates it
+ *                 ({@code DecisionGraph.validationReport(decision)}), which the build plugins check too; the issues
+ *                 of the graph itself are its model's {@link GraphModel#report()}
+ * @param model    the decision requirements graph the decision belongs to, which {@link #evaluate} evaluates it
+ *                 through; null for a decision table read alone
  */
 public record Decision(String name, String location, DecisionTable table, PraeceptaEngine<Map<String, String>, Map<String, String>> engine,
-        ValidationReport report) {
+        ValidationReport report, GraphModel model) {
 
+    /**
+     * A decision.
+     *
+     * @throws NullPointerException     if a component that may not be null is
+     * @throws IllegalArgumentException if it has a table but no engine, or an engine but no table, or neither and no
+     *                                  model
+     */
     public Decision {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(location, "location");
-        Objects.requireNonNull(table, "table");
-        Objects.requireNonNull(engine, "engine");
         Objects.requireNonNull(report, "report");
+        if ((table == null) != (engine == null)) {
+            throw new IllegalArgumentException("Decision '%s': a table needs its engine, and an engine its table".formatted(name));
+        }
+        if (table == null && model == null) {
+            throw new IllegalArgumentException("Decision '%s' needs a table, or a model it belongs to".formatted(name));
+        }
+    }
+
+    /** A decision table read alone, as in 0.6: evaluated by its engine, from its columns. */
+    public Decision(String name, String location, DecisionTable table, PraeceptaEngine<Map<String, String>, Map<String, String>> engine,
+            ValidationReport report) {
+        this(name, location, Objects.requireNonNull(table, "table"), Objects.requireNonNull(engine, "engine"), report, null);
     }
 
     /**
@@ -101,9 +132,33 @@ public record Decision(String name, String location, DecisionTable table, Praece
         return new Decision(table.name(), location, table, engine, engine.validationReport());
     }
 
-    /** Evaluates an input: the column values by column name, as text. */
+    /**
+     * A decision of a decision requirements graph: its table's map-based engine, if its logic is a table, and the model,
+     * which evaluates it. Validation never fails here; {@link Decisions#load} decides what fails.
+     *
+     * @param logReport whether the table's engine logs its validation report; the graph's own tables log theirs as
+     *                  {@link GraphModel#of} says
+     * @throws NoSuchElementException   if the model has no decision of that name
+     * @throws IllegalArgumentException if its table cannot be built into an engine
+     */
+    public static Decision of(GraphModel model, String name, boolean logReport) {
+        var element = model.graph().model().decision(name).orElseThrow(() -> new NoSuchElementException(
+                "Decision model '%s' has no decision named '%s'".formatted(model.name(), name)));
+        if (element.logic() instanceof DecisionLogic.Table(var table, var type)) {
+            // the report is the graph's analysis of the table, as the build plugins check it, so fail-on agrees with them
+            var alone = of(model.location(), table, logReport);
+            return new Decision(name, model.location(), table, alone.engine(), model.graph().validationReport(name), model);
+        }
+        return new Decision(name, model.location(), null, null, model.graph().validationReport(name), model);
+    }
+
+    /**
+     * Evaluates the decision: a table read alone from its column values by column name, as text; a decision of a
+     * {@linkplain #model() model} from the model's input data by name, as text, through the decisions it requires
+     * ({@link GraphModel#evaluate}).
+     */
     public List<Map<String, String>> evaluate(Map<String, String> input) {
-        return engine.evaluate(input);
+        return model == null ? engine.evaluate(input) : model.evaluate(name, input);
     }
 
     /**
@@ -111,12 +166,25 @@ public record Decision(String name, String location, DecisionTable table, Praece
      * {@code name}, {@code location}, {@code hitPolicy}, {@code aggregation} (null for none), {@code rules}
      * (how many), {@code inputs} and {@code outputs} (each {@code name}, {@code type}, and for inputs
      * {@code list}), and {@code issues} (each {@code severity}, {@code kind}, {@code rules}, {@code detail},
-     * {@code example} and {@code message}).
+     * {@code example} and {@code message}). A decision of a model has no table keys for a literal expression, and
+     * adds {@code model}, {@code logic}, {@code expression} (for a literal expression), {@code type},
+     * {@code requiredDecisions}, {@code inputData} and {@code canEvaluate} ({@link GraphModel}).
      */
     public Map<String, Object> describe() {
         var description = new LinkedHashMap<String, Object>();
         description.put("name", name);
         description.put("location", location);
+        if (table != null) {
+            describeTable(description);
+        }
+        description.put("issues", report.issues().stream().map(Decision::describe).toList());
+        if (model != null) {
+            description.putAll(model.describe(name));
+        }
+        return Collections.unmodifiableMap(description);
+    }
+
+    private void describeTable(Map<String, Object> description) {
         description.put("hitPolicy", table.hitPolicy().name());
         description.put("aggregation", table.aggregation() == null ? null : table.aggregation().name());
         description.put("rules", table.rules().size());
@@ -132,11 +200,10 @@ public record Decision(String name, String location, DecisionTable table, Praece
         description.put("outputs", table.outputs().stream()
                 .map(output -> Map.<String, Object>of("name", output.name(), "type", output.type().name()))
                 .toList());
-        description.put("issues", report.issues().stream().map(Decision::describe).toList());
-        return Collections.unmodifiableMap(description);
     }
 
-    private static Map<String, Object> describe(Issue issue) {
+    /** An issue as plain maps, for a management endpoint. */
+    static Map<String, Object> describe(Issue issue) {
         var description = new LinkedHashMap<String, Object>();
         description.put("severity", issue.severity().name());
         description.put("kind", issue.kind().name());

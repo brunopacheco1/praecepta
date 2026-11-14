@@ -54,9 +54,9 @@ SPDX-License-Identifier: Apache-2.0
           <h1>DMN decision tables for Java, answered in a fraction of a&nbsp;microsecond.</h1>
           <p class="lede">
             <em>Praecepta</em> (Latin for “rules”, said <em>pry-KEP-ta</em>) evaluates DMN decision tables
-            with strict DMN hit policies. Write tables in a modeller, Excel, CSV or code; validate them
-            when you build; evaluate them with a small engine that has no dependencies, on its own or as
-            beans in Spring Boot, Quarkus or Micronaut.
+            with strict DMN hit policies, and the decision requirement graphs that join them. Write tables
+            in a modeller, Excel, CSV or code; validate them when you build; evaluate them with a small
+            engine that has no dependencies, on its own or as beans in Spring Boot, Quarkus or Micronaut.
           </p>
           <div class="actions">
             <a class="button primary" href="#start">Get started</a>
@@ -127,6 +127,12 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
             covers, with an example) and default outputs no input can reach, for list columns too.</p>
         </article>
         <article>
+          <h3>Decision requirement graphs</h3>
+          <p>Decisions that require other decisions and input data, each a table or a literal expression
+            such as <code>Credit Limit / 12</code>, evaluated in dependency order, with cycles, missing
+            requirements and type mismatches reported when the graph is built.</p>
+        </article>
+        <article>
           <h3>DMN in, DMN out</h3>
           <p>Reads DMN 1.1 to 1.5, including files from Camunda Modeler and outputs that compute, as in
             <code>(price - discount) * 1.2</code> or <code>due + duration("P14D")</code>, and writes DMN 1.3
@@ -134,13 +140,15 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
         </article>
         <article>
           <h3>Maven and Gradle plugins</h3>
-          <p>Compile Excel, CSV and DMN tables at build time into typed input and output records, so your
-            application ships only the engine. Both generate the same classes.</p>
+          <p>Compile Excel, CSV and DMN tables at build time into typed input and output records, and a
+            typed class per decision of a graph, so your application ships only the engine. Both generate
+            the same classes.</p>
         </article>
         <article>
           <h3>Spring Boot, Quarkus, Micronaut</h3>
-          <p>Drop DMN files under <code>rules/</code> and inject one engine per decision. An invalid table
-            stops the application from starting, or Quarkus from building it, with every problem listed.</p>
+          <p>Drop DMN files under <code>rules/</code> and inject one engine per decision table, or evaluate
+            any decision, a graph's too, by name. An invalid table or graph stops the application from
+            starting, or Quarkus from building it, with every problem listed.</p>
         </article>
         <article>
           <h3>Native images</h3>
@@ -203,8 +211,9 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
         <li>
           <h3>Or let your framework load them</h3>
           <p>Put DMN files under <code>src/main/resources/rules/</code> and add one module instead of the
-            engine. Each decision becomes an engine bean, named after it; an invalid table stops the
-            application from starting, or Quarkus from building it.</p>
+            engine. Each decision table becomes an engine bean, named after its decision, and the
+            <code>Decisions</code> bean evaluates every decision, a graph's too, by name; an invalid table
+            stops the application from starting, or Quarkus from building it.</p>
           <ul class="plain">
             <li>Spring Boot 4: <code>praecepta-spring-boot-starter</code>, inject with
               <code>@Qualifier("Discount")</code> (<a href="https://github.com/brunopacheco1/praecepta#praecepta-spring-boot-starter">guide</a>)</li>
@@ -272,18 +281,25 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
 
     <section class="wrap section" aria-labelledby="not-title">
       <h2 id="not-title">What it is not</h2>
-      <p>Praecepta does one thing: single DMN decision tables, fast. Use Camunda or Drools when you need:</p>
+      <p>Praecepta is on its way to a full DMN 1.5 engine, one layer per release
+        (<a href="https://github.com/brunopacheco1/praecepta/issues/120">#120</a>), but it is not one yet. Today it evaluates decision tables and the
+        graphs of tables and literal expressions around them. It does not have these yet; when you need one
+        before its release, use Camunda or Drools:</p>
       <ul class="plain">
-        <li><strong>Full FEEL:</strong> functions, contexts, <code>if</code> and tests that compute, such as
-          <code>income &gt; 2 * rent</code>. Praecepta's input entries are FEEL simple unary tests: in DMN
-          they may compare with another input (<code>&gt; limit</code>) or test a list's elements, but not
-          compute. Output entries may compute with <code>+ - * / **</code> on strings, numbers, dates, times
-          and durations, but call no functions other than the date and time literals.</li>
-        <li><strong>Decision requirement graphs:</strong> decisions feeding other decisions, business
-          knowledge models and boxed expressions
-          (<a href="https://github.com/brunopacheco1/praecepta/issues/14">#14</a>).</li>
-        <li><strong>A process engine, a modeller or a decision service</strong> around the tables.</li>
+        <li><strong>Full FEEL</strong> (0.8, <a href="https://github.com/brunopacheco1/praecepta/issues/116">#116</a>): list and context expressions, <code>if</code>,
+          <code>for</code>, filters, <code>and</code> and <code>or</code>, and tests that compute, such as
+          <code>income &gt; 2 * rent</code>. Praecepta's input entries are FEEL simple unary tests: in DMN they
+          may compare with another input (<code>&gt; limit</code>) or test a list's elements, but not compute.
+          Output entries and literal expressions may compute with <code>+ - * / **</code> on strings, numbers,
+          dates, times and durations.</li>
+        <li><strong>Built-in functions</strong> (0.9, <a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>), such as <code>sum(...)</code>:
+          none is called but the date and time literals.</li>
+        <li><strong>Business knowledge models and boxed expressions</strong> (0.10,
+          <a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>), and <strong>decision services and imports</strong> (0.11,
+          <a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>).</li>
       </ul>
+      <p>Nor will it be a process engine, a modeller or a server around the decisions: it is a library your
+        application calls.</p>
     </section>
 
     <section id="security" class="wrap section" aria-labelledby="security-title">
@@ -455,36 +471,48 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
       <h2 id="roadmap-title">Roadmap</h2>
       <ol class="timeline">
         <li>
-          <h3>0.6 · released</h3>
+          <h3>0.7 · released</h3>
           <ul class="plain">
-            <li>Analysis of rules that test list columns (<a href="https://github.com/brunopacheco1/praecepta/issues/78">#78</a>)</li>
-            <li>More FEEL in cells: <code>=</code> and <code>!=</code> tests and other literal forms, times with a zone id,
-              missing elements in lists (<a href="https://github.com/brunopacheco1/praecepta/issues/81">#81</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/82">#82</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/84">#84</a>)</li>
-            <li>Output expressions over dates, times and durations (<a href="https://github.com/brunopacheco1/praecepta/issues/85">#85</a>); behaviour DMN 1.5 leaves open,
-              <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/DMN-CONFORMANCE.md">recorded</a> (<a href="https://github.com/brunopacheco1/praecepta/issues/86">#86</a>)</li>
-            <li>Null outputs in aggregations, null defaults, and default outputs on complete tables, as DMN 1.5
-              defines them (<a href="https://github.com/brunopacheco1/praecepta/issues/90">#90</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/91">#91</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/92">#92</a>)</li>
-            <li>The Gradle plugin on the Gradle Plugin Portal, native builds of the framework integrations in CI,
-              and smaller fixes (<a href="https://github.com/brunopacheco1/praecepta/issues/93">#93</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/99">#99</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/95">#95</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/96">#96</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/98">#98</a>)</li>
-            <li>The DMN conformance kit still passes 83 of 86; the rest need decisions feeding other decisions
-              (<a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
+            <li>Decision requirement graphs: decisions that require other decisions, each a table or a literal
+              expression, in the engine, the build plugins and the framework integrations (<a href="https://github.com/brunopacheco1/praecepta/issues/14">#14</a>)</li>
+            <li>The whole DMN conformance kit, scored: 454 of 3,511 result nodes pass, 454 of the 458 Praecepta
+              evaluates; decision tables still pass 83 of 86 (<a href="https://github.com/brunopacheco1/praecepta/issues/115">#115</a>,
+              <a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
+            <li>Rules reached only by a time with a zone id no longer reported unreachable (<a href="https://github.com/brunopacheco1/praecepta/issues/114">#114</a>)</li>
           </ul>
         </li>
         <li>
-          <h3>Next: 0.7</h3>
+          <h3>Next: 0.8</h3>
           <ul class="plain">
-            <li>Decisions feeding other decisions, if they fit (<a href="https://github.com/brunopacheco1/praecepta/issues/14">#14</a>)</li>
-          </ul>
-        </li>
-        <li>
-          <h3>0.8</h3>
-          <ul class="plain">
-            <li>An online playground: paste a table, see its validation report and try inputs (<a href="https://github.com/brunopacheco1/praecepta/issues/21">#21</a>)</li>
+            <li>The FEEL core: the whole expression language, in literal expressions, cells and output entries
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/116">#116</a>)</li>
           </ul>
         </li>
         <li>
           <h3>0.9</h3>
           <ul class="plain">
+            <li>FEEL's built-in functions (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>)</li>
+          </ul>
+        </li>
+        <li>
+          <h3>0.10</h3>
+          <ul class="plain">
+            <li>Boxed expressions and business knowledge models; decision tables reach 86 of 86 in the
+              conformance kit (<a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>)</li>
+          </ul>
+        </li>
+        <li>
+          <h3>0.11 and 1.0</h3>
+          <ul class="plain">
+            <li>Decision services, imports and the rest of DMN 1.5, then a DMN 1.5 conformance claim and a
+              stable API (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>)</li>
+            <li>A second maintainer, so every change is reviewed by someone other than its author</li>
+          </ul>
+        </li>
+        <li>
+          <h3>After 1.0</h3>
+          <ul class="plain">
+            <li>An online playground: paste a table, see its validation report and try inputs (<a href="https://github.com/brunopacheco1/praecepta/issues/21">#21</a>)</li>
             <li>Kotlin: a null-safe API through JSpecify, Kotlin code from the build plugins, and a Kotlin DSL
               (<a href="https://github.com/brunopacheco1/praecepta/issues/104">#104</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/105">#105</a>, <a href="https://github.com/brunopacheco1/praecepta/issues/106">#106</a>)</li>
           </ul>
@@ -495,15 +523,9 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
             <li>Micronaut 5, once the Java baseline moves past 21 (<a href="https://github.com/brunopacheco1/praecepta/issues/94">#94</a>)</li>
           </ul>
         </li>
-        <li>
-          <h3>Towards 1.0</h3>
-          <ul class="plain">
-            <li>A stable API, once these features settle</li>
-            <li>A second maintainer, so every change is reviewed by someone other than its author</li>
-          </ul>
-        </li>
       </ol>
-      <p class="more">These are intentions, not promises: the
+      <p class="more">The plan to a full DMN 1.5 engine is tracked in <a href="https://github.com/brunopacheco1/praecepta/issues/120">#120</a>. These are
+        intentions, not promises: the
         <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/ROADMAP.md">roadmap</a> follows what people ask for.</p>
     </section>
 

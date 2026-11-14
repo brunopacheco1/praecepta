@@ -21,7 +21,7 @@ import org.gradle.api.tasks.SourceSetContainer;
  * <pre>{@code
  * plugins {
  *     java
- *     id("io.github.brunopacheco1.praecepta") version "0.5.0"
+ *     id("io.github.brunopacheco1.praecepta") version "0.7.0"
  * }
  *
  * praecepta {

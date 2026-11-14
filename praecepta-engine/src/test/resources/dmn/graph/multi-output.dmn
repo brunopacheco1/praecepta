@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A table with two outputs gives a context, whose components Shipping and Total read by path -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="pricing" name="Pricing" namespace="https://example.com/pricing">
+  <itemDefinition name="tPricing">
+    <itemComponent name="discount"><typeRef>number</typeRef></itemComponent>
+    <itemComponent name="grade"><typeRef>string</typeRef></itemComponent>
+  </itemDefinition>
+  <inputData id="total" name="Order Total">
+    <variable name="Order Total" typeRef="number"/>
+  </inputData>
+  <inputData id="customer" name="Customer Type">
+    <variable name="Customer Type" typeRef="string"/>
+  </inputData>
+  <decision id="pricing_decision" name="Pricing">
+    <variable name="Pricing" typeRef="tPricing"/>
+    <informationRequirement><requiredInput href="#customer"/></informationRequirement>
+    <decisionTable id="pricing_table" hitPolicy="UNIQUE">
+      <input>
+        <inputExpression typeRef="string"><text>Customer Type</text></inputExpression>
+      </input>
+      <output name="discount" typeRef="number"/>
+      <output name="grade" typeRef="string"/>
+      <rule>
+        <inputEntry><text>"Gold"</text></inputEntry>
+        <outputEntry><text>0.2</text></outputEntry>
+        <outputEntry><text>"A"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>"Silver"</text></inputEntry>
+        <outputEntry><text>0.1</text></outputEntry>
+        <outputEntry><text>"B"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>not("Gold", "Silver")</text></inputEntry>
+        <outputEntry><text>0</text></outputEntry>
+        <outputEntry><text>"C"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="shipping" name="Shipping">
+    <variable name="Shipping" typeRef="string"/>
+    <informationRequirement><requiredDecision href="#pricing_decision"/></informationRequirement>
+    <decisionTable id="shipping_table" hitPolicy="UNIQUE">
+      <input>
+        <inputExpression typeRef="string"><text>Pricing.grade</text></inputExpression>
+      </input>
+      <output typeRef="string"/>
+      <rule>
+        <inputEntry><text>"A"</text></inputEntry>
+        <outputEntry><text>"Free"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>"B", "C"</text></inputEntry>
+        <outputEntry><text>"Standard"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="final_total" name="Total">
+    <variable name="Total" typeRef="number"/>
+    <informationRequirement><requiredInput href="#total"/></informationRequirement>
+    <informationRequirement><requiredDecision href="#pricing_decision"/></informationRequirement>
+    <literalExpression><text>Order Total * (1 - Pricing.discount)</text></literalExpression>
+  </decision>
+</definitions>

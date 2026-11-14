@@ -88,6 +88,10 @@
                         <table>
                             <source>rules/shipping.dmn</source>
                         </table>
+                        <!-- a decision requirements graph (#14): a class per decision and CreditModel -->
+                        <table>
+                            <source>rules/credit.dmn</source>
+                        </table>
                     </tables>
                 </configuration>
             </plugin>

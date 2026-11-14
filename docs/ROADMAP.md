@@ -11,73 +11,70 @@ priorities follow what users ask for, so a 👍 or a comment on an issue moves i
 are made is in [GOVERNANCE.md](../GOVERNANCE.md); past decisions are in
 [MODERNISATION.md](MODERNISATION.md).
 
-## 0.6
-Released in November 2026 (see the [changelog](../CHANGELOG.md)), with the DMN 1.5 gaps that the
-reviews of 0.4 and 0.5 against the specification found in single tables:
-- **Analysis of rules that test list columns**
-  ([#78](https://github.com/brunopacheco1/praecepta/issues/78)): overlaps, unreachable rules and
-  gaps for them too.
-- **FEEL literal forms and the `=` and `!=` tests**
-  ([#81](https://github.com/brunopacheco1/praecepta/issues/81)), such as `!= "PT"`, `1.2e3`,
-  `@"2025-01-31"`, `date(2025, 1, 31)` and comments.
-- **Times with a zone id** ([#82](https://github.com/brunopacheco1/praecepta/issues/82)), such as
-  `time("10:30:00@Europe/Paris")`.
-- **Missing elements in list inputs** ([#84](https://github.com/brunopacheco1/praecepta/issues/84)),
-  as FEEL's list functions treat them.
-- **Output expressions over dates, times and durations**
-  ([#85](https://github.com/brunopacheco1/praecepta/issues/85)), as in `due + duration("P14D")`.
-- **Behaviour that DMN 1.5 and the TCK leave undecided**
-  ([#86](https://github.com/brunopacheco1/praecepta/issues/86)), recorded in
-  [DMN-CONFORMANCE.md](DMN-CONFORMANCE.md) until a later DMN version or the TCK decides it.
-- **Fixes** that follow DMN 1.5: SUM, MIN and MAX give null when a matching rule's output is null
-  ([#90](https://github.com/brunopacheco1/praecepta/issues/90)), a complete table that declares a
-  default output is an error ([#91](https://github.com/brunopacheco1/praecepta/issues/91)), and a
-  null default is told from no default ([#92](https://github.com/brunopacheco1/praecepta/issues/92)).
+## The plan: a full DMN 1.5 engine
+From 0.7, Praecepta grows from a validated decision-table engine into a full DMN 1.5 engine, one layer
+per release, tracked in [#120](https://github.com/brunopacheco1/praecepta/issues/120). Each layer is
+scored against the whole [DMN TCK](../praecepta-tck/RESULTS.md) and judged by the DMN 1.5
+specification and the TCK alone. Decision tables keep what sets Praecepta apart, the validation report
+and the typed generated code; the general engine evaluates everything around them, and the generated
+classes gain each feature through it.
 
-And for the integrations shipped in 0.5:
-- **The Gradle plugin on the Gradle Plugin Portal**
-  ([#93](https://github.com/brunopacheco1/praecepta/issues/93)), so `pluginManagement` needs no
-  `mavenCentral()`.
-- **Native builds of Spring Boot, Micronaut and Quarkus applications in CI**
-  ([#99](https://github.com/brunopacheco1/praecepta/issues/99)).
-- Smaller fixes: validation issues logged once
-  ([#95](https://github.com/brunopacheco1/praecepta/issues/95)), `DmnReader` pinned to the JDK's XML
-  parser ([#96](https://github.com/brunopacheco1/praecepta/issues/96)), and published POMs without
-  the JUnit BOM ([#98](https://github.com/brunopacheco1/praecepta/issues/98)). The Gradle plugin
-  keeps compiling against the Gradle 8.11.1 API, for reasons recorded in
-  [ARCHITECTURE.md](ARCHITECTURE.md) ([#97](https://github.com/brunopacheco1/praecepta/issues/97)).
+## 0.7
+Released in November 2026 (see the [changelog](../CHANGELOG.md)):
+- **Decision requirement graphs** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)):
+  DMN models whose decisions require other decisions and input data, where each decision is a
+  decision table or a literal expression in the arithmetic of output entries. `DecisionGraph`
+  evaluates them in dependency order and reports cycles, missing requirements and type mismatches
+  when it is built; the Maven and Gradle plugins generate a typed class per decision, and Spring
+  Boot, Micronaut and Quarkus evaluate them by name.
+- **The whole DMN TCK, scored** ([#115](https://github.com/brunopacheco1/praecepta/issues/115)):
+  every model of compliance levels 2 and 3. 454 of its 3,511 result nodes pass (12.9 %), and 454
+  of the 458 that Praecepta evaluates; every other node is listed with the release that brings what
+  it needs. The decision-table checks still pass 83 of 86, and the build fails only on a
+  regression.
+- **A fix**: rules reached only by a time with a zone id that no cell names are no longer reported
+  unreachable ([#114](https://github.com/brunopacheco1/praecepta/issues/114)).
 
-The TCK stays at 83 of 86 checks; the other 3 need decision requirement graphs. Its arithmetic test
-cases now also run as output expressions: Praecepta reads 489 of their 1,101 checks, and gives the
-kit's result for all but one.
-
-## Next: 0.7
-- **Decision requirement graphs** (decisions feeding other decisions,
-  [#14](https://github.com/brunopacheco1/praecepta/issues/14)), the last 3 TCK checks, if they fit
-  without turning Praecepta into a full DMN engine.
-
-## 0.8
-- **An online playground** ([#21](https://github.com/brunopacheco1/praecepta/issues/21)): paste a
-  table, see its validation report and evaluate inputs, without installing anything.
+## Next: 0.8
+- **The FEEL core** ([#116](https://github.com/brunopacheco1/praecepta/issues/116)): the whole
+  expression language of DMN 1.5: three-valued boolean logic, lists, contexts and ranges as values,
+  `if`, comparisons, `between`, `in` and `instance of` as expressions, paths, filters, `for` and
+  `some`/`every`, and function invocations, in literal expressions and in the cells and output
+  entries of decision tables, which keep their analysis and generated code.
 
 ## 0.9
-Praecepta for Kotlin:
-- **A null-safe API** through [JSpecify](https://jspecify.dev)
-  ([#104](https://github.com/brunopacheco1/praecepta/issues/104)), so Kotlin, and Java tools such as
-  NullAway, see which values may be null, in the engine and in the generated classes.
-- **Kotlin code from the build plugins**
-  ([#105](https://github.com/brunopacheco1/praecepta/issues/105)): the Maven and Gradle plugins and
-  the Quarkus extension generate Kotlin data classes and objects, when asked, instead of Java.
-- **A Kotlin DSL module** ([#106](https://github.com/brunopacheco1/praecepta/issues/106)),
-  `praecepta-kotlin`, for building engines and rules in Kotlin.
+- **Built-in functions** ([#117](https://github.com/brunopacheco1/praecepta/issues/117)): DMN 1.5's
+  function library: conversion, boolean, string, list, numeric, date and time, range and context
+  functions, such as `substring`, `sum`, `round half up` and `day of week`.
+
+## 0.10
+- **Boxed expressions and business knowledge models**
+  ([#118](https://github.com/brunopacheco1/praecepta/issues/118)): invocations, function
+  definitions, boxed contexts, relations, lists, conditionals, iterators and filters, and
+  structured inputs typed by item definitions. With them the decision tables of the TCK reach 86
+  of 86.
+
+## 0.11 and 1.0
+- **Decision services, imports and the rest of DMN 1.5**
+  ([#119](https://github.com/brunopacheco1/praecepta/issues/119)), then 1.0: a claim of DMN 1.5
+  conformance, scored against the whole TCK, and a stable API, once the project has a second
+  maintainer (see [GOVERNANCE.md](../GOVERNANCE.md)). After 1.0, breaking changes wait for a major
+  version.
+
+## After 1.0
+- **An online playground** ([#21](https://github.com/brunopacheco1/praecepta/issues/21)): paste a
+  table, see its validation report and evaluate inputs, without installing anything.
+- **Praecepta for Kotlin**: a null-safe API through [JSpecify](https://jspecify.dev)
+  ([#104](https://github.com/brunopacheco1/praecepta/issues/104)), so Kotlin, and Java tools such
+  as NullAway, see which values may be null, in the engine and in the generated classes; Kotlin
+  code from the build plugins ([#105](https://github.com/brunopacheco1/praecepta/issues/105)), data
+  classes and objects instead of Java when asked; and a Kotlin DSL module
+  ([#106](https://github.com/brunopacheco1/praecepta/issues/106)), `praecepta-kotlin`, for building
+  engines and rules in Kotlin.
 
 ## Later
 - **Micronaut 5** ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25:
   once the project's Java baseline moves past 21.
-
-## Towards 1.0
-A stable API, once the features above have settled and the project has a second maintainer
-(see [GOVERNANCE.md](../GOVERNANCE.md)). After 1.0, breaking changes wait for a major version.
 
 ## The project itself
 - **A second maintainer**, so every change can be reviewed by someone other than its author.

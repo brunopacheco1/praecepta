@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Decisions whose logic is a literal expression, over strings, numbers, dates and durations -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="literals" name="Literals" namespace="https://example.com/literals">
+  <itemDefinition name="tLoan">
+    <itemComponent name="principal"><typeRef>number</typeRef></itemComponent>
+    <itemComponent name="rate"><typeRef>number</typeRef></itemComponent>
+    <itemComponent name="months"><typeRef>number</typeRef></itemComponent>
+  </itemDefinition>
+  <inputData id="name" name="Full Name">
+    <variable name="Full Name" typeRef="string"/>
+  </inputData>
+  <inputData id="start" name="Start">
+    <variable name="Start" typeRef="date"/>
+  </inputData>
+  <inputData id="hours" name="Hours">
+    <variable name="Hours" typeRef="number"/>
+  </inputData>
+  <inputData id="loan" name="Loan">
+    <variable name="Loan" typeRef="tLoan"/>
+  </inputData>
+  <decision id="greeting" name="Greeting">
+    <variable name="Greeting" typeRef="string"/>
+    <informationRequirement><requiredInput href="#name"/></informationRequirement>
+    <literalExpression><text>"Hello " + Full Name</text></literalExpression>
+  </decision>
+  <decision id="due" name="Due">
+    <variable name="Due" typeRef="date"/>
+    <informationRequirement><requiredInput href="#start"/></informationRequirement>
+    <literalExpression><text>Start + duration("P14D")</text></literalExpression>
+  </decision>
+  <decision id="starts_at" name="Starts At">
+    <variable name="Starts At" typeRef="dateTime"/>
+    <informationRequirement><requiredInput href="#start"/></informationRequirement>
+    <literalExpression><text>Start</text></literalExpression>
+  </decision>
+  <decision id="shift" name="Shift">
+    <informationRequirement><requiredInput href="#hours"/></informationRequirement>
+    <literalExpression><text>duration("PT1H") * Hours</text></literalExpression>
+  </decision>
+  <decision id="payment" name="Payment">
+    <variable name="Payment" typeRef="number"/>
+    <informationRequirement><requiredInput href="#loan"/></informationRequirement>
+    <literalExpression><text>(Loan.principal * Loan.rate / 12) / (1 - (1 + Loan.rate / 12) ** -Loan.months)</text></literalExpression>
+  </decision>
+</definitions>

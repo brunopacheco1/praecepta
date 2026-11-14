@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.compiler;
 
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
@@ -25,9 +26,14 @@ import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
  *                     {@code name}, {@code decision}, {@code hitPolicy}, {@code aggregation}, {@code inputs},
  *                     {@code outputs}, {@code list}, {@code fileHeader}); {@link #XML_ELEMENTS} for a Maven
  *                     pom, {@link #QUOTED} by default
+ * @param log          where the compiler sends a line the build tool should log at its informational level (Maven's
+ *                     info, Gradle's lifecycle): one per DMN source whose decision table is compiled alone because
+ *                     {@code DmnReader.readModel} rejects its model with what a later release plans, naming the file,
+ *                     the feature and the release and issue that plan it, so that the graph left out is seen; none by
+ *                     default
  */
 public record CompilerOptions(String packageName, Severity failOn, String fileHeader, String generator,
-        UnaryOperator<String> settingNames) {
+        UnaryOperator<String> settingNames, Consumer<String> log) {
 
     /** Names settings as the elements of a Maven pom: {@code <hitPolicy>}. */
     public static final UnaryOperator<String> XML_ELEMENTS = setting -> "<" + setting + ">";
@@ -35,10 +41,21 @@ public record CompilerOptions(String packageName, Severity failOn, String fileHe
     /** Names settings as quoted words: {@code 'hitPolicy'}. */
     public static final UnaryOperator<String> QUOTED = setting -> "'" + setting + "'";
 
+    /** Logs nothing. */
+    private static final Consumer<String> NO_LOG = line -> {
+        // the build tool did not ask for the compiler's lines
+    };
+
     public CompilerOptions {
         Objects.requireNonNull(packageName, "packageName");
         Objects.requireNonNull(generator, "generator");
         Objects.requireNonNull(settingNames, "settingNames");
+        Objects.requireNonNull(log, "log");
+    }
+
+    /** Options that log nothing ({@link #withLog} sets where the compiler's lines go). */
+    public CompilerOptions(String packageName, Severity failOn, String fileHeader, String generator, UnaryOperator<String> settingNames) {
+        this(packageName, failOn, fileHeader, generator, settingNames, NO_LOG);
     }
 
     /**
@@ -48,22 +65,27 @@ public record CompilerOptions(String packageName, Severity failOn, String fileHe
      * @param generator   the tool named in the generated sources, such as {@code praecepta-gradle-plugin}
      */
     public static CompilerOptions of(String packageName, String generator) {
-        return new CompilerOptions(packageName, Severity.ERROR, null, generator, QUOTED);
+        return new CompilerOptions(packageName, Severity.ERROR, null, generator, QUOTED, NO_LOG);
     }
 
     /** These options with another {@link #failOn()} severity; null never fails on validation. */
     public CompilerOptions withFailOn(Severity severity) {
-        return new CompilerOptions(packageName, severity, fileHeader, generator, settingNames);
+        return new CompilerOptions(packageName, severity, fileHeader, generator, settingNames, log);
     }
 
     /** These options with another {@link #fileHeader()}; null for none. */
     public CompilerOptions withFileHeader(String header) {
-        return new CompilerOptions(packageName, failOn, header, generator, settingNames);
+        return new CompilerOptions(packageName, failOn, header, generator, settingNames, log);
     }
 
     /** These options with another way of naming settings in messages. */
     public CompilerOptions withSettingNames(UnaryOperator<String> naming) {
-        return new CompilerOptions(packageName, failOn, fileHeader, generator, naming);
+        return new CompilerOptions(packageName, failOn, fileHeader, generator, naming, log);
+    }
+
+    /** These options sending the compiler's informational lines to {@code lines} ({@link #log()}). */
+    public CompilerOptions withLog(Consumer<String> lines) {
+        return new CompilerOptions(packageName, failOn, fileHeader, generator, settingNames, lines);
     }
 
     /** The tool's name for a setting, for messages. */

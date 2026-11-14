@@ -143,16 +143,17 @@ class ZonedTimesTest {
             Assertions.assertThat(cutOff.toLocalTime()).isAfterOrEqualTo(LocalTime.NOON);
             Assertions.assertThat(engine.evaluate(new Delivery(cutOff, null))).isEmpty();
         });
-        // a time before 05:00 on the clock is at most 18 hours behind offset zero, so it is not after 23:00 there: no gap
+        // a time before 05:00 on the clock is at most 14 hours behind offset zero (FEEL's offsets lie in -14:00..+14:00,
+        // #123), so it is not after 19:00 there: no gap, where 0.6 took Java's -18:00 and reported one up to 23:00
         var covered = deliveries(HitPolicy.FIRST, List.of(delivery(1, ">= time(\"05:00:00\")", "-", "day"),
-                delivery(2, "<= time(\"23:00:00Z\")", "-", "not too late")));
+                delivery(2, "<= time(\"19:00:00Z\")", "-", "not too late")));
         Assertions.assertThat(covered.validationReport().issues(Kind.GAP)).isEmpty();
-        // a second earlier, the times just before 05:00 at -18:00 are left
+        // a second earlier, the times just before 05:00 at -14:00 are left
         var uncovered = deliveries(HitPolicy.FIRST, List.of(delivery(1, ">= time(\"05:00:00\")", "-", "day"),
-                delivery(2, "<= time(\"22:59:59Z\")", "-", "not too late")));
+                delivery(2, "<= time(\"18:59:59Z\")", "-", "not too late")));
         Assertions.assertThat(uncovered.validationReport().issues(Kind.GAP)).singleElement().satisfies(gap -> {
             var cutOff = (OffsetTime) gap.example().get("cutOff");
-            Assertions.assertThat(cutOff.getOffset()).isEqualTo(ZoneOffset.MIN);
+            Assertions.assertThat(cutOff.getOffset()).isEqualTo(ZoneOffset.ofHours(-14));
             Assertions.assertThat(cutOff.toLocalTime()).isBetween(LocalTime.of(4, 59, 59), LocalTime.of(5, 0));
             Assertions.assertThat(uncovered.evaluate(new Delivery(cutOff, null))).isEmpty();
         });
@@ -193,9 +194,10 @@ class ZonedTimesTest {
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "11:00Z"))).containsExactly("morning");
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "11:00-08:00"))).as("19:00Z, but 11:00 on the clock").containsExactly("morning");
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "13:00+02:00"))).as("11:00Z, but 13:00 on the clock").isEmpty();
-        // the zone makes no difference to cells without one, so the gap is given once, by local time
+        // the zone makes no difference to cells without one, so the gap is given once, by local time; a time with a zone id
+        // compares with no cell (#114)
         Assertions.assertThat(engine.validationReport().issues(Kind.GAP)).extracting(ValidationReport.Issue::detail)
-                .containsExactly("cutOff in [time(\"12:00:00\")..+inf)");
+                .containsExactly("cutOff in {[time(\"12:00:00\")..+inf), any time with a zone id no cell names}");
     }
 
     @Test
@@ -213,7 +215,7 @@ class ZonedTimesTest {
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "13:00+02:00"))).containsExactly("morning");
         Assertions.assertThat(engine.evaluate(Map.of("cutOff", "11:00-08:00"))).isEmpty();
         Assertions.assertThat(engine.validationReport().issues(Kind.GAP)).extracting(ValidationReport.Issue::detail)
-                .containsExactly("cutOff in {[time(\"12:00:00\")..+inf), [time(\"12:00:00Z\")..+inf)}");
+                .containsExactly("cutOff in {[time(\"12:00:00\")..+inf), [time(\"12:00:00Z\")..+inf), any time with a zone id no cell names}");
     }
 
     @Test

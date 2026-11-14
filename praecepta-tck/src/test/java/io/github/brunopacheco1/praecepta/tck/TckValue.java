@@ -7,7 +7,6 @@ package io.github.brunopacheco1.praecepta.tck;
 
 import java.math.BigDecimal;
 import java.time.Duration;
-import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -91,14 +90,17 @@ sealed interface TckValue {
     }
 
     /**
-     * Whether {@code actual} is the value this expected value describes. Numbers compare as decimals,
-     * dates, times and date-times by value, and booleans ignoring case; a list compares in order unless
-     * {@code ordered} is false. Praecepta has no null list, so an empty list stands for null.
+     * Whether {@code actual} is the value this expected value describes. A simple value must be of the expected
+     * kind (a number, a string, a boolean, a date, a time, a date and time or a duration) when both name theirs, so the
+     * text {@code "10"} is not the number 10; numbers compare as decimals, dates, times and date-times by value, and
+     * booleans ignoring case; a list compares in order unless {@code ordered} is false. Praecepta's single decision
+     * tables have no null list, so an empty list stands for null.
      */
     default boolean matches(TckValue actual, boolean ordered) {
         return switch (this) {
             case Nil nil -> actual instanceof Nil || actual instanceof Items items && items.values().isEmpty();
-            case Simple expected -> actual instanceof Simple simple && sameSimple(expected, simple.text());
+            case Simple expected -> actual instanceof Simple simple && sameKind(expected.type(), simple.type())
+                    && sameSimple(expected, simple.text());
             case Components expected -> actual instanceof Components components
                     && expected.values().keySet().equals(components.values().keySet())
                     && expected.values().entrySet().stream()
@@ -108,12 +110,33 @@ sealed interface TckValue {
         };
     }
 
+    /** Whether two simple values are of one kind, by their types (XML Schema's or FEEL's names); true if either names none. */
+    private static boolean sameKind(String expected, String actual) {
+        var expectedKind = kind(expected);
+        var actualKind = kind(actual);
+        return expectedKind.isEmpty() || actualKind.isEmpty() || expectedKind.equals(actualKind);
+    }
+
+    /** The kind of a simple type: number, string, boolean, date, time, datetime or duration; empty if unknown. */
+    static String kind(String type) {
+        return switch (type.toLowerCase(Locale.ROOT).replace(" ", "")) {
+            case "decimal", "double", "integer", "int", "long", "float", "number" -> "number";
+            case "string" -> "string";
+            case "boolean" -> "boolean";
+            case "date" -> "date";
+            case "time" -> "time";
+            case "datetime", "dateandtime" -> "datetime";
+            case "duration", "daytimeduration", "yearmonthduration", "daysandtimeduration", "yearsandmonthsduration" -> "duration";
+            default -> "";
+        };
+    }
+
     private static boolean sameSimple(Simple expected, String actual) {
         try {
             return switch (expected.type().toLowerCase(Locale.ROOT)) {
                 case "decimal", "double", "integer", "int", "long", "float" ->
                         new BigDecimal(expected.text().strip()).compareTo(new BigDecimal(actual.strip())) == 0;
-                case "date" -> LocalDate.parse(expected.text().strip()).equals(LocalDate.parse(actual.strip()));
+                case "date" -> FeelTemporals.parseDate(expected.text().strip()).equals(FeelTemporals.parseDate(actual.strip()));
                 case "time" -> sameTemporal(FeelTemporals.parseTime(expected.text().strip()), FeelTemporals.parseTime(actual.strip()));
                 case "datetime" -> sameTemporal(FeelTemporals.parseDateTime(expected.text().strip()),
                         FeelTemporals.parseDateTime(actual.strip()));

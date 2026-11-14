@@ -1,0 +1,465 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# The DMN TCK result nodes that passed when this file was last regenerated, one per line: the test case
+# directory, the test file, the test case id and the result node's name, then, after a tab, "graph" if the
+# node passed through the decision requirements graph. TckTest fails the build when one of them no longer
+# passes, or no longer passes through the graph. Regenerate it, with RESULTS.md, only to record a deliberate
+# change:
+#
+#     mvn -pl praecepta-tck -am test -Dtck.update=true
+compliance-level-2/0001-input-data-string/0001-input-data-string-test-01.xml #001 Greeting Message	graph
+compliance-level-2/0002-input-data-number/0002-input-data-number-test-01.xml #001 Yearly Salary	graph
+compliance-level-2/0003-input-data-string-allowed-values/0003-input-data-string-allowed-values-test-01.xml #001 Employment Status Statement	graph
+compliance-level-2/0004-simpletable-U/0004-simpletable-U-test-01.xml #001 Approval Status	graph
+compliance-level-2/0004-simpletable-U/0004-simpletable-U-test-01.xml #002 Approval Status	graph
+compliance-level-2/0004-simpletable-U/0004-simpletable-U-test-01.xml #003 Approval Status	graph
+compliance-level-2/0005-simpletable-A/0005-simpletable-A-test-01.xml #001 Approval Status	graph
+compliance-level-2/0005-simpletable-A/0005-simpletable-A-test-01.xml #002 Approval Status	graph
+compliance-level-2/0005-simpletable-A/0005-simpletable-A-test-01.xml #003 Approval Status	graph
+compliance-level-2/0006-simpletable-P1/0006-simpletable-P1-test-01.xml #001 Approval Status	graph
+compliance-level-2/0006-simpletable-P1/0006-simpletable-P1-test-01.xml #002 Approval Status	graph
+compliance-level-2/0006-simpletable-P1/0006-simpletable-P1-test-01.xml #003 Approval Status	graph
+compliance-level-2/0007-simpletable-P2/0007-simpletable-P2-test-01.xml #001 Approval Status	graph
+compliance-level-2/0007-simpletable-P2/0007-simpletable-P2-test-01.xml #002 Approval Status	graph
+compliance-level-2/0007-simpletable-P2/0007-simpletable-P2-test-01.xml #003 Approval Status	graph
+compliance-level-2/0010-multi-output-U/0010-multi-output-U-test-01.xml #001 Approval	graph
+compliance-level-2/0010-multi-output-U/0010-multi-output-U-test-01.xml #002 Approval	graph
+compliance-level-2/0010-multi-output-U/0010-multi-output-U-test-01.xml #003 Approval	graph
+compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #001 Decision1	graph
+compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #002 Decision2	graph
+compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #004 Decision4	graph
+compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #005 Decision5	graph
+compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #007 Decision7	graph
+compliance-level-2/0101-feel-constants/0101-feel-constants-test-01.xml #008 Decision8	graph
+compliance-level-2/0102-feel-constants/0102-feel-constants-test-01.xml #001 Decision1	graph
+compliance-level-2/0102-feel-constants/0102-feel-constants-test-01.xml #002 Decision2	graph
+compliance-level-2/0102-feel-constants/0102-feel-constants-test-01.xml #003 Decision3	graph
+compliance-level-2/0102-feel-constants/0102-feel-constants-test-01.xml #004 Decision4	graph
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #001 Decision1
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #002 Decision2
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #003 Decision3
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #004 Decision4
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #005 Decision5
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #006 Decision6
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #007 Decision7
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #008 Decision8
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #009 Decision9
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #010 Decision10
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #011 Decision11
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #012 Decision12
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #013 Decision13
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #014 Decision14
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #015 Decision15
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #016 Decision16
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #017 Decision17
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #018 Decision18
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #019 Decision19
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #020 Decision20
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #021 Decision21
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #022 Decision22
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #031 Decision31
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #032 Decision32
+compliance-level-2/0105-feel-math/0105-feel-math-test-01.xml #033 Decision33
+compliance-level-2/0108-first-hitpolicy/0108-first-hitpolicy-test-01.xml #001 Approval	graph
+compliance-level-2/0108-first-hitpolicy/0108-first-hitpolicy-test-01.xml #002 Approval	graph
+compliance-level-2/0108-first-hitpolicy/0108-first-hitpolicy-test-01.xml #003 Approval	graph
+compliance-level-2/0109-ruleOrder-hitpolicy/0109-ruleOrder-hitpolicy-test-01.xml #001 Approval	graph
+compliance-level-2/0109-ruleOrder-hitpolicy/0109-ruleOrder-hitpolicy-test-01.xml #002 Approval	graph
+compliance-level-2/0109-ruleOrder-hitpolicy/0109-ruleOrder-hitpolicy-test-01.xml #003 Approval	graph
+compliance-level-2/0110-outputOrder-hitpolicy/0110-outputOrder-hitpolicy-test-01.xml #001 Approval Status	graph
+compliance-level-2/0110-outputOrder-hitpolicy/0110-outputOrder-hitpolicy-test-01.xml #002 Approval Status	graph
+compliance-level-2/0110-outputOrder-hitpolicy/0110-outputOrder-hitpolicy-test-01.xml #003 Approval Status	graph
+compliance-level-2/0111-first-hitpolicy-singleoutputcol/0111-first-hitpolicy-singleoutputcol-test-01.xml #001 Advertisement	graph
+compliance-level-2/0111-first-hitpolicy-singleoutputcol/0111-first-hitpolicy-singleoutputcol-test-01.xml #002 Advertisement	graph
+compliance-level-2/0111-first-hitpolicy-singleoutputcol/0111-first-hitpolicy-singleoutputcol-test-01.xml #003 Advertisement	graph
+compliance-level-2/0112-ruleOrder-hitpolicy-singleinoutcol/0112-ruleOrder-hitpolicy-singleinoutcol-test-01.xml #001 Approval	graph
+compliance-level-2/0112-ruleOrder-hitpolicy-singleinoutcol/0112-ruleOrder-hitpolicy-singleinoutcol-test-01.xml #002 Approval	graph
+compliance-level-2/0112-ruleOrder-hitpolicy-singleinoutcol/0112-ruleOrder-hitpolicy-singleinoutcol-test-01.xml #003 Approval	graph
+compliance-level-2/0113-outputOrder-hitpolicy-singleinoutcol/0113-outputOrder-hitpolicy-singleinoutcol-test-01.xml #001 Approval Status	graph
+compliance-level-2/0113-outputOrder-hitpolicy-singleinoutcol/0113-outputOrder-hitpolicy-singleinoutcol-test-01.xml #002 Approval Status	graph
+compliance-level-2/0113-outputOrder-hitpolicy-singleinoutcol/0113-outputOrder-hitpolicy-singleinoutcol-test-01.xml #003 Approval Status	graph
+compliance-level-2/0114-min-collect-hitpolicy/0114-min-collect-hitpolicy-test-01.xml #001 CarInsurance	graph
+compliance-level-2/0114-min-collect-hitpolicy/0114-min-collect-hitpolicy-test-01.xml #002 CarInsurance	graph
+compliance-level-2/0114-min-collect-hitpolicy/0114-min-collect-hitpolicy-test-01.xml #003 CarInsurance	graph
+compliance-level-2/0115-sum-collect-hitpolicy/0115-sum-collect-hitpolicy-test-01.xml #001 Salary	graph
+compliance-level-2/0115-sum-collect-hitpolicy/0115-sum-collect-hitpolicy-test-01.xml #002 Salary	graph
+compliance-level-2/0115-sum-collect-hitpolicy/0115-sum-collect-hitpolicy-test-01.xml #003 Salary	graph
+compliance-level-2/0116-count-collect-hitpolicy/0116-count-collect-hitpolicy-test-01.xml #001 Salary	graph
+compliance-level-2/0116-count-collect-hitpolicy/0116-count-collect-hitpolicy-test-01.xml #002 Salary	graph
+compliance-level-2/0116-count-collect-hitpolicy/0116-count-collect-hitpolicy-test-01.xml #003 Salary	graph
+compliance-level-2/0117-multi-any-hitpolicy/0117-multi-any-hitpolicy-test-01.xml #001 Approval	graph
+compliance-level-2/0117-multi-any-hitpolicy/0117-multi-any-hitpolicy-test-01.xml #002 Approval	graph
+compliance-level-2/0117-multi-any-hitpolicy/0117-multi-any-hitpolicy-test-01.xml #003 Approval	graph
+compliance-level-2/0118-multi-priority-hitpolicy/0118-multi-priority-hitpolicy-test-01.xml #001 Approval Status	graph
+compliance-level-2/0118-multi-priority-hitpolicy/0118-multi-priority-hitpolicy-test-01.xml #002 Approval Status	graph
+compliance-level-2/0118-multi-priority-hitpolicy/0118-multi-priority-hitpolicy-test-01.xml #003 Approval Status	graph
+compliance-level-2/0119-multi-collect-hitpolicy/0119-multi-collect-hitpolicy-test-01.xml #001 Approval Status	graph
+compliance-level-2/0119-multi-collect-hitpolicy/0119-multi-collect-hitpolicy-test-01.xml #002 Approval Status	graph
+compliance-level-2/0119-multi-collect-hitpolicy/0119-multi-collect-hitpolicy-test-01.xml #003 Approval Status	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Adjudication
+compliance-level-3/0008-listGen/0008-listGen-test-01.xml #004 listGen4
+compliance-level-3/0008-listGen/0008-listGen-test-01.xml #005 listGen5
+compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #001 priceGt10	graph
+compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #002 priceInRange	graph
+compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #003 dateCompare1	graph
+compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #004 dateCompare2	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Boolean	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Date	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Date and Time	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Days and Time Duration	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Number	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare String	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Time	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Years and Months Duration	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Boolean	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Date	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Date and Time	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Days and Time Duration	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Number	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare String	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Time	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_58109f16-2e9b-496e-bfff-5f0adbfa0279 Compare Years and Months Duration	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Boolean	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Date	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Date and Time	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Days and Time Duration	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Number	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare String	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Time	graph
+compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Years and Months Duration	graph
+compliance-level-3/0039-dt-list-semantics/0039-dt-list-semantics-test-01.xml #_07726176-a1a0-4e9e-9de2-16dba51556e2 Symptom Analysis	graph
+compliance-level-3/0039-dt-list-semantics/0039-dt-list-semantics-test-01.xml #_a217c840-6ead-4cb7-a3e1-ad9df9c0c584 Symptom Analysis	graph
+compliance-level-3/0073-feel-comments/0073-feel-comments-test-01.xml #decision_001 decision_001	graph
+compliance-level-3/0073-feel-comments/0073-feel-comments-test-01.xml #decision_002 decision_002	graph
+compliance-level-3/0073-feel-comments/0073-feel-comments-test-01.xml #decision_003 decision_003	graph
+compliance-level-3/0075-feel-exponent/0075-feel-exponent-test-01.xml #decision_001 decision_001
+compliance-level-3/0075-feel-exponent/0075-feel-exponent-test-01.xml #decision_001_a decision_001_a
+compliance-level-3/0077-feel-nan/0077-feel-nan-test-01.xml #decision_001 decision_001	graph
+compliance-level-3/0078-feel-infinity/0078-feel-infinity-test-01.xml #decision_001 decision_001	graph
+compliance-level-3/0078-feel-infinity/0078-feel-infinity-test-01.xml #decision_002 decision_002	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #literal_001 literal_001
+compliance-level-3/0093-feel-at-literals/0093-feel-at-literals-test-01.xml #date_002 date_002
+compliance-level-3/0093-feel-at-literals/0093-feel-at-literals-test-01.xml #datetime_002 datetime_002
+compliance-level-3/0093-feel-at-literals/0093-feel-at-literals-test-01.xml #datetime_006 datetime_006
+compliance-level-3/0093-feel-at-literals/0093-feel-at-literals-test-01.xml #dt_duration_002 dt_duration_002
+compliance-level-3/0093-feel-at-literals/0093-feel-at-literals-test-01.xml #time_002 time_002
+compliance-level-3/0093-feel-at-literals/0093-feel-at-literals-test-01.xml #time_004 time_004
+compliance-level-3/0093-feel-at-literals/0093-feel-at-literals-test-01.xml #ym_duration_002 ym_duration_002
+compliance-level-3/0099-arithmetic-negation/0099-arithmetic-negation-test-01.xml #decision_001 decision_001
+compliance-level-3/0099-arithmetic-negation/0099-arithmetic-negation-test-01.xml #decision_002 decision_002
+compliance-level-3/0099-arithmetic-negation/0099-arithmetic-negation-test-01.xml #decision_003 decision_003
+compliance-level-3/0099-arithmetic-negation/0099-arithmetic-negation-test-01.xml #decision_003_a decision_003_a
+compliance-level-3/0099-arithmetic-negation/0099-arithmetic-negation-test-01.xml #decision_004 decision_004
+compliance-level-3/0099-arithmetic-negation/0099-arithmetic-negation-test-01.xml #decision_004_a decision_004_a
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_dtDuration_001 add_lhs_dateAndTime_to_rhs_dtDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_dtDuration_002 add_lhs_dateAndTime_to_rhs_dtDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_dtDuration_003 add_lhs_dateAndTime_to_rhs_dtDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_dtDuration_004 add_lhs_dateAndTime_to_rhs_dtDuration_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_dtDuration_005 add_lhs_dateAndTime_to_rhs_dtDuration_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_dtDuration_006 add_lhs_dateAndTime_to_rhs_dtDuration_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_dtDuration_007 add_lhs_dateAndTime_to_rhs_dtDuration_007
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_dtDuration_008 add_lhs_dateAndTime_to_rhs_dtDuration_008
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_dtDuration_011 add_lhs_dateAndTime_to_rhs_dtDuration_011
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_dtDuration_012 add_lhs_dateAndTime_to_rhs_dtDuration_012
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_ymDuration_001 add_lhs_dateAndTime_to_rhs_ymDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_ymDuration_002 add_lhs_dateAndTime_to_rhs_ymDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_ymDuration_003 add_lhs_dateAndTime_to_rhs_ymDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_ymDuration_004 add_lhs_dateAndTime_to_rhs_ymDuration_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_ymDuration_005 add_lhs_dateAndTime_to_rhs_ymDuration_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_ymDuration_006 add_lhs_dateAndTime_to_rhs_ymDuration_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_ymDuration_007 add_lhs_dateAndTime_to_rhs_ymDuration_007
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dateAndTime_to_rhs_ymDuration_008 add_lhs_dateAndTime_to_rhs_ymDuration_008
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_date_to_rhs_dtDuration_001 add_lhs_date_to_rhs_dtDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_date_to_rhs_dtDuration_002 add_lhs_date_to_rhs_dtDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_date_to_rhs_dtDuration_003 add_lhs_date_to_rhs_dtDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_date_to_rhs_ymDuration_001 add_lhs_date_to_rhs_ymDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_date_to_rhs_ymDuration_002 add_lhs_date_to_rhs_ymDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_dateAndTime_001 add_lhs_dtDuration_to_rhs_dateAndTime_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_dateAndTime_002 add_lhs_dtDuration_to_rhs_dateAndTime_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_dateAndTime_003 add_lhs_dtDuration_to_rhs_dateAndTime_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_dateAndTime_004 add_lhs_dtDuration_to_rhs_dateAndTime_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_dateAndTime_005 add_lhs_dtDuration_to_rhs_dateAndTime_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_dateAndTime_006 add_lhs_dtDuration_to_rhs_dateAndTime_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_dateAndTime_007 add_lhs_dtDuration_to_rhs_dateAndTime_007
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_dateAndTime_008 add_lhs_dtDuration_to_rhs_dateAndTime_008
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_dateAndTime_011 add_lhs_dtDuration_to_rhs_dateAndTime_011
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_dateAndTime_012 add_lhs_dtDuration_to_rhs_dateAndTime_012
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_date_001 add_lhs_dtDuration_to_rhs_date_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_date_002 add_lhs_dtDuration_to_rhs_date_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_date_003 add_lhs_dtDuration_to_rhs_date_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_dtDuration_001 add_lhs_dtDuration_to_rhs_dtDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_dtDuration_002 add_lhs_dtDuration_to_rhs_dtDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_time_001 add_lhs_dtDuration_to_rhs_time_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_time_002 add_lhs_dtDuration_to_rhs_time_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_dtDuration_to_rhs_time_003 add_lhs_dtDuration_to_rhs_time_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_number_to_rhs_number_001 add_lhs_number_to_rhs_number_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_number_to_rhs_number_002 add_lhs_number_to_rhs_number_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_number_to_rhs_number_003 add_lhs_number_to_rhs_number_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_number_to_rhs_number_004 add_lhs_number_to_rhs_number_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_number_to_rhs_number_005 add_lhs_number_to_rhs_number_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_time_to_rhs_dtDuration_001 add_lhs_time_to_rhs_dtDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_time_to_rhs_dtDuration_002 add_lhs_time_to_rhs_dtDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_time_to_rhs_dtDuration_003 add_lhs_time_to_rhs_dtDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_dateAndTime_001 add_lhs_ymDuration_to_rhs_dateAndTime_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_dateAndTime_002 add_lhs_ymDuration_to_rhs_dateAndTime_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_dateAndTime_003 add_lhs_ymDuration_to_rhs_dateAndTime_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_dateAndTime_004 add_lhs_ymDuration_to_rhs_dateAndTime_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_dateAndTime_005 add_lhs_ymDuration_to_rhs_dateAndTime_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_dateAndTime_006 add_lhs_ymDuration_to_rhs_dateAndTime_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_dateAndTime_007 add_lhs_ymDuration_to_rhs_dateAndTime_007
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_dateAndTime_008 add_lhs_ymDuration_to_rhs_dateAndTime_008
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_date_001 add_lhs_ymDuration_to_rhs_date_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_date_002 add_lhs_ymDuration_to_rhs_date_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_ymDuration_001 add_lhs_ymDuration_to_rhs_ymDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_ymDuration_002 add_lhs_ymDuration_to_rhs_ymDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_ymDuration_003 add_lhs_ymDuration_to_rhs_ymDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_ymDuration_004 add_lhs_ymDuration_to_rhs_ymDuration_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_ymDuration_005 add_lhs_ymDuration_to_rhs_ymDuration_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #add_lhs_ymDuration_to_rhs_ymDuration_006 add_lhs_ymDuration_to_rhs_ymDuration_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #divide_lhs_dtDuration_by_rhs_dtDuration_001 divide_lhs_dtDuration_by_rhs_dtDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #divide_lhs_dtDuration_by_rhs_number_001 divide_lhs_dtDuration_by_rhs_number_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #divide_lhs_dtDuration_by_rhs_number_003 divide_lhs_dtDuration_by_rhs_number_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #divide_lhs_number_by_rhs_number_001 divide_lhs_number_by_rhs_number_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #divide_lhs_ymDuration_by_rhs_number_001 divide_lhs_ymDuration_by_rhs_number_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #divide_lhs_ymDuration_by_rhs_number_003 divide_lhs_ymDuration_by_rhs_number_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #divide_lhs_ymDuration_by_rhs_number_004 divide_lhs_ymDuration_by_rhs_number_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #divide_lhs_ymDuration_by_rhs_ymDuration_001 divide_lhs_ymDuration_by_rhs_ymDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #exponent_lhs_number_exp_rhs_number_001 exponent_lhs_number_exp_rhs_number_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #exponent_lhs_number_exp_rhs_number_002 exponent_lhs_number_exp_rhs_number_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #exponent_lhs_number_exp_rhs_number_003 exponent_lhs_number_exp_rhs_number_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #exponent_lhs_number_exp_rhs_number_004 exponent_lhs_number_exp_rhs_number_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #exponent_lhs_number_exp_rhs_number_006 exponent_lhs_number_exp_rhs_number_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #exponent_lhs_number_exp_rhs_number_007 exponent_lhs_number_exp_rhs_number_007
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_dtDuration_by_rhs_number_001 multiply_lhs_dtDuration_by_rhs_number_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_dtDuration_by_rhs_number_002 multiply_lhs_dtDuration_by_rhs_number_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_dtDuration_by_rhs_number_003 multiply_lhs_dtDuration_by_rhs_number_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_dtDuration_by_rhs_number_004 multiply_lhs_dtDuration_by_rhs_number_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_dtDuration_by_rhs_number_005 multiply_lhs_dtDuration_by_rhs_number_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_dtDuration_by_rhs_number_006 multiply_lhs_dtDuration_by_rhs_number_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_dtDuration_by_rhs_number_007 multiply_lhs_dtDuration_by_rhs_number_007
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_dtDuration_by_rhs_number_008 multiply_lhs_dtDuration_by_rhs_number_008
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_dtDuration_001 multiply_lhs_number_by_rhs_dtDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_dtDuration_002 multiply_lhs_number_by_rhs_dtDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_dtDuration_003 multiply_lhs_number_by_rhs_dtDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_dtDuration_004 multiply_lhs_number_by_rhs_dtDuration_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_dtDuration_005 multiply_lhs_number_by_rhs_dtDuration_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_dtDuration_006 multiply_lhs_number_by_rhs_dtDuration_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_dtDuration_007 multiply_lhs_number_by_rhs_dtDuration_007
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_dtDuration_008 multiply_lhs_number_by_rhs_dtDuration_008
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_number_001 multiply_lhs_number_by_rhs_number_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_number_002 multiply_lhs_number_by_rhs_number_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_number_003 multiply_lhs_number_by_rhs_number_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_number_004 multiply_lhs_number_by_rhs_number_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_ymDuration_001 multiply_lhs_number_by_rhs_ymDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_ymDuration_002 multiply_lhs_number_by_rhs_ymDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_ymDuration_003 multiply_lhs_number_by_rhs_ymDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_ymDuration_004 multiply_lhs_number_by_rhs_ymDuration_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_ymDuration_005 multiply_lhs_number_by_rhs_ymDuration_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_ymDuration_006 multiply_lhs_number_by_rhs_ymDuration_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_ymDuration_007 multiply_lhs_number_by_rhs_ymDuration_007
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_ymDuration_008 multiply_lhs_number_by_rhs_ymDuration_008
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_ymDuration_009 multiply_lhs_number_by_rhs_ymDuration_009
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_ymDuration_010 multiply_lhs_number_by_rhs_ymDuration_010
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_ymDuration_by_rhs_number_001 multiply_lhs_ymDuration_by_rhs_number_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_ymDuration_by_rhs_number_002 multiply_lhs_ymDuration_by_rhs_number_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_ymDuration_by_rhs_number_003 multiply_lhs_ymDuration_by_rhs_number_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_ymDuration_by_rhs_number_004 multiply_lhs_ymDuration_by_rhs_number_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_ymDuration_by_rhs_number_005 multiply_lhs_ymDuration_by_rhs_number_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_ymDuration_by_rhs_number_006 multiply_lhs_ymDuration_by_rhs_number_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_ymDuration_by_rhs_number_007 multiply_lhs_ymDuration_by_rhs_number_007
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_ymDuration_by_rhs_number_008 multiply_lhs_ymDuration_by_rhs_number_008
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_ymDuration_by_rhs_number_009 multiply_lhs_ymDuration_by_rhs_number_009
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_ymDuration_by_rhs_number_010 multiply_lhs_ymDuration_by_rhs_number_010
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_dateAndTime_001 subtract_lhs_dateAndTime_minus_rhs_dateAndTime_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_dateAndTime_006 subtract_lhs_dateAndTime_minus_rhs_dateAndTime_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_dateAndTime_007 subtract_lhs_dateAndTime_minus_rhs_dateAndTime_007
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_dateAndTime_008 subtract_lhs_dateAndTime_minus_rhs_dateAndTime_008
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_dateAndTime_010 subtract_lhs_dateAndTime_minus_rhs_dateAndTime_010
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_dateAndTime_011 subtract_lhs_dateAndTime_minus_rhs_dateAndTime_011
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_dateAndTime_012 subtract_lhs_dateAndTime_minus_rhs_dateAndTime_012
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_date_002 subtract_lhs_dateAndTime_minus_rhs_date_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_date_003 subtract_lhs_dateAndTime_minus_rhs_date_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_date_004 subtract_lhs_dateAndTime_minus_rhs_date_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_date_005 subtract_lhs_dateAndTime_minus_rhs_date_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_dtDuration_001 subtract_lhs_dateAndTime_minus_rhs_dtDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_dtDuration_002 subtract_lhs_dateAndTime_minus_rhs_dtDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_dtDuration_003 subtract_lhs_dateAndTime_minus_rhs_dtDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_dtDuration_004 subtract_lhs_dateAndTime_minus_rhs_dtDuration_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_ymDuration_001 subtract_lhs_dateAndTime_minus_rhs_ymDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_ymDuration_002 subtract_lhs_dateAndTime_minus_rhs_ymDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_ymDuration_003 subtract_lhs_dateAndTime_minus_rhs_ymDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_ymDuration_004 subtract_lhs_dateAndTime_minus_rhs_ymDuration_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_ymDuration_005 subtract_lhs_dateAndTime_minus_rhs_ymDuration_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_ymDuration_006 subtract_lhs_dateAndTime_minus_rhs_ymDuration_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dateAndTime_minus_rhs_ymDuration_007 subtract_lhs_dateAndTime_minus_rhs_ymDuration_007
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dateAndTime_002 subtract_lhs_date_minus_rhs_dateAndTime_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dateAndTime_003 subtract_lhs_date_minus_rhs_dateAndTime_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dateAndTime_004 subtract_lhs_date_minus_rhs_dateAndTime_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dateAndTime_005 subtract_lhs_date_minus_rhs_dateAndTime_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_date_001 subtract_lhs_date_minus_rhs_date_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_date_002 subtract_lhs_date_minus_rhs_date_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_date_003 subtract_lhs_date_minus_rhs_date_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dtDuration_001 subtract_lhs_date_minus_rhs_dtDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dtDuration_002 subtract_lhs_date_minus_rhs_dtDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dtDuration_003 subtract_lhs_date_minus_rhs_dtDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dtDuration_004 subtract_lhs_date_minus_rhs_dtDuration_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dtDuration_005 subtract_lhs_date_minus_rhs_dtDuration_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dtDuration_006 subtract_lhs_date_minus_rhs_dtDuration_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dtDuration_007 subtract_lhs_date_minus_rhs_dtDuration_007
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dtDuration_008 subtract_lhs_date_minus_rhs_dtDuration_008
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dtDuration_009 subtract_lhs_date_minus_rhs_dtDuration_009
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dtDuration_010 subtract_lhs_date_minus_rhs_dtDuration_010
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dtDuration_011 subtract_lhs_date_minus_rhs_dtDuration_011
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_dtDuration_012 subtract_lhs_date_minus_rhs_dtDuration_012
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_ymDuration_001 subtract_lhs_date_minus_rhs_ymDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_ymDuration_002 subtract_lhs_date_minus_rhs_ymDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_ymDuration_003 subtract_lhs_date_minus_rhs_ymDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_date_minus_rhs_ymDuration_004 subtract_lhs_date_minus_rhs_ymDuration_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dtDuration_minus_rhs_dtDuration_001 subtract_lhs_dtDuration_minus_rhs_dtDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dtDuration_minus_rhs_dtDuration_002 subtract_lhs_dtDuration_minus_rhs_dtDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dtDuration_minus_rhs_dtDuration_003 subtract_lhs_dtDuration_minus_rhs_dtDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dtDuration_minus_rhs_dtDuration_004 subtract_lhs_dtDuration_minus_rhs_dtDuration_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dtDuration_minus_rhs_dtDuration_005 subtract_lhs_dtDuration_minus_rhs_dtDuration_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_dtDuration_minus_rhs_dtDuration_006 subtract_lhs_dtDuration_minus_rhs_dtDuration_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_number_minus_rhs_number_001 subtract_lhs_number_minus_rhs_number_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_number_minus_rhs_number_002 subtract_lhs_number_minus_rhs_number_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_number_minus_rhs_number_003 subtract_lhs_number_minus_rhs_number_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_number_minus_rhs_number_004 subtract_lhs_number_minus_rhs_number_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_number_minus_rhs_number_005 subtract_lhs_number_minus_rhs_number_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_number_minus_rhs_number_006 subtract_lhs_number_minus_rhs_number_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_number_minus_rhs_number_007 subtract_lhs_number_minus_rhs_number_007
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_time_minus_rhs_dtDuration_001 subtract_lhs_time_minus_rhs_dtDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_time_minus_rhs_dtDuration_002 subtract_lhs_time_minus_rhs_dtDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_time_minus_rhs_dtDuration_003 subtract_lhs_time_minus_rhs_dtDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_time_minus_rhs_dtDuration_005 subtract_lhs_time_minus_rhs_dtDuration_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_time_minus_rhs_time_001 subtract_lhs_time_minus_rhs_time_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_time_minus_rhs_time_002 subtract_lhs_time_minus_rhs_time_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_time_minus_rhs_time_003 subtract_lhs_time_minus_rhs_time_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_time_minus_rhs_time_004 subtract_lhs_time_minus_rhs_time_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_time_minus_rhs_time_005 subtract_lhs_time_minus_rhs_time_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_time_minus_rhs_time_006 subtract_lhs_time_minus_rhs_time_006
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_ymDuration_minus_rhs_ymDuration_001 subtract_lhs_ymDuration_minus_rhs_ymDuration_001
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_ymDuration_minus_rhs_ymDuration_002 subtract_lhs_ymDuration_minus_rhs_ymDuration_002
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_ymDuration_minus_rhs_ymDuration_003 subtract_lhs_ymDuration_minus_rhs_ymDuration_003
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_ymDuration_minus_rhs_ymDuration_004 subtract_lhs_ymDuration_minus_rhs_ymDuration_004
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_ymDuration_minus_rhs_ymDuration_005 subtract_lhs_ymDuration_minus_rhs_ymDuration_005
+compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #subtract_lhs_ymDuration_minus_rhs_ymDuration_006 subtract_lhs_ymDuration_minus_rhs_ymDuration_006
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #011_5f0b42b1f8 feel-date-function_011_5f0b42b1f8
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #012_d9e4b97438 feel-date-function_012_d9e4b97438
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #013_d7e901ee86 feel-date-function_013_d7e901ee86
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #014_fad7e00633 feel-date-function_014_fad7e00633
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #017_887dfef005 feel-date-function_017_887dfef005
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #018_fc0ef0c8cb feel-date-function_018_fc0ef0c8cb
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #019_b2b82796ce feel-date-function_019_b2b82796ce
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #020_7d56b7bf63 feel-date-function_020_7d56b7bf63
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #021_95fb3d9984 feel-date-function_021_95fb3d9984
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #022_4063db2d59 feel-date-function_022_4063db2d59
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #023_4a1f604006 feel-date-function_023_4a1f604006
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #024_3cb98a2bb8 feel-date-function_024_3cb98a2bb8
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #025_cf0ad1313c feel-date-function_025_cf0ad1313c
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #026_cedd7e5e5f feel-date-function_026_cedd7e5e5f
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #027_987c5be372 feel-date-function_027_987c5be372
+compliance-level-3/1115-feel-date-function/1115-feel-date-function-test-01.xml #028_35ca79a6cd feel-date-function_028_35ca79a6cd
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #015_376d693a79 feel-time-function_015_376d693a79
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #017_f3683885f5 feel-time-function_017_f3683885f5
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #018_35f1f2cce8 feel-time-function_018_35f1f2cce8
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #019_879be89d63 feel-time-function_019_879be89d63
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #020_72b421086e feel-time-function_020_72b421086e
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #021_5c50fa1dff feel-time-function_021_5c50fa1dff
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #022_55e76d3595 feel-time-function_022_55e76d3595
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #023_5cbbb85435 feel-time-function_023_5cbbb85435
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #024_5f7f735e8f feel-time-function_024_5f7f735e8f
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #025_139b25b795 feel-time-function_025_139b25b795
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #026_c5208af118 feel-time-function_026_c5208af118
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #027_45082fd26c feel-time-function_027_45082fd26c
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #030_390d4f4648 feel-time-function_030_390d4f4648
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #031_4d086a3b59 feel-time-function_031_4d086a3b59
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #032_d9b0d7f931 feel-time-function_032_d9b0d7f931
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #033_8420160da1 feel-time-function_033_8420160da1
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #034_13c312c376 feel-time-function_034_13c312c376
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #035_fbfce88ac4 feel-time-function_035_fbfce88ac4
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #038_05b311131c feel-time-function_038_05b311131c
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #039_5b65992f0d feel-time-function_039_5b65992f0d
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #040_6c9d17b491 feel-time-function_040_6c9d17b491
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #041_29a448d57e feel-time-function_041_29a448d57e
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #042_00146f2977 feel-time-function_042_00146f2977
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #043_2edfae8414 feel-time-function_043_2edfae8414
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #044_3073ffd026 feel-time-function_044_3073ffd026
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #045_ad1339e858 feel-time-function_045_ad1339e858
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #048_9bedd52886 feel-time-function_048_9bedd52886
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #049_617d9e09d6 feel-time-function_049_617d9e09d6
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #050_524d9a8146 feel-time-function_050_524d9a8146
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #051_a71d2a08f7 feel-time-function_051_a71d2a08f7
+compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #052_d825d58888 feel-time-function_052_d825d58888
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #007_59863d1b57 feel-date-and-time-function_007_59863d1b57
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #008_83eb9a93ba feel-date-and-time-function_008_83eb9a93ba
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #009_1982fa549c feel-date-and-time-function_009_1982fa549c
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #010_59f5b47012 feel-date-and-time-function_010_59f5b47012
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #013_c4fd0a0e8d feel-date-and-time-function_013_c4fd0a0e8d
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #014_ded0e5fe2f feel-date-and-time-function_014_ded0e5fe2f
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #015_9e27148afd feel-date-and-time-function_015_9e27148afd
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #016_c08e4d417a feel-date-and-time-function_016_c08e4d417a
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #017_47816add0e feel-date-and-time-function_017_47816add0e
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #018_0614e473e7 feel-date-and-time-function_018_0614e473e7
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #019_c312e3dfe3 feel-date-and-time-function_019_c312e3dfe3
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #020_29e0585b6f feel-date-and-time-function_020_29e0585b6f
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #021_99f0215b60 feel-date-and-time-function_021_99f0215b60
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #022_b8b20f0328 feel-date-and-time-function_022_b8b20f0328
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #029_e3a5e786a0 feel-date-and-time-function_029_e3a5e786a0
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #030_2f97bff606 feel-date-and-time-function_030_2f97bff606
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #031_61e70c285f feel-date-and-time-function_031_61e70c285f
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #034_75580be3aa feel-date-and-time-function_034_75580be3aa
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #035_831b1ad0c5 feel-date-and-time-function_035_831b1ad0c5
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #036_189e1c3095 feel-date-and-time-function_036_189e1c3095
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #037_c7aec7ecf7 feel-date-and-time-function_037_c7aec7ecf7
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #038_1493e6d873 feel-date-and-time-function_038_1493e6d873
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #039_593292b25c feel-date-and-time-function_039_593292b25c
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #041_c6decfe6a3 feel-date-and-time-function_041_c6decfe6a3
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #042_0cbcc3d1dc feel-date-and-time-function_042_0cbcc3d1dc
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #043_2e4177d00c feel-date-and-time-function_043_2e4177d00c
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #044_9404547f9d feel-date-and-time-function_044_9404547f9d
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #045_5d93a541eb feel-date-and-time-function_045_5d93a541eb
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #046_89c1cd8daa feel-date-and-time-function_046_89c1cd8daa
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #048_e387922273 feel-date-and-time-function_048_e387922273
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #049_eb9cd1f777 feel-date-and-time-function_049_eb9cd1f777
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #050_2d960354af feel-date-and-time-function_050_2d960354af
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #051_46bdaa00b0 feel-date-and-time-function_051_46bdaa00b0
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #052_911dbd0a24 feel-date-and-time-function_052_911dbd0a24
+compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #053_283c083df9 feel-date-and-time-function_053_283c083df9
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #003_951e1d1c31 feel-duration-function_003_951e1d1c31
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #004_6b31e7cde7 feel-duration-function_004_6b31e7cde7
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #005_202d863d07 feel-duration-function_005_202d863d07
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #006_a885f926d9 feel-duration-function_006_a885f926d9
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #007_2f0ad399f3 feel-duration-function_007_2f0ad399f3
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #008_747f56743d feel-duration-function_008_747f56743d
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #009_cef3c1ed26 feel-duration-function_009_cef3c1ed26
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #010_5b452a4975 feel-duration-function_010_5b452a4975
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #011_2169615b94 feel-duration-function_011_2169615b94
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #012_2affe6d169 feel-duration-function_012_2affe6d169
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #013_0e8e26513c feel-duration-function_013_0e8e26513c
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #014_598ba6fabd feel-duration-function_014_598ba6fabd
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #015_ce2cb09830 feel-duration-function_015_ce2cb09830
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #016_af3e37fdbd feel-duration-function_016_af3e37fdbd
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #017_4f4549fda4 feel-duration-function_017_4f4549fda4
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #018_f5ec776811 feel-duration-function_018_f5ec776811
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #019_2e6885755a feel-duration-function_019_2e6885755a
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #020_af58b3766e feel-duration-function_020_af58b3766e
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #021_e48e70ad4e feel-duration-function_021_e48e70ad4e
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #022_668f24bed7 feel-duration-function_022_668f24bed7
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #023_6fc32087db feel-duration-function_023_6fc32087db
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #024_fd7000d72f feel-duration-function_024_fd7000d72f
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #025_f8ffbd8658 feel-duration-function_025_f8ffbd8658
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #026_e6c47f0cae feel-duration-function_026_e6c47f0cae
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #027_33b7fb8704 feel-duration-function_027_33b7fb8704
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #028_971b94f16d feel-duration-function_028_971b94f16d
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #029_1a12a226cc feel-duration-function_029_1a12a226cc
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #030_afac0f2062 feel-duration-function_030_afac0f2062
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #031_1ddad718b9 feel-duration-function_031_1ddad718b9
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #032_72c46a9ec9 feel-duration-function_032_72c46a9ec9
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #033_5d1540abaf feel-duration-function_033_5d1540abaf
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #034_aa9cbb21a6 feel-duration-function_034_aa9cbb21a6
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #035_93eef01ae7 feel-duration-function_035_93eef01ae7
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #036_5f2775875e feel-duration-function_036_5f2775875e
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #037_8c9ea9c0e6 feel-duration-function_037_8c9ea9c0e6

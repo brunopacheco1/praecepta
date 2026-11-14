@@ -87,7 +87,8 @@ final class DecisionsRegistrar implements ImportBeanDefinitionRegistrar {
         decisionsBean.setAttribute(DECISION_ATTRIBUTE, "");
         registry.registerBeanDefinition(PraeceptaAutoConfiguration.DECISIONS_BEAN, decisionsBean);
 
-        for (var decision : decisions.all()) {
+        // a decision table's engine; a literal expression of a decision model has none, and is evaluated through Decisions
+        for (var decision : decisions.all().stream().filter(decision -> decision.engine() != null).toList()) {
             var engineBean = new RootBeanDefinition(PraeceptaEngine.class);
             engineBean.setTargetType(ENGINE_TYPE);
             engineBean.setInstanceSupplier(decision::engine);

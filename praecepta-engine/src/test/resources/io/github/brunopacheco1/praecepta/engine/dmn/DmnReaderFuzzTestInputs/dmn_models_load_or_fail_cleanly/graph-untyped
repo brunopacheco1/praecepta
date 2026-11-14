@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Outputs and input expressions without a typeRef, and decision tables bound to the type their variable declares -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="untyped" name="Untyped" namespace="https://example.com/untyped">
+  <itemDefinition name="tNumbers" isCollection="true">
+    <typeRef>number</typeRef>
+  </itemDefinition>
+  <itemDefinition name="tOffer">
+    <itemComponent name="rate"><typeRef>number</typeRef></itemComponent>
+    <itemComponent name="label"><typeRef>string</typeRef></itemComponent>
+  </itemDefinition>
+  <inputData id="x" name="X">
+    <variable name="X" typeRef="number"/>
+  </inputData>
+  <!-- a single output without a typeRef, as DMN 1.5 Table 34 has it, whose entries are numbers -->
+  <decision id="base" name="Base">
+    <informationRequirement><requiredInput href="#x"/></informationRequirement>
+    <decisionTable hitPolicy="UNIQUE">
+      <input><inputExpression><text>X</text></inputExpression></input>
+      <output/>
+      <rule>
+        <inputEntry><text>&gt; 0</text></inputEntry>
+        <outputEntry><text>10</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>&lt;= 0</text></inputEntry>
+        <outputEntry><text>20</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="next" name="Next">
+    <variable name="Next" typeRef="number"/>
+    <informationRequirement><requiredDecision href="#base"/></informationRequirement>
+    <literalExpression><text>Base + 1</text></literalExpression>
+  </decision>
+  <decision id="positive" name="Positive">
+    <informationRequirement><requiredInput href="#x"/></informationRequirement>
+    <decisionTable hitPolicy="FIRST">
+      <input><inputExpression><text>X</text></inputExpression></input>
+      <output/>
+      <rule>
+        <inputEntry><text>&gt; 0</text></inputEntry>
+        <outputEntry><text>true</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>false</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <!-- one result, bound to a variable typed by a list: a list of one -->
+  <decision id="listed" name="Listed">
+    <variable name="Listed" typeRef="tNumbers"/>
+    <informationRequirement><requiredInput href="#x"/></informationRequirement>
+    <decisionTable hitPolicy="UNIQUE">
+      <input><inputExpression typeRef="number"><text>X</text></inputExpression></input>
+      <output/>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>1</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <!-- several results, bound to a variable of a single number: the one result, or null for several -->
+  <decision id="single" name="Single">
+    <variable name="Single" typeRef="number"/>
+    <informationRequirement><requiredInput href="#x"/></informationRequirement>
+    <decisionTable hitPolicy="COLLECT">
+      <input><inputExpression typeRef="number"><text>X</text></inputExpression></input>
+      <output/>
+      <rule>
+        <inputEntry><text>&gt; 0</text></inputEntry>
+        <outputEntry><text>1</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>&gt; 10</text></inputEntry>
+        <outputEntry><text>2</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <!-- several outputs without a typeRef, typed by the components of the variable's structure -->
+  <decision id="offer" name="Offer">
+    <variable name="Offer" typeRef="tOffer"/>
+    <informationRequirement><requiredInput href="#x"/></informationRequirement>
+    <decisionTable hitPolicy="FIRST">
+      <input><inputExpression><text>X</text></inputExpression></input>
+      <output name="rate"/>
+      <output name="label"/>
+      <rule>
+        <inputEntry><text>&gt; 100</text></inputEntry>
+        <outputEntry><text>0.1</text></outputEntry>
+        <outputEntry><text>"big"</text></outputEntry>
+      </rule>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>0</text></outputEntry>
+        <outputEntry><text>"small"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="discounted" name="Discounted">
+    <variable name="Discounted" typeRef="number"/>
+    <informationRequirement><requiredDecision href="#offer"/></informationRequirement>
+    <informationRequirement><requiredInput href="#x"/></informationRequirement>
+    <literalExpression><text>X * (1 - Offer.rate)</text></literalExpression>
+  </decision>
+  <!-- a table whose one result is bound to a type it does not conform to: null, and reported -->
+  <decision id="wrong" name="Wrong">
+    <variable name="Wrong" typeRef="date"/>
+    <informationRequirement><requiredInput href="#x"/></informationRequirement>
+    <decisionTable hitPolicy="FIRST">
+      <input><inputExpression typeRef="number"><text>X</text></inputExpression></input>
+      <output typeRef="string"/>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>"not a date"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

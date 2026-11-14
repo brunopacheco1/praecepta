@@ -6,14 +6,14 @@ SPDX-License-Identifier: Apache-2.0
 
 # Architecture
 
-Praecepta evaluates single DMN decision tables. It is a library, not a service: an application
-builds an engine once and calls it.
+Praecepta evaluates DMN decision tables, and the decision requirement graphs of tables and literal expressions
+around them. It is a library, not a service: an application builds an engine, or a graph, once and calls it.
 
 ## Modules
 
 | Module | Depends on | Role |
 |---|---|---|
-| `praecepta-engine` | the JDK only (`java.xml`) | The engine, the cell parser, DMN reading and writing, and validation. A JPMS module, `io.github.brunopacheco1.praecepta.engine`. |
+| `praecepta-engine` | the JDK only (`java.xml`) | The engine, the cell parser, DMN reading and writing, validation, and decision requirement graphs (`DecisionGraph`). A JPMS module, `io.github.brunopacheco1.praecepta.engine`. |
 | `praecepta-loader` | engine, Apache POI | Reads rules from Excel (first sheet) and semicolon-separated CSV files. |
 | `praecepta-compiler` | engine, loader | The build-time core of the build tools: loads a table, validates it, writes it as DMN and generates typed Java classes (`TableCompiler`). Independent of any build tool. |
 | `praecepta-integration` | engine | The runtime core of the framework integrations: finds DMN files by location pattern and builds a map-based engine per decision, with its validation report (`Decisions`). Independent of any framework. |
@@ -25,7 +25,7 @@ builds an engine once and calls it.
 | `praecepta-quarkus` | integration, Quarkus ArC | Quarkus extension, runtime: builds the `Decisions` bean and one engine bean per decision (`@Identifier("Discount")`) from the DMN the build step validated (`PraeceptaRecorder`). |
 | `praecepta-quarkus-deployment` | runtime, compiler, Quarkus ArC deployment | Quarkus extension, build time: finds DMN files, compiles declared Excel and CSV tables, validates them and fails the build on the configured issues; reloads changed tables in dev mode (`PraeceptaProcessor`). |
 | `praecepta-benchmarks` | engine, Camunda 8, Drools, JMH | Compares Praecepta with other engines; not published. |
-| `praecepta-tck` | engine | Runs the DMN TCK's decision-table cases; not published. |
+| `praecepta-tck` | engine, integration | Runs the whole DMN TCK (compliance levels 2 and 3) and scores every result node against a committed baseline; not published. |
 | `praecepta-native-tests` | the framework modules | A Spring Boot, a Micronaut and a Quarkus application, built as GraalVM native executables and run; in the reactor only with the `native-frameworks` profile; not published. |
 
 The build-tool and framework integrations build on `praecepta-compiler` and `praecepta-integration`, so
@@ -79,7 +79,8 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
      coordinate of its literal's kind (an interval with an end of each kind reads both). When the
      cells of a column are all of one kind, one coordinate has a single class and the pairs are as
      many as the classes of the other. A pair is empty when no value has both coordinates: an
-     instant and a local time are a whole number of seconds apart, at most 18 hours. A column has
+     instant and a local time are a whole number of seconds apart, at most 14 hours, as FEEL's offsets
+     lie in -14:00..+14:00 (#123; a getter may give a Java value beyond, which is no FEEL value). A column has
      only the classes its input can reach (`Zoning`): `timeInput` and `dateTimeInput` give values
      without a zone, `offsetTimeInput` and `zonedDateTimeInput` with one, `zonedTimeInput` times with a
      zone id or, in a zone with one fixed offset, at an offset, and map-based inputs, read from text, any of
@@ -89,9 +90,10 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
      comparison of it is one DMN 1.5 leaves open, which Praecepta takes as FEEL's null (see
      [DMN conformance](DMN-CONFORMANCE.md)). Each zone id the cells name has a line of
      local times of its own, and one class holds the zone ids no cell names; every test of another kind is
-     unknown on them, and theirs on every other class. A column of map-based inputs whose cells name no zone
-     id keeps that class out of the analysis, and gives such a time the mask of the rules that accept any
-     value, so that tables without zone ids keep the report they had. A zone with one fixed offset
+     unknown on them, and theirs on every other class. A column whose inputs can be such times (map-based
+     inputs, `zonedTimeInput`, a list's elements) has that class even when its cells name no zone id: only
+     the rules that accept any value match it, and the analyses visit it as they do every class, so a rule
+     that only such a time reaches is not reported unreachable (#114). A zone with one fixed offset
      (`Etc/UTC`) is no such zone: DMN 1.5's example of `time(from)` (Table 72) has
      `time("00:01:00@Etc/UTC")` equal `time("00:01:00Z")`, so the engine reads a time in such a zone as the
      `OffsetTime` at that offset at its edges (`FeelTemporals.parseTime` for text, cells and output entries,
@@ -135,10 +137,8 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
    it is complete (`Completeness`): whether every input, a missing value in any column and a string no rule
    mentions included, matches a rule, so that the default can never be given (an ERROR,
    `UNREACHABLE_DEFAULT_OUTPUT`). It searches a list column as the minimal sets of rules every list it takes
-   can match (`ListAnalysis.everyOutcome`: missing lists and missing elements included), and it also visits
-   the time with a zone id that a column takes though no cell names one, which the other analyses leave out
-   (`ColumnIndex.hiddenZoneIdMask`). The analysis is exact, because it searches
-   the same column classes the index uses. A list column is searched as the sets of its element
+   can match (`ListAnalysis.everyOutcome`: missing lists and missing elements included). The analysis is
+   exact, because it searches the same column classes the index uses. A list column is searched as the sets of its element
    classes (`ListAnalysis`): rules `"PT"` and `"BR"` overlap on `["PT","BR"]`. Which rules a list
    matches depends only on which element classes it holds, and adding an element only adds positive
    rules and removes `not(...)` ones, so overlaps are decided pairwise and the last list column of a
@@ -168,7 +168,7 @@ An engine is **immutable** once built: any number of threads may share it withou
   from none: with several outputs, defaults that are all `null` still make a default output, of nulls.
   It uses the JDK's own XML parser (`DocumentBuilderFactory.newDefaultInstance()`, never one JAXP finds
   on the class path) with DTDs and external entities disabled. Anything it does not
-  support (function calls, inputs computed by other decisions) is rejected
+  support (function calls) is rejected
   with an error naming the decision, rule and column. Output entries may be expressions of
   literals (dates, times and durations included) and inputs with `+ - * / **` (`OutputExpression`): they are kept as written, parsed and
   type-checked when the engine is built, and evaluated only for matching rules, like outputs that
@@ -178,6 +178,116 @@ An engine is **immutable** once built: any number of threads may share it withou
   exactly those forms back into the same tests Praecepta's own syntax writes `"PT", >= 18`.
 - `DmnWriter` writes a `DecisionTable` as standard DMN 1.3, which `DmnReader` reads back unchanged
   and which Camunda 8 and Drools evaluate identically (the benchmarks check this).
+
+## Decision requirement graphs (#14)
+A DMN model whose decisions require other decisions and input data is a decision requirements graph (DMN 1.5,
+chapter 6). 0.7 evaluates graphs whose decisions are decision tables or literal expressions in the expression
+subset output entries take; later releases add the other kinds of logic as further implementations of the same
+types (see *Growing it* below).
+
+```
+ DMN file ──(DmnReader.readModel)──► DecisionModel ──► DecisionGraph.Builder ──► DecisionGraph ──► evaluate(decision, inputData)
+ code ──(DecisionGraph.builder())───────────────────────────┘        │
+                                                                     ├──► validationReport(): cycles, missing requirements, type mismatches
+ DecisionModel ──(DmnWriter.write)──► DMN                            └──► validationReport(decision): each table's own analysis
+```
+
+**The model** (`beans`, plain records, no behaviour): `DecisionModel(name, inputData, decisions)`; an
+`InputData(name, FeelType type)`; a `Decision(name, requiredDecisions, requiredInputs, DecisionLogic logic)`, whose
+requirements are names of the model's elements (the information requirements of DMN 1.5, 6.3.13). `DecisionLogic` is
+a sealed interface with two kinds today: `Table(DecisionTable)`, named after its decision, and
+`LiteralExpression(text, declared FeelType)`, checked to be in the expression subset when it is made
+(`OutputExpression`). `FeelType` (`feel`) is the type of a value passed between elements: `Simple(ColumnType)`,
+`ListOf(FeelType)`, `Context(components by name, ordered)`, or `Any` where the model declares none. The model
+rejects two elements of one name (6.3.7, 6.3.11), and nothing else: a model may be ill-formed, which the graph reports.
+
+**Reading and writing.** `DmnReader.readModel` reads every `inputData` (its variable's `typeRef`, resolved through
+item definitions to a `FeelType`: collections, components, nested to `MAX_TYPE_DEPTH` levels, with a check for types
+defined in terms of themselves) and every `decision`: its information requirements, by `href` to an element of the
+model (one to no element is kept as the id it names, which the graph reports as missing), and its logic, a decision
+table or a literal expression, each with the type the decision variable's `typeRef` declares (`FeelType.ANY` for
+none), which its value is bound to. A table is read as `read(dmn, decision)` reads it, except that what declares no
+`typeRef` is typed from the model (`ModelTypes`): an input expression by the input data or decision it names (or the
+component a path names), an output by the decision's variable (its component of the output's name, for several
+outputs), else by its output entries when they are all literals of one type. What later releases bring is rejected
+whole with an `UnsupportedFeatureException`, whose `release()` and `issue()` name the release that plans it, so that
+callers fall back by its type, never by its message: business knowledge models, knowledge requirements and boxed
+expressions as logic (#118), FEEL beyond the subset (#116, function calls #117), decision services, imports and
+references into other models (#119). Knowledge sources, authority requirements,
+annotations and diagrams take no part in evaluation and are ignored. `DmnWriter.write(DecisionModel)` writes DMN 1.3
+with ids by position (`input_data_0`, `decision_0`, and `decision_0_` before the ids of a decision's table, so the
+tables of a model never share an id), item definitions for list and context types, and literal expressions as
+written; a model it writes reads back as the same model, and writes the same again. `read(dmn)`, `read(dmn, decision)`
+and `readAll(dmn)` read single tables as before.
+
+**Building** (`DecisionGraph`, with the package-private `GraphAnalysis`, `GraphNodes` and `GraphValues`). Every
+input data and decision gets a *slot*: input data first, then decisions, in the model's order. `GraphAnalysis` then:
+1. checks each requirement exists and is of its kind (`MISSING_REQUIREMENT`);
+2. resolves each name a decision's logic reads (a table's columns and the inputs its cells compare with, a literal
+   expression's names) among that decision's requirements: the requirement so named, else the one named by its
+   longest part before a dot, the rest being a path into its value (`Pricing.discount`, `Loan.principal`), as
+   `DecisionModel.elementOf` resolves names for every part of Praecepta; a name no requirement provides is a
+   `MISSING_REQUIREMENT` (7.3.4), and a path to a date's, time's or duration's property (`Birth.year`), which the
+   full FEEL language brings, an `UNSUPPORTED_FEATURE`;
+3. finds cycles among required decisions (Tarjan's algorithm with an explicit stack), reported with the cycle's
+   path (`DECISION_CYCLE`), and orders the other decisions so each comes after those it requires (Kahn's algorithm);
+4. works out types: an input data without a `typeRef` takes the type of the table columns that read it whole, when
+   they agree; a table's value is its one output's type, or a context of its outputs, a list of that under a hit
+   policy with several results and no aggregation, a number for COUNT; a literal expression's comes from the types
+   of the names it reads (single strings, numbers, dates, times or durations), or is the type of the one name it is,
+   or is known only when it is evaluated where a name it reads has no type (the expression is then typed from its
+   values, `GraphNodes.LiteralNode`); operands FEEL's arithmetic does not combine make it null (`ALWAYS_NULL`, a
+   WARNING). Either value is then bound to the decision's declared type as DMN 1.5, 10.3.2.9.4, binds it
+   (`GraphValues.Binding`): as it is where it conforms (10.3.2.9.2), a date to a date and time, a value to a list
+   of one, a list of one to its element, checked when evaluated where its type is known only then, and anything
+   else that does not conform to null (`ALWAYS_NULL`);
+5. checks that each value a table reads fits its column (`TYPE_MISMATCH`): the column's type, or for a column of lists
+   a list of it or a single value (a list of one); a path must exist in the type it reads; a cell that names a list
+   (`Flu Symptoms`) asks whether the value is in it, so such an input is bound as a list of the table;
+6. marks the decisions that cannot be evaluated: those with an issue, in a cycle, or requiring such a decision.
+
+The graph's report lists those issues, ERRORs but for `ALWAYS_NULL`, a WARNING, whose decision is evaluated; each
+issue kind is one of `ValidationReport.Kind`, which later layers will extend (a `switch` over it keeps a `default`).
+`Builder.failOn(severity)` rejects the graph when its report, or
+one of its tables', has issues that severe, and `logValidationReport` logs them once, as `PraeceptaEngine` does.
+Each decision table becomes a `PraeceptaEngine<Object[], Object>` (`GraphNodes.TableNode`), whose inputs are the
+graph's slots: each column is bound with a getter that reads its slot and path (`PraeceptaEngine.Builder.valueInput`,
+package-private, of `Zoning.EITHER`, as map-based inputs are, so each table's validation report is the one the
+framework integrations' map-based engines report), and whose output strategy gives the table's value (each output
+converted from text to its type once, when the engine is built, for rules that compute nothing). A literal expression
+is parsed once (`GraphNodes.LiteralNode`) and reads its names through resolved slots and paths.
+
+**Evaluating.** `evaluate(decision, inputData)` takes the decision's *plan*, worked out the first time and cached:
+the slots of the input data it needs and the decisions it needs, itself last, in dependency order. It fills an
+`Object[]` of slots with the input data, made FEEL values of their declared types (`GraphValues.normalise`: an
+`Integer` becomes a `BigDecimal`, a `Period` a `YearsAndMonths`, text of a simple type its value, a map the declared
+components of a context, and a value of no declared type copied, unmodifiable, its numbers `BigDecimal`s), then
+evaluates each decision once into its slot. A column that reads a value of no declared type converts it then, as an
+input data of the column's type is converted, or rejects it. A path reads a context's component, or of
+a list of contexts the list of their components (10.3.2.5), and a column of lists takes a single value as a list of
+one (10.3.2.9.4). No walk over the graph recurses, so a chain of thousands of decisions builds and evaluates on any
+thread's stack. A graph is immutable once built (the plans are cached in a concurrent map) and thread-safe.
+
+**For the build plugins and the framework integrations** (how they use it is in the two sections below).
+Everything they need is public API of `DecisionGraph`:
+`decisions()` (names, in model order), `inputData()` (each input data's `FeelType`, declared or worked out),
+`type(decision)` (a decision's `FeelType`), `requiredInputData(decision)` (what a decision reads, directly or
+through the decisions it requires), `canEvaluate(decision)`, `validationReport()` and `validationReport(decision)`,
+`evaluate(decision, inputData)` and `evaluate(decisions, inputData)` (several at once, each required decision once),
+and `model()` (to write the model with `DmnWriter`, as generated code would ship it). A typed input record per
+decision can be generated from `requiredInputData` and `inputData()`'s types; an output type from `type(decision)`
+(`Simple` → its Java type, `Context` → a record of components, `ListOf` → a `List`). The map-based integrations can
+pass maps of text, as simple types take text. The values a graph gives are the `FeelType` value classes listed in
+its Javadoc, immutable.
+
+**Growing it.** Each later layer adds to these types rather than replacing them: full FEEL (0.8, #116) replaces
+`LiteralExpression`'s subset parser and `GraphNodes.LiteralNode` with a FEEL interpreter over the same slots, and
+`FeelType` with FEEL's full type system (ranges, functions); built-in functions (0.9, #117) are names that
+resolve to the built-in context; boxed expressions and business knowledge models (0.10, #118) are further
+`DecisionLogic` kinds with nodes of their own, and invocables become elements with slots that hold functions,
+required through knowledge requirements, with the same cycle and type checks; decision services and imports (0.11,
+#119) add elements and qualified names to the resolution of step 2. The reader rejects each of them by name until
+then.
 
 ## The compiler and the build plugins
 `TableCompiler` (in `praecepta-compiler`) compiles one table, described by a `TableDefinition`, with
@@ -204,6 +314,30 @@ Gradle plugin's `GeneratePraecepta` task turn each configured table into a `Tabl
 
 At runtime, the generated code needs only `praecepta-engine`. The tool writes the result with
 `CompiledTable.write`, so every tool writes the same files.
+
+**Decision requirement graphs** (#14). Before loading a DMN source as a table, `TableCompiler` reads it as a
+decision model (`DmnReader.readModel`); `GraphCompiler` takes over when the decision the definition names, or,
+when it names none, one of the model's decisions, requires another decision or is a literal expression. Anything
+else compiles as before, byte for byte (the golden files of single tables are unchanged): a decision table that
+requires only input data, a model without such decisions, and a file that is not a well-formed model in a way a
+file of tables never had to be (two elements of one name, which `DmnWriter` writes for a table with a column of its
+own name; a decision without logic), and a model that uses what a later release plans (#116 to #119) but has the
+table to compile, which 0.6 compiled; without such a table, the reader's message, which names the release, fails
+the build. `GraphCompiler` builds the graph (`DecisionGraph.Builder.failOn` at the build's `failOn`, without
+logging), writes the model with `DmnWriter.write(model)`, and `GraphSourceGenerator` generates:
+- a model class, `<Model>Model` (or the named decision's class with `Model`), that reads the DMN resource once into
+  a `DecisionGraph` (`graph()`, `validationReport()`), with a record per structured input data, and the helpers the
+  conversions call (lists element by element, `YearsAndMonths` to `Period`);
+- per decision, an input record of `requiredInputData(decision)` and a class whose `evaluate` puts each component in
+  a map by input data name, evaluates the decision through the graph, and converts its value: a cast for simple
+  types, a record's `of(Map)` for a context (a `<Decision>Output` record; contexts within contexts are nested
+  records, depth bounded by the reader's `MAX_TYPE_DEPTH`), the helpers for lists and years and months durations.
+  Times and date-times are typed `Object` and `TemporalAccessor`: the graph keeps a value's zone, or lack of one,
+  as its class, which the model's types do not say (`TimeZones` decides it for a table's own columns from what its
+  cells write, which says nothing of a value one decision passes another).
+Each decision's table keeps its analysis (`CompiledTable.reports()`, by generated class, beside the graph's own
+report by the model class). The generated classes evaluate through the engine's `DecisionGraph`, so they agree with
+it by construction; `GraphCompilerTest` checks them against it and against `praecepta-integration`'s map engine.
 
 The Gradle plugin is built by the Maven reactor like every other module, compiled against the Gradle
 API that gradleplugins.dev redistributes on Maven Central (`dev.gradleplugins:gradle-api`, provided),
@@ -247,6 +381,22 @@ log their reports themselves (`Decisions.load(sources, failOn, false)`, which bu
 its report. At startup, Quarkus builds its engines without logging either, since its build logged the
 issues. Aggregations follow `AggregationOperator.check`, the engine's statement of where DMN defines them,
 and compare values of the output's type (`FeelLiterals.value`, `FeelTemporals.compare`).
+
+**Decision requirement graphs** (#14). `Decisions.load` reads each file as a decision model
+(`DmnReader.readModel`). When one of its decisions requires another decision, or is a literal expression
+(`GraphModel.needed`), the file becomes a `GraphModel`: its `DecisionGraph`, built once, and the conversion of maps
+of text to input data (simple values stay text, which the graph parses with their type; lists are read as a list
+column reads them; a context is gathered from its components' paths, `Loan.principal`) and of a decision's value to
+the maps a table's engine gives (one per element of a list, a context's components as text, any other value under
+the table's one output, or the decision's name; none for null). Every decision of the file is then a `Decision`
+whose `evaluate` goes through the graph; a table's decision keeps its own map-based engine (its report is the one
+the graph's table reports, since the graph binds its columns as map inputs, `Zoning.EITHER`), which the frameworks
+register as its bean, so table beans are what 0.6 registered; a literal expression has no table, no engine and no
+bean. The graph's report is checked at `fail-on` and logged once, as the model's. Any other file is read as before
+with `readAll`, a model the reader rejects included: one with a later release's feature, whose tables 0.6 loaded and
+still loads, alone (the rest of the model is not evaluated, and the file fails with the reader's message, which names
+the release, when it has no table), and one that is not a well-formed model, as a file of tables never had to be. `Decisions.describe()` adds `models` only when there are graphs, so the description of files of tables
+is unchanged.
 
 The Spring Boot starter loads the tables while the context registers its bean definitions (an
 `ImportBeanDefinitionRegistrar`), because each decision becomes a bean of its own, named
@@ -316,6 +466,29 @@ profile, so the default build does not need GraalVM; the `Native frameworks` wor
 application with GraalVM for JDK 25, and Micronaut's with JDK 21 too (Spring Boot 4 and Quarkus 3.40 need
 GraalVM 25; the invoker skips them on an older one). Each takes its framework's defaults, the
 `native-maven-plugin` version included, as its users would.
+
+## Scoring the DMN TCK (#115)
+`praecepta-tck` runs every model of compliance levels 2 and 3 of the DMN TCK, at a pinned commit, in every
+build, and scores each result node as passed, failed or not supported ([RESULTS.md](../praecepta-tck/RESULTS.md)).
+Its pieces are meant to outlive the layers of the DMN 1.5 plan (#120):
+- **One seam for evaluation.** `ModelEvaluator` takes a result node (the model, the test case's inputs, what
+  it invokes) and returns a value, an error, a failure, or the features it lacks; the runner compares, scores
+  and reports. `GraphEvaluator` evaluates a decision through its model's `DecisionGraph` (#14), a decision
+  whose value the test case gives being input data instead; the nodes it does not take (a model `readModel`
+  rejects, a decision the graph's report blocks) go to `SingleDecisionEvaluator`, which evaluates one decision
+  on its own, a decision table through `DmnReader` and the engine and a literal expression as an output
+  expression: `graphs.orElse(single)`. A later release adds its evaluator in front the same way, and the nodes
+  it cannot take keep the reasons the others give.
+- **Reasons by feature, with the release that brings them.** A not-supported node lists every `Feature` it
+  needs (a FEEL construct, a built-in function by name, business knowledge models, invocations, boxed
+  contexts, decision services, imports, structured inputs...), each in one area of the plan, found in its own
+  logic and in what it requires. RESULTS.md counts them by feature and by the release after which a node has
+  all it needs, so each release can see what it unlocks. A node's feature area comes from its content alone,
+  so it stays put as Praecepta grows.
+- **Only regressions fail the build.** `baseline.txt` lists the nodes that passed when it was last
+  regenerated; one of them no longer passing fails the build, and a node that fails or is not supported never
+  does. RESULTS.md and the baseline are regenerated together, deliberately (`-Dtck.update=true`), so a new pass
+  is recorded by a reviewed change, not silently.
 
 ## Design decisions
 The main decisions and their reasons (strict DMN semantics, bitsets instead of a trie or generated

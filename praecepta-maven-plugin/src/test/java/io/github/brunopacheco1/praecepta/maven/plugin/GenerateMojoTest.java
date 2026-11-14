@@ -10,10 +10,12 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.maven.model.Resource;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugin.logging.SystemStreamLog;
 import org.apache.maven.project.MavenProject;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +39,7 @@ class GenerateMojoTest {
         project = new MavenProject();
         project.setFile(basedir.resolve("pom.xml").toFile());
         var rules = Files.createDirectories(basedir.resolve("src/main/rules"));
-        for (var name : List.of("fees.csv", "overlapping.csv")) {
+        for (var name : List.of("fees.csv", "overlapping.csv", "credit.dmn")) {
             Files.copy(Path.of(GenerateMojoTest.class.getResource("/tables/" + name).toURI()), rules.resolve(name));
         }
     }
@@ -59,6 +61,63 @@ class GenerateMojoTest {
                 .contains(basedir.resolve("target/generated-sources/praecepta").toString());
         Assertions.assertThat(project.getResources()).extracting(Resource::getDirectory)
                 .contains(basedir.resolve("target/generated-resources/praecepta").toString());
+    }
+
+    /** A DMN model whose decisions require one another (#14): a model class, and an input record and a class per decision. */
+    @Test
+    void a_decision_requirements_graph_generates_a_class_per_decision() throws Exception {
+        var credit = new TableConfig(new File("src/main/rules/credit.dmn"), null, null, null, null, List.of(), List.of());
+        mojo(List.of(credit), "ERROR", null).execute();
+
+        var sources = basedir.resolve("target/generated-sources/praecepta/com/acme/rules");
+        for (var name : List.of("CreditModel", "RiskCategory", "RiskCategoryInput", "CreditLimit", "CreditLimitInput", "MonthlyLimit",
+                "MonthlyLimitInput")) {
+            Assertions.assertThat(sources.resolve(name + ".java")).exists();
+        }
+        Assertions.assertThat(basedir.resolve("target/generated-resources/praecepta/com/acme/rules/CreditModel.dmn")).content()
+                .contains("<literalExpression");
+
+        // the model and a decision of it, compiled apart, would both generate the decision's classes
+        var monthly = new TableConfig(new File("src/main/rules/credit.dmn"), null, "Monthly Limit", null, null, List.of(), List.of());
+        Assertions.assertThatThrownBy(() -> mojo(List.of(credit, monthly), "ERROR", null).execute())
+                .isInstanceOf(MojoFailureException.class)
+                .hasMessage("Two tables generate the class MonthlyLimitInput; set <name> on one");
+    }
+
+    /**
+     * A DMN file whose model uses what a later release plans compiles its decision table alone, as in 0.6, and the
+     * build says so at info level, once per file however many tables read it, naming the file, the feature and the
+     * release and issue that plan it.
+     */
+    @Test
+    void a_table_compiled_alone_for_what_a_later_release_plans_is_logged_once_per_file() throws Exception {
+        Files.writeString(basedir.resolve("src/main/rules/later.dmn"), """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
+                  <businessKnowledgeModel id="bkm" name="Rate"/>
+                  <decision id="tier" name="Tier"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>
+                    <output name="tier" typeRef="string"/>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"any"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var tiers = List.of(new TableConfig(new File("src/main/rules/later.dmn"), "Tier", null, null, null, List.of(), List.of()),
+                new TableConfig(new File("src/main/rules/later.dmn"), "OtherTier", null, null, null, List.of(), List.of()));
+        var infos = new ArrayList<String>();
+        var mojo = mojo(tiers, "ERROR", null);
+        mojo.setLog(new SystemStreamLog() {
+            @Override
+            public void info(CharSequence content) {
+                infos.add(content.toString());
+            }
+        });
+        mojo.execute();
+
+        Assertions.assertThat(basedir.resolve("target/generated-sources/praecepta/com/acme/rules/OtherTier.java")).exists();
+        Assertions.assertThat(infos).filteredOn(line -> line.contains("compiled alone")).singleElement().asString()
+                .startsWith(basedir.resolve("src/main/rules/later.dmn") + ": its decision table is compiled alone, "
+                        + "without its decision requirements graph, which needs Praecepta 0.10 (#118): ")
+                .contains("business knowledge model 'Rate'");
+        Assertions.assertThat(infos).filteredOn(line -> line.startsWith("Compiled table")).hasSize(2);
     }
 
     @Test

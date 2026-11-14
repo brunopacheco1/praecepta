@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 import io.github.brunopacheco1.praecepta.compiler.ColumnDefinition;
@@ -53,14 +54,16 @@ final class DeclaredTables {
      *
      * @param key              the table's key under {@code quarkus.praecepta.tables}
      * @param projectDirectory what relative sources are resolved against
+     * @param log              where the compiler's informational lines go ({@code CompilerOptions.log}): a DMN
+     *                         source compiled as its decision table alone, as its model uses what a later release plans
      * @throws IllegalArgumentException naming the table's key, for any configuration or table mistake
      */
-    static Table compile(String key, TableConfig config, Path projectDirectory) {
+    static Table compile(String key, TableConfig config, Path projectDirectory, Consumer<String> log) {
         var source = config.source().map(path -> resolve(path, projectDirectory)).orElse(null);
         var definition = new TableDefinition(source, null, config.decision().orElse(null), config.hitPolicy().orElse(null),
                 config.aggregation().orElse(null), columns(config.inputs().orElse(List.of())),
                 columns(config.outputs().orElse(List.of())));
-        var options = CompilerOptions.of("", GENERATOR).withFailOn(null).withSettingNames(KEBAB_CASE);
+        var options = CompilerOptions.of("", GENERATOR).withFailOn(null).withSettingNames(KEBAB_CASE).withLog(log);
         try {
             var compiled = TableCompiler.compile(definition, options);
             return new Table(source.toString(), compiled.dmn().getBytes(StandardCharsets.UTF_8));

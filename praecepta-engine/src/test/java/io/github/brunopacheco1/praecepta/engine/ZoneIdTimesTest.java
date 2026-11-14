@@ -83,7 +83,7 @@ class ZoneIdTimesTest {
                 .rules(List.of(rule(1, "< time(\"12:00:00\")"), rule(2, ">= time(\"12:00:00\")"), rule(3, "-")))
                 .build();
         Assertions.assertThat(engine.evaluate(input("11:00@Europe/Paris"))).containsExactly("3");
-        // the analysis keeps the classes it had: no gap among times with a zone id
+        // rule 3 takes it: no gap
         Assertions.assertThat(engine.validationReport().issues(Kind.GAP)).isEmpty();
         var typed = PraeceptaEngine.<Map<String, Object>, String>builder()
                 .hitPolicy(HitPolicy.FIRST)
@@ -93,6 +93,67 @@ class ZoneIdTimesTest {
                 .build();
         Map<String, Object> zoneId = Map.of("at", new ZonedTime(LocalTime.NOON, PARIS));
         Assertions.assertThatThrownBy(() -> typed.evaluate(zoneId)).isInstanceOf(ClassCastException.class);
+    }
+
+    @Test
+    void a_rule_reached_only_by_a_time_with_a_zone_id_no_cell_names_is_reachable() {
+        // #114, shrunk from EngineMatchesReferencePropertiesTest: rule 2 matches every time c1 takes but one in a zone id
+        // with a changing offset, which it compares with none (FEEL's null), and a missing one; rule 5 the missing one
+        var rules = List.of(rule(1, "> c0", "-", "x"), rule(2, "-", "not([time(\"08:00:00@Etc/UTC\")..time(\"08:00:00@Etc/UTC\")))", "x"),
+                rule(3, "-", "c0", "x"), rule(4, "c1", "-", "x"), rule(5, "-", "= null", "y"));
+        var table = new DecisionTable("t", HitPolicy.PRIORITY, null,
+                List.of(new DecisionTable.InputColumn("c0", ColumnType.TIME, "]time(\"09:00:00@Europe/Paris\")..time(\"10:00:00@Europe/Paris\")["),
+                        new DecisionTable.InputColumn("c1", ColumnType.TIME, null)),
+                List.of(new DecisionTable.OutputColumn("out", ColumnType.STRING, List.of("y", "x"))), rules, true, Set.of());
+        var engine = PraeceptaEngine.<Map<String, String>, String>builder()
+                .table(table)
+                .inputs(PraeceptaInput::new)
+                .output(output -> output.values().get("out"))
+                .build();
+        Assertions.assertThat(engine.validationReport().issues(Kind.UNREACHABLE_RULE)).isEmpty();
+        // rules 1, 2 and 5 do not match it (c0 > c0 is false), so x is rules 3 and 4's
+        Assertions.assertThat(engine.evaluate(Map.of("c0", "09:30@Europe/Paris", "c1", "09:30@Europe/Paris"))).containsExactly("x");
+    }
+
+    @Test
+    void a_time_with_a_zone_id_no_cell_names_is_a_gap_where_no_rule_takes_any_value() {
+        // #114: such a time compares with none of the cells (FEEL's null), so neither rule matches it
+        var engine = PraeceptaEngine.<Map<String, String>, String>builder()
+                .hitPolicy(HitPolicy.UNIQUE)
+                .inputs(PraeceptaInput::new)
+                .columnType("at", ColumnType.TIME)
+                .output(output -> output.values().get("id"))
+                .rules(List.of(rule(1, "< time(\"12:00:00\")"), rule(2, ">= time(\"12:00:00\")")))
+                .build();
+        Assertions.assertThat(engine.evaluate(input("11:00@Europe/Paris"))).isEmpty();
+        Assertions.assertThat(engine.validationReport().issues(Kind.GAP)).singleElement().satisfies(gap -> {
+            Assertions.assertThat(gap.detail()).isEqualTo("at = any time with a zone id no cell names");
+            Assertions.assertThat(engine.evaluate(input(gap.example().get("at").toString()))).isEmpty();
+        });
+        // declared input values that rule such times out leave no gap
+        var declared = PraeceptaEngine.<Map<String, String>, String>builder()
+                .hitPolicy(HitPolicy.UNIQUE)
+                .inputs(PraeceptaInput::new)
+                .columnType("at", ColumnType.TIME)
+                .allowedValues("at", "[time(\"00:00:00\")..time(\"23:59:59\")]")
+                .output(output -> output.values().get("id"))
+                .rules(List.of(rule(1, "< time(\"12:00:00\")"), rule(2, ">= time(\"12:00:00\")")))
+                .build();
+        Assertions.assertThat(declared.validationReport().issues(Kind.GAP)).isEmpty();
+    }
+
+    @Test
+    void a_list_holding_a_time_with_a_zone_id_no_cell_names_reaches_the_rules_after_a_not() {
+        // #114, in a list's elements: not(12:00) of such an element is unknown, so a list holding it matches neither rule 2 nor 3
+        var engine = PraeceptaEngine.<Map<String, String>, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .inputs(PraeceptaInput::new)
+                .listColumnType("at", ColumnType.TIME)
+                .output(output -> output.values().get("id"))
+                .rules(List.of(rule(1, "null"), rule(2, "not(time(\"12:00:00\"))"), rule(3, "time(\"12:00:00\")"), rule(4, "-")))
+                .build();
+        Assertions.assertThat(engine.evaluate(input("[time(\"10:30:00@Europe/Paris\")]"))).containsExactly("4");
+        Assertions.assertThat(engine.validationReport().issues(Kind.UNREACHABLE_RULE)).isEmpty();
     }
 
     @Test
@@ -177,6 +238,10 @@ class ZoneIdTimesTest {
         var input = new HashMap<String, String>();
         input.put("at", at);
         return input;
+    }
+
+    private static Praeceptum rule(int id, String c0, String c1, String out) {
+        return new Praeceptum(id, new PraeceptaInput(Map.of("c0", c0, "c1", c1)), new PraeceptaOutput(Map.of("out", out)));
     }
 
     private static Praeceptum rule(int id, String cell) {

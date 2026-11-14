@@ -109,19 +109,28 @@ public class GenerateMojo extends AbstractMojo {
         if (tables.isEmpty()) {
             throw new MojoFailureException("Configure at least one <table>");
         }
-        var options = new CompilerOptions(packageName, severity(failOn), fileHeader, GENERATOR, CompilerOptions.XML_ELEMENTS);
+        // a DMN file compiled as its decision table alone, as its model uses what a later release plans: once per file
+        var logged = new HashSet<String>();
+        var options = new CompilerOptions(packageName, severity(failOn), fileHeader, GENERATOR, CompilerOptions.XML_ELEMENTS)
+                .withLog(line -> {
+                    if (logged.add(line)) {
+                        getLog().info(line);
+                    }
+                });
         var classNames = new HashSet<String>();
         try {
             for (var table : tables) {
                 resolveSource(table);
                 var result = compile(table, options);
-                if (!classNames.add(result.className())) {
-                    throw new MojoFailureException("Two tables generate the class " + result.className() + "; set <name> on one");
+                for (var className : result.classNames()) {
+                    if (!classNames.add(className)) {
+                        throw new MojoFailureException("Two tables generate the class " + className + "; set <name> on one");
+                    }
                 }
-                result.report().issues().forEach(issue -> getLog().warn(result.className() + ": " + issue));
+                result.reports().forEach((className, report) -> report.issues().forEach(issue -> getLog().warn(className + ": " + issue)));
                 result.write(outputDirectory.toPath(), resourceDirectory.toPath());
-                getLog().info("Compiled table %s (%d rules, %s) into %s.%s".formatted(table.source.getName(),
-                        result.table().rules().size(), result.table().hitPolicy(), packageName, result.className()));
+                getLog().info("Compiled %s %s (%s) into %s.%s".formatted(result.table() != null ? "table" : "decision model",
+                        table.source.getName(), result.summary(), packageName, result.className()));
             }
         } catch (IOException e) {
             throw new MojoFailureException("Cannot write generated files: " + e.getMessage(), e);

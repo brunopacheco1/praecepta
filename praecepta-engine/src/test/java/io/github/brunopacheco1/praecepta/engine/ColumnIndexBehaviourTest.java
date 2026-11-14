@@ -243,39 +243,39 @@ class ColumnIndexBehaviourTest {
     }
 
     @Test
-    void no_time_has_an_instant_and_a_local_time_more_than_18_hours_apart() {
-        var column = columnTaking(ColumnType.TIME, Zoning.ZONED, null, "< time(\"05:00:00\")", "> time(\"23:00:00Z\")", "< time(\"01:00:00Z\")");
-        // before 05:00 on the clock and after 23:00 at offset zero would be more than 18 hours behind it
+    void no_time_has_an_instant_and_a_local_time_more_than_14_hours_apart() {
+        var column = columnTaking(ColumnType.TIME, Zoning.ZONED, null, "< time(\"05:00:00\")", "> time(\"19:00:00Z\")", "< time(\"01:00:00Z\")");
+        // before 05:00 on the clock and after 19:00 at offset zero would be more than 14 hours behind it, beyond FEEL's offsets
         Assertions.assertThat(column.describe(3)).isEqualTo("time(\"01:00:00Z\") at local time (-inf..time(\"05:00:00\"))");
         Assertions.assertThat(column.empty[3]).isFalse();
-        Assertions.assertThat(column.describe(12)).isEqualTo("(time(\"23:00:00Z\")..+inf) at local time (-inf..time(\"05:00:00\"))");
+        Assertions.assertThat(column.describe(12)).isEqualTo("(time(\"19:00:00Z\")..+inf) at local time (-inf..time(\"05:00:00\"))");
         Assertions.assertThat(column.empty[12]).isTrue();
-        Assertions.assertThat(column.describe(13)).isEqualTo("(time(\"23:00:00Z\")..+inf) at local time time(\"05:00:00\")");
+        Assertions.assertThat(column.describe(13)).isEqualTo("(time(\"19:00:00Z\")..+inf) at local time time(\"05:00:00\")");
         Assertions.assertThat(column.empty[13]).isTrue();
-        // 05:00:00.000000001-18:00 is 23:00:00.000000001Z
+        // 05:00:00.000000001-14:00 is 19:00:00.000000001Z
         Assertions.assertThat(column.empty[14]).isFalse();
         Assertions.assertThat(column.representative(14)).isInstanceOfSatisfying(OffsetTime.class, time -> {
             Assertions.assertThat(time.toLocalTime()).isAfter(LocalTime.of(5, 0));
-            Assertions.assertThat(PrimitiveKeys.utcNanos(time)).isGreaterThan(LocalTime.of(23, 0).toNanoOfDay());
+            Assertions.assertThat(PrimitiveKeys.utcNanos(time)).isGreaterThan(LocalTime.of(19, 0).toNanoOfDay());
         });
-        // on the clock at 05:00 exactly and at 23:00 at offset zero exactly: 05:00-18:00
-        Assertions.assertThat(column.representative(10)).isEqualTo(OffsetTime.of(5, 0, 0, 0, ZoneOffset.MIN));
+        // on the clock at 05:00 exactly and at 19:00 at offset zero exactly: 05:00-14:00
+        Assertions.assertThat(column.representative(10)).isEqualTo(OffsetTime.of(5, 0, 0, 0, ZoneOffset.ofHours(-14)));
     }
 
     @Test
-    void times_with_an_offset_span_from_minus_18_to_42_hours_by_instant() {
-        var column = columnTaking(ColumnType.TIME, Zoning.ZONED, null, "<= time(\"00:00:00+18:00\")", ">= time(\"23:59:59.999999999-18:00\")",
+    void times_with_an_offset_span_from_minus_14_to_38_hours_by_instant() {
+        var column = columnTaking(ColumnType.TIME, Zoning.ZONED, null, "<= time(\"00:00:00+14:00\")", ">= time(\"23:59:59.999999999-14:00\")",
                 "[time(\"01:00:00+02:00\")..time(\"23:00:00-02:00\")]");
         Assertions.assertThat(dump(column)).isEqualTo("""
-                0 (-inf..time("00:00:00+18:00")) empty rules=[]
-                1 time("00:00:00+18:00") rules=[0] example=00:00+18:00 (OffsetTime)
-                2 (time("00:00:00+18:00")..time("01:00:00+02:00")) rules=[] example=08:30+18:00 (OffsetTime)
+                0 (-inf..time("00:00:00+14:00")) empty rules=[]
+                1 time("00:00:00+14:00") rules=[0] example=00:00+14:00 (OffsetTime)
+                2 (time("00:00:00+14:00")..time("01:00:00+02:00")) rules=[] example=06:30+14:00 (OffsetTime)
                 3 time("01:00:00+02:00") rules=[2] example=01:00+02:00 (OffsetTime)
                 4 (time("01:00:00+02:00")..time("23:00:00-02:00")) rules=[2] example=14:00+02:00 (OffsetTime)
                 5 time("23:00:00-02:00") rules=[2] example=23:00-02:00 (OffsetTime)
-                6 (time("23:00:00-02:00")..time("23:59:59.999999999-18:00")) rules=[] example=23:29:59.999999999-10:00 (OffsetTime)
-                7 time("23:59:59.999999999-18:00") rules=[1] example=23:59:59.999999999-18:00 (OffsetTime)
-                8 (time("23:59:59.999999999-18:00")..+inf) empty rules=[]
+                6 (time("23:00:00-02:00")..time("23:59:59.999999999-14:00")) rules=[] example=23:29:59.999999999-08:00 (OffsetTime)
+                7 time("23:59:59.999999999-14:00") rules=[1] example=23:59:59.999999999-14:00 (OffsetTime)
+                8 (time("23:59:59.999999999-14:00")..+inf) empty rules=[]
                 9 null missing rules=[] example=-
                 """);
     }
@@ -298,7 +298,8 @@ class ColumnIndexBehaviourTest {
                 9 (time("12:00:00+01:00")..+inf) at local time (-inf..time("12:00:00")) rules=[0, 1, 2, 3] example=11:30Z (OffsetTime)
                 10 (time("12:00:00+01:00")..+inf) at local time time("12:00:00") rules=[1, 2] example=12:00Z (OffsetTime)
                 11 (time("12:00:00+01:00")..+inf) at local time (time("12:00:00")..+inf) rules=[1, 2, 3] example=18:00Z (OffsetTime)
-                12 null missing rules=[3] example=-
+                12 any time with a zone id no cell names rules=[2] example=12:00:00@Africa/Abidjan (ZonedTime)
+                13 null missing rules=[3] example=-
                 """);
         // runs never cross from one kind to the other; all of a kind says which it is
         Assertions.assertThat(column.describe(List.of(1, 2, 3)))
@@ -348,10 +349,14 @@ class ColumnIndexBehaviourTest {
     }
 
     @Test
-    void a_map_input_with_a_zone_id_is_left_out_of_the_classes_when_no_cell_names_one() {
+    void a_map_input_with_a_zone_id_has_a_class_when_no_cell_names_one() {
         var column = columnTaking(ColumnType.TIME, Zoning.EITHER, null, "< time(\"12:00:00\")", "not(time(\"12:00:00\"))", "!= null",
                 "not(null)", "-");
-        Assertions.assertThat(dump(column)).doesNotContain("zone id");
+        // #114: the analyses visit it as any other class; only the cells that accept any value match it
+        Assertions.assertThat(dump(column)).contains("""
+                6 any time with a zone id no cell names rules=[2, 3, 4] example=12:00:00@Africa/Abidjan (ZonedTime)
+                7 null missing rules=[1, 4] example=-
+                """);
         // FEEL does not define how a time with a zone id compares with one without: < and not(...) are both unknown
         Assertions.assertThat(lookups(column, "11:00@Europe/Paris", "11:00")).isEqualTo("""
                 '11:00@Europe/Paris' (String) -> [2, 3, 4]
@@ -369,7 +374,8 @@ class ColumnIndexBehaviourTest {
                 3 (-inf..time("12:00:00")) with a time zone rules=[0, 1] example=11:00Z (OffsetTime)
                 4 time("12:00:00") with a time zone rules=[] example=12:00Z (OffsetTime)
                 5 (time("12:00:00")..+inf) with a time zone rules=[1] example=13:00Z (OffsetTime)
-                6 null missing rules=[1] example=-
+                6 any time with a zone id no cell names rules=[] example=12:00:00@Africa/Abidjan (ZonedTime)
+                7 null missing rules=[1] example=-
                 """);
         // the same local times of both kinds are described once
         Assertions.assertThat(column.describe(List.of(1, 2, 4, 5))).containsExactly("[time(\"12:00:00\")..+inf)");

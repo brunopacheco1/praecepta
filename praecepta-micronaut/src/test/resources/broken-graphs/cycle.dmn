@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A and B require each other; C requires A; D requires neither and can be evaluated -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="cycle" name="Cycle" namespace="https://example.com/cycle">
+  <inputData id="x" name="X">
+    <variable name="X" typeRef="number"/>
+  </inputData>
+  <decision id="a" name="A">
+    <variable name="A" typeRef="number"/>
+    <informationRequirement><requiredDecision href="#b"/></informationRequirement>
+    <informationRequirement><requiredInput href="#x"/></informationRequirement>
+    <decisionTable hitPolicy="FIRST">
+      <input><inputExpression typeRef="number"><text>B</text></inputExpression></input>
+      <input><inputExpression typeRef="number"><text>X</text></inputExpression></input>
+      <output typeRef="number"/>
+      <rule>
+        <inputEntry><text>-</text></inputEntry>
+        <inputEntry><text>-</text></inputEntry>
+        <outputEntry><text>1</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="b" name="B">
+    <variable name="B" typeRef="number"/>
+    <informationRequirement><requiredDecision href="#a"/></informationRequirement>
+    <literalExpression><text>A + 1</text></literalExpression>
+  </decision>
+  <decision id="c" name="C">
+    <variable name="C" typeRef="number"/>
+    <informationRequirement><requiredDecision href="#a"/></informationRequirement>
+    <literalExpression><text>A * 2</text></literalExpression>
+  </decision>
+  <decision id="d" name="D">
+    <variable name="D" typeRef="number"/>
+    <informationRequirement><requiredInput href="#x"/></informationRequirement>
+    <literalExpression><text>X + 1</text></literalExpression>
+  </decision>
+  <decision id="e" name="E">
+    <variable name="E" typeRef="number"/>
+    <informationRequirement><requiredDecision href="#e"/></informationRequirement>
+    <literalExpression><text>E + 1</text></literalExpression>
+  </decision>
+</definitions>

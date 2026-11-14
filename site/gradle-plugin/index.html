@@ -204,6 +204,14 @@ PraeceptaEngine&lt;DiscountInput, DiscountOutput&gt; engine = Discount.engine();
           values name zone ids is the engine's <code>ZonedTime</code>. A string column with a value list is an
           enum, and a list column a <code>java.util.List</code>.</li>
         <li>The DMN resource is written next to the classes, so the table ships in your jar as DMN.</li>
+        <li>From 0.7.0, a DMN file whose decisions require other decisions (a decision requirement graph of
+          decision tables and literal expressions) compiles to a class named after the model, which holds the
+          graph, and a class per decision with an input record of the input data it needs; the graph's cycles,
+          missing requirements and type mismatches fail the build at <code>failOn</code>
+          (<a href="https://github.com/brunopacheco1/praecepta#decision-requirement-graphs-in-generated-code">details</a>).
+          A file that uses what a later release brings, such as a business knowledge model, compiles its decision
+          table alone, as before, and the task says so in one lifecycle line per file, naming what it uses and the
+          release that plans it.</li>
       </ul>
     </section>
 

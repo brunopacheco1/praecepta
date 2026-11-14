@@ -84,7 +84,7 @@
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.12.0</central-publishing-maven-plugin.version>
-        <versions-maven-plugin.version>2.24.0</versions-maven-plugin.version>
+        <versions-maven-plugin.version>2.25.1</versions-maven-plugin.version>
         <maven-invoker-plugin.version>3.10.1</maven-invoker-plugin.version>
         <!-- native images (#19): only the native-image test project uses them (praecepta-maven-plugin/src/it/native-app) -->
         <native-maven-plugin.version>1.1.18</native-maven-plugin.version>
@@ -106,7 +106,7 @@
              (its last release); the plugin uses only API that Gradle 8.5 to 9 share -->
         <gradle-api.version>8.11.1</gradle-api.version>
         <!-- the Groovy that Gradle ${gradle-api.version} bundles; its in-process tests need more of it than the API -->
-        <groovy.version>3.0.22</groovy.version>
+        <groovy.version>3.0.25</groovy.version>
         <!-- the Gradle version the functional tests run (-P gradle-functional); gradle-versions.yml sets others -->
         <gradle-functional.version>9.8.2</gradle-functional.version>
     </properties>
@@ -192,7 +192,7 @@
                      (GHSA-xxph-c9ww-hj94). Tests use it only; no published module depends on it. -->
                 <groupId>com.google.guava</groupId>
                 <artifactId>guava</artifactId>
-                <version>33.7.2-jre</version>
+                <version>33.8.0-jre</version>
             </dependency>
             <dependency>
                 <groupId>org.assertj</groupId>

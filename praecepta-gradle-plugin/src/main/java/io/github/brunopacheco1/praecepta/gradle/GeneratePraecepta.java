@@ -60,13 +60,15 @@ public abstract class GeneratePraecepta extends DefaultTask {
     /** The tool the generated sources name. */
     static final String GENERATOR = "praecepta-gradle-plugin";
 
+    private static final String TABLE = "table";
+
     /**
      * How messages name the settings: quoted, with the Maven plugin's {@code <name>} as {@code 'className'}, since
      * {@code name} is the table's name in its container.
      */
     static final UnaryOperator<String> SETTING_NAMES = setting -> switch (setting) {
         case "name" -> "'className'";
-        case "table" -> "table";
+        case TABLE -> TABLE;
         default -> "'" + setting + "'";
     };
 
@@ -156,21 +158,36 @@ public abstract class GeneratePraecepta extends DefaultTask {
             throw new GradleException("Register at least one table: praecepta { tables { register(\"discount\") { ... } } }");
         }
         var packageName = getPackageName().get();
+        // a DMN file compiled as its decision table alone, as its model uses what a later release plans: once per file
+        var logged = new HashSet<String>();
         var options = CompilerOptions.of(packageName, GENERATOR)
                 .withFailOn(severity(getFailOn().get()))
                 .withFileHeader(getFileHeader().getOrNull())
-                .withSettingNames(SETTING_NAMES);
+                .withSettingNames(SETTING_NAMES)
+                .withLog(line -> {
+                    if (logged.add(line)) {
+                        getLogger().lifecycle(line);
+                    }
+                });
         var classNames = new HashSet<String>();
         for (var table : tables) {
             var compiled = compile(table, options);
-            if (!classNames.add(compiled.className())) {
-                throw new GradleException("Two tables generate the class %s; set %s on one"
-                        .formatted(compiled.className(), SETTING_NAMES.apply("name")));
+            for (var className : compiled.classNames()) {
+                if (!classNames.add(className)) {
+                    throw new GradleException("Two tables generate the class %s; set %s on one".formatted(className, SETTING_NAMES.apply("name")));
+                }
             }
-            compiled.report().issues().forEach(issue -> getLogger().warn(compiled.className() + ": " + issue));
+            compiled.reports().forEach((className, report) -> report.issues().forEach(issue -> getLogger().warn(className + ": " + issue)));
             write(compiled, sourceRoot, resourceRoot);
-            getLogger().info("Compiled table {} ({} rules, {}) into {}", table.getName(), compiled.table().rules().size(),
-                    compiled.table().hitPolicy(), packageName.isEmpty() ? compiled.className() : packageName + "." + compiled.className());
+            logCompiled(compiled, table, packageName);
+        }
+    }
+
+    /** Logs, at info, what a table or a decision model was compiled into. */
+    private void logCompiled(CompiledTable compiled, TableSpec table, String packageName) {
+        if (getLogger().isInfoEnabled()) {
+            getLogger().info("Compiled {} {} ({}) into {}", compiled.table() != null ? TABLE : "decision model", table.getName(),
+                    compiled.summary(), packageName.isEmpty() ? compiled.className() : packageName + "." + compiled.className());
         }
     }
 

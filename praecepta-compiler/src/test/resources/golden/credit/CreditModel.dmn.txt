@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_Credit" name="Credit" namespace="https://github.com/brunopacheco1/praecepta/Credit">
+  <inputData id="input_data_0" name="Applicant Age">
+    <variable id="input_data_0_variable" name="Applicant Age" typeRef="number"/>
+  </inputData>
+  <inputData id="input_data_1" name="Income">
+    <variable id="input_data_1_variable" name="Income" typeRef="number"/>
+  </inputData>
+  <decision id="decision_0" name="Risk Category">
+    <variable id="decision_0_variable" name="Risk Category" typeRef="string"/>
+    <informationRequirement id="decision_0_requirement_0"><requiredInput href="#input_data_0"/></informationRequirement>
+    <decisionTable id="decision_0_table" hitPolicy="UNIQUE">
+      <input id="decision_0_input_0" label="Applicant Age">
+        <inputExpression id="decision_0_input_expression_0" typeRef="number"><text>Applicant Age</text></inputExpression>
+      </input>
+      <output id="decision_0_output_0" name="Risk Category" typeRef="string"/>
+      <rule id="decision_0_rule_0">
+        <inputEntry id="decision_0_input_entry_0_0"><text>&lt; 25</text></inputEntry>
+        <outputEntry id="decision_0_output_entry_0_0"><text>"High"</text></outputEntry>
+      </rule>
+      <rule id="decision_0_rule_1">
+        <inputEntry id="decision_0_input_entry_1_0"><text>&gt;= 25</text></inputEntry>
+        <outputEntry id="decision_0_output_entry_1_0"><text>"Low"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_1" name="Credit Limit">
+    <variable id="decision_1_variable" name="Credit Limit" typeRef="number"/>
+    <informationRequirement id="decision_1_requirement_0"><requiredDecision href="#decision_0"/></informationRequirement>
+    <informationRequirement id="decision_1_requirement_1"><requiredInput href="#input_data_1"/></informationRequirement>
+    <decisionTable id="decision_1_table" hitPolicy="UNIQUE">
+      <input id="decision_1_input_0" label="Risk Category">
+        <inputExpression id="decision_1_input_expression_0" typeRef="string"><text>Risk Category</text></inputExpression>
+      </input>
+      <input id="decision_1_input_1" label="Income">
+        <inputExpression id="decision_1_input_expression_1" typeRef="number"><text>Income</text></inputExpression>
+      </input>
+      <output id="decision_1_output_0" name="Credit Limit" typeRef="number"/>
+      <rule id="decision_1_rule_0">
+        <inputEntry id="decision_1_input_entry_0_0"><text>"High"</text></inputEntry>
+        <inputEntry id="decision_1_input_entry_0_1"><text>-</text></inputEntry>
+        <outputEntry id="decision_1_output_entry_0_0"><text>Income * 0.5</text></outputEntry>
+      </rule>
+      <rule id="decision_1_rule_1">
+        <inputEntry id="decision_1_input_entry_1_0"><text>"Low"</text></inputEntry>
+        <inputEntry id="decision_1_input_entry_1_1"><text>-</text></inputEntry>
+        <outputEntry id="decision_1_output_entry_1_0"><text>Income * 2</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_2" name="Monthly Limit">
+    <variable id="decision_2_variable" name="Monthly Limit" typeRef="number"/>
+    <informationRequirement id="decision_2_requirement_0"><requiredDecision href="#decision_1"/></informationRequirement>
+    <literalExpression id="decision_2_literal"><text>Credit Limit / 12</text></literalExpression>
+  </decision>
+</definitions>

@@ -16,7 +16,7 @@ which:
    (`skipPublishing`; see [CONTRIBUTING.md](../CONTRIBUTING.md#adding-a-module)) to Maven Central,
    waiting until they are live. No list of modules is kept: the build deploys every module that does not
    opt out, and the workflow finds the published jars from their signatures
-   (`.github/scripts/published_modules.py`), so a new module needs no change here. As of 0.6.0 they are
+   (`.github/scripts/published_modules.py`), so a new module needs no change here. As of 0.7.0 they are
    the parent POM (`praecepta`), `praecepta-engine`, `praecepta-loader` and `praecepta-maven-plugin`,
    and, since 0.5.0, `praecepta-compiler`, `praecepta-integration`, `praecepta-gradle-plugin` with its
    plugin marker, `praecepta-spring-boot-starter`, `praecepta-micronaut`, `praecepta-quarkus` and

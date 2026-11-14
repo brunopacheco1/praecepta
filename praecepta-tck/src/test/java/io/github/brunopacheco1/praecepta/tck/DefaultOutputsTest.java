@@ -89,9 +89,9 @@ class DefaultOutputsTest {
 
     @Test
     void a_rejected_default_output_is_reported_as_its_own_feature() {
-        Assertions.assertThat(TckRunner.unsupportedFeature(
+        Assertions.assertThat(DecisionTableEvaluator.unsupportedFeature(
                 "Decision 'Fee', output 'Fee': default output 'score + 1' is not supported; a default output must be a literal number"))
-                .isEqualTo("default outputs that are not literals");
+                .isEqualTo(Feature.decisionTable("default outputs that are not literals"));
     }
 
     private static DecisionTable table(String testCase, String decision) throws IOException {

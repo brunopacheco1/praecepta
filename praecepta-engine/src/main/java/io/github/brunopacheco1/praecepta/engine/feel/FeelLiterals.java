@@ -40,14 +40,14 @@ public final class FeelLiterals {
         return switch (value) {
             case null -> "null";
             case String text -> "\"" + FeelStrings.escaped(text) + "\"";
-            case LocalDate date -> invocation("date", date.toString());
+            case LocalDate date -> invocation("date", text(date));
             case LocalTime time -> invocation("time", text(time));
             case OffsetTime time -> invocation("time", text(time));
             case ZonedTime time -> invocation("time", time.toString());
             case LocalDateTime dateTime -> invocation("date and time", text(dateTime));
             // FEEL has no literal for the later of two equal local times in a zone: the offset keeps its instant
             case ZonedDateTime dateTime -> invocation("date and time", isLaterAtOverlap(dateTime)
-                    ? DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(dateTime) : text(dateTime));
+                    ? year(DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(dateTime)) : text(dateTime));
             case Duration duration -> invocation("duration", text(duration));
             case YearsAndMonths duration -> invocation("duration", duration.toString());
             default -> text(value); // numbers and booleans
@@ -60,7 +60,8 @@ public final class FeelLiterals {
     }
 
     /**
-     * The plain text of a value: decimals without an exponent, ISO dates and times with their seconds
+     * The plain text of a value: decimals without an exponent, ISO dates and times with their seconds, a year of more
+     * than four digits without a {@code +} (XML Schema's {@code 99999-12-31}, DMN 1.5, 10.3.4.1)
      * and, if they have one, their offset ({@code 08:30:00Z}, {@code 2025-01-31T08:30:00+01:00}) or zone
      * id as FEEL writes it ({@code 2025-01-31T08:30:00@Europe/Paris}), ISO durations as FEEL writes them
      * ({@code P1DT2H}, {@code P1Y2M}). A date-time whose local time occurs twice in its zone, as clocks go
@@ -74,12 +75,23 @@ public final class FeelLiterals {
             case Duration duration -> durationText(duration);
             case LocalTime time -> DateTimeFormatter.ISO_LOCAL_TIME.format(time);
             case OffsetTime time -> DateTimeFormatter.ISO_OFFSET_TIME.format(time);
-            case LocalDateTime dateTime -> DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime);
-            case ZonedDateTime dateTime when dateTime.getZone() instanceof ZoneOffset -> DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(dateTime);
-            case ZonedDateTime dateTime when isLaterAtOverlap(dateTime) -> DateTimeFormatter.ISO_ZONED_DATE_TIME.format(dateTime);
-            case ZonedDateTime dateTime -> DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime) + "@" + dateTime.getZone().getId();
+            case LocalDate date -> year(date.toString());
+            case LocalDateTime dateTime -> year(DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime));
+            case ZonedDateTime dateTime when dateTime.getZone() instanceof ZoneOffset ->
+                    year(DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(dateTime));
+            case ZonedDateTime dateTime when isLaterAtOverlap(dateTime) -> year(DateTimeFormatter.ISO_ZONED_DATE_TIME.format(dateTime));
+            case ZonedDateTime dateTime -> year(DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(dateTime)) + "@" + dateTime.getZone().getId();
             default -> value.toString();
         };
+    }
+
+    /**
+     * A date or date and time as Java's ISO form writes it, its year as XML Schema writes one (DMN 1.5, 10.3.4.1):
+     * without the {@code +} Java puts before more than four digits ({@code 99999-12-31}), which
+     * {@link FeelTemporals#parseDate} rejects.
+     */
+    private static String year(String iso) {
+        return iso.startsWith("+") ? iso.substring(1) : iso;
     }
 
     /**
@@ -103,7 +115,7 @@ public final class FeelLiterals {
             return switch (type) {
                 case NUMBER -> new BigDecimal(value);
                 case BOOLEAN -> bool(value);
-                case DATE -> LocalDate.parse(value);
+                case DATE -> FeelTemporals.parseDate(value);
                 case TIME -> FeelTemporals.parseTime(value);
                 case DATE_TIME -> FeelTemporals.parseDateTime(value);
                 case DAY_TIME_DURATION -> Duration.parse(value);

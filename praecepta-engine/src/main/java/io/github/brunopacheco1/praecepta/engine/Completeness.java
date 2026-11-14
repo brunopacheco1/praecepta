@@ -24,9 +24,7 @@ import java.util.Set;
  * values ({@code -} matches it, and so does {@code null}): a table whose rules cover every declared value but not a
  * missing one still gives its default for a missing input. And it visits the class of strings no rule mentions in a
  * string column without declared values, since such a string is an input too. Every class an input can fall in is
- * visited ({@link ColumnIndex#canOccur}), and so is a time with a zone id in a column of map-based inputs whose cells
- * name none, which the other analyses leave out ({@link ColumnIndex#hiddenZoneIdMask}: only the cells that accept any
- * value match it), so the search is exact over the rules it is given.
+ * visited ({@link ColumnIndex#canOccur}), so the search is exact over the rules it is given.
  *
  * <p>A column that holds lists is searched as the sets of rules its lists can match ({@link ListAnalysis#everyOutcome}):
  * every list, a missing one, the empty one and ones holding missing elements included, of which only the minimal sets
@@ -75,13 +73,6 @@ final class Completeness {
                     distinct.putIfAbsent(key(dense), dense);
                     BitsetIndex.and(rest, dense);
                 }
-            }
-            var hidden = col.hiddenZoneIdMask();
-            if (hidden != null) {
-                var dense = index.allRules();
-                Masks.and(dense, hidden);
-                distinct.putIfAbsent(key(dense), dense);
-                BitsetIndex.and(rest, dense);
             }
             classMasks[c] = distinct.values().toArray(long[][]::new);
             coversRest[c] = rest;
