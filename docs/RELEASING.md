@@ -113,12 +113,14 @@ every release waits for a click.
    git tag -s vX.Y.Z -m "Praecepta X.Y.Z"
    git push origin vX.Y.Z
    ```
-3. Watch **Actions → Release**. When it is green, the artifacts are on Maven Central (search can
+3. Watch **Actions → Release**. With a reviewer on the `release` environment, each of its two jobs
+   waits for its own approval: approve **Publish to the Gradle Plugin Portal** too once Maven
+   Central's job is done. When the run is green, the artifacts are on Maven Central (search can
    take a few hours to show them), the GitHub release is published and the Gradle plugin is on the
    Plugin Portal. If only the **Publish to the Gradle Plugin Portal** job fails, fix the cause and
    re-run that job alone (**Re-run failed jobs**): it needs nothing from the other job but Maven
    Central's files.
-4. Set the development version for the next release (`mvn versions:set -DnewVersion=X.Y.(Z+1)-SNAPSHOT
+4. Set the development version for the next release (`mvn versions:set -DnewVersion=X.(Y+1).0-SNAPSHOT
    -DgenerateBackupPoms=false -DprocessAllModules`) in a pull request. This also refreshes
    `project.build.outputTimestamp`, which the next release keeps (see *Rebuilding a release*).
 
