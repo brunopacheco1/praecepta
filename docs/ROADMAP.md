@@ -32,8 +32,11 @@ Released in November 2026 (see the [changelog](../CHANGELOG.md)):
   of the 458 that Praecepta evaluates; every other node is listed with the release that brings what
   it needs. The decision-table checks still pass 83 of 86, and the build fails only on a
   regression.
-- **A fix**: rules reached only by a time with a zone id that no cell names are no longer reported
-  unreachable ([#114](https://github.com/brunopacheco1/praecepta/issues/114)).
+- **Fixes**: rules reached only by a time with a zone id that no cell names are no longer reported
+  unreachable ([#114](https://github.com/brunopacheco1/praecepta/issues/114)), and dates, times and
+  date-times are read in XML Schema's lexical forms: an offset beyond -14:00..+14:00
+  ([#123](https://github.com/brunopacheco1/praecepta/issues/123)) and a year with a leading `+`
+  ([#124](https://github.com/brunopacheco1/praecepta/issues/124)) are rejected.
 
 ## Next: 0.8
 - **The FEEL core** ([#116](https://github.com/brunopacheco1/praecepta/issues/116)): the whole
