@@ -22,9 +22,6 @@ import java.util.Objects;
  * @param end            the end, or null if it has none
  * @param endIncluded    whether the end is in the range
  * @param comparison     for a comparison with one endpoint, its operator; null for a range between two endpoints
- * @throws IllegalArgumentException if a comparison's endpoints are not those it has: a {@code <} or {@code <=} with a
- *                                  start or without an end, an end included for {@code <} or excluded for {@code <=},
- *                                  and so on
  */
 public record FeelRange(Object start, boolean startIncluded, Object end, boolean endIncluded, Comparison comparison) {
 
@@ -75,7 +72,13 @@ public record FeelRange(Object start, boolean startIncluded, Object end, boolean
         }
     }
 
-    /** Checks that a comparison's endpoints and inclusions are those it has. */
+    /**
+     * Checks that a comparison's endpoints and inclusions are those it has.
+     *
+     * @throws IllegalArgumentException if they are not: a {@code <} or {@code <=} with a start, an end included for
+     *                                  {@code <} or excluded for {@code <=}, an {@code =} whose start is not its end,
+     *                                  and so on
+     */
     public FeelRange {
         if (comparison != null && !isShapeOf(comparison, start, startIncluded, end, endIncluded)) {
             throw new IllegalArgumentException("a range '%s e' has no start %s %s and end %s %s".formatted(comparison.symbol(),

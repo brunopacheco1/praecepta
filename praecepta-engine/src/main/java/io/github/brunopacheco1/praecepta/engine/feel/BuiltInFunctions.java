@@ -11,7 +11,9 @@ import java.util.Set;
 /**
  * FEEL's built-in functions (DMN 1.5, 10.3.4): their names, which are in every expression's scope, and the functions
  * Praecepta evaluates. This is where 0.9 (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>)
- * registers the function library, each function a {@link FeelFunction} under its FEEL name. Until then
+ * registers the function library, each function a {@link BuiltInFunction} under its FEEL name, with its parameters, the
+ * arguments it takes ({@link BuiltInFunction.Arity}: fixed, optional or variadic) and a body given the evaluation that
+ * invokes it, so that it counts against that evaluation's limits and reports its errors there. Until then
  * {@link #lookup} has none, and an invocation of one is parsed as what Praecepta does not evaluate yet
  * ({@link FeelExpression#unsupported()}); only {@code date}, {@code time}, {@code date and time} and {@code duration}
  * of literal arguments, which FEEL's date time literals are (grammar rule 60), are evaluated, when the expression is
