@@ -124,7 +124,7 @@ public final class DmnWriter {
         var inputTypes = new String[inputData.size()];
         for (int i = 0; i < inputData.size(); i++) {
             ids.put(inputData.get(i).name(), INPUT_DATA + i);
-            inputTypes[i] = typeRef(xml, inputData.get(i).type(), INPUT_DATA + i + TYPE_SUFFIX, "input data '" + inputData.get(i).name() + "'");
+            inputTypes[i] = elementTypeRef(xml, inputData.get(i).type(), INPUT_DATA + i + TYPE_SUFFIX, model.types(), "input data '" + inputData.get(i).name() + "'");
         }
         var decisionTypes = new String[decisions.size()];
         for (int d = 0; d < decisions.size(); d++) {
@@ -133,9 +133,9 @@ public final class DmnWriter {
             switch (decision.logic()) {
                 case DecisionLogic.Table(var table, var type) -> {
                     listItemDefinitions(xml, table, DECISION + d + "_");
-                    decisionTypes[d] = typeRef(xml, type, DECISION + d + TYPE_SUFFIX, "decision '" + decision.name() + "'");
+                    decisionTypes[d] = elementTypeRef(xml, type, DECISION + d + TYPE_SUFFIX, model.types(), "decision '" + decision.name() + "'");
                 }
-                case DecisionLogic.LiteralExpression literal -> decisionTypes[d] = typeRef(xml, literal.type(), DECISION + d + TYPE_SUFFIX,
+                case DecisionLogic.LiteralExpression literal -> decisionTypes[d] = elementTypeRef(xml, literal.type(), DECISION + d + TYPE_SUFFIX, model.types(),
                         "decision '" + decision.name() + "'");
             }
         }
@@ -223,6 +223,25 @@ public final class DmnWriter {
     /** The attribute {@code typeRef="..."}, or nothing for a value of any type. */
     private static String optionalType(String typeRef) {
         return typeRef == null ? "" : attribute(TYPE_REF, typeRef);
+    }
+
+    /**
+     * The {@code typeRef} of an element's type, as {@link #typeRef} gives it, where the model's own types are written
+     * already: a type of the model under the name an item definition would be given is that one, not written twice, and
+     * a type the model names otherwise takes the next name that is free ({@code input_data_0_type_1}).
+     */
+    private static String elementTypeRef(StringBuilder xml, FeelType type, String name, Map<String, FeelType> named, String where) {
+        if (type instanceof FeelType.Simple || type instanceof FeelType.Any) {
+            return typeRef(xml, type, name, where);
+        }
+        if (type.equals(named.get(name))) {
+            return name;
+        }
+        var free = name;
+        for (int k = 1; named.containsKey(free); k++) {
+            free = name + "_" + k;
+        }
+        return typeRef(xml, type, free, where);
     }
 
     /**

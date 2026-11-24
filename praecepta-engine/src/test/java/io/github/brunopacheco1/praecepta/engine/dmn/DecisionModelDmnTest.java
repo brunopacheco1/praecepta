@@ -222,6 +222,34 @@ class DecisionModelDmnTest {
                 .isTrue());
     }
 
+    /**
+     * A type of the model under the name the writer gives an element's item definition is written once, and the element's
+     * type is that one; a type of the model of that name that is another type leaves the element the next free name.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"number", "string"})
+    void a_type_of_the_model_named_as_an_element_type_is_written_once(String principal) {
+        var xml = dmn("""
+                <itemDefinition name="input_data_0_type">
+                  <itemComponent name="principal"><typeRef>%s</typeRef></itemComponent>
+                </itemDefinition>
+                <itemDefinition name="tLoan"><itemComponent name="principal"><typeRef>number</typeRef></itemComponent></itemDefinition>
+                <inputData id="l" name="Loan"><variable name="Loan" typeRef="tLoan"/></inputData>
+                <decision id="d" name="Typed">
+                  <informationRequirement><requiredInput href="#l"/></informationRequirement>
+                  <literalExpression><text>Loan instance of input_data_0_type</text></literalExpression>
+                </decision>""".formatted(principal));
+        var model = read(xml);
+
+        var written = DmnWriter.write(model);
+        var read = read(written);
+
+        assertThat(read).isEqualTo(model);
+        assertThat(DmnWriter.write(read)).isEqualTo(written);
+        assertThat(Pattern.compile("<itemDefinition name=\"input_data_0_type\"").matcher(written).results().count()).isOne();
+        assertThat(written).contains(principal.equals("number") ? "typeRef=\"input_data_0_type\"" : "typeRef=\"input_data_0_type_1\"");
+    }
+
     /** The model, without the decision whose requirement refers to no element, which DMN cannot write. */
     private static DecisionModel withoutMissing(DecisionModel model) {
         return new DecisionModel(model.name(), model.inputData(),
