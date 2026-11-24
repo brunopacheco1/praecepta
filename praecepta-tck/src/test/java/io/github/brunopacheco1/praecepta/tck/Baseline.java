@@ -61,8 +61,10 @@ final class Baseline {
     /**
      * The keys the baseline lists, each with its tag ({@link #GRAPH}, or empty).
      *
-     * @throws IllegalStateException if there is no baseline, or it lists no node, unless {@code update} is set: a missing
-     *                               baseline would let every regression pass
+     * @throws IllegalStateException if there is no baseline, or it lists no node, or lists one twice, or tags one with
+     *                               anything but {@link #GRAPH}, unless {@code update} is set: a missing baseline would
+     *                               let every regression pass, a node listed twice could hide a change of its tag, and a
+     *                               mistyped tag ({@code graph } with a space) would drop its check through the graph
      */
     static Map<String, String> read(Path file, boolean update) {
         if (!Files.exists(file)) {
@@ -74,10 +76,7 @@ final class Baseline {
         }
         var keys = new TreeMap<String, String>();
         try (var lines = Files.lines(file)) {
-            lines.filter(line -> !line.isBlank() && !line.startsWith("#")).forEach(line -> {
-                int tab = line.indexOf('\t');
-                keys.put(tab < 0 ? line : line.substring(0, tab), tab < 0 ? "" : line.substring(tab + 1));
-            });
+            lines.filter(line -> !line.isBlank() && !line.startsWith("#")).forEach(line -> add(keys, line, file, update));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -85,6 +84,21 @@ final class Baseline {
             throw new IllegalStateException(file.toAbsolutePath() + " lists no result node; regenerate it with -Dtck.update=true");
         }
         return keys;
+    }
+
+    /** Adds a line's key and tag; a key listed already, or a tag other than {@link #GRAPH}, fails, unless updating. */
+    private static void add(Map<String, String> keys, String line, Path file, boolean update) {
+        int tab = line.indexOf('\t');
+        var key = tab < 0 ? line : line.substring(0, tab);
+        var tag = tab < 0 ? "" : line.substring(tab + 1);
+        if (!update && !tag.isEmpty() && !tag.equals(GRAPH)) {
+            throw new IllegalStateException("%s tags '%s' with '%s', which is not '%s'; fix it, or regenerate it with -Dtck.update=true"
+                    .formatted(file.toAbsolutePath(), key, tag, GRAPH));
+        }
+        if (keys.put(key, tag) != null && !update) {
+            throw new IllegalStateException("%s lists '%s' twice; fix it, or regenerate it with -Dtck.update=true"
+                    .formatted(file.toAbsolutePath(), key));
+        }
     }
 
     /**

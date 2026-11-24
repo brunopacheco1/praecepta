@@ -97,8 +97,7 @@ final class LiteralExpressionEvaluator {
                 owner = model.decision(name);
             }
             if (owner == null) {
-                var scanned = FeelScan.features(text, model);
-                throw new Unsupported(scanned.isEmpty() ? List.of(OTHER_NAMES) : scanned);
+                throw new Unsupported(unknownName(text, model));
             }
             var type = inputType(model, owner);
             builder.inputData(name, type);
@@ -120,6 +119,19 @@ final class LiteralExpressionEvaluator {
         } catch (InvalidInputException e) {
             return new Evaluation.Failure("an input is not of its type: " + e.getMessage());
         }
+    }
+
+    /**
+     * What a name that is neither an input data nor a decision of the model needs: an imported model's, if the model
+     * imports one (0.11's imports, DMN 1.5, 6.3.3), else what the text uses that Praecepta does not, else names beyond the
+     * decision's inputs.
+     */
+    static List<Feature> unknownName(String text, DmnModel model) {
+        if (model.imports()) {
+            return List.of(Feature.IMPORTS);
+        }
+        var scanned = FeelScan.features(text, model);
+        return scanned.isEmpty() ? List.of(OTHER_NAMES) : scanned;
     }
 
     /** The type of an input data or a decision whose value the test case gives, as its {@code typeRef} names it. */
