@@ -251,6 +251,7 @@ compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #date_004 d
 compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #datetime_001 datetime_001	graph
 compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #datetime_002 datetime_002	graph
 compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #datetime_003 datetime_003	graph
+compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #datetime_003_a datetime_003_a	graph
 compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #datetime_004 datetime_004	graph
 compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #datetime_005 datetime_005	graph
 compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #datetime_006 datetime_006	graph
@@ -328,6 +329,7 @@ compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #time_002_a
 compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #time_002_b time_002_b	graph
 compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #time_003 time_003	graph
 compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #time_004 time_004	graph
+compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #time_005 time_005	graph
 compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #time_006 time_006	graph
 compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #time_010 time_010	graph
 compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #time_011 time_011	graph

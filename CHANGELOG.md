@@ -205,10 +205,11 @@ report is checked at `fail-on`); if you look for `MISSING_REQUIREMENT` where a l
   reported as an ERROR.
 - **A path to a property of a date, time or duration** (`Birth.year`) is evaluated (Table 65), in a literal expression
   and in a decision table's column alike, where 0.7 reported it as `UNSUPPORTED_FEATURE`.
-- **A literal expression that is not FEEL, or names a type neither FEEL nor the model defines** (`x instance of
-  tUnknown`), is reported as the new `ValidationReport.Kind.INVALID_EXPRESSION`, an ERROR, where it was a
-  `MISSING_REQUIREMENT`; the decision still cannot be evaluated, nor can those that require it. A decision table with
-  such an entry is rejected when it is read, as before. **Upgrade note:** code that looks for `MISSING_REQUIREMENT`
+- **A literal expression that is not FEEL** is reported as the new `ValidationReport.Kind.INVALID_EXPRESSION`, an
+  ERROR, where it was a `MISSING_REQUIREMENT`; the decision still cannot be evaluated, nor can those that require it.
+  A decision table with such an entry is rejected when it is read, as before. One that names a type neither FEEL nor
+  the model defines (`x instance of tUnknown`) is FEEL: that construct is null with an error, as the TCK has it, and
+  the decision is reported as `ALWAYS_NULL`. **Upgrade note:** code that looks for `MISSING_REQUIREMENT`
   to find such a decision looks for `INVALID_EXPRESSION`; a `switch` over `Kind` with a `default` branch, as the
   enum's Javadoc asks, needs no change.
 - **`TableCompiler.compile` throws an `IllegalArgumentException` for a source the engine rejects**, its message the
@@ -246,7 +247,7 @@ report is checked at `fail-on`); if you look for `MISSING_REQUIREMENT` where a l
   framework integrations (`failOn(ERROR)` by default).
 - **A decision table's FEEL may name the model's item definitions** (`Amount instance of tAmount`), as a literal
   expression's may, where the model failed to read; the model's types are those its literal expressions or its
-  tables name. A table read alone (`DmnReader.read`) has no model's types, as before.
+  tables name. A table read alone (`DmnReader.read`) has no model's types: there, such a construct is null.
 - **A name a table's FEEL reads that is neither one of its inputs nor a value a graph gives** is rejected when the
   engine is built, where it was read as the table's first column.
 - **A graph parses each decision table's FEEL once**, in its analysis, and its engine takes those parses, where it

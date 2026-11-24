@@ -411,8 +411,8 @@ class FeelTablesTest {
         Assertions.assertThat(graph.evaluate("Typed", missing)).isEqualTo(false);
         // the model writes back as it was read, its item definition with it
         Assertions.assertThat(DmnReader.readModel(stream(DmnWriter.write(model)))).isEqualTo(model);
-        // a table read alone has no model: what it names is no type of it
-        Assertions.assertThatThrownBy(() -> DmnReader.read(stream(xml))).isInstanceOf(InvalidDecisionTableException.class);
+        // a table read alone has no model: what it names is no type of it, so the test is null and the rule never matches
+        Assertions.assertThat(mapEngine(DmnReader.read(stream(xml))).evaluate(Map.of("Amount", "5")).getFirst()).containsEntry("Typed", "false");
     }
 
     /**
@@ -448,22 +448,23 @@ class FeelTablesTest {
     }
 
     /**
-     * A literal expression that is not FEEL, or names a type the model does not define, is an invalid expression, not a
-     * missing requirement; a table with the same entry is rejected.
+     * A literal expression that names a type the model does not define is FEEL: that construct is null with an error, as
+     * the TCK has it, so the decision is always null; a table with the same entry reads, and its entry is null.
      */
     @Test
-    void a_literal_expression_that_names_an_unknown_type_is_an_invalid_expression() {
+    void a_literal_expression_that_names_an_unknown_type_is_always_null() {
         var graph = DecisionGraph.builder().logValidationReport(false)
                 .inputData("x", ColumnType.NUMBER)
                 .literalDecision("Typed", "x instance of tUnknown")
                 .build();
         Assertions.assertThat(graph.validationReport().issues()).extracting(ValidationReport.Issue::kind)
-                .containsExactly(Kind.INVALID_EXPRESSION);
-        Assertions.assertThat(graph.validationReport().issues().getFirst().toString()).startsWith("ERROR decision 'Typed': ")
+                .containsExactly(Kind.ALWAYS_NULL);
+        Assertions.assertThat(graph.validationReport().issues().getFirst().toString()).startsWith("WARNING decision 'Typed'")
                 .contains("tUnknown");
-        var table = stream(PRICES.formatted("", "Base instance of tUnknown", "null"));
-        Assertions.assertThatThrownBy(() -> DmnReader.readModel(table)).isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessageContaining("tUnknown");
+        Assertions.assertThat(graph.evaluate("Typed", Map.of("x", 1))).isNull();
+        var table = DmnReader.readModel(stream(PRICES.formatted("", "Base instance of tUnknown", "null")));
+        var price = DecisionGraph.builder().model(table).logValidationReport(false).build();
+        Assertions.assertThat(price.evaluate("Price", Map.of("Base", 1, "Rate", 1))).isNull();
     }
 
     private static PraeceptaEngine<Map<String, String>, Map<String, String>> mapEngine(DecisionTable table) {

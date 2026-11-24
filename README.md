@@ -508,7 +508,7 @@ graph.validationReport("Credit Limit");                    // that table's own a
   (`MISSING_REQUIREMENT`), a value that does not fit where it goes, such as a string into a number column or
   a list into a column of single values (`TYPE_MISMATCH`), and what Praecepta does not evaluate yet, such as a
   built-in function, naming the release that plans it (`UNSUPPORTED_FEATURE`), and a literal expression that is not
-  FEEL, or names a type the model does not define (`INVALID_EXPRESSION`). Such a decision, and every decision
+  FEEL (`INVALID_EXPRESSION`). Such a decision, and every decision
   that requires it, cannot be evaluated; the others can. A decision whose value DMN 1.5 defines as null whatever
   its inputs (operands FEEL does not combine, a path to a component its type does not have, a value that does
   not conform to the declared type) is a WARNING
@@ -1084,10 +1084,10 @@ build, and gives two numbers:
 - **Decision tables: 83 of 86 checks pass (96.5 %).** These are the decision-table checks counted since the
   first release; the other three read inputs computed by other decisions in models that also invoke
   business knowledge models, which come in 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)).
-- **The whole kit: 2,273 of 3,511 result nodes pass (64.7 %).** Every model of compliance levels 2 and 3
+- **The whole kit: 2,275 of 3,511 result nodes pass (64.8 %).** Every model of compliance levels 2 and 3
   (148 models at the pinned commit), each result node scored as passed, failed or not supported, each
   decision evaluated through its model's decision requirement graph where Praecepta reads the model. This
-  measures how much of DMN 1.5 Praecepta covers: of the 2,279 nodes it evaluates, 2,273 pass (the six others
+  measures how much of DMN 1.5 Praecepta covers: of the 2,279 nodes it evaluates, 2,275 pass (the four others
   are [known failures](praecepta-tck/README.md#known-failures)), and the other 1,232 need features it does
   not have yet, mostly FEEL's built-in functions (0.9).
 

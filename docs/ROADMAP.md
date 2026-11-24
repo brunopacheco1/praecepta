@@ -48,8 +48,8 @@ Released in November 2026 (see the [changelog](../CHANGELOG.md)):
   tables' input expressions and output entries; their input entries are any FEEL unary tests. Tables
   keep their bitset index, analysis and generated code: a cell beyond the simple unary tests is
   applied to the rules the index matches, and the analysis reports nothing it cannot prove.
-- **The DMN TCK**: 2,273 of its 3,511 result nodes pass (64.7 %, from 454), and 2,273 of the 2,279
-  that Praecepta evaluates; 1,287 of the 1,289 nodes of FEEL's feature area pass. Most of the 1,232
+- **The DMN TCK**: 2,275 of its 3,511 result nodes pass (64.8 %, from 454), and 2,275 of the 2,279
+  that Praecepta evaluates; all 1,289 nodes of FEEL's feature area pass. Most of the 1,232
   nodes not supported yet need FEEL's built-in functions. The decision-table checks still pass 83 of
   86.
 
