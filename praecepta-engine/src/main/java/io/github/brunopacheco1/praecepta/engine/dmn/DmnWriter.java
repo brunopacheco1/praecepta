@@ -26,9 +26,11 @@ import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelUnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
@@ -383,7 +385,7 @@ public final class DmnWriter {
 
     /** An output, with its value list and its default value ({@code defaultOutputEntry}), if it has them, in that order. */
     private static void output(StringBuilder xml, int c, OutputColumn output, String prefix) {
-        xml.append("      <output").append(idAndName(prefix + "output_" + c, output.name())).append(typed(output.type()));
+        xml.append("      <output").append(idAndName(prefix + "output_" + c, output.name())).append(output.typed() ? typed(output.type()) : "");
         if (output.values().isEmpty() && !output.hasDefault()) {
             xml.append("/>\n");
             return;
@@ -479,9 +481,25 @@ public final class DmnWriter {
             }
             return render(feel ? CellParser.parseFeel(cell, type) : CellParser.parse(cell, type));
         } catch (CellSyntaxException e) {
-            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+            if (!feel) {
+                throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+            }
+            return beyondSimple(cell, e, where);
         }
     }
+
+    /** A strict FEEL cell beyond the simple unary tests ({@link FeelUnaryTests}): as written, once checked. */
+    private static String beyondSimple(String cell, CellSyntaxException rejected, String where) {
+        try {
+            FeelUnaryTests.parseCell(cell, NO_NAMES, rejected);
+        } catch (CellSyntaxException e) {
+            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+        }
+        return cell.strip();
+    }
+
+    /** No names in scope: a cell's names are read as words, which is all checking it needs. */
+    private static final FeelExpression.Scope NO_NAMES = FeelExpression.scope(List.of(), Map.of());
 
     private static String join(List<Test> tests) {
         return tests.stream().map(DmnWriter::test).collect(Collectors.joining(", "));

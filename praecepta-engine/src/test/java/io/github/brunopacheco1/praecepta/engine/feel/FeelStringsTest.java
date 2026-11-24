@@ -77,7 +77,7 @@ class FeelStringsTest {
         var cell = new UnaryTests.Positive(List.of(new UnaryTests.Equals(text)));
         Assertions.assertThat(CellParser.parseFeel(literal, ColumnType.STRING)).isEqualTo(cell);
         Assertions.assertThat(CellParser.parse(literal, ColumnType.STRING)).isEqualTo(cell);
-        Assertions.assertThat(OutputExpression.parse(literal).evaluate(name -> null)).isEqualTo(text);
+        Assertions.assertThat(FeelExpression.parse(literal).evaluate(name -> null)).isEqualTo(text);
     }
 
     @Provide
@@ -115,7 +115,7 @@ class FeelStringsTest {
         var cell = new UnaryTests.Positive(List.of(new UnaryTests.Equals(text)));
         Assertions.assertThat(CellParser.parseFeel(written, ColumnType.STRING)).as(written).isEqualTo(cell);
         Assertions.assertThat(CellParser.parse(written, ColumnType.STRING)).as(written).isEqualTo(cell);
-        Assertions.assertThat(OutputExpression.parse(written).evaluate(name -> null)).as(written).isEqualTo(text);
+        Assertions.assertThat(FeelExpression.parse(written).evaluate(name -> null)).as(written).isEqualTo(text);
     }
 
     @Property(tries = 2000, edgeCases = EdgeCasesMode.MIXIN)
@@ -125,7 +125,7 @@ class FeelStringsTest {
         Assertions.assertThat(literal.chars()).as(literal).noneMatch(c -> c >= 0x0A && c <= 0x0D);
         Assertions.assertThat(CellParser.parseFeel(literal, ColumnType.STRING)).as(literal)
                 .isEqualTo(new UnaryTests.Positive(List.of(new UnaryTests.Equals(text))));
-        Assertions.assertThat(OutputExpression.parse(literal).evaluate(name -> null)).as(literal).isEqualTo(text);
+        Assertions.assertThat(FeelExpression.parse(literal).evaluate(name -> null)).as(literal).isEqualTo(text);
     }
 
     /** One character of a literal, in one of four forms; a form the character cannot take falls back to the next. */

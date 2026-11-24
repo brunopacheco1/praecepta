@@ -19,8 +19,8 @@ import net.jqwik.api.Property;
 import net.jqwik.api.Provide;
 
 /**
- * Properties of FEEL as {@link FeelExpression} evaluates it: it agrees with the arithmetic output entries compute
- * ({@link OutputExpression}), on which 0.7's literal expressions ran; equality is reflexive and symmetric
+ * Properties of FEEL as {@link FeelExpression} evaluates it: its arithmetic agrees with decimal arithmetic of 34
+ * digits ({@link ArithmeticReference}, DMN 1.5, 10.3.2.3.1 and Table 59); equality is reflexive and symmetric
  * (DMN 1.5, Table 53); and the logic of three values obeys De Morgan's laws (Table 50).
  */
 class FeelExpressionPropertiesTest {
@@ -38,13 +38,51 @@ class FeelExpressionPropertiesTest {
     }
 
     @Property(tries = TRIES)
-    void arithmetic_agrees_with_output_expressions(@ForAll("arithmetic") String text) {
-        var expected = OutputExpression.parse(text).evaluate(VALUES::get);
+    void arithmetic_agrees_with_decimal_arithmetic(@ForAll("arithmetic") String text) {
+        var expected = new ArithmeticReference(text).evaluate(VALUES::get);
         var actual = FeelExpression.parse(text, List.of("a", "b", "c")).evaluate(VALUES::get);
         if (expected == null) {
             assertThat(actual).isNull();
         } else {
             assertThat((BigDecimal) actual).isEqualByComparingTo((BigDecimal) expected);
+        }
+    }
+
+    /**
+     * The arithmetic {@link #arithmetic()} writes, fully parenthesised, evaluated with Java's decimals of 34 digits, as
+     * DMN 1.5 has FEEL's numbers (10.3.2.3.1): a division by zero is null (Table 59).
+     */
+    private record ArithmeticReference(String text) {
+
+        Object evaluate(java.util.function.Function<String, Object> values) {
+            return value(new int[] {0}, values);
+        }
+
+        private BigDecimal value(int[] at, java.util.function.Function<String, Object> values) {
+            if (text.charAt(at[0]) != '(') {
+                int end = text.indexOf(' ', at[0]);
+                int close = text.indexOf(')', at[0]);
+                int stop = end < 0 ? text.length() : end;
+                stop = close >= 0 && close < stop ? close : stop;
+                var leaf = text.substring(at[0], stop);
+                at[0] = stop;
+                return Character.isLetter(leaf.charAt(0)) ? (BigDecimal) values.apply(leaf) : new BigDecimal(leaf);
+            }
+            at[0]++;
+            var left = value(at, values);
+            char operator = text.charAt(at[0] + 1);
+            at[0] += 3;
+            var right = value(at, values);
+            at[0]++; // the closing parenthesis
+            if (left == null || right == null) {
+                return null;
+            }
+            return switch (operator) {
+                case '+' -> left.add(right, java.math.MathContext.DECIMAL128);
+                case '-' -> left.subtract(right, java.math.MathContext.DECIMAL128);
+                case '*' -> left.multiply(right, java.math.MathContext.DECIMAL128);
+                default -> right.signum() == 0 ? null : left.divide(right, java.math.MathContext.DECIMAL128);
+            };
         }
     }
 

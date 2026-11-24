@@ -45,7 +45,6 @@ import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
-import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
@@ -263,7 +262,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
             values.put(output, value == null ? null : text(value));
         });
         rule.output().expressions().forEach((output, expression) -> {
-            var value = evaluate(OutputExpression.parse(expression), name -> value(input, name));
+            var value = evaluate(ReferenceExpression.parse(expression), name -> value(input, name));
             values.put(output, switch (value) {
                 case null -> null;
                 case BigDecimal number -> number.compareTo(BigDecimal.ZERO) == 0 ? "0" : number.stripTrailingZeros().toPlainString();
@@ -295,16 +294,16 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * (DMN 1.5, Tables 57, 59 and 60). Exponents are whole numbers here. Dates, times and durations follow
      * {@link #temporal}; unary minus is {@code e * -1} (Table 62).
      */
-    private static Object evaluate(OutputExpression expression, Function<String, Object> inputs) {
+    private static Object evaluate(ReferenceExpression expression, Function<String, Object> inputs) {
         return switch (expression) {
-            case OutputExpression.Literal literal -> fixed(literal.value());
-            case OutputExpression.Name name -> inputs.apply(name.name());
-            case OutputExpression.Negation negation -> {
+            case ReferenceExpression.Literal literal -> fixed(literal.value());
+            case ReferenceExpression.Name name -> inputs.apply(name.name());
+            case ReferenceExpression.Negation negation -> {
                 var operand = evaluate(negation.operand(), inputs);
-                yield operand == null ? null : evaluate(new OutputExpression.Arithmetic(OutputExpression.Operator.MULTIPLY,
-                        new OutputExpression.Literal(operand), new OutputExpression.Literal(BigDecimal.ONE.negate())), inputs);
+                yield operand == null ? null : evaluate(new ReferenceExpression.Arithmetic(ReferenceExpression.Operator.MULTIPLY,
+                        new ReferenceExpression.Literal(operand), new ReferenceExpression.Literal(BigDecimal.ONE.negate())), inputs);
             }
-            case OutputExpression.Arithmetic arithmetic -> {
+            case ReferenceExpression.Arithmetic arithmetic -> {
                 var a = evaluate(arithmetic.left(), inputs);
                 var b = evaluate(arithmetic.right(), inputs);
                 if (a == null || b == null) {
@@ -338,7 +337,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
      * id, and not at all otherwise; a years and months duration scales to the whole month toward zero, a days and
      * time one to the nanosecond.
      */
-    private static Object temporal(OutputExpression.Operator operator, Object a, Object b) {
+    private static Object temporal(ReferenceExpression.Operator operator, Object a, Object b) {
         try {
             return switch (operator) {
                 case ADD -> a instanceof Duration || a instanceof YearsAndMonths && !(b instanceof YearsAndMonths) && !(b instanceof Duration)

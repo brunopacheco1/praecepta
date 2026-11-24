@@ -1,0 +1,821 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# The kit's literal expressions that the output expressions of 0.6 and 0.7 read: arithmetic of names and literals. A
+# node whose logic is one of them is in the feature area of single decision tables and arithmetic (0.6), as
+# LiteralExpressionEvaluator.inTheSubset reads this list, so that the area stays put as Praecepta grows. Written by the
+# parser 0.8 retired, at the kit's pinned commit: one expression a line, with \\, \n, \r and \t for a backslash, line
+# breaks and tabs.
+\n                /*\n                some intro waffle\n                */\n                1 + 1 // and stuff\n            
+"10" * "10"
+"10" * 10
+"10" * @"10:10:10"
+"10" * @"2021-01-01"
+"10" * @"2021-01-01T10:10:10"
+"10" * @"P1D"
+"10" * @"P1Y"
+"10" ** "10"
+"10" ** 10
+"10" ** @"10:10:10"
+"10" ** @"2021-01-01"
+"10" ** @"2021-01-01T10:10:10"
+"10" ** @"P1D"
+"10" ** @"P1Y"
+"10" + 10
+"10" + @"10:10:10"
+"10" + @"2021-01-01"
+"10" + @"2021-01-01T10:10:10"
+"10" + @"P1D"
+"10" + @"P1Y"
+"10" - "10"
+"10" - 10
+"10" - @"10:10:10"
+"10" - @"2021-01-01"
+"10" - @"2021-01-01T10:10:10"
+"10" - @"P1D"
+"10" - @"P1Y"
+"10" / "10"
+"10" / 10
+"10" / @"10:10:10"
+"10" / @"2021-01-01"
+"10" / @"2021-01-01T10:10:10"
+"10" / @"P1D"
+"10" / @"P1Y"
+"15_1"
+"15_2"
+"A " + decision_003_input_1 + " " + decision_003_input_2 + " " + inputData_003
+"ACCEPT"
+"AimLoan"
+"B: " + Model B.Evaluating Say Hello + "; B2: " + Model B2.Evaluating B2 Say Hello
+"BKM III" + " # " + param
+"D"
+"Evaluating Say Hello to: "+modelA.Greet the Person
+"Hello " + Full Name
+"Hello " + Person.name + "!"
+"Hello, "+Person name
+"Home Loans Today"
+"I never get invoked"
+"Oceans Capital"
+"Sebonic"
+"You are " + Employment Status
+"abc"
+"bar"
+"bkm_001"
+"d3_1"
+"d3_2"
+"decision C 2"
+"decision C 3"
+"decision_001"
+"eClick Lending"
+"eClickLending"
+"eRates Mortgage"
+"else"
+"foo " + decision_002_input
+"foo " + decision_006_3
+"foo " + decision_009_3
+"foo " + decision_010_3
+"foo bar"
+"foo"
+"foo" ** 4
+"java.lang.Math"
+"max(double, double)"
+"not a boolean"
+"sprocket"
+"then"
+"thisIsSomeLongStringThatMustBeProcessedSoHopefullyThisTestPassWithItAndIMustWriteSomethingMoreSoItIsLongerAndLongerAndLongerAndLongerAndLongerTillItIsReallyLong"
+"trinket"
+"widget"
+"šomeÚnicodeŠtriňg"
+"横綱"
+(-10)*(-5)
+(-10)+(-5)
+(-10)-(-5)
+(-10)/(-5)
+(10+20)-(-5+3)
+(10+20)/(-5*3)
+(10+20)/0
+(10+5)*(-5*3)
+(2*3.141592) * radius
+(5+2)**5
+(Amount *Rate/12) / (1 - (1 + Rate/12)**-Term)
+(loan.amount * loan.rate/12)/(1-(1+loan.rate/12)**-loan.term)
+(loan.principal*loan.rate/12)/(1-(1+loan.rate/12)**-loan.termMonths)
+(p*r/12)/(1-(1+r/12)**-n)
+-"10"
+--10
+-.872
+-1.0 / 0.0
+-1.1234 - -0.2345
+-1.5 * @"P2M"
+-10
+-10 * -10
+-10 * @"-P1D"
+-10 * @"-P1Y"
+-10 + -5
+-10 + 5
+-10 - -5
+-10 - 5
+-10*-5
+-10+-5
+-10--5
+-10/-5
+-125.4321987654
+-2.5 * @"P1Y11M"
+-3 ** 2
+-5 ** 2
+-50
+-@"-P1D"
+-@"-P1Y"
+-@"10:10:10"
+-@"2021-01-01"
+-@"2021-01-01T10:10:10"
+-@"P1D"
+-@"P1Y"
+.03000
+.03125
+.03200
+.03250
+.03375
+.03500
+.872
+0
+0 * @"P1D"
+0 * @"P1M"
+0.0 / 0.0
+0.0375
+0.1
+0.2*loanAmt
+1
+1 + /* 1 + */ 1
+1 + // eol comment\n                1\n            
+1 + a
+1+1
+1.0 / 0.0
+1.1
+1.1234 - -0.2345
+1.1234 - 0.2345
+1.2*10**3
+1.2345 + 2.234
+1.5
+1.5 * @"P2M"
+1.5 * @"P4DT1H"
+10
+10 * "10"
+10 * -10
+10 * 0
+10 * 10
+10 * @"-P1D"
+10 * @"-P1Y"
+10 * @"10:10:10"
+10 * @"2021-01-01"
+10 * @"2021-01-01T10:10:10"
+10 * @"P1D"
+10 * @"P1Y"
+10 ** "10"
+10 ** @"10:10:10"
+10 ** @"2021-01-01"
+10 ** @"2021-01-01T10:10:10"
+10 ** @"P1D"
+10 ** @"P1Y"
+10 + "10"
+10 + -5
+10 + 20 / (-5 - 3)
+10 + 20 / -5 - 3
+10 + 5
+10 + @"10:10:10"
+10 + @"2021-01-01"
+10 + @"2021-01-01T10:10:10"
+10 + @"P1D"
+10 + @"P1Y"
+10 - "10"
+10 - -5
+10 - 5
+10 - @"10:10:10"
+10 - @"2021-01-01"
+10 - @"2021-01-01T10:10:10"
+10 - @"P1D"
+10 - @"P1Y"
+10 / "10"
+10 / @"10:10:10"
+10 / @"2021-01-01"
+10 / @"2021-01-01T10:10:10"
+10 / @"P1D"
+10 / @"P1Y"
+10**-5
+10**5
+10*5
+10+5
+10-5
+10/5
+100
+100 / 0
+100 / 10
+1000
+12 * @"P1M"
+12 * Monthly Salary
+1200
+123
+125.4321987654
+15
+1995
+2.5 * @"PT23H"
+22
+24 * @"P1M"
+24 * @"PT1H"
+25
+2518
+26 * @"P1M"
+26 * @"PT1H"
+2700
+285
+3 ** 4 ** 5
+3966
+4028
+4317
+5 ** -2
+5 ** 2
+5 ** 2.55
+5+2**(5+3)
+5+2**5
+5+2**5+3
+5+5
+5.5 ** 2
+50
+822
+@"-P1D" * -10
+@"-P1D" * 10
+@"-P1D" + @"2021-01-01T10:10:10"
+@"-P1D" - @"-PT2H"
+@"-P1D" - @"PT2H"
+@"-P1M" + @"2021-01-01T10:10:10"
+@"-P1M" + @"2021-01-01T10:10:10+11:00"
+@"-P1Y" * -10
+@"-P1Y" * 10
+@"-P1Y" + @"-P2M"
+@"-P1Y" + @"2021-01-01T10:10:10"
+@"-P1Y" + @"P2M"
+@"-P1Y" - @"-P2M"
+@"-P1Y" - @"P2M"
+@"-PT1H" + @"2021-01-01T10:10:10"
+@"-PT1H" + @"2021-01-01T10:10:10+11:00"
+@"10:10:10" * "10"
+@"10:10:10" * 10
+@"10:10:10" * @"10:10:10"
+@"10:10:10" * @"2021-01-01"
+@"10:10:10" * @"2021-01-01T10:10:10"
+@"10:10:10" * @"P1D"
+@"10:10:10" * @"P1Y"
+@"10:10:10" ** "10"
+@"10:10:10" ** 10
+@"10:10:10" ** @"10:10:10"
+@"10:10:10" ** @"2021-01-01"
+@"10:10:10" ** @"2021-01-01T10:10:10"
+@"10:10:10" ** @"P1D"
+@"10:10:10" ** @"P1Y"
+@"10:10:10" + "10"
+@"10:10:10" + 10
+@"10:10:10" + @"10:10:10"
+@"10:10:10" + @"2021-01-01"
+@"10:10:10" + @"2021-01-01T10:10:10"
+@"10:10:10" + @"P1Y"
+@"10:10:10" - "10"
+@"10:10:10" - 10
+@"10:10:10" - @"09:10:10"
+@"10:10:10" - @"11:10:10"
+@"10:10:10" - @"2021-01-01"
+@"10:10:10" - @"2021-01-01T10:10:10"
+@"10:10:10" - @"P1D"
+@"10:10:10" - @"P1Y"
+@"10:10:10" - @"PT1H"
+@"10:10:10" / "10"
+@"10:10:10" / 10
+@"10:10:10" / @"10:10:10"
+@"10:10:10" / @"2021-01-01"
+@"10:10:10" / @"2021-01-01T10:10:10"
+@"10:10:10" / @"P1D"
+@"10:10:10" / @"P1Y"
+@"10:10:10+11:00" - @"09:10:10+11:00"
+@"10:10:10+11:00" - @"11:10:10+11:00"
+@"10:10:10+11:00" - @"P1D"
+@"10:10:10+11:00" - @"PT1H"
+@"10:10:10@Australia/Melbourne" - @"09:10:10@Australia/Melbourne"
+@"10:10:10@Australia/Melbourne" - @"11:10:10@Australia/Melbourne"
+@"10:15:00" + @"P1D"
+@"10:15:00" + @"PT1H"
+@"10:15:00+11:00" + @"P1D"
+@"10:30:11"
+@"10:30:11+11:00"
+@"2018-12-08T10:30:11"
+@"2018-12-08T10:30:11+11:00"
+@"2019-03-31"
+@"2020-03-01" - @"PT24H"
+@"2021-01-01" * "10"
+@"2021-01-01" * 10
+@"2021-01-01" * @"10:10:10"
+@"2021-01-01" * @"2021-01-01"
+@"2021-01-01" * @"2021-01-01T10:10:10"
+@"2021-01-01" * @"P1D"
+@"2021-01-01" * @"P1Y"
+@"2021-01-01" ** "10"
+@"2021-01-01" ** 10
+@"2021-01-01" ** @"10:10:10"
+@"2021-01-01" ** @"2021-01-01"
+@"2021-01-01" ** @"2021-01-01T10:10:10"
+@"2021-01-01" ** @"P1D"
+@"2021-01-01" ** @"P1Y"
+@"2021-01-01" + "10"
+@"2021-01-01" + 10
+@"2021-01-01" + @"10:10:10"
+@"2021-01-01" + @"2021-01-01"
+@"2021-01-01" + @"2021-01-01T10:10:10"
+@"2021-01-01" + @"P1D"
+@"2021-01-01" + @"P1M"
+@"2021-01-01" + @"P1Y"
+@"2021-01-01" + @"PT36H"
+@"2021-01-01" + @"PT48H"
+@"2021-01-01" - "10"
+@"2021-01-01" - 10
+@"2021-01-01" - @"10:10:10"
+@"2021-01-01" / "10"
+@"2021-01-01" / 10
+@"2021-01-01" / @"10:10:10"
+@"2021-01-01" / @"2021-01-01"
+@"2021-01-01" / @"2021-01-01T10:10:10"
+@"2021-01-01" / @"P1D"
+@"2021-01-01" / @"P1Y"
+@"2021-01-01T00:00:00" - @"2021-01-02"
+@"2021-01-01T10:10:10" * "10"
+@"2021-01-01T10:10:10" * 10
+@"2021-01-01T10:10:10" * @"10:10:10"
+@"2021-01-01T10:10:10" * @"2021-01-01"
+@"2021-01-01T10:10:10" * @"2021-01-01T10:10:10"
+@"2021-01-01T10:10:10" * @"P1D"
+@"2021-01-01T10:10:10" * @"P1Y"
+@"2021-01-01T10:10:10" ** "10"
+@"2021-01-01T10:10:10" ** 10
+@"2021-01-01T10:10:10" ** @"10:10:10"
+@"2021-01-01T10:10:10" ** @"2021-01-01"
+@"2021-01-01T10:10:10" ** @"2021-01-01T10:10:10"
+@"2021-01-01T10:10:10" ** @"P1D"
+@"2021-01-01T10:10:10" ** @"P1Y"
+@"2021-01-01T10:10:10" + "10"
+@"2021-01-01T10:10:10" + 10
+@"2021-01-01T10:10:10" + @"-P1D"
+@"2021-01-01T10:10:10" + @"-P1M"
+@"2021-01-01T10:10:10" + @"-P1Y"
+@"2021-01-01T10:10:10" + @"-PT1H"
+@"2021-01-01T10:10:10" + @"10:10:10"
+@"2021-01-01T10:10:10" + @"2021-01-01"
+@"2021-01-01T10:10:10" + @"2021-01-01T10:10:10"
+@"2021-01-01T10:10:10" + @"P0D"
+@"2021-01-01T10:10:10" + @"P0M"
+@"2021-01-01T10:10:10" + @"P0Y"
+@"2021-01-01T10:10:10" + @"P1D"
+@"2021-01-01T10:10:10" + @"P1M"
+@"2021-01-01T10:10:10" + @"P1Y"
+@"2021-01-01T10:10:10" + @"PT0H"
+@"2021-01-01T10:10:10" + @"PT1H"
+@"2021-01-01T10:10:10" - "10"
+@"2021-01-01T10:10:10" - 10
+@"2021-01-01T10:10:10" - @"-P1M"
+@"2021-01-01T10:10:10" - @"-P1Y"
+@"2021-01-01T10:10:10" - @"10:10:10"
+@"2021-01-01T10:10:10" - @"P0M"
+@"2021-01-01T10:10:10" - @"P0Y"
+@"2021-01-01T10:10:10" - @"P1D"
+@"2021-01-01T10:10:10" - @"P1M"
+@"2021-01-01T10:10:10" - @"P1Y"
+@"2021-01-01T10:10:10" - @"PT1H"
+@"2021-01-01T10:10:10" / "10"
+@"2021-01-01T10:10:10" / 10
+@"2021-01-01T10:10:10" / @"10:10:10"
+@"2021-01-01T10:10:10" / @"2021-01-01"
+@"2021-01-01T10:10:10" / @"2021-01-01T10:10:10"
+@"2021-01-01T10:10:10" / @"P1D"
+@"2021-01-01T10:10:10" / @"P1Y"
+@"2021-01-01T10:10:10+11:00" + @"-P1M"
+@"2021-01-01T10:10:10+11:00" + @"-PT1H"
+@"2021-01-01T10:10:10+11:00" + @"P1M"
+@"2021-01-01T10:10:10+11:00" + @"PT1H"
+@"2021-01-01T10:10:10+11:00" - @"P1D"
+@"2021-01-01T10:10:10+11:00" - @"P1Y"
+@"2021-01-02" - @"-P1Y"
+@"2021-01-02" - @"-PT1H"
+@"2021-01-02" - @"-PT1M"
+@"2021-01-02" - @"-PT1S"
+@"2021-01-02" - @"-PT24H"
+@"2021-01-02" - @"-PT25H"
+@"2021-01-02" - @"1995-01-01"
+@"2021-01-02" - @"1995-01-01T10:10:10@Australia/Melbourne"
+@"2021-01-02" - @"2021-01-01"
+@"2021-01-02" - @"2021-01-01T10:10:10"
+@"2021-01-02" - @"2021-01-01T10:10:10+11:00"
+@"2021-01-02" - @"2021-01-01T10:10:10@Australia/Melbourne"
+@"2021-01-02" - @"2021-01-02T00:00:00Z"
+@"2021-01-02" - @"P1D"
+@"2021-01-02" - @"P1M"
+@"2021-01-02" - @"P1Y"
+@"2021-01-02" - @"PT1H"
+@"2021-01-02" - @"PT1M"
+@"2021-01-02" - @"PT1S"
+@"2021-01-02" - @"PT24H"
+@"2021-01-02" - @"PT25H"
+@"2021-01-02T00:00:00" - @"PT1H"
+@"2021-01-02T00:00:00Z" - @"2021-01-02"
+@"2021-01-02T10:10:10" - @"2021-01-01T10:10:10"
+@"2021-01-02T10:10:10" - @"2021-01-01T10:10:10+02:00"
+@"2021-01-02T10:10:10" - @"2021-01-01T10:10:10@Europe/Paris"
+@"2021-01-02T10:10:10+01:00" - @"1995-01-01"
+@"2021-01-02T10:10:10+01:00" - @"2021-01-01"
+@"2021-01-02T10:10:10+01:00" - @"2021-01-01T10:10:10"
+@"2021-01-02T10:10:10+01:00" - @"2021-01-01T10:10:10@Europe/Paris"
+@"2021-01-02T10:10:10+02:00" - @"2021-01-01T10:10:10"
+@"2021-01-02T10:10:10@Europe/Paris" - @"1995-01-01"
+@"2021-01-02T10:10:10@Europe/Paris" - @"1995-01-01T10:10:10@Asia/Dhaka"
+@"2021-01-02T10:10:10@Europe/Paris" - @"1995-01-01T10:10:10@Europe/Paris"
+@"2021-01-02T10:10:10@Europe/Paris" - @"2021-01-01"
+@"2021-01-02T10:10:10@Europe/Paris" - @"2021-01-01T10:10:10"
+@"2021-01-02T10:10:10@Europe/Paris" - @"2021-01-01T10:10:10@Asia/Dhaka"
+@"2021-01-02T10:10:10@Europe/Paris" - @"2021-01-01T10:10:10@Europe/Paris"
+@"2021-01-12T10:10:10" + @"P1DT1H"
+@"2021-01-12T10:10:10+11:00" + @"P1DT1H"
+@"P0D" + @"2021-01-01T10:10:10"
+@"P0M" + @"2021-01-01T10:10:10"
+@"P0Y" + @"2021-01-01T10:10:10"
+@"P10D"
+@"P10D" / 0
+@"P10D" / 10
+@"P10D" / @"P0D"
+@"P10D" / @"P0Y"
+@"P10D" / @"P5D"
+@"P10DT23H" / 2.5
+@"P10Y"
+@"P10Y" / 0
+@"P10Y" / 10
+@"P10Y" / @"P5Y"
+@"P10Y11M" / -2.5
+@"P10Y11M" / 2.5
+@"P1D" * "10"
+@"P1D" * 0
+@"P1D" * 10
+@"P1D" * @"10:10:10"
+@"P1D" * @"2021-01-01"
+@"P1D" * @"2021-01-01T10:10:10"
+@"P1D" * @"P1D"
+@"P1D" * @"P1Y"
+@"P1D" ** "10"
+@"P1D" ** 10
+@"P1D" ** @"10:10:10"
+@"P1D" ** @"2021-01-01"
+@"P1D" ** @"2021-01-01T10:10:10"
+@"P1D" ** @"P1D"
+@"P1D" ** @"P1Y"
+@"P1D" + "10"
+@"P1D" + 10
+@"P1D" + @"10:15:00"
+@"P1D" + @"10:15:00+11:00"
+@"P1D" + @"2021-01-01"
+@"P1D" + @"2021-01-01T10:10:10"
+@"P1D" + @"P1Y"
+@"P1D" + @"P2D"
+@"P1D" - "10"
+@"P1D" - 10
+@"P1D" - @"-PT0H"
+@"P1D" - @"-PT2H"
+@"P1D" - @"10:10:10"
+@"P1D" - @"2021-01-01"
+@"P1D" - @"2021-01-01T10:10:10"
+@"P1D" - @"P1Y"
+@"P1D" - @"PT0H"
+@"P1D" - @"PT2H"
+@"P1D" / "10"
+@"P1D" / @"10:10:10"
+@"P1D" / @"2021-01-01"
+@"P1D" / @"2021-01-01T10:10:10"
+@"P1D" / @"P1Y"
+@"P1DT1H" + @"2021-01-12T10:10:10"
+@"P1DT1H" + @"2021-01-12T10:10:10+11:00"
+@"P1M" * 0
+@"P1M" * 12
+@"P1M" * 24
+@"P1M" * 26
+@"P1M" + @"2021-01-01"
+@"P1M" + @"2021-01-01T10:10:10"
+@"P1M" + @"2021-01-01T10:10:10+11:00"
+@"P1Y" * "10"
+@"P1Y" * 10
+@"P1Y" * @"10:10:10"
+@"P1Y" * @"2021-01-01"
+@"P1Y" * @"2021-01-01T10:10:10"
+@"P1Y" * @"P1D"
+@"P1Y" * @"P1Y"
+@"P1Y" ** "10"
+@"P1Y" ** 10
+@"P1Y" ** @"10:10:10"
+@"P1Y" ** @"2021-01-01"
+@"P1Y" ** @"2021-01-01T10:10:10"
+@"P1Y" ** @"P1D"
+@"P1Y" ** @"P1Y"
+@"P1Y" + "10"
+@"P1Y" + 10
+@"P1Y" + @"-P0M"
+@"P1Y" + @"-P2M"
+@"P1Y" + @"10:10:10"
+@"P1Y" + @"2021-01-01"
+@"P1Y" + @"2021-01-01T10:10:10"
+@"P1Y" + @"P0M"
+@"P1Y" + @"P1D"
+@"P1Y" + @"P2M"
+@"P1Y" - "10"
+@"P1Y" - 10
+@"P1Y" - @"-P0M"
+@"P1Y" - @"-P2M"
+@"P1Y" - @"10:10:10"
+@"P1Y" - @"2021-01-01"
+@"P1Y" - @"2021-01-01T10:10:10"
+@"P1Y" - @"P0M"
+@"P1Y" - @"P1D"
+@"P1Y" - @"P2M"
+@"P1Y" / "10"
+@"P1Y" / @"10:10:10"
+@"P1Y" / @"2021-01-01"
+@"P1Y" / @"2021-01-01T10:10:10"
+@"P1Y" / @"P1D"
+@"P1Y11M" * -2.5
+@"P2M" * -1.5
+@"P2M" * 1.5
+@"P4DT1H" * 1.5
+@"PT0H" + @"2021-01-01T10:10:10"
+@"PT1H" * 24
+@"PT1H" * 26
+@"PT1H" + @"10:15:00"
+@"PT1H" + @"2021-01-01T10:10:10"
+@"PT1H" + @"2021-01-01T10:10:10+11:00"
+@"PT23H" * 2.5
+@"PT24H" + @"P1D"
+@"PT36H" + @"2021-01-01"
+@"PT48H" + @"2021-01-01"
+A
+A and B
+A or B
+Affordability
+Affordability calculation
+AffordabilityCalculation
+Applicant data.Age
+Applicant data.EmploymentStatus
+Applicant data.ExistingCustomer
+Applicant data.MartitalStatus
+Applicant data.Monthly.Expenses
+Applicant data.Monthly.Income
+Applicant data.Monthly.Repayments
+ApplicantData.Age
+ApplicantData.EmploymentStatus
+ApplicantData.ExistingCustomer
+ApplicantData.MaritalStatus
+ApplicantData.Monthly.Expenses
+ApplicantData.Monthly.Income
+ApplicantData.Monthly.Repayments
+Application risk score
+Application risk score model
+ApplicationRiskScore
+ApplicationRiskScoreModel
+B
+B Value
+B Value / 255
+BKM I
+BKM II
+Boxed Context
+BoxedContextOutput
+Bureau call type table
+Bureau data.Bankrupt
+Bureau data.CreditScore
+BureauCallTypeTable
+BureauData.Bankrupt
+BureauData.CreditScore
+C
+Credit contingency factor table
+CreditContingencyFactorTable
+Date-Time - Date-Time2
+Date-Time2.hour
+Date-Time2.minute
+Date-Time2.second
+Date-Time2.time offset
+Date.fromString.day
+Date.fromString.month
+Date.fromString.year
+Description
+Eligibility rules
+EligibilityRules
+FUNCT
+G Value
+G Value / 255
+Installment calculation
+InstallmentCalculation
+Monthly Income - (Monthly Repayments + Monthly Expenses)
+Monthly Repayment + Monthly Fee
+MonthlyIncome - (MonthlyExpenses + MonthlyRepayments)
+MonthlyPayment
+MonthlyRepayment+MonthlyFee
+Person
+Person.Children
+Person.Gender
+Person.Name
+Post-bureau affordability
+Post-bureau risk category
+Post-bureau risk category table
+Post-bureauAffordability
+Post-bureauRiskCategory
+Post-bureauRiskCategoryTable
+Pre-bureau affordability
+Pre-bureau risk category
+Pre-bureau risk category table
+Pre-bureauAffordability
+Pre-bureauRiskCategory
+Pre-bureauRiskCategoryTable
+Profile of Color
+R Value
+R Value / 255 
+Requested product.Amount
+Requested product.ProductType
+Requested product.Rate
+Requested product.Term
+RequestedProduct.Amount
+RequestedProduct.ProductType
+RequestedProduct.Rate
+RequestedProduct.Term
+Required monthly installment
+RequiredMonthlyInstallment
+Risk Category
+RiskCategory
+Routing rules
+RoutingRules
+a * 10
+a * b
+a*b
+a*b*c*d
+a+b
+a.person.name
+a.person.name + b.DecisionB
+arg
+bkm_001
+bkm_005
+cmyk
+cmyk Value
+context01
+date and time("-2017-12-31T11:22:33")
+date and time("-2017-12-31T11:22:33.456+01:35")
+date and time("2012-12-24")
+date and time("2017-12-31T00:00:00")
+date and time("2017-12-31T11:22:33")
+date and time("2017-12-31T11:22:33+01:00")
+date and time("2017-12-31T11:22:33+01:35")
+date and time("2017-12-31T11:22:33-01:35")
+date and time("2017-12-31T11:22:33-02:00")
+date and time("2017-12-31T11:22:33.123456789")
+date and time("2017-12-31T11:22:33.345")
+date and time("2017-12-31T11:22:33.456+01:35")
+date and time("2017-12-31T11:22:33.567Z")
+date and time("2017-12-31T11:22:33Z")
+date and time("2018-12-10") ** 4
+date and time(date and time("2017-08-10T10:20:00"),time("23:59:01"))
+date and time(date and time("2017-08-10T10:20:00"),time("23:59:01.987654321"))
+date and time(date and time("2017-08-10T10:20:00+02:00"),time("23:59:01"))
+date and time(date and time("2017-08-10T10:20:00+02:00"),time("23:59:01.987654321"))
+date and time(date and time("2017-08-10T10:20:00@Europe/Paris"),time("23:59:01"))
+date and time(date and time("2017-08-10T10:20:00@Europe/Paris"),time("23:59:01.987654321"))
+date and time(date and time("2017-09-05T10:20:00"),time("09:15:30+02:00"))
+date and time(date and time("2017-09-05T10:20:00"),time("09:15:30.123456Z"))
+date and time(date and time("2017-09-05T10:20:00"),time("09:15:30.987654321+02:00"))
+date and time(date and time("2017-09-05T10:20:00"),time("09:15:30Z"))
+date and time(date and time("2017-09-05T10:20:00+02:00"),time("09:15:30.123456Z"))
+date and time(date and time("2017-09-05T10:20:00+02:00"),time("09:15:30.987654321+02:00"))
+date and time(date and time("2017-09-05T10:20:00-01:00"),time("09:15:30+02:00"))
+date and time(date and time("2017-09-05T10:20:00-01:00"),time("09:15:30Z"))
+date and time(date and time("2017-09-05T10:20:00@Europe/Paris"),time("09:15:30+02:00"))
+date and time(date and time("2017-09-05T10:20:00@Europe/Paris"),time("09:15:30.123456Z"))
+date and time(date and time("2017-09-05T10:20:00@Europe/Paris"),time("09:15:30.987654321+02:00"))
+date and time(date and time("2017-09-05T10:20:00@Europe/Paris"),time("09:15:30Z"))
+date and time(date("2017-01-01"),time("23:59:01"))
+date and time(date("2017-01-01"),time("23:59:01+02:00"))
+date and time(date("2017-01-01"),time("23:59:01Z"))
+date("-2017-01-01")
+date("-2017-12-31")
+date("2000-02-01")
+date("2000-12-01")
+date("2017-01-01")
+date("2017-12-31")
+date("2018-12-10") ** 4
+date(-2017,01,01)
+date(-2017,12,31)
+date(2000, 01, 02)
+date(2000, 1, 2)
+date(2017,01,01)
+date(2017,12,31)
+date(date and time("2012-12-25T11:00:00Z"))
+date(date and time("2017-08-03T10:15:30+01:00"))
+date(date and time("2017-08-14T14:25:00"))
+date(date and time("2017-08-14T14:25:00.123456789"))
+date(date and time("2017-09-03T09:45:30@Europe/Paris"))
+date(date and time("2017-09-06T09:45:30@Asia/Dhaka"))
+date(date and time(date and time("2017-08-14T14:25:00"),time("10:50:00")))
+date(date("2017-10-11"))
+decisionService_002_input_1
+decisionService_003_input_1
+decision_013_3
+decision_014_3
+dtDuration1 + dtDuration2
+dtDuration1.seconds
+duration("-P100M")
+duration("-P1Y")
+duration("-P999999999M")
+duration("-P99999999Y")
+duration("-PT1H2M")
+duration("P0D")
+duration("P0M")
+duration("P0Y")
+duration("P100M")
+duration("P1D")
+duration("P1DT2H3M4.123456789S")
+duration("P1Y")
+duration("P1Y27M")
+duration("P1Y2M")
+duration("P26M")
+duration("P2D") ** 4
+duration("P2DT100M")
+duration("P2DT274M")
+duration("P2Y") ** 4
+duration("P999999999M")
+duration("P99999999Y")
+duration("PT0.000S")
+duration("PT0.999S")
+duration("PT0.S")
+duration("PT0H")
+duration("PT0M")
+duration("PT0S")
+duration("PT1000M")
+duration("PT1000M0.999999999S")
+duration("PT240H")
+duration("PT24H")
+duration("PT2H")
+duration("PT3600S")
+duration("PT3M")
+duration("PT4S")
+duration("PT555M")
+duration("PT61M")
+element * 2
+hex Value
+inputData_011_1 + " " + inputData_011_2 + " " + decision_011_3 + " " + decision_011_4
+inputData_012_1 + " " + inputData_012_2 + " " + decision_012_3 + " " + decision_012_4
+inputData_013_1
+inputData_013_1 + " " + decision_013_3
+inputData_014_1
+inputData_014_1 + " " + decision_014_3
+input_013_1 * 10
+mapping
+nestedContext01
+override greeting
+p*(1+r/12)**n - pmt*(-1+(1+r/12)**n)/r
+p*r/12/(1-(1+r/12)**-n)
+person.name
+person.name + DecisionB
+product.fee
+product.lenderName
+product.points
+product.rate
+requestedAmt*(1+points/100)+fee
+the description
+time("00:00:00")
+time("00:00:00Z")
+time("01:02:03")
+time("10:30:00") ** 4
+time("11:00:00Z")
+time("11:22:33+00:00")
+time("11:22:33-00:00")
+time("11:22:33.123456789")
+time("11:22:33.444")
+time("13:20:00+02:00")
+time("13:20:00-05:00")
+time("23:59:00Z")
+time(11, 59, 00, duration("-PT2H1M"))
+time(11, 59, 00, duration("-PT2H1M0S"))
+time(11, 59, 00, duration("PT2H1M"))
+time(11, 59, 00, duration("PT2H1M0S"))
+time(11, 59, 45, duration("-PT0H"))
+time(11, 59, 45, duration("-PT2H"))
+time(11, 59, 45, duration("PT0H"))
+time(11, 59, 45, duration("PT2H"))
+time(11, 59, 45, null)
+time(12,00,00,null)
+time(date and time("2017-08-10T10:20:00"))
+time(date and time("2017-08-10T10:20:00+00:00"))
+time(date and time("2017-08-10T10:20:00+01:00"))
+time(date and time("2017-08-10T10:20:00-00:00"))
+time(date and time("2017-08-10T10:20:00-01:00"))
+time(date and time("2017-08-10T10:20:00Z"))
+time(date and time(date and time("2017-08-10T10:20:00"),time("23:59:01")))
+time(date and time(date and time("2017-08-10T10:20:00"),time("23:59:01.987654321")))
+time(date and time(date and time("2017-09-05T10:20:00"),time("09:15:30+02:00")))
+time(date and time(date and time("2017-09-05T10:20:00"),time("09:15:30Z")))
+time(date("2017-08-10"))
+ymDuration2.years

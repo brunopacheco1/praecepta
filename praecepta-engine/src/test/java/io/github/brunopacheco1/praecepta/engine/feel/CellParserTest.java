@@ -329,7 +329,7 @@ class CellParserTest {
                 .toString();
         Assertions.assertThat(CellParser.parse(cell, ColumnType.STRING)).as("Praecepta's syntax").isEqualTo(positive(new Equals(value)));
         Assertions.assertThat(CellParser.parseFeel(cell, ColumnType.STRING)).as("strict FEEL").isEqualTo(positive(new Equals(value)));
-        Assertions.assertThat(OutputExpression.parse(cell).evaluate(name -> null)).as("an output expression").isEqualTo(value);
+        Assertions.assertThat(FeelExpression.parse(cell).evaluate(name -> null)).as("an output expression").isEqualTo(value);
     }
 
     @Test
@@ -372,7 +372,7 @@ class CellParserTest {
         Assertions.assertThatThrownBy(() -> CellParser.parseFeel(cell, ColumnType.STRING))
                 .isInstanceOf(CellSyntaxException.class)
                 .hasMessageContaining("a string literal may not hold a line break; write \\n or \\r");
-        Assertions.assertThatThrownBy(() -> OutputExpression.parse(cell + " + x"))
+        Assertions.assertThatThrownBy(() -> FeelExpression.parse(cell + " + x"))
                 .isInstanceOf(ExpressionSyntaxException.class)
                 .hasMessageContaining("a string literal may not hold a line break");
         // Praecepta's own syntax, as spreadsheets hold it, keeps it

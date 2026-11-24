@@ -30,7 +30,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
-import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 
 /**
@@ -246,7 +246,7 @@ class FixedOffsetZoneTimesTest {
     }
 
     private static Object evaluate(String expression) {
-        return OutputExpression.parse(expression).evaluate(name -> null);
+        return FeelExpression.parse(expression).evaluate(name -> null);
     }
 
     private static PraeceptaEngine<Map<String, String>, String> mapEngine(HitPolicy policy, List<Praeceptum> rules) {

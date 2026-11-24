@@ -20,7 +20,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 
-/** Output expressions over dates, times, date-times and durations (#85): DMN 1.5, Tables 57, 59 and 62. */
+/** FEEL expressions over dates, times, date-times and durations (#85), as output entries compute them: DMN 1.5, Tables 57, 59 and 62. */
 class TemporalExpressionsTest {
 
     private static final Map<String, ColumnType> TYPES = Map.of("due", ColumnType.DATE, "sent", ColumnType.DATE_TIME,
@@ -49,8 +49,8 @@ class TemporalExpressionsTest {
             "name + \" by \" + \"2025\"           | STRING              | a by 2025",
     })
     void dates_times_and_durations_combine_as_feel_defines(String text, ColumnType type, String value) {
-        var expression = OutputExpression.parse(text);
-        Assertions.assertThat(expression.type(TYPES::get)).isEqualTo(type);
+        var expression = parse(text);
+        Assertions.assertThat(expression.type(TemporalExpressionsTest::type)).isEqualTo(FeelType.of(type));
         var result = expression.evaluate(inputs()::get);
         Assertions.assertThat(result).isEqualTo(type == ColumnType.NUMBER ? result : FeelLiterals.value(value, type));
         if (type == ColumnType.NUMBER) {
@@ -72,7 +72,7 @@ class TemporalExpressionsTest {
             "duration(\"P999999999Y\") * 1e10",
     })
     void what_feel_does_not_define_for_these_values_is_null(String text) {
-        Assertions.assertThat(OutputExpression.parse(text).evaluate(inputs()::get)).isNull();
+        Assertions.assertThat(parse(text).evaluate(inputs()::get)).isNull();
     }
 
     /**
@@ -100,7 +100,7 @@ class TemporalExpressionsTest {
             "date and time(\"2025-10-26T12:00:00@Europe/Paris\") - @\"PT24H\"       | DATE_TIME | 2025-10-25T13:00:00+02:00",
     })
     void months_keep_the_day_and_days_move_by_instant(String text, ColumnType type, String value) {
-        var result = OutputExpression.parse(text).evaluate(any -> null);
+        var result = parse(text).evaluate(any -> null);
         if (value == null) {
             Assertions.assertThat(result).isNull();
         } else if (type == ColumnType.DATE_TIME && value.length() > 16) {
@@ -117,7 +117,7 @@ class TemporalExpressionsTest {
      */
     @Test
     void a_month_later_on_a_skipped_local_time_moves_forward_by_the_gap() {
-        var result = OutputExpression.parse("date and time(\"2025-01-30T02:30:00@Europe/Paris\") + @\"P2M\"").evaluate(any -> null);
+        var result = parse("date and time(\"2025-01-30T02:30:00@Europe/Paris\") + @\"P2M\"").evaluate(any -> null);
         Assertions.assertThat(result).hasToString("2025-03-30T03:30+02:00[Europe/Paris]");
     }
 
@@ -125,7 +125,7 @@ class TemporalExpressionsTest {
     void a_missing_operand_gives_null() {
         var missing = new HashMap<>(inputs());
         missing.put("due", null);
-        Assertions.assertThat(OutputExpression.parse("due + @\"P1D\"").evaluate(missing::get)).isNull();
+        Assertions.assertThat(parse("due + @\"P1D\"").evaluate(missing::get)).isNull();
     }
 
     @ParameterizedTest
@@ -140,30 +140,34 @@ class TemporalExpressionsTest {
             "elapsed / tenure       | / combines a days and time duration and a years and months duration, which gives null in FEEL",
             "elapsed ** 2           | ** combines a days and time duration and a number, which gives null in FEEL",
             "-due                   | - applies to numbers and durations, not to a date",
-            "ok + 1                 | 'ok' is a boolean; output expressions combine strings, numbers, dates, times and durations",
+            "ok + 1                 | + combines a boolean and a number, which gives null in FEEL",
     })
-    void types_feel_does_not_combine_are_rejected(String text, String message) {
-        var expression = OutputExpression.parse(text);
-        Assertions.assertThatThrownBy(() -> expression.type(TYPES::get))
-                .isInstanceOf(ExpressionTypeException.class)
-                .hasMessage(message);
+    void types_feel_does_not_combine_are_always_null(String text, String message) {
+        var reasons = new java.util.ArrayList<String>();
+        Assertions.assertThat(parse(text).type(TemporalExpressionsTest::type, reasons::add)).isEqualTo(FeelType.NULL);
+        Assertions.assertThat(reasons.getFirst()).isEqualTo(message);
+        Assertions.assertThat(parse(text).evaluate(inputs()::get)).isNull();
     }
 
     @Test
     void date_time_literals_are_read_as_cells_read_them() {
-        Assertions.assertThat(OutputExpression.parse("@\"2025-01-31\" + date and time(\"2025-01-31T10:00:00\") - due"))
-                .isNotNull();
-        Assertions.assertThat(OutputExpression.parse("date(2025, 1, 31) + @\"P1D\"").evaluate(any -> null)).isEqualTo(LocalDate.of(2025, 2, 1));
-        Assertions.assertThatThrownBy(() -> OutputExpression.parse("date(\"2025-02-30\") + @\"P1D\""))
-                .isInstanceOf(ExpressionSyntaxException.class)
-                .hasMessageContaining("invalid date '2025-02-30'");
-        Assertions.assertThatThrownBy(() -> OutputExpression.parse("date(x)"))
-                .isInstanceOf(ExpressionSyntaxException.class)
-                .hasMessageContaining("'x' is not a string, a number or a date time literal");
-        // other functions are still not supported
-        Assertions.assertThatThrownBy(() -> OutputExpression.parse("years and months duration(due, due)"))
-                .isInstanceOf(ExpressionSyntaxException.class)
-                .hasMessageContaining("function calls");
+        Assertions.assertThat(parse("date(2025, 1, 31) + @\"P1D\"").evaluate(any -> null)).isEqualTo(LocalDate.of(2025, 2, 1));
+        // an invalid date literal is null, with an error (DMN 1.5, 10.3.2.15; the TCK's 1115-feel-date-function)
+        var errors = new java.util.ArrayList<String>();
+        Assertions.assertThat(parse("date(\"2025-02-30\") + @\"P1D\"").evaluate(any -> null, errors::add)).isNull();
+        Assertions.assertThat(errors).isNotEmpty();
+        // the date and time functions of other arguments, and the other built-in functions, are planned for 0.9 (#117)
+        Assertions.assertThat(parse("date(x)").unsupported()).containsExactly("the built-in function 'date', planned for 0.9 (#117)");
+        Assertions.assertThat(parse("years and months duration(due, due)").unsupported())
+                .containsExactly("the built-in function 'years and months duration', planned for 0.9 (#117)");
+    }
+
+    private static FeelExpression parse(String text) {
+        return FeelExpression.parse(text, TYPES.keySet());
+    }
+
+    private static FeelType type(String name) {
+        return TYPES.containsKey(name) ? FeelType.of(TYPES.get(name)) : null;
     }
 
     private static Map<String, Object> inputs() {

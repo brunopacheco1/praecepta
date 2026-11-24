@@ -37,7 +37,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
  * </pre>
  *
  * The arguments are themselves literals: strings, numbers, date time literals, and {@code null} for a time's offset.
- * {@link CellParser} reads a cell's literals with it, and {@link ExpressionParser} the literals of output
+ * {@link CellParser} reads a cell's literals with it, and {@link FeelParser} the literals of FEEL
  * expressions, so that both read the same forms.
  */
 final class TemporalLiterals {

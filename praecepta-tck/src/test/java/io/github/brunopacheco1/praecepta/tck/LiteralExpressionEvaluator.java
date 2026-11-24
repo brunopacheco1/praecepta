@@ -5,10 +5,15 @@
  */
 package io.github.brunopacheco1.praecepta.tck;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.w3c.dom.Element;
 
@@ -19,7 +24,6 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException
 import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
-import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 import io.github.brunopacheco1.praecepta.tck.TckSuite.Check;
 
 /**
@@ -31,7 +35,8 @@ import io.github.brunopacheco1.praecepta.tck.TckSuite.Check;
  * 0.9.
  *
  * <p>Which feature area a node is in is fixed by the kit's content, not by what Praecepta reads: {@link #inTheSubset}
- * tells the arithmetic of names and literals that 0.6's output expressions computed, which counts as no feature.
+ * tells the arithmetic of names and literals that the output expressions of 0.6 and 0.7 computed, which counts as no
+ * feature; 0.8 retired their parser, so the kit's expressions it read are listed in {@code subset-expressions.txt}.
  */
 final class LiteralExpressionEvaluator {
 
@@ -139,16 +144,47 @@ final class LiteralExpressionEvaluator {
     }
 
     /**
-     * Whether the text is in the subset 0.6's output expressions computed: arithmetic of names and literals. It fixes a
-     * node's feature area, which does not change as Praecepta grows; it says nothing of what Praecepta reads now.
+     * Whether the text is in the subset the output expressions of 0.6 and 0.7 computed: arithmetic of names and literals,
+     * as {@code subset-expressions.txt} lists the kit's. It fixes a node's feature area, which does not change as
+     * Praecepta grows; it says nothing of what Praecepta reads now.
      */
     static boolean inTheSubset(String text) {
-        try {
-            OutputExpression.parse(text);
-            return true;
-        } catch (ExpressionSyntaxException e) {
-            return false;
+        return SUBSET.contains(text);
+    }
+
+    private static final Set<String> SUBSET = subset();
+
+    /** The kit's expressions in the subset, as {@code subset-expressions.txt} lists them, each unescaped. */
+    private static Set<String> subset() {
+        try (var in = LiteralExpressionEvaluator.class.getResourceAsStream("/subset-expressions.txt")) {
+            var expressions = new HashSet<String>();
+            for (var line : new String(in.readAllBytes(), StandardCharsets.UTF_8).split("\n", -1)) {
+                if (!line.startsWith("#") && !line.isEmpty()) {
+                    expressions.add(unescaped(line));
+                }
+            }
+            return Set.copyOf(expressions);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
+    }
+
+    /** A line of the list as the expression it stands for: {@code \\}, {@code \n}, {@code \r} and {@code \t} read back. */
+    private static String unescaped(String line) {
+        var text = new StringBuilder();
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '\\' && i + 1 < line.length()) {
+                c = switch (line.charAt(++i)) {
+                    case 'n' -> '\n';
+                    case 'r' -> '\r';
+                    case 't' -> '\t';
+                    default -> line.charAt(i);
+                };
+            }
+            text.append(c);
+        }
+        return text.toString();
     }
 
     /** Whether Praecepta evaluates the text: it is FEEL, and uses nothing Praecepta does not evaluate yet. */
@@ -166,7 +202,7 @@ final class LiteralExpressionEvaluator {
      */
     static List<Feature> inputs(DmnModel model, String text) {
         var features = new LinkedHashSet<Feature>();
-        for (var name : OutputExpression.parse(text).names()) {
+        for (var name : FeelExpression.parse(text).names()) {
             var dot = name.indexOf('.');
             var input = model.inputData(dot > 0 && model.inputData(name) == null ? name.substring(0, dot) : name);
             switch (input == null ? new ItemType.Any() : ItemType.of(model, DmnModel.typeRef(input))) {

@@ -197,8 +197,7 @@ public final class DecisionGraph {
         var decision = analysis.model.decisions().get(d);
         var reads = analysis.reads.get(d);
         return switch (decision.logic()) {
-            case DecisionLogic.Table(var table, var type) -> new GraphNodes.TableNode(table, analysis.tableReads(d), reads,
-                    analysis.listedNamedInputs.get(d), analysis.bindings[d], type, log);
+            case DecisionLogic.Table(var table, var type) -> new GraphNodes.TableNode(table, analysis, d, type, log);
             case DecisionLogic.LiteralExpression literal -> new GraphNodes.LiteralNode(analysis.expressions[d], reads, analysis.bindings[d],
                     literal.type());
         };
@@ -581,18 +580,22 @@ public final class DecisionGraph {
             names.addAll(decisionNames);
             var scope = FeelExpression.scope(names, types);
             var resolved = decisions.stream()
-                    .map(decision -> inferred.contains(decision.name()) ? withRequirements(decision, inputNames, decisionNames, scope) : decision)
+                    .map(decision -> inferred.contains(decision.name()) ? withRequirements(decision, names, decisionNames, scope) : decision)
                     .toList();
             return new DecisionGraph(new DecisionModel(name, inputData, resolved, types), failOn, log);
         }
 
-        /** The decision, requiring what its logic reads. */
-        private static Decision withRequirements(Decision decision, Set<String> inputNames, Set<String> decisionNames,
+        /**
+         * The decision, requiring what its logic reads.
+         *
+         * @param names the names of the model's input data and decisions
+         */
+        private static Decision withRequirements(Decision decision, Set<String> names, Set<String> decisionNames,
                 FeelExpression.Scope scope) {
             var requiredDecisions = new LinkedHashSet<String>();
             var requiredInputs = new LinkedHashSet<String>();
-            for (var read : GraphAnalysis.namesRead(decision, scope)) {
-                var element = DecisionModel.elementOf(read, name -> inputNames.contains(name) || decisionNames.contains(name));
+            for (var read : GraphAnalysis.namesRead(decision, names, scope)) {
+                var element = DecisionModel.elementOf(read, names::contains);
                 var root = element == null ? read : element;
                 if (decisionNames.contains(root)) {
                     requiredDecisions.add(root);

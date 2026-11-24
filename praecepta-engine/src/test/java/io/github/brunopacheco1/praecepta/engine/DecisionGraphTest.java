@@ -705,19 +705,23 @@ class DecisionGraphTest {
     }
 
     @Test
-    void the_default_output_of_a_table_with_several_results_is_a_list_of_one() {
-        // DMN 1.5, 10.3.2.10, step 2 gives the default, which binding to the decision's list type makes a list of one
-        // (10.3.2.9.4), as the DMN TCK's 0109-ruleOrder-hitpolicy expects
-        var graph = DecisionGraph.builder()
-                .logValidationReport(false)
-                .inputData("Age", ColumnType.NUMBER)
-                .decision(Tables.withDefault(Tables.table("Status", "RULE ORDER", List.of("Age:number"), List.of("Status:string"), List.of(
-                        List.of(">= 18", "\"adult\""), List.of(">= 65", "\"senior\""))), "Declined"))
-                .build();
+    void the_default_output_of_a_table_with_several_results_is_a_single_value_bound_to_the_decisions_type() {
+        // DMN 1.5, 10.3.2.10, step 2 gives the default, a single value, which binding to a decision of a list type makes a
+        // list of one (10.3.2.9.4), as the DMN TCK's 0109-ruleOrder-hitpolicy expects, and to one of no declared type
+        // leaves as it is (docs/DMN-CONFORMANCE.md, case 14)
+        var table = Tables.withDefault(Tables.table("Status", "RULE ORDER", List.of("Age:number"), List.of("Status:string"), List.of(
+                List.of(">= 18", "\"adult\""), List.of(">= 65", "\"senior\""))), "Declined");
+        var untyped = DecisionGraph.builder().logValidationReport(false).inputData("Age", ColumnType.NUMBER).decision(table).build();
+        var typed = DecisionGraph.builder().logValidationReport(false).inputData("Age", ColumnType.NUMBER)
+                .decision(table, FeelType.listOf(ColumnType.STRING)).build();
 
-        assertThat(graph.evaluate("Status", Map.of("Age", 70))).isEqualTo(List.of("adult", "senior"));
-        assertThat(graph.evaluate("Status", Map.of("Age", 10))).isEqualTo(List.of("Declined"));
-        assertThat(graph.evaluate("Status", new HashMap<>(Map.of()))).isEqualTo(List.of("Declined"));
+        assertThat(untyped.evaluate("Status", Map.of("Age", 70))).isEqualTo(List.of("adult", "senior"));
+        assertThat(untyped.evaluate("Status", Map.of("Age", 10))).isEqualTo("Declined");
+        assertThat(untyped.evaluate("Status", new HashMap<>(Map.of()))).isEqualTo("Declined");
+        assertThat(untyped.type("Status")).as("a list, or the default output").isEqualTo(FeelType.ANY);
+        assertThat(typed.evaluate("Status", Map.of("Age", 70))).isEqualTo(List.of("adult", "senior"));
+        assertThat(typed.evaluate("Status", Map.of("Age", 10))).isEqualTo(List.of("Declined"));
+        assertThat(typed.type("Status")).isEqualTo(FeelType.listOf(ColumnType.STRING));
     }
 
     @Test

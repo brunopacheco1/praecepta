@@ -71,21 +71,24 @@ final class GraphNodes {
         private final FeelType declared;
 
         /**
-         * @param reads    what the table reads, columns and the inputs its cells compare with
-         * @param names    where each name it reads is, among the graph's slots; a name it cannot read is missing
-         * @param listed   the inputs its cells compare with whose values are lists, though the table reads single values
-         * @param binding  how its value is bound to its decision
+         * @param analysis the graph's analysis, which says, for decision {@code d}: what the table reads (columns, the
+         *                 inputs its cells compare with, and the names its FEEL reads), where each name it reads is among
+         *                 the graph's slots (a name it cannot read is missing), the inputs its cells compare with whose
+         *                 values are lists, though the table reads single values, its columns that read a property of a
+         *                 date, time or duration, and how its value is bound to its decision
          * @param declared the type its decision declares
          * @param log      whether the engine logs its validation report
          * @throws InvalidDecisionTableException if the table cannot be built into an engine
          */
-        TableNode(DecisionTable table, List<ColumnRead> reads, Map<String, Resolution> names, Set<String> listed,
-                GraphValues.Binding binding, FeelType declared, boolean log) {
+        TableNode(DecisionTable table, GraphAnalysis analysis, int d, FeelType declared, boolean log) {
+            var reads = analysis.tableReads(d);
+            var names = analysis.reads.get(d);
+            var properties = analysis.propertyColumns.get(d);
             listResult = !table.hitPolicy().isSingleHit() && table.aggregation() == null;
-            this.binding = binding;
+            this.binding = analysis.bindings[d];
             this.declared = declared;
             var lists = new HashSet<>(table.listInputs());
-            lists.addAll(listed);
+            lists.addAll(analysis.listedNamedInputs.get(d));
             var read = lists.equals(table.listInputs()) ? table : new DecisionTable(table.name(), table.hitPolicy(), table.aggregation(),
                     table.inputs(), table.outputs(), table.rules(), table.feelCells(), lists);
             try {
@@ -96,14 +99,68 @@ final class GraphNodes {
                         .table(read)
                         .output(new TableOutputs(table.outputs()))
                         .logValidationReport(log);
-                for (var column : reads) {
-                    var list = lists.contains(column.name());
-                    builder.valueInput(column.name(), column.type(), list, getter(names.get(column.name()), column, list));
-                }
+                bindColumns(builder, reads, names, properties, lists);
+                bindExpressions(builder, table, reads, names, lists);
                 engine = builder.build();
             } catch (RuntimeException e) {
                 throw new InvalidDecisionTableException("Decision '%s': %s".formatted(table.name(), e.getMessage()));
             }
+        }
+
+        /**
+         * Binds the columns that name what they read and the inputs simple cells compare with, each to a getter of its
+         * slot and path, or, for a path to a property of a date, time or duration, to the property as FEEL reads it.
+         */
+        private static void bindColumns(PraeceptaEngine.Builder<Object[], Object> builder, GraphAnalysis.TableReads reads,
+                Map<String, Resolution> names, Map<String, GraphAnalysis.PropertyColumn> properties, Set<String> lists) {
+            for (var column : reads.columns()) {
+                var list = lists.contains(column.name());
+                var property = properties.get(column.name());
+                builder.valueInput(column.name(), column.type(), list, property == null
+                        ? getter(names.get(column.name()), column, list)
+                        : computed(property.expression(), column, Map.of(property.root(), new Resolution(property.slot(), new String[0], null))));
+            }
+        }
+
+        /**
+         * Binds what the table's FEEL reads: the names its cells, input expressions and output entries read beside its
+         * columns, given as their values are, and the columns its input expressions compute.
+         */
+        private static void bindExpressions(PraeceptaEngine.Builder<Object[], Object> builder, DecisionTable table,
+                GraphAnalysis.TableReads reads, Map<String, Resolution> names, Set<String> lists) {
+            for (var name : reads.expressions()) {
+                var resolution = names.get(name);
+                if (resolution == null) {
+                    builder.expressionInput(name, FeelType.ANY, values -> null); // no requirement provides it: reported
+                } else {
+                    builder.expressionInput(name, resolution.type() == null ? FeelType.ANY : resolution.type(), reader(resolution));
+                }
+            }
+            for (var input : table.inputs()) {
+                var expression = reads.computed().get(input.name());
+                if (expression != null) {
+                    var list = lists.contains(input.name());
+                    builder.valueInput(input.name(), input.type(), list, computed(expression, new ColumnRead(input.name(), input.type(), list),
+                            names));
+                }
+            }
+        }
+
+        /**
+         * The getter of a column whose input expression is an expression ({@code Age * 12}): its value, from the values
+         * of the names it reads, made a value of the column's type as a column's value of no declared type is, or
+         * rejected.
+         */
+        private static Function<Object[], Object> computed(FeelExpression expression, ColumnRead column, Map<String, Resolution> names) {
+            var readers = new HashMap<String, Function<Object[], Object>>();
+            names.forEach((name, resolution) -> readers.put(name, reader(resolution)));
+            return values -> {
+                var value = expression.evaluate(name -> {
+                    var reader = readers.get(name);
+                    return reader == null ? null : reader.apply(values);
+                });
+                return column.list() ? asList(value, column, true) : checked(value, column);
+            };
         }
 
         /**
@@ -150,14 +207,21 @@ final class GraphNodes {
 
         @Override
         public Object evaluate(Object[] values, Consumer<String> errors) {
-            var results = engine.evaluate(values);
+            var results = engine.evaluate(values, errors);
             if (results.isEmpty()) {
                 return null; // DMN 1.5, 10.3.2.10, step 2: no rule matches and no default output
             }
+            if (listResult && engine.isDefault(results)) {
+                // DMN 1.5, 10.3.2.10, step 2: the default output is a single value, whatever the hit policy, which binds
+                // as 10.3.2.9.4 has it: to a decision typed by a list as a list of one (the DMN TCK's
+                // 0109-ruleOrder-hitpolicy), and to one of no declared type as it is (docs/DMN-CONFORMANCE.md, case 14)
+                var single = value(results.getFirst());
+                if (binding == GraphValues.Binding.NULL) {
+                    return null;
+                }
+                return declared instanceof FeelType.Any ? single : GraphValues.conform(single, declared, 0);
+            }
             if (listResult) {
-                // a default output, under a hit policy with several results, is given as a list of one, which binds as
-                // 10.3.2.9.4 has it to a decision typed by a list (as the DMN TCK's 0109-ruleOrder-hitpolicy has it); to
-                // an untyped decision, DMN 1.5 gives the single value (docs/DMN-CONFORMANCE.md, case 14)
                 var list = new ArrayList<>(results.size());
                 results.forEach(result -> list.add(value(result)));
                 return GraphValues.bind(Collections.unmodifiableList(list), binding, declared);
@@ -189,7 +253,7 @@ final class GraphNodes {
      * the framework integrations' map-based engine does: SUM with FEEL's 34 digits, MIN and MAX in FEEL's order (null for
      * values that do not compare), COUNT as a number.
      */
-    private static final class TableOutputs implements OutputStrategy<Object> {
+    private static final class TableOutputs implements ValueOutputs<Object> {
         private final List<OutputColumn> columns;
 
         TableOutputs(List<OutputColumn> columns) {
@@ -198,16 +262,30 @@ final class GraphNodes {
 
         @Override
         public Object transform(PraeceptaOutput output) {
+            return transform(output, Map.of());
+        }
+
+        /**
+         * The outputs as the decision's value: the values the rule computes as they are (a list, a context, or a value of
+         * an output of no declared type, which keeps its own, DMN 1.5, 10.3.2.10, step 3c), the others from their text.
+         */
+        @Override
+        public Object transform(PraeceptaOutput output, Map<String, Object> values) {
             Object value;
             if (columns.size() == 1) {
-                var column = columns.getFirst();
-                value = GraphValues.outputValue(output.values().get(column.name()), column.type());
+                value = value(columns.getFirst(), output, values);
             } else {
                 var context = new LinkedHashMap<String, Object>();
-                columns.forEach(column -> context.put(column.name(), GraphValues.outputValue(output.values().get(column.name()), column.type())));
+                columns.forEach(column -> context.put(column.name(), value(column, output, values)));
                 value = Collections.unmodifiableMap(context);
             }
             return value == null ? Missing.NULL : value;
+        }
+
+        private static Object value(OutputColumn column, PraeceptaOutput output, Map<String, Object> values) {
+            return values.containsKey(column.name())
+                    ? values.get(column.name())
+                    : GraphValues.outputValue(output.values().get(column.name()), column.type());
         }
 
         @Override

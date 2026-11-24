@@ -132,8 +132,8 @@ public final class FeelExpression {
 
     /** Names, and the types a model defines, in scope for parsing expressions; immutable and thread-safe. */
     public static final class Scope {
-        private final FeelParser.Names names;
-        private final Map<String, FeelType> types;
+        final FeelParser.Names names;
+        final Map<String, FeelType> types;
 
         private Scope(FeelParser.Names names, Map<String, FeelType> types) {
             this.names = names;
@@ -154,6 +154,15 @@ public final class FeelExpression {
      */
     public List<String> names() {
         return names;
+    }
+
+    /**
+     * The literal values the expression holds, in the order written: strings, numbers, booleans, and the dates, times,
+     * date-times and durations of its date and time literals ({@code @"10:30:00Z"}, {@code time("10:30:00")}); not
+     * {@code null}. A code generator reads from them, say, whether the times an expression gives have a time zone.
+     */
+    public List<Object> literals() {
+        return Node.literals(List.of(root));
     }
 
     /**
