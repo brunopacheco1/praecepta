@@ -202,6 +202,26 @@ class PraeceptaPluginTest {
         Assertions.assertThat(projectDir.resolve("build/generated/sources/praecepta/java/main/com/acme/rules/Fees.java")).doesNotExist();
     }
 
+    /**
+     * A source the engine rejects, or that uses what a later release plans with no table to compile alone, fails the
+     * build as a GradleException, with the engine's message and exception as its cause.
+     */
+    @Test
+    void a_source_the_engine_rejects_fails_the_build() throws IOException {
+        var later = projectDir.resolve("src/main/rules/bkm.dmn");
+        Files.writeString(later, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
+                  <businessKnowledgeModel id="bkm" name="Rate"/>
+                  <decision id="a" name="A"><literalExpression><text>1</text></literalExpression></decision>
+                </definitions>""");
+        extension.getTables().register("later", table -> table.getSource().set(later.toFile()));
+
+        Assertions.assertThatThrownBy(task()::generate)
+                .isInstanceOf(GradleException.class)
+                .hasMessageContaining("business knowledge model 'Rate'")
+                .hasRootCauseInstanceOf(io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException.class);
+    }
+
     @Test
     void two_tables_cannot_generate_the_same_class() {
         fees("fees");

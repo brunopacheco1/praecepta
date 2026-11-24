@@ -414,6 +414,30 @@ class GraphModelTest {
         Assertions.assertThatThrownBy(() -> decisions.evaluate("Label", notAList)).isInstanceOf(InvalidInputException.class);
     }
 
+    /**
+     * An input data whose type no text holds (a list of contexts here, as of lists, ranges and functions) is missing when
+     * no text is given for it, and rejected, naming its type, when text is.
+     */
+    @Test
+    void an_input_data_of_a_type_no_text_holds_is_missing_or_rejected() {
+        var file = """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="Nested" namespace="n">
+                  <itemDefinition name="tRow"><itemComponent name="n"><typeRef>number</typeRef></itemComponent></itemDefinition>
+                  <itemDefinition name="tGrid" isCollection="true"><typeRef>tRow</typeRef></itemDefinition>
+                  <inputData id="grid" name="Grid"><variable name="Grid" typeRef="tGrid"/></inputData>
+                  <decision id="size" name="Size">
+                    <informationRequirement><requiredInput href="#grid"/></informationRequirement>
+                    <literalExpression><text>if Grid = null then "none" else "some"</text></literalExpression>
+                  </decision>
+                </definitions>""";
+        var decisions = Decisions.load(List.of(TableSource.of("nested.dmn", file.getBytes(StandardCharsets.UTF_8))), Severity.ERROR);
+        Assertions.assertThat(decisions.evaluate("Size", Map.of())).containsExactly(Map.of("Size", "none"));
+        Assertions.assertThat(decisions.evaluate("Size", Map.of("Grid", " "))).containsExactly(Map.of("Size", "none"));
+        var text = Map.of("Grid", "[{n: 1}]");
+        Assertions.assertThatThrownBy(() -> decisions.evaluate("Size", text)).isInstanceOf(InvalidInputException.class)
+                .hasMessageContaining("cannot be given as text");
+    }
+
     @Test
     void decisions_listed_before_the_decisions_they_require_are_evaluated_after_them() {
         var decisions = load("chain-reversed.dmn");

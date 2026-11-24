@@ -38,6 +38,7 @@ import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
 import io.github.brunopacheco1.praecepta.engine.beans.AggregationOperator;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 
 /**
  * Compiles decision tables, as the Maven plugin's {@code generate} goal does. For each table it:
@@ -195,7 +196,7 @@ public abstract class GeneratePraecepta extends DefaultTask {
     private static CompiledTable compile(TableSpec table, CompilerOptions options) {
         try {
             return TableCompiler.compile(definition(table), options);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | InvalidDecisionTableException e) {
             throw new GradleException(e.getMessage(), e);
         }
     }
