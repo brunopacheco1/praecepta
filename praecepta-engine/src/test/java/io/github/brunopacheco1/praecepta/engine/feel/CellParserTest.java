@@ -622,6 +622,23 @@ class CellParserTest {
             "a.2b                         | false",
             "age * 2                      | false",
             "f(x)                         | false",
+            // words FEEL reads as an expression, with its keywords where the expression has them, are no name
+            "? instance of tAmount        | false",
+            "?                            | false",
+            "a.?b                         | false",
+            "if true then y else y        | false",
+            "for x in xs return x         | false",
+            "some x in xs satisfies x     | false",
+            "every x in xs satisfies x    | false",
+            "x instance of t              | false",
+            // keywords elsewhere are words of a name
+            "days in weekend              | true",
+            "Another Date and Time        | true",
+            "Proof of Income              | true",
+            "if only                      | true",
+            "some value                   | true",
+            "instance                     | true",
+            "Is valid?                    | true",
     })
     void feel_names_allow_single_spaces_between_words(String text, boolean name) {
         Assertions.assertThat(CellParser.isName(text)).as(text).isEqualTo(name);

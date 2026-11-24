@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
@@ -102,8 +103,45 @@ public final class CellParser {
      * {@code _} or {@code ?}, continues with letters, digits, {@code _} and {@code ?}, and may hold single
      * spaces between words, as FEEL allows: {@code Credit Score}, {@code Applicant data.Monthly income}.
      * Checked one code point at a time, so long input costs linear time and no stack.
+     *
+     * <p>Words that FEEL reads as an expression are no name, though each is a word: a word that starts with
+     * {@code ?}, the value a unary test tests ({@code ? instance of tAmount}); {@code if ... then ... else ...},
+     * {@code for ... in ... return ...}, {@code some} or {@code every ... in ... satisfies ...}, with their keyword
+     * first; and {@code instance of} between words. Words such as {@code and}, {@code in} or {@code of} anywhere else
+     * are part of a name ({@code days in weekend}); and text that is no name here is read as FEEL, which reads a name
+     * in scope as the name, however many keywords it holds.
      */
     public static boolean isName(String text) {
+        return isNameText(text) && !readsAsExpression(text);
+    }
+
+    /** The textual expressions, by their first keyword, and the keywords they hold after it, in order. */
+    private static final Map<String, List<String>> TEXTUAL_EXPRESSIONS = Map.of(
+            "if", List.of("then", "else"),
+            "for", List.of("in", "return"),
+            "some", List.of("in", "satisfies"),
+            "every", List.of("in", "satisfies"));
+
+    /** Whether words that make a name are rather an expression FEEL reads: see {@link #isName}. */
+    private static boolean readsAsExpression(String text) {
+        if (text.indexOf(' ') < 0) {
+            return text.startsWith("?") || text.contains(".?");
+        }
+        var words = text.split("[ .]");
+        var keywords = TEXTUAL_EXPRESSIONS.getOrDefault(words[0], List.of());
+        int found = 0;
+        for (int i = 0; i < words.length; i++) {
+            if (words[i].startsWith("?") || words[i].equals("instance") && i > 0 && i + 2 < words.length && words[i + 1].equals("of")) {
+                return true;
+            }
+            if (i > 1 && found < keywords.size() && words[i].equals(keywords.get(found))) {
+                found++;
+            }
+        }
+        return !keywords.isEmpty() && found == keywords.size();
+    }
+
+    private static boolean isNameText(String text) {
         int previous = '.'; // the text starts a part, as if after a dot
         int i = 0;
         while (i < text.length()) {
