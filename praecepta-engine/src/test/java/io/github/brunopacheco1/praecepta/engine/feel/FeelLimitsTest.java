@@ -66,6 +66,16 @@ class FeelLimitsTest {
     }
 
     @Test
+    void ranges_of_one_endpoint_nested_compare_in_time_linear_in_their_depth() {
+        // = e starts and ends at e: a range of ranges of ranges... shares its endpoints, which are compared once
+        var nested = "(" + "= ".repeat(200) + "1)";
+        assertThat(outcome(nested + " = " + nested)).isEqualTo("value");
+        assertThat(FeelExpression.parse(nested + " = " + nested).evaluate(name -> null)).isEqualTo(true);
+        assertThat(FeelExpression.parse(nested + " instance of " + "range<".repeat(200) + "number" + ">".repeat(200))
+                .evaluate(name -> null)).isEqualTo(true);
+    }
+
+    @Test
     void strings_plus_makes_hold_at_most_ten_million_characters_in_all() {
         var doubling = new StringBuilder("{s0: \"ab\"");
         for (int i = 1; i < 60; i++) {

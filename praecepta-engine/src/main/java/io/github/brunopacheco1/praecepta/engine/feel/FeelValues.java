@@ -144,7 +144,7 @@ final class FeelValues {
                                     || isInstance(context.get(component.getKey()), component.getValue(), depth + 1, work)));
             case FeelType.RangeOf(var element) -> value instanceof FeelRange range && work.spend() && work.spend()
                     && (range.start() == null || isInstance(range.start(), element, depth + 1, work))
-                    && (range.end() == null || isInstance(range.end(), element, depth + 1, work));
+                    && (range.end() == null || range.end() == range.start() || isInstance(range.end(), element, depth + 1, work));
             case FeelType.FunctionOf function -> value instanceof FeelFunction f && f.type().conformsTo(function);
         };
     }
@@ -249,7 +249,8 @@ final class FeelValues {
             return null;
         }
         var start = equality(x.start(), y.start(), depth + 1, work);
-        var end = equality(x.end(), y.end(), depth + 1, work);
+        // = e and != e start and end at e: compared once, so that nested ones take as long as they are deep
+        var end = x.start() == x.end() && y.start() == y.end() ? start : equality(x.end(), y.end(), depth + 1, work);
         if (Boolean.FALSE.equals(start) || Boolean.FALSE.equals(end)) {
             return false;
         }
