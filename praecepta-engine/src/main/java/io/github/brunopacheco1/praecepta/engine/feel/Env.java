@@ -160,9 +160,20 @@ final class Env implements FeelValues.Budget {
         return null;
     }
 
-    /** Reports an error whose message is built only if errors are reported, and gives null. */
+    /**
+     * Reports an error whose message is built only if it is reported: where errors are, and fewer than
+     * {@link #MAX_ERRORS} have been; gives null.
+     */
     Object error(Supplier<String> message) {
-        return reporting() ? error(message.get()) : null;
+        if (reporting()) {
+            if (shared.reported < MAX_ERRORS) {
+                shared.reported++;
+                shared.errors.accept(message.get());
+            } else {
+                shared.dropped++;
+            }
+        }
+        return null;
     }
 
     /** Ends the evaluation: reports how many errors were beyond {@link #MAX_ERRORS}, if any were. */

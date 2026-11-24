@@ -49,11 +49,6 @@ sealed interface Node {
         return value instanceof Boolean ? value : null;
     }
 
-    /** Whether an error is not worth reporting: none is, or the evaluation ran out of steps, which it reported. */
-    private static boolean silent(Env env) {
-        return !env.reporting() || env.stopped();
-    }
-
     /**
      * The values of the constants in trees, in the order written, but null, found with a stack of their own: a
      * constant of a function value (a built-in function) is no literal and is left out.
@@ -212,8 +207,8 @@ sealed interface Node {
             var value = FeelNumbers.normalise(operand.evaluate(env));
             var type = FeelValues.simpleType(value);
             if (type == null || FeelArithmetic.negationType(type) == null) {
-                return env.reporting() ? env.error("-%s: FEEL negates numbers and durations, not a %s"
-                        .formatted(FeelValues.text(value), FeelValues.typeName(value))) : null;
+                return env.error(() -> "-%s: FEEL negates numbers and durations, not a %s"
+                        .formatted(FeelValues.text(value), FeelValues.typeName(value)));
             }
             return FeelArithmetic.negate(value);
         }
@@ -309,9 +304,10 @@ sealed interface Node {
                     yield order == null ? null : holds(order);
                 }
             };
-            if (value == null && !silent(env)) {
-                env.error("%s %s %s: FEEL does not compare a %s and a %s".formatted(FeelValues.text(a), operator, FeelValues.text(b),
-                        FeelValues.typeName(a), FeelValues.typeName(b)));
+            // a null of an evaluation that ran out of steps needs no error of its own: the evaluation reported one
+            if (value == null && !env.stopped()) {
+                env.error(() -> "%s %s %s: FEEL does not compare a %s and a %s".formatted(FeelValues.text(a), operator,
+                        FeelValues.text(b), FeelValues.typeName(a), FeelValues.typeName(b)));
             }
             return value;
         }
@@ -495,8 +491,8 @@ sealed interface Node {
                     return result;
                 }
             }
-            return result == null && !silent(env)
-                    ? env.error("in tests " + FeelValues.text(v) + " against values FEEL does not compare it with") : result;
+            return result == null && !env.stopped()
+                    ? env.error(() -> "in tests " + FeelValues.text(v) + " against values FEEL does not compare it with") : result;
         }
 
         @Override
@@ -673,7 +669,7 @@ sealed interface Node {
         @Override
         public Object evaluate(Env env) {
             var value = endpoint.evaluate(env);
-            return value == null ? env.error("the endpoint of " + operator.symbol() + " is null") : FeelRange.comparison(operator, value);
+            return value == null ? env.error(() -> "the endpoint of " + operator.symbol() + " is null") : FeelRange.comparison(operator, value);
         }
 
         @Override
@@ -699,9 +695,9 @@ sealed interface Node {
         public Object evaluate(Env env) {
             var value = target.evaluate(env);
             return switch (value) {
-                case null -> env.error("null has no '" + name + "'");
+                case null -> env.error(() -> "null has no '" + name + "'");
                 case Map<?, ?> context -> context.containsKey(name) ? context.get(name)
-                        : env.error("the context has no entry '" + name + "'");
+                        : env.error(() -> "the context has no entry '" + name + "'");
                 case List<?> list -> {
                     if (!env.step(list.size())) {
                         yield null;
