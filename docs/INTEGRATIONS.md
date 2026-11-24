@@ -103,7 +103,7 @@ integrations find their tables at runtime, so their engines take maps instead:
   `UnsupportedFeatureException` `DmnReader.readModel` throws, not by its message. A file without such decisions loads
   exactly as before, its decision tables read alone. So does a file that is no graph Praecepta evaluates yet:
   one that uses what later releases bring (business knowledge models, boxed expressions, decision services,
-  imports, literal expressions that invoke built-in functions), or that is not a well-formed decision model (two elements of one
+  imports, literal expressions or decision table entries that invoke built-in functions), or that is not a well-formed decision model (two elements of one
   name, as `DmnWriter` writes a table with a column of its own name, a decision without logic), which a file of
   tables never had to be. Its decision tables load alone, as in 0.6, and nothing else of it is evaluated; a file
   with no decision table fails, naming the feature and its issue. A file whose tables load alone because it uses

@@ -26,7 +26,7 @@ on its own or as beans in Spring Boot, Quarkus or Micronaut.
 > **Status: 0.x.** The API may still change between minor versions until 1.0. Praecepta is growing from
 > a decision-table engine into a full DMN 1.5 engine, one layer per release
 > ([#120](https://github.com/brunopacheco1/praecepta/issues/120)). 0.8 covers decision tables and the
-> decision requirement graphs of tables and literal expressions in the full FEEL language, not yet FEEL's
+> decision requirement graphs of tables and literal expressions, both in the full FEEL language, not yet FEEL's
 > built-in functions or business knowledge models; see [what Praecepta is not](#what-praecepta-is-not).
 
 # Features
@@ -34,8 +34,9 @@ on its own or as beans in Spring Boot, Quarkus or Micronaut.
   (with SUM / MIN / MAX / COUNT aggregation)
 - DMN FEEL cells on STRING, NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION and
   YEAR_MONTH_DURATION columns: lists, `not(...)`, comparisons, `=` and `!=`, intervals, `null`, every
-  FEEL literal form (`1.2e3`, `@"2025-01-31"`, `date(2025, 1, 31)`) and comments; unquoted `PT,ES` cells
-  from earlier versions keep working
+  FEEL literal form (`1.2e3`, `@"2025-01-31"`, `date(2025, 1, 31)`) and comments, which the bitset index
+  evaluates; and, in a DMN file, any FEEL unary tests (`> Limit * 2`, `[Low..Low + 10]`, `? > 5 and ? < 10`),
+  applied to the rules the index matches; unquoted `PT,ES` cells from earlier versions keep working
 - Times and date-times with or without a time zone (an offset, or a zone id such as `@Europe/Paris`):
   two with a zone compare by instant, and one with a zone and one without by local time (DMN 1.5,
   Table 54); a time with a zone id compares only with times in its zone, unless the zone has one fixed
@@ -43,9 +44,10 @@ on its own or as beans in Spring Boot, Quarkus or Micronaut.
   [DMN conformance](docs/DMN-CONFORMANCE.md) for the cases DMN 1.5 leaves open)
 - List inputs, such as a customer's nationalities, whose elements may be missing: a cell holds when
   some element passes it
-- DMN output entries that name an input or compute with `+`, `-`, `*`, `/` and `**` on strings,
-  numbers, dates, times and durations (`(price - discount) * 1.2`, `Symptom + " is listed"`,
-  `due + duration("P14D")`, `returned - sent`), evaluated only for the rules that match
+- DMN input expressions and output entries in the full FEEL language (`Age * 12`, `Birth.year`,
+  `(price - discount) * 1.2`, `if Rate > 0.5 then "high" else "low"`, `due + duration("P14D")`), parsed and
+  typed when the engine is built and evaluated only for the rules that match; one FEEL gives null whatever its
+  inputs is a warning of the validation report
 - [Decision requirement graphs](#decision-requirement-graphs): DMN files whose decisions, tables and
   literal expressions, require one another and input data, evaluated in dependency order, with cycles,
   missing requirements and type mismatches reported when the graph is built
@@ -112,16 +114,11 @@ rebuilds it independently to check it is bit-for-bit identical to Maven Central.
 
 # What Praecepta is not
 Praecepta evaluates DMN decision tables, fast, and the decision requirement graphs whose decisions are
-tables or literal expressions in the arithmetic of output entries
+tables or literal expressions, in the full FEEL language but its built-in functions
 ([decision requirement graphs](#decision-requirement-graphs)). It is on its way to a full DMN 1.5 engine, one
 layer per release ([#120](https://github.com/brunopacheco1/praecepta/issues/120), see the
 [roadmap](docs/ROADMAP.md)), but it is not one yet. It does not have these yet; when you need one of them
 before its release, use an engine that has it, such as Camunda or Drools:
-- **Full FEEL in decision tables** (the rest of 0.8, [#116](https://github.com/brunopacheco1/praecepta/issues/116)):
-  literal expressions are full FEEL since 0.8, but a table's input entries are still FEEL *simple unary tests*:
-  they may compare with another input (`> limit`) or test a list's elements, but not compute (e.g.
-  `income > 2 * rent`); and its output entries compute with `+`, `-`, `*`, `/` and `**` on strings, numbers,
-  dates, times and durations, and hold no comparison or `if`.
 - **FEEL's built-in functions** (0.9, [#117](https://github.com/brunopacheco1/praecepta/issues/117)), such as
   `string length(...)`, `sum(...)` or `max(...)`: nothing is called but the date and time literals
   `date(...)`, `time(...)`, `date and time(...)` and `duration(...)`.
@@ -165,7 +162,8 @@ engine.validationReport();                 // static findings, e.g. unreachable 
 ```
 
 ### Cells
-Cells are DMN FEEL simple unary tests, parsed according to the column's type:
+Cells are DMN FEEL simple unary tests, parsed according to the column's type, which the bitset index evaluates
+(a DMN file's cells may be any FEEL unary tests besides, see [DMN](#dmn)):
 
 | Cell | Matches | Columns |
 |---|---|---|
@@ -375,14 +373,33 @@ Supported:
   of them (such as a `string` with allowed values, which become the input value list); times and
   date-times with or without a time zone, which may be an offset or a zone id
   (`time("10:30:00@Europe/Paris")`).
+- **Inputs that are expressions** (`Age * 12`, `Applicant.birth.year`, `Orders[amount > 100].code`; DMN 1.5,
+  7.3.2), computed from the inputs they read: typed, where they declare no `typeRef`, as FEEL types them from the
+  types the file's input data and decisions declare (a table read alone included), else strings.
 - **Input entries** in the cell syntax above, as strict FEEL: strings quoted (an unquoted word is a
   reference to another variable), with FEEL's escape sequences, numbers as FEEL writes them (`.5`,
   `1.2e3`), `=` and `!=` tests, comments, and dates, times and durations written with `date(...)`,
   `time(...)`, `date and time(...)` and `duration(...)`, in any of their forms, or as at-literals
-  (`@"2025-01-31"`).
+  (`@"2025-01-31"`). The bitset index evaluates them.
+- **Input entries in the full FEEL language** of unary tests (DMN 1.5, grammar rules 13 to 17): positive unary
+  tests whose values and endpoints are any expression (`> Limit * 2`, `[Low..Low + 10]`, `= Base + 1`), lists and
+  ranges as values (`[1, 2, Limit]`, `[[1..2], 5]`: the value is in one of them), expressions that name `?`, the
+  value tested (`? > 5 and ? < 10`, `some x in ? satisfies x > Limit` in a list column), and `not(...)` of any of
+  them. A test that names `?` holds where its value is true; any other is a value, which holds the input's value
+  when it is a range that holds it, a list one of whose elements holds or equals it, or a value that equals it (Table
+  55; `true` holds only `true`). A test FEEL gives null for (a comparison of a number and a string, or with a
+  missing value) holds for no value, and neither does its `not(...)`. The index matches the rules of such cells as
+  if the cell were `-`, and the engine then applies the cell to them, as it does a cell that compares with another
+  input; the analysis never counts those rules as overlapping, hiding other rules or covering a default, and looks
+  for no gaps in a table that has them, so it reports nothing it cannot prove. A cell made only of what the index
+  reads (literals, comparisons and intervals of them) is read as before: one with a literal of another type than its
+  column (`"10"` in a number column), or an interval that starts after it ends, is rejected.
 - **Entries that compare with another input** (`> limit`, `[floor..limit]`, `not(home)`), which then
   becomes an input of the engine, bound like a column (with map-based inputs it is read with the type of
-  the column that names it).
+  the column that names it). So does any name a FEEL entry or input expression reads that is not a column
+  (`Limit` in `> Limit * 2`): with map-based inputs it is read with the type `columnType(...)` declares, else that
+  of the column or output whose entry reads it first; in a [decision graph](#decision-requirement-graphs) it is the
+  value of the requirement it names, of that requirement's type.
 - **List columns**, typed by a collection (`isCollection="true"`, with allowed values on the item type),
   whose entries test the elements with FEEL's list functions (`list contains(?, "PT")`,
   `list contains(?, null)`, `some x in ? satisfies x >= 18`, `? = null`, joined with `or`, and `not(...)`);
@@ -390,19 +407,26 @@ Supported:
   is in the list (`list contains(Flu Symptoms, Symptom)`: a missing value is in a list that holds a missing
   element).
 - **Output entries** that are literals, name one of the table's inputs (`a` returns the input `a`), or
-  compute their value from literals and inputs with `+`, `-`, `*`, `/`, `**` and parentheses
-  (`Symptom + " is listed"`, `(price - discount) * 1.2`, `amount * (1 + rate) ** years`): `+` joins
-  strings or adds numbers, results have FEEL's 34 digits, and a missing operand gives a missing output.
+  are any FEEL expression (DMN 1.5, chapter 10): `Symptom + " is listed"`, `(price - discount) * 1.2`,
+  `amount * (1 + rate) ** years`, `if score > 700 then "A" else "B"`, `{base: price, total: base * 1.2}.total`,
+  `[min, max]`. They are parsed and typed when the engine is built, and evaluated only for the rules that match;
+  `+` joins strings or adds numbers, results have FEEL's 34 digits, and a missing operand gives a missing output.
   Dates, times, date-times and durations combine as DMN 1.5 has it (Tables 57, 59 and 62):
   `due + duration("P14D")` is a date, `returned - sent` (two date-times, or two times, or two dates) a days
   and time duration, `start + @"P1Y"` keeps the type of `start`, `duration("PT8H") * days` and
   `-elapsed` are durations, and `elapsed / duration("PT1H")` is a number. Where FEEL gives null, so does
   the output: a date-time with a zone minus one without, a date plus a month that has not its day
   (`date("2025-01-31") + duration("P1M")`), a division by zero; a years and months duration scaled by a
-  number keeps whole months (`duration("P1Y11M") * -2.5` is `-P4Y9M`, as the DMN TCK has it). Types FEEL
-  does not combine (`due + 1`, `elapsed + tenure`) are rejected when the engine is built.
-  The inputs they name are columns, or inputs the cells compare with, that hold single values.
-- **Default output values** (`defaultOutputEntry`, literals of the output's type, and one of its output
+  number keeps whole months (`duration("P1Y11M") * -2.5` is `-P4Y9M`, as the DMN TCK has it). Operands FEEL
+  does not combine (`due + 1`, `"a" + 1`) give null, as FEEL has it (the text before DMN 1.5's Tables 56 and 58; 0.7
+  rejected them), and so does a value that does not conform to the output's type (`Base + Rate` in a date output,
+  10.3.2.9.4; a string output takes any value as its text): an entry that is null whatever its inputs is a WARNING of
+  the validation report (`ALWAYS_NULL`). A string, list or context the entry gives is passed to the output strategy
+  as text (`["PT", "BR"]`), and to a [decision graph](#decision-requirement-graphs) as the value it is. An entry
+  that is a single literal of another type than its output (`"one"` in a number output) is rejected, as a cell's
+  is.
+- **Default output values** (`defaultOutputEntry`, literals of the output's type, or FEEL expressions that
+  read no input, such as `-1` or `"N/" + "A"`, whose value is taken when the table is read, and one of its output
   values when it lists them), which are the result when no rule matches, whatever the hit policy or
   aggregation (`[{Status=Declined, Rate=null}]` rather than `[]`; an output without a default is null in
   it). A default of `null` is a default too: a table whose outputs all default to `null` gives
@@ -424,8 +448,9 @@ Supported:
   FEEL's `sum`, `min` and `max` are null for a list that holds null (10.3.4.4): the engine gives that rule's
   output (`[{fee=null}]`), and COUNT counts the rule.
 
-Anything else is rejected with a message naming the decision, rule and column: function calls such as
-`upper case(a)`, `if` and comparisons in output entries. A column may read another decision's value (its
+Anything else is rejected with a message naming the decision, rule and column; FEEL's built-in functions
+(`upper case(a)`, `string length(name) > 3`) with an `UnsupportedFeatureException` naming 0.9
+([#117](https://github.com/brunopacheco1/praecepta/issues/117)). A column may read another decision's value (its
 input expression names it), which a table read alone takes as an input of the engine, and a
 [decision graph](#decision-requirement-graphs) gives it from that decision. `DmnReader.readAll(dmn)`
 reads every decision table of a file. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
@@ -466,11 +491,13 @@ graph.validationReport("Credit Limit");                    // that table's own a
 - **Values.** A table with one output gives its value, with several a context (a `Map` of its outputs), whose
   components a decision reads by path (`Pricing.discount`), and under RULE ORDER, OUTPUT ORDER or COLLECT
   without an aggregation a list of those, which a list column downstream takes (`Checks.code` is the list of
-  each result's `code`); no match without a default output gives null. Either value is bound to the type the
+  each result's `code`); no match without a default output gives null, and with one the default output, a single
+  value whatever the hit policy (DMN 1.5, 10.3.2.10, step 2). Either value is bound to the type the
   decision's variable declares (DMN 1.5, 10.3.2.9.4): a single result to a list as a list of one, a list of one
   result to a single value as that result, a date to a date and time; a value that does not conform is null. An
-  output without a `typeRef`, as DMN 1.5 wants a single output to be, takes the variable's type, or the type of its
-  output entries when they are all literals of one type (`10` is a number). Input data are given as Java values
+  output without a `typeRef`, as DMN 1.5 wants a single output to be, takes the variable's type, or the one type
+  its output entries give, as FEEL types them (`10` and `Base * 2` are numbers); where they give several, or a list
+  or a context, each entry gives its own value (10.3.2.10, step 3c). Input data are given as Java values
   (`Integer`, `BigDecimal`, `LocalDate`, `List`, `Map` for a structured type...) or, for simple types, as text.
 - **Input data** are typed by their `typeRef`: a built-in type, or an item definition, which may be a
   collection or have components (`Loan.principal`). One without a `typeRef` takes the type of the decision
@@ -538,8 +565,11 @@ time zone (an input compared with such a column in a cell, as in `> limit`, take
 time is the engine's `ZonedTime` when the values written for it have zone ids, some of them perhaps
 offsets (a zone id with one fixed offset, `@Etc/UTC`, counts as its offset: a column of only such zone ids is
 an `OffsetTime`); an output whose entry
-is an expression counts by its operands of the output's type (`start + duration("PT8H")` has the kind of
-`start`); a column that mixes kinds fails the build. An input declared with `<list>true</list>` (or typed
+is an expression, and a cell in the full FEEL language, counts by its literals and the inputs of the output's or
+column's type it reads (`start + duration("PT8H")` has the kind of `start`); a column that mixes kinds fails the
+build. A column whose input expression is an expression (`Age * 12`) is no component: the class computes it from the
+inputs it reads, which are, as is any input a FEEL cell or output entry reads beside the columns (`Limit` in
+`> Limit * 2`), typed as the column or output that reads it. An input declared with `<list>true</list>` (or typed
 by a collection in a DMN file) becomes a `java.util.List` of its type. At runtime the generated code
 needs only `praecepta-engine`; Apache POI stays a build-time dependency.
 
@@ -609,8 +639,10 @@ DecisionGraph graph = CreditModel.graph();     // the whole graph, e.g. to evalu
   requires (`graph.requiredInputData`), and `<Decision>.evaluate` gives its value as its Java type: `String`,
   `BigDecimal`, `Boolean`, `LocalDate`, `Duration`, `Period`; a `TemporalAccessor` for a date and time and an
   `Object` for a time, as FEEL's values of those types may have a time zone or not; a `List` for a list, as
-  under RULE ORDER or COLLECT; and a `<Decision>Output` record for a context, as a table with several outputs
-  gives. It is null where FEEL's value is (no rule matched and no default). `<Decision>.validationReport()` is
+  under RULE ORDER or COLLECT; a `<Decision>Output` record for a context, as a table with several outputs
+  gives; and an `Object` for a value of any type, as a table output whose entries give values of several types
+  (DMN 1.5, 10.3.2.10, step 3c) or a decision of no declared type whose table has several results and a default
+  output gives. It is null where FEEL's value is (no rule matched and no default). `<Decision>.validationReport()` is
   its table's own analysis.
 - `<decision>` compiles one decision of the file: its class is named after it (or `<name>`), and its model
   class `<Class>Model`. A decision table that requires no other decision compiles as before, as do files
@@ -1050,23 +1082,21 @@ build, and gives two numbers:
 - **Decision tables: 83 of 86 checks pass (96.5 %).** These are the decision-table checks counted since the
   first release; the other three read inputs computed by other decisions in models that also invoke
   business knowledge models, which come in 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)).
-- **The whole kit: 454 of 3,511 result nodes pass (12.9 %).** Every model of compliance levels 2 and 3
+- **The whole kit: 2,273 of 3,511 result nodes pass (64.7 %).** Every model of compliance levels 2 and 3
   (148 models at the pinned commit), each result node scored as passed, failed or not supported, each
   decision evaluated through its model's decision requirement graph where Praecepta reads the model. This
-  measures how much of DMN 1.5 Praecepta covers: of the 458 nodes it evaluates, 454 pass (the four others
-  are [known failures](praecepta-tck/README.md#known-failures)), and the other 3,053 need features it does
-  not have yet. No result node of the kit needs decision requirement graphs alone, so they add no pass yet.
+  measures how much of DMN 1.5 Praecepta covers: of the 2,279 nodes it evaluates, 2,273 pass (the six others
+  are [known failures](praecepta-tck/README.md#known-failures)), and the other 1,232 need features it does
+  not have yet, mostly FEEL's built-in functions (0.9).
 
 Praecepta is a decision-table engine growing into a full DMN 1.5 engine one layer per release
-([#120](https://github.com/brunopacheco1/praecepta/issues/120)), so most of the kit (FEEL beyond the arithmetic
-of output entries, built-in functions, boxed expressions, business knowledge models, decision services) is
-still ahead; [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md) has the results per model and feature area,
+([#120](https://github.com/brunopacheco1/praecepta/issues/120)), so a third of the kit (built-in functions,
+boxed expressions, business knowledge models, decision services) is still ahead; [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md) has the results per model and feature area,
 every feature the unsupported nodes need with the release that brings it, and how many nodes each release
 would complete. The build fails only on a regression: a node the committed baseline has passing that no
-longer does. The literal expressions of the TCK's arithmetic test cases also run as output expressions on
-their own terms: of their 1,101 checks, Praecepta reads 489, of which 276 give the kit's result, 212 are
-rejected when the engine is built where the kit expects null (operands of types FEEL does not combine), and
-one differs (see [praecepta-tck/README.md](praecepta-tck/README.md#output-expressions)). Semantics are judged
+longer does. The literal expressions of the TCK's arithmetic test cases also run as decision tables' output
+entries: of their 1,101 checks, 1,100 give the kit's result, 826 of them null (operands of types FEEL does not
+combine), and one differs (see [praecepta-tck/README.md](praecepta-tck/README.md#output-entries)). Semantics are judged
 by DMN 1.5 and the TCK alone; where both leave a case open, what Praecepta does is recorded in
 [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md), to be settled when a later DMN version or the TCK
 decides.
