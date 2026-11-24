@@ -37,7 +37,9 @@ unquoted word (now the name of an input); if a decision of no declared type has 
 default output (its default is now a single value), or a literal expression reads a path to a component its type
 does not have (now null with a WARNING, where it was an ERROR); or if a framework integration or build plugin loads
 a DMN file whose literal expressions use FEEL beyond 0.7's subset (it now loads, and compiles, as a graph, whose
-report is checked at `fail-on`).
+report is checked at `fail-on`); if you look for `MISSING_REQUIREMENT` where a literal expression is not FEEL (now
+`INVALID_EXPRESSION`), catch an `InvalidDecisionTableException` from `TableCompiler.compile` (now the cause of its
+`IllegalArgumentException`), or change the map `DecisionTable.namedInputs()` returns (now unmodifiable).
 
 ### Added
 - **The full FEEL language in literal expressions** ([#116](https://github.com/brunopacheco1/praecepta/issues/116)):
@@ -185,6 +187,24 @@ report is checked at `fail-on`).
   reported as an ERROR.
 - **A path to a property of a date, time or duration** (`Birth.year`) is evaluated (Table 65), in a literal expression
   and in a decision table's column alike, where 0.7 reported it as `UNSUPPORTED_FEATURE`.
+- **A literal expression that is not FEEL, or names a type neither FEEL nor the model defines** (`x instance of
+  tUnknown`), is reported as the new `ValidationReport.Kind.INVALID_EXPRESSION`, an ERROR, where it was a
+  `MISSING_REQUIREMENT`; the decision still cannot be evaluated, nor can those that require it. A decision table with
+  such an entry is rejected when it is read, as before. **Upgrade note:** code that looks for `MISSING_REQUIREMENT`
+  to find such a decision looks for `INVALID_EXPRESSION`; a `switch` over `Kind` with a `default` branch, as the
+  enum's Javadoc asks, needs no change.
+- **`TableCompiler.compile` throws an `IllegalArgumentException` for a source the engine rejects**, its message the
+  engine's and its cause the `InvalidDecisionTableException` (or `UnsupportedFeatureException`, which names the
+  release that plans what the source uses), where that exception escaped; so the Maven plugin fails the build with a
+  `MojoFailureException`, and the Gradle plugin with a `GradleException`, as for any other mistake in a table.
+  **Upgrade note:** code that caught `InvalidDecisionTableException` from `TableCompiler.compile` catches the
+  `IllegalArgumentException` and reads its cause.
+- **`DecisionTable.namedInputs()` is worked out once per table and returns an unmodifiable map**, where it parsed
+  every cell on each call and returned a new, modifiable map; it reads the names an expression reads whatever the
+  types it names. **Upgrade note:** copy the map to change it.
+- **`DecisionLogic.LiteralExpression.expression()` says what it is for**: the expression as its syntax alone reads it,
+  for its syntax and `unsupported()`, not for the names it reads, which differ from those a `DecisionGraph` reads
+  where a requirement's name holds an operator (`Income - Tax`). Unchanged otherwise.
 - **Build dependencies**: the versions-maven-plugin 2.25.2
   ([#132](https://github.com/brunopacheco1/praecepta/pull/132)), Maven 3.10.1 in the Maven wrapper
   ([#133](https://github.com/brunopacheco1/praecepta/pull/133)), and the GitHub Actions the workflows pin:
@@ -194,6 +214,36 @@ report is checked at `fail-on`).
   building still needs Maven 3.9 or later.
 
 ### Fixed
+- **A decision table's output entry whose value holds a list many times over** (`{a0: [1, 1], a1: [a0, a0], ...,
+  a40: [a39, a39]}.a40`) no longer hangs its evaluation: a computed output is written as text only for an output
+  strategy that takes text (a graph's tables take its value), and at most 65,536 characters of a list or a context,
+  then `...`, where its text was written out whole, for every computed output.
+- **A column computed by its input expression (`Age * 12`) is computed once per evaluation**, however many FEEL cells
+  and output entries read it, where it was computed again for each; a table without one costs nothing more. A graph's
+  tables compute theirs in the engine too, a single value of a column of lists being a list of one (DMN 1.5,
+  10.3.2.9.4), as the graph gave it.
+- **Rules that test a computed column are left out of the validation report's analysis**, as rules with FEEL cells
+  are: the bitset index sees `Age * 12` as a column of its own, unrelated to `Age`, so a UNIQUE table of `< 18` on
+  `Age` and `>= 216` on `Age * 12` was reported as overlapping, an ERROR that stopped the build plugins and the
+  framework integrations (`failOn(ERROR)` by default).
+- **A decision table's FEEL may name the model's item definitions** (`Amount instance of tAmount`), as a literal
+  expression's may, where the model failed to read; the model's types are those its literal expressions or its
+  tables name. A table read alone (`DmnReader.read`) has no model's types, as before.
+- **A name a table's FEEL reads that is neither one of its inputs nor a value a graph gives** is rejected when the
+  engine is built, where it was read as the table's first column.
+- **A graph parses each decision table's FEEL once**, in its analysis, and its engine takes those parses, where it
+  parsed them twice more; `TimeZones` in the compiler reads a table's FEEL once, where it worked out the names in
+  scope once per column and per output entry.
+- **The compiler gives a date-and-time output a date-time with a zone where an entry gives a date**, which DMN 1.5,
+  10.3.2.9.4, binds to the date and time at UTC midnight (`date("2020-01-01") + duration("P1D")` is
+  `2020-01-02T00:00:00Z`), where its generated record took a `LocalDateTime` and failed to read the value.
+- **The compiler links a FEEL cell's column only with the inputs of its type that the cell reads**, where it linked
+  a date-and-time column with a time column a cell read and rejected the table for times with and without a zone;
+  and an input read by a computed column takes that column's kind of time (`start + @"PT1H"` compared with
+  `@"2020-01-01T10:00:00Z"` makes `start` a `ZonedDateTime`), where it was a `LocalDateTime`.
+- **The DMN TCK harness credits a literal expression's name from an imported model to imports** (0.11), not to 0.8's
+  scopes, and fails on a baseline that lists a node twice or tags one with anything but `graph`, where it read the
+  last line and dropped the check.
 - **`time(date)`**, of a date literal, is the time of that date at UTC midnight, `00:00:00Z` (DMN 1.5, 10.3.2.3.5,
   and the DMN TCK's `1116-feel-time-function`), in cells and expressions alike, where it was rejected.
 

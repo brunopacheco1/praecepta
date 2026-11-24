@@ -23,6 +23,7 @@ import io.github.brunopacheco1.praecepta.compiler.CompiledTable;
 import io.github.brunopacheco1.praecepta.compiler.CompilerOptions;
 import io.github.brunopacheco1.praecepta.compiler.TableCompiler;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 
 /**
  * Compiles decision tables at build time. For each configured table it:
@@ -152,7 +153,7 @@ public class GenerateMojo extends AbstractMojo {
     private static CompiledTable compile(TableConfig table, CompilerOptions options) throws MojoFailureException {
         try {
             return TableCompiler.compile(table.definition(), options);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | InvalidDecisionTableException e) {
             throw new MojoFailureException(e.getMessage(), e);
         }
     }

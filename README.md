@@ -507,7 +507,8 @@ graph.validationReport("Credit Limit");                    // that table's own a
   a cycle (`DECISION_CYCLE`), a requirement the model does not have or a name no requirement provides
   (`MISSING_REQUIREMENT`), a value that does not fit where it goes, such as a string into a number column or
   a list into a column of single values (`TYPE_MISMATCH`), and what Praecepta does not evaluate yet, such as a
-  built-in function, naming the release that plans it (`UNSUPPORTED_FEATURE`). Such a decision, and every decision
+  built-in function, naming the release that plans it (`UNSUPPORTED_FEATURE`), and a literal expression that is not
+  FEEL, or names a type the model does not define (`INVALID_EXPRESSION`). Such a decision, and every decision
   that requires it, cannot be evaluated; the others can. A decision whose value DMN 1.5 defines as null whatever
   its inputs (operands FEEL does not combine, a path to a component its type does not have, a value that does
   not conform to the declared type) is a WARNING

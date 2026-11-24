@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 
 import io.github.brunopacheco1.praecepta.tck.Feature.Area;
@@ -98,7 +99,8 @@ class SingleDecisionEvaluatorTest {
     void a_built_in_function_is_not_supported_yet_and_counts_as_its_release() {
         var check = KIT.get("compliance-level-3/1104-feel-string-length-function/1104-feel-string-length-function-test-01.xml #001_1afe6930d1 "
                 + "feel-string-length-function_001_1afe6930d1");
-        var needs = ((Evaluation.Unsupported) evaluator.evaluate(check)).needs();
-        assertThat(needs).first().isEqualTo(Feature.builtIn("string length"));
+        assertThat(evaluator.evaluate(check)).asInstanceOf(InstanceOfAssertFactories.type(Evaluation.Unsupported.class))
+                .extracting(Evaluation.Unsupported::needs, InstanceOfAssertFactories.list(Feature.class))
+                .first().isEqualTo(Feature.builtIn("string length"));
     }
 }

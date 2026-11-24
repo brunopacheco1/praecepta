@@ -75,7 +75,7 @@ public final class Decisions {
      * its decisions are evaluated through its decision requirements graph ({@link GraphModel}), whose validation
      * report is checked too; otherwise each of its decision tables is a decision of its own, evaluated alone. A model
      * that uses what Praecepta does not evaluate yet (business knowledge models, boxed expressions, decision services,
-     * imports, FEEL beyond its expression subset), or that is not a well-formed decision model (two elements of one
+     * imports, FEEL's built-in functions), or that is not a well-formed decision model (two elements of one
      * name, such as a table with a column of its own name as {@code DmnWriter} writes it, a decision without logic),
      * which a file of decision tables never had to be, has its decision tables read alone, as before
      * ({@code DmnReader.readAll}), and nothing else of it is evaluated; one that has no decision table is rejected,

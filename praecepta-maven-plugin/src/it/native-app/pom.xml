@@ -92,6 +92,10 @@
                         <table>
                             <source>rules/credit.dmn</source>
                         </table>
+                        <!-- decision tables in the full FEEL language (0.8, #116): FEEL cells, a computed column, FEEL outputs -->
+                        <table>
+                            <source>rules/feel.dmn</source>
+                        </table>
                     </tables>
                 </configuration>
             </plugin>

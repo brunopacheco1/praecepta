@@ -16,6 +16,7 @@ import java.time.OffsetTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -23,8 +24,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -102,6 +105,10 @@ public final class DmnReader {
     private static final String DECISION_TABLE = "decisionTable";
     private static final String VARIABLE = "variable";
     private static final String LABEL = "label";
+    private static final String OUTPUT_ENTRY = "outputEntry";
+    private static final String DEFAULT_OUTPUT_ENTRY = "defaultOutputEntry";
+    private static final String AGGREGATION = "aggregation";
+    private static final String COUNT = "COUNT";
     /** At most this many levels of item definitions and components in the type of an input data or a decision. */
     public static final int MAX_TYPE_DEPTH = 32;
 
@@ -208,12 +215,11 @@ public final class DmnReader {
     }
 
     /**
-     * The model's item definitions that its literal expressions may name (in {@code instance of}, or a function's
-     * parameters): those whose name one of their texts holds.
+     * The model's item definitions that its FEEL may name (in {@code instance of}, or a function's parameters): those whose
+     * name one of its texts holds, a literal expression or a decision table's entry or input expression.
      */
     private static Map<String, FeelType> namedTypes(ItemDefinitions types, List<DecisionModel.Decision> decisions) {
-        var texts = decisions.stream().map(DecisionModel.Decision::logic).filter(DecisionLogic.LiteralExpression.class::isInstance)
-                .map(logic -> ((DecisionLogic.LiteralExpression) logic).text()).toList();
+        var texts = decisions.stream().flatMap(decision -> texts(decision.logic())).toList();
         var named = new LinkedHashMap<String, FeelType>();
         if (!texts.isEmpty()) {
             types.all().forEach((name, type) -> {
@@ -223,6 +229,17 @@ public final class DmnReader {
             });
         }
         return named;
+    }
+
+    /** The FEEL texts of a decision's logic: a literal expression, or a table's input expressions, input and output entries. */
+    private static Stream<String> texts(DecisionLogic logic) {
+        return switch (logic) {
+            case DecisionLogic.LiteralExpression literal -> Stream.of(literal.text());
+            case DecisionLogic.Table(var table, var type) -> Stream.concat(
+                    table.inputs().stream().map(InputColumn::name),
+                    table.rules().stream().flatMap(rule -> Stream.concat(rule.input().values().values().stream(),
+                            rule.output().expressions().values().stream())).filter(Objects::nonNull));
+        };
     }
 
     /** Rejects the elements of a model that Praecepta does not evaluate yet, naming the release that plans them. */
@@ -431,7 +448,7 @@ public final class DmnReader {
         var where = decisionWhere(name);
 
         var hitPolicy = hitPolicy(table.getAttribute("hitPolicy"), where);
-        var aggregation = aggregation(table.getAttribute("aggregation"), where);
+        var aggregation = aggregation(table.getAttribute(AGGREGATION), where);
 
         var lists = new HashSet<String>();
         var inputs = children(table, "input").stream().map(input -> inputColumn(input, types, model, lists, where)).toList();
@@ -439,7 +456,8 @@ public final class DmnReader {
         if (outputElements.isEmpty()) {
             throw new InvalidDecisionTableException(where + ": the decision table has no output");
         }
-        var scope = new TableScope(types, inputs);
+        // a table read alone has no model, whose item definitions its FEEL could name
+        var scope = new TableScope(types, inputs, model != null);
         // a single unnamed output is the decision's result, named after the decision, and typed by it
         var single = outputElements.size() == 1;
         var unnamedOutput = single ? name : "";
@@ -493,11 +511,14 @@ public final class DmnReader {
     private static final class TableScope {
         private final ItemDefinitions types;
         private final List<InputColumn> inputs;
+        /** Whether the table is read as part of a model, whose item definitions its FEEL may name. */
+        private final boolean model;
         private FeelExpression.Scope scope;
 
-        TableScope(ItemDefinitions types, List<InputColumn> inputs) {
+        TableScope(ItemDefinitions types, List<InputColumn> inputs, boolean model) {
             this.types = types;
             this.inputs = inputs;
+            this.model = model;
         }
 
         FeelExpression.Scope get() {
@@ -505,7 +526,7 @@ public final class DmnReader {
                 var names = new LinkedHashSet<>(types.elementNames());
                 // a column that is an expression is no name: its text would read as itself
                 inputs.stream().filter(input -> CellParser.isName(input.name())).forEach(input -> names.add(input.name()));
-                scope = FeelExpression.scope(names, Map.of());
+                scope = FeelExpression.scope(names, model ? types.all() : Map.of());
             }
             return scope;
         }
@@ -602,7 +623,7 @@ public final class DmnReader {
                 return declared;
             }
             var table = child(decision, DECISION_TABLE);
-            if ("COUNT".equalsIgnoreCase(table.getAttribute("aggregation").strip())) {
+            if (COUNT.equalsIgnoreCase(table.getAttribute(AGGREGATION).strip())) {
                 return Optional.of(ColumnType.STRING);
             }
             return entriesType(entries, index, output);
@@ -616,12 +637,12 @@ public final class DmnReader {
         private Optional<ColumnType> entriesType(Entries entries, int index, Element output) {
             var texts = new ArrayList<String>();
             for (var rule : entries.rules()) {
-                var outputEntries = children(rule, "outputEntry");
+                var outputEntries = children(rule, OUTPUT_ENTRY);
                 if (index < outputEntries.size()) {
                     texts.add(textOf(outputEntries.get(index)));
                 }
             }
-            var defaultEntry = nonBlankText(output, "defaultOutputEntry");
+            var defaultEntry = nonBlankText(output, DEFAULT_OUTPUT_ENTRY);
             if (defaultEntry != null) {
                 texts.add(defaultEntry);
             }
@@ -663,7 +684,7 @@ public final class DmnReader {
         private Optional<ColumnType> declaredOutputType(Element decision, Element output, ItemDefinitions items, String where) {
             var table = child(decision, DECISION_TABLE);
             boolean single = children(table, "output").size() == 1;
-            if (!output.getAttribute(TYPE_REF).isBlank() || single && "COUNT".equalsIgnoreCase(table.getAttribute("aggregation").strip())) {
+            if (!output.getAttribute(TYPE_REF).isBlank() || single && COUNT.equalsIgnoreCase(table.getAttribute(AGGREGATION).strip())) {
                 return Optional.empty();
             }
             var typeRef = table.getAttribute(TYPE_REF);
@@ -692,13 +713,13 @@ public final class DmnReader {
         private static Optional<ColumnType> literalType(List<Element> rules, int index, Element output) {
             var texts = new ArrayList<String>();
             for (var rule : rules) {
-                var entries = children(rule, "outputEntry");
+                var entries = children(rule, OUTPUT_ENTRY);
                 if (index >= entries.size()) {
                     return Optional.empty(); // reported when the rule is read
                 }
                 texts.add(textOf(entries.get(index)));
             }
-            var defaultEntry = nonBlankText(output, "defaultOutputEntry");
+            var defaultEntry = nonBlankText(output, DEFAULT_OUTPUT_ENTRY);
             if (defaultEntry != null) {
                 texts.add(defaultEntry);
             }
@@ -794,7 +815,7 @@ public final class DmnReader {
             case "SUM" -> AggregationOperator.SUM;
             case "MIN" -> AggregationOperator.MIN;
             case "MAX" -> AggregationOperator.MAX;
-            case "COUNT" -> AggregationOperator.COUNT;
+            case COUNT -> AggregationOperator.COUNT;
             default -> throw new InvalidDecisionTableException(
                     "%s: aggregation '%s' is not supported (SUM, MIN, MAX and COUNT are)".formatted(where, value));
         };
@@ -968,7 +989,7 @@ public final class DmnReader {
      */
     private static LiteralOutput defaultValue(Element output, ColumnType type, List<String> values, TableScope scope,
             String where) {
-        var text = nonBlankText(output, "defaultOutputEntry");
+        var text = nonBlankText(output, DEFAULT_OUTPUT_ENTRY);
         if (text == null) {
             return null;
         }
@@ -1081,7 +1102,7 @@ public final class DmnReader {
      */
     private static Praeceptum rule(Element rule, String where, int number, Columns columns, List<NamedInput> names) {
         var inputEntries = children(rule, "inputEntry");
-        var outputEntries = children(rule, "outputEntry");
+        var outputEntries = children(rule, OUTPUT_ENTRY);
         if (inputEntries.size() != columns.inputs().size() || outputEntries.size() != columns.outputs().size()) {
             throw new InvalidDecisionTableException("%s: has %d input and %d output entries; the table has %d inputs and %d outputs"
                     .formatted(where, inputEntries.size(), outputEntries.size(), columns.inputs().size(), columns.outputs().size()));
@@ -1443,6 +1464,8 @@ public final class DmnReader {
         private Set<String> elementNames;
         private FeelExpression.Scope expressionScope;
         private ModelTypes modelTypes;
+        /** Every type the item definitions define ({@link #all}), read once. */
+        private Map<String, FeelType> all;
 
         ItemDefinitions(Element root) {
             this.root = root;
@@ -1568,6 +1591,13 @@ public final class DmnReader {
          * left out.
          */
         Map<String, FeelType> all() {
+            if (all == null) {
+                all = Collections.unmodifiableMap(allTypes());
+            }
+            return all;
+        }
+
+        private Map<String, FeelType> allTypes() {
             var all = new LinkedHashMap<String, FeelType>();
             functions = true;
             try {

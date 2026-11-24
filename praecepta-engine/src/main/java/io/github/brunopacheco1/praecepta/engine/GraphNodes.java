@@ -98,9 +98,11 @@ final class GraphNodes {
                 var builder = PraeceptaEngine.<Object[], Object>builder()
                         .table(read)
                         .output(new TableOutputs(table.outputs()))
+                        .types(analysis.model.types())
+                        .parsed(reads.parsed())
                         .logValidationReport(log);
                 bindColumns(builder, reads, names, properties, lists);
-                bindExpressions(builder, table, reads, names, lists);
+                bindExpressions(builder, reads, names);
                 engine = builder.build();
             } catch (RuntimeException e) {
                 throw new InvalidDecisionTableException("Decision '%s': %s".formatted(table.name(), e.getMessage()));
@@ -124,24 +126,16 @@ final class GraphNodes {
 
         /**
          * Binds what the table's FEEL reads: the names its cells, input expressions and output entries read beside its
-         * columns, given as their values are, and the columns its input expressions compute.
+         * columns, given as their values are. The columns its input expressions compute, the engine computes from them.
          */
-        private static void bindExpressions(PraeceptaEngine.Builder<Object[], Object> builder, DecisionTable table,
-                GraphAnalysis.TableReads reads, Map<String, Resolution> names, Set<String> lists) {
+        private static void bindExpressions(PraeceptaEngine.Builder<Object[], Object> builder, GraphAnalysis.TableReads reads,
+                Map<String, Resolution> names) {
             for (var name : reads.expressions()) {
                 var resolution = names.get(name);
                 if (resolution == null) {
                     builder.expressionInput(name, FeelType.ANY, values -> null); // no requirement provides it: reported
                 } else {
                     builder.expressionInput(name, resolution.type() == null ? FeelType.ANY : resolution.type(), reader(resolution));
-                }
-            }
-            for (var input : table.inputs()) {
-                var expression = reads.computed().get(input.name());
-                if (expression != null) {
-                    var list = lists.contains(input.name());
-                    builder.valueInput(input.name(), input.type(), list, computed(expression, new ColumnRead(input.name(), input.type(), list),
-                            names));
                 }
             }
         }

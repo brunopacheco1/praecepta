@@ -580,7 +580,7 @@ public final class DecisionGraph {
             names.addAll(decisionNames);
             var scope = FeelExpression.scope(names, types);
             var resolved = decisions.stream()
-                    .map(decision -> inferred.contains(decision.name()) ? withRequirements(decision, names, decisionNames, scope) : decision)
+                    .map(decision -> inferred.contains(decision.name()) ? withRequirements(decision, names, decisionNames, scope, types) : decision)
                     .toList();
             return new DecisionGraph(new DecisionModel(name, inputData, resolved, types), failOn, log);
         }
@@ -589,12 +589,13 @@ public final class DecisionGraph {
          * The decision, requiring what its logic reads.
          *
          * @param names the names of the model's input data and decisions
+         * @param types the types the model defines
          */
         private static Decision withRequirements(Decision decision, Set<String> names, Set<String> decisionNames,
-                FeelExpression.Scope scope) {
+                FeelExpression.Scope scope, Map<String, FeelType> types) {
             var requiredDecisions = new LinkedHashSet<String>();
             var requiredInputs = new LinkedHashSet<String>();
-            for (var read : GraphAnalysis.namesRead(decision, names, scope)) {
+            for (var read : GraphAnalysis.namesRead(decision, names, scope, types)) {
                 var element = DecisionModel.elementOf(read, names::contains);
                 var root = element == null ? read : element;
                 if (decisionNames.contains(root)) {

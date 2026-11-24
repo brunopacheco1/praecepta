@@ -132,6 +132,14 @@ public final class FeelExpression {
         return new Scope(List.copyOf(names), Map.copyOf(types));
     }
 
+    /**
+     * Names in scope, where any type name that is not FEEL's reads as {@code Any}, as a check of syntax alone reads it:
+     * for finding which names expressions read, without the types of the model they belong to.
+     */
+    public static Scope namesScope(Collection<String> names) {
+        return new Scope(List.copyOf(names), null);
+    }
+
     /** Names, and the types a model defines, in scope for parsing expressions; immutable and thread-safe. */
     public static final class Scope {
         private final List<String> given;

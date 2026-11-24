@@ -81,10 +81,16 @@ public sealed interface DecisionLogic {
         }
 
         /**
-         * The parsed expression, parsed again on each call, with no names in scope but those it binds itself: every
-         * other name is read as words up to a keyword or an operator. A {@code DecisionGraph} parses it with the names of
-         * its decision's requirements in scope, which this cannot know
-         * ({@link FeelExpression#parse(String, java.util.Collection)}).
+         * The expression as its syntax alone reads it, parsed again on each call: for checking its syntax and what it uses
+         * ({@link FeelExpression#unsupported()}), not for the names it reads, nor for evaluating it.
+         *
+         * <p>It is parsed with no names in scope but those it binds itself, and no model's types: every other name is
+         * read as words up to a keyword or an operator, and every type name it does not know as any type. A
+         * {@code DecisionGraph} parses it with the names of its decision's requirements in scope, and the model's item
+         * definitions, which this cannot know ({@link FeelExpression#parse(String, java.util.Collection, java.util.Map)}),
+         * so its {@link FeelExpression#names()} may differ from those the graph reads: a requirement named
+         * {@code Income - Tax} is one name to the graph but the subtraction of {@code Tax} from {@code Income} here, and
+         * a type name the model does not define is an error to the graph but not here.
          *
          * @throws IllegalArgumentException never, as the text was checked when the expression was made
          */

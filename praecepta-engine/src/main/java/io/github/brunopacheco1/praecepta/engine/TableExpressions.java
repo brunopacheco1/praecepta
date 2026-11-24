@@ -21,6 +21,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelUnaryTests;
 
 /**
@@ -34,8 +35,12 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelUnaryTests;
 final class TableExpressions {
 
     private final Collection<String> names;
+    /** The types the model defines (its item definitions), which {@code instance of} and parameters may name. */
+    private final Map<String, FeelType> types;
     /** The names in scope, indexed when the first expression is parsed: a table of simple cells parses none. */
     private FeelExpression.Scope scope;
+    /** What was parsed already, by text, in the same scope ({@link Parsed}); nothing for a table built alone. */
+    private final Parsed parsed;
     /** By rule (index in rule order), by column: its input entry in the full FEEL language. */
     private final Map<Integer, Map<String, FeelUnaryTests>> cells = new HashMap<>();
     /** By column: the input expression a column's value is computed with. */
@@ -48,14 +53,31 @@ final class TableExpressions {
      */
     private final Map<String, ColumnType> named = new LinkedHashMap<>();
 
-    /** @param names the names in scope: those the engine reads */
-    TableExpressions(Collection<String> names) {
+    /**
+     * The table's FEEL as {@link GraphAnalysis} parsed it, by text, so that a {@link DecisionGraph} parses each of its
+     * tables' entries once: its input entries beyond the simple unary tests, and its input expressions and output
+     * entries, parsed in {@link #scope}, which the engine then parses in, too.
+     */
+    record Parsed(FeelExpression.Scope scope, Map<String, FeelUnaryTests> cells, Map<String, FeelExpression> expressions) {
+
+        static final Parsed NONE = new Parsed(null, Map.of(), Map.of());
+    }
+
+    /**
+     * @param names  the names in scope: those the engine reads
+     * @param types  the types the model defines, by name
+     * @param parsed what was parsed already, and the scope it was parsed in, which then replaces {@code names}
+     */
+    TableExpressions(Collection<String> names, Map<String, FeelType> types, Parsed parsed) {
         this.names = names;
+        this.types = types;
+        this.parsed = parsed;
+        this.scope = parsed.scope();
     }
 
     private FeelExpression.Scope scope() {
         if (scope == null) {
-            scope = FeelExpression.scope(new LinkedHashSet<>(names), Map.of());
+            scope = FeelExpression.scope(new LinkedHashSet<>(names), types);
         }
         return scope;
     }
@@ -77,11 +99,14 @@ final class TableExpressions {
      */
     void cell(Praeceptum rule, int ruleIndex, String column, ColumnType type, CellSyntaxException rejected) {
         var where = "Rule %s, column '%s'".formatted(rule.priority(), column);
-        FeelUnaryTests tests;
-        try {
-            tests = FeelUnaryTests.parseCell(rule.input().values().get(column), scope(), rejected);
-        } catch (CellSyntaxException e) {
-            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+        var text = rule.input().values().get(column);
+        var tests = text == null ? null : parsed.cells().get(text);
+        if (tests == null) {
+            try {
+                tests = FeelUnaryTests.parseCell(text, scope(), rejected);
+            } catch (CellSyntaxException e) {
+                throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+            }
         }
         rejectUnsupported(where, tests.unsupported());
         cells.computeIfAbsent(ruleIndex, any -> new LinkedHashMap<>()).put(column, tests);
@@ -115,11 +140,13 @@ final class TableExpressions {
     }
 
     private FeelExpression parse(String text, String where) {
-        FeelExpression expression;
-        try {
-            expression = FeelExpression.parse(text, scope());
-        } catch (ExpressionSyntaxException e) {
-            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+        var expression = parsed.expressions().get(text);
+        if (expression == null) {
+            try {
+                expression = FeelExpression.parse(text, scope());
+            } catch (ExpressionSyntaxException e) {
+                throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+            }
         }
         rejectUnsupported(where, expression.unsupported());
         return expression;
@@ -146,9 +173,9 @@ final class TableExpressions {
         return cells.isEmpty() && columns.isEmpty() && outputs.isEmpty();
     }
 
-    /** The rule's cells in the full FEEL language, by column; null if it has none. */
+    /** The rule's cells in the full FEEL language, by column; empty if it has none. */
     Map<String, FeelUnaryTests> cells(int ruleIndex) {
-        return cells.get(ruleIndex);
+        return cells.getOrDefault(ruleIndex, Map.of());
     }
 
     /** The columns computed from other inputs, with their input expressions. */
@@ -156,9 +183,9 @@ final class TableExpressions {
         return columns;
     }
 
-    /** The rule's output entries that compute their value, by output; null if it has none. */
+    /** The rule's output entries that compute their value, by output; empty if it has none. */
     Map<String, FeelExpression> outputs(int ruleIndex) {
-        return outputs.get(ruleIndex);
+        return outputs.getOrDefault(ruleIndex, Map.of());
     }
 
     /** The names the expressions read, columns among them, each with the type of what reads it first, in the order first read. */

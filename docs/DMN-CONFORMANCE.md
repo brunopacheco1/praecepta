@@ -49,9 +49,9 @@ release meant to remove it.
 | 23 | [Limits of one evaluation](#23-limits-of-one-evaluation) | open |
 | 24 | [A unary test that does not name `?` and gives a boolean](#24-a-unary-test-that-does-not-name--and-gives-a-boolean) | open; the TCK's boolean columns point one way |
 | 25 | [Names a table read alone does not have](#25-names-a-table-read-alone-does-not-have) | open |
-| 26 | [A literal entry of another type than its column or output](#26-a-literal-entry-of-another-type-than-its-column-or-output) | open |
+| 26 | [A literal entry of another type than its column or output](#26-a-literal-entry-of-another-type-than-its-column-or-output) | decided by DMN 1.5 for output entries (8.3.3); open for input entries |
 | 27 | [A default output that reads an input](#27-a-default-output-that-reads-an-input) | open |
-| 28 | [A value of another type than its output](#28-a-value-of-another-type-than-its-output) | open |
+| 28 | [A value of another type than its output](#28-a-value-of-another-type-than-its-output) | decided by DMN 1.5 for an entry whose type shows it (8.3.3); open for a value known only when evaluated |
 
 How Praecepta returns DMN's null result, which is a choice of representation rather than of semantics,
 is [at the end](#how-a-null-result-is-returned).
@@ -393,16 +393,19 @@ integrations alike.
   of that requirement's type, as DMN 1.5 has it.
 
 ## 26. A literal entry of another type than its column or output
-- **DMN 1.5.** FEEL compares a number with a string as null (Table 53), so a cell `"10"` in a number column holds for
-  no input, and a value of another type than an output's is null where it is bound to it (10.3.2.9.4). Whether a model
-  whose entries are literals of another type than their column's or output's is valid is not said.
+- **DMN 1.5.** For outputs, 8.3.3 decides: "The ith outputEntry SHALL be consistent with the typeRef of the ith
+  OutputClause", so a model whose output entry is a literal of another type than its output's is not valid. For input
+  entries it says only that "the ith inputExpression must satisfy the ith inputEntry"; FEEL compares a number with a
+  string as null (Table 53), so a cell `"10"` in a number column holds for no input, and whether a model with such a
+  cell is valid is not said.
 - **TCK.** No test has one.
-- **Praecepta (since 0.1, kept in 0.8.0).** A cell that is a literal, a comparison with one or an interval between two
-  (the simple unary tests the bitset index evaluates) of another type than its column's is rejected when the table is
-  read, and so is one whose interval starts after it ends; so is an output entry or a default output that is a single
-  literal of another type than its output (`"one"` in a number output), or a date and time literal that gives no value
-  (`time("08:00:00+14:01")`). Such an entry can never be what it says, and the table is wrong where it can be shown to
-  be. An entry that computes a value is FEEL (case 13): null where its operands do not combine, with a WARNING.
+- **Praecepta (since 0.1, kept in 0.8.0).** An output entry or a default output that is a single literal of another type
+  than its output (`"one"` in a number output), or a date and time literal that gives no value
+  (`time("08:00:00+14:01")`), is rejected when the table is read, as 8.3.3 makes the model invalid. A cell that is a
+  literal, a comparison with one or an interval between two (the simple unary tests the bitset index evaluates) of
+  another type than its column's is rejected too, and so is one whose interval starts after it ends: such a cell can
+  never hold, and the table is wrong where it can be shown to be, which for input entries is Praecepta's choice. An
+  entry that computes a value is FEEL (cases 13 and 28): null where its operands do not combine, with a WARNING.
 
 ## 27. A default output that reads an input
 - **DMN 1.5.** 10.3.2.10, step 2: "if a default output value d is specified, DTI=FEEL(d)", an expression; Table 46:
@@ -413,15 +416,20 @@ integrations alike.
   is taken when the table is read; one that reads an input, which no output value list could hold, is rejected.
 
 ## 28. A value of another type than its output
-- **DMN 1.5.** An output clause declares a `typeRef` (Table 37), and 10.3.2.9.4 binds a value to a declared type
-  where a decision's value is bound to its variable; it does not say whether an output entry's value is bound to its
-  output's type.
+- **DMN 1.5.** An output clause of a table with several outputs may declare a `typeRef`; that of a table with one
+  output "SHALL NOT specify a typeRef" (Table 34), its decision's variable typing the table's value. 8.3.3 requires
+  that "The ith outputEntry SHALL be consistent with the typeRef of the ith OutputClause", so an entry whose type shows
+  it gives a value of another type makes the model invalid. 10.3.2.9.4 binds a value to a declared type where a
+  decision's value is bound to its variable; what a value known only when the entry is evaluated (of a name of no
+  declared type, say) becomes when it is not of its output's type is not said.
 - **TCK.** Its output entries give values of their output's type.
 - **Praecepta (since 0.8.0, [#116](https://github.com/brunopacheco1/praecepta/issues/116)).** An output entry's value
   is bound to its output's type as 10.3.2.9.4 binds a decision's: as it is where it conforms, a date to a date and time
-  at UTC midnight, a list of one to its element, and null otherwise, with a WARNING (`ALWAYS_NULL`) where the entry's
-  type shows it when the table is built. A string output takes any value as its text, as Praecepta has typed outputs
-  since 0.6 (it takes unquoted numbers and dates as their text).
+  at UTC midnight, a list of one to its element, and null otherwise. An entry whose type shows that its value is not
+  of its output's type, which 8.3.3 makes invalid, is reported with a WARNING (`ALWAYS_NULL`) when the table is built
+  and evaluated to null rather than rejected, as a literal entry of another type is (case 26). A single output
+  clause's `typeRef`, which Table 34 says it does not have, is read where one is given. A string output takes any
+  value as its text, as Praecepta has typed outputs since 0.6 (it takes unquoted numbers and dates as their text).
 
 ## Known deviations
 Where DMN 1.5 or the TCK decides and Praecepta does otherwise. Each is reported or documented where it shows,
@@ -431,9 +439,12 @@ the default output of a table with several results bound to a decision of no dec
 value (case 14); output entries whose operands FEEL does not combine, now null, where they were rejected (case 13);
 and untyped outputs whose entries are not literals of one type, which now give each entry its own type (case 13).
 
-- **A context type's conformance, and a literal expression's own `typeRef`.** A value is bound to the type its
-  decision's variable declares; a literal expression's `typeRef` is read only where the variable has none, and one
-  that differs from the variable's (7.3.1 requires them equal) is not reported.
+- **A literal expression's own `typeRef`.** A literal expression's value is bound to the type its decision's variable
+  declares (10.3.2.9.4); the literal expression's own `typeRef` is read only where the variable has none, and one that
+  differs from the variable's is not reported, though 7.3.1 says that "the referenced type SHALL be the same as the type
+  of the containing Decision element". (A value bound to a context type conforms as 10.3.2.9.2 has it since 0.8.0:
+  `{a: 1}` bound to `context<a: number, b: string>` is null, with an `ALWAYS_NULL` WARNING, and a context with
+  components beyond the type's keeps them.)
 
 ## How a null result is returned
 DMN 1.5 gives a decision table one result, which may be null; Praecepta's engine returns a list of
