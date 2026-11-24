@@ -233,7 +233,8 @@ input data and decision gets a *slot*: input data first, then decisions, in the 
    that decision's requirements: the requirement so named, else the one named by its longest part before a dot, the
    rest being a path into its value (`Pricing.discount` in a table column), as `DecisionModel.elementOf` resolves
    names for every part of Praecepta; a name no requirement provides is a `MISSING_REQUIREMENT` (7.3.4), and a
-   built-in function a literal expression invokes an `UNSUPPORTED_FEATURE` (0.9, #117);
+   built-in function a literal expression invokes an `UNSUPPORTED_FEATURE` (0.9, #117), and a literal expression that
+   is not FEEL, or names a type neither FEEL nor the model defines, an `INVALID_EXPRESSION`;
 3. finds cycles among required decisions (Tarjan's algorithm with an explicit stack), reported with the cycle's
    path (`DECISION_CYCLE`), and orders the other decisions so each comes after those it requires (Kahn's algorithm);
 4. works out types: an input data without a `typeRef` takes the type of the table columns that read it whole, when
