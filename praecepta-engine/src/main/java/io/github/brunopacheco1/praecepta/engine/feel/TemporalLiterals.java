@@ -39,6 +39,13 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
  * The arguments are themselves literals: strings, numbers, date time literals, and {@code null} for a time's offset.
  * {@link CellParser} reads a cell's literals with it, and {@link FeelParser} the literals of FEEL
  * expressions, so that both read the same forms.
+ *
+ * <p>A time string is in XML Schema's lexical form for {@code time} (10.3.4.1), which takes {@code 24:00:00} (with any
+ * zero fraction) as midnight, {@code 00:00:00}: {@code time("24:00:00")} and {@code @"24:00:00Z"} are
+ * {@code 00:00:00} and {@code 00:00:00Z}. A date time string is a date string, {@code T} and a time string (10.3.4.1),
+ * and at {@code 24:00:00} it is midnight of the next day, as XML Schema's {@code dateTime} reads it and the DMN TCK's
+ * {@code 0100-arithmetic} has it: {@code @"2021-01-01T24:00:00"} is {@code 2021-01-02T00:00:00}. Any other time past
+ * {@code 23:59:59} is invalid ({@code 24:00:01}, the TCK's {@code 1116-feel-time-function}).
  */
 final class TemporalLiterals {
 
@@ -49,6 +56,10 @@ final class TemporalLiterals {
     private static final Pattern DATE = Pattern.compile("[+-]?\\d{4,}-\\d{2}-\\d{2}");
     private static final Pattern YEARS_AND_MONTHS = Pattern.compile("-?P(\\d+Y)?(\\d+M)?");
     private static final Pattern NUMBER = Pattern.compile("-?(\\d+(\\.\\d+)?|\\.\\d+)([eE][+-]?\\d+)?");
+    /** A time string at hour 24, and what follows it: an offset or a zone id. */
+    private static final Pattern TIME_24 = Pattern.compile("24:00:00(?:\\.0+)?(.*)", Pattern.DOTALL);
+    /** A date time string at hour 24: its date, and what follows the time. */
+    private static final Pattern DATE_TIME_24 = Pattern.compile("([+-]?\\d{4,}-\\d{2}-\\d{2})T24:00:00(?:\\.0+)?(.*)", Pattern.DOTALL);
     /** Deeper nesting than {@code date and time(date(date and time(...)), ...)} is refused, so that reading never runs out of stack. */
     private static final int MAX_DEPTH = 8;
 
@@ -416,8 +427,9 @@ final class TemporalLiterals {
     }
 
     private Object time(String iso) {
+        var midnight = TIME_24.matcher(iso);
         try {
-            return FeelTemporals.parseTime(iso);
+            return FeelTemporals.parseTime(midnight.matches() ? "00:00:00" + midnight.group(1) : iso);
         } catch (DateTimeParseException e) {
             throw invalid(ColumnType.TIME, iso);
         }
@@ -436,9 +448,22 @@ final class TemporalLiterals {
             throw new IllegalArgumentException("invalid date and time '" + iso + "'; write a zone id as @Europe/Paris");
         }
         try {
-            return FeelTemporals.parseDateTime(iso);
+            return FeelTemporals.parseDateTime(hour24(iso));
         } catch (DateTimeParseException e) {
             throw invalid(ColumnType.DATE_TIME, iso);
+        }
+    }
+
+    /** A date time string at hour 24 as midnight of the next day; any other text as it is. */
+    private static String hour24(String iso) {
+        var matcher = DATE_TIME_24.matcher(iso);
+        if (!matcher.matches()) {
+            return iso;
+        }
+        try {
+            return FeelLiterals.text(FeelTemporals.parseDate(matcher.group(1)).plusDays(1)) + "T00:00:00" + matcher.group(2);
+        } catch (DateTimeException e) {
+            return iso;
         }
     }
 

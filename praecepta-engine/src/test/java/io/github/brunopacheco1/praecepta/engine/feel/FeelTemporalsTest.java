@@ -221,6 +221,21 @@ class FeelTemporalsTest {
     }
 
     @Test
+    void feel_compares_times_and_date_times_to_the_millisecond() {
+        // docs/DMN-CONFORMANCE.md, case 18: the DMN TCK's 0068-feel-equality; compare keeps the nanosecond
+        var time = LocalTime.of(10, 30, 0, 100_000);
+        Assertions.assertThat(FeelTemporals.compareToTheMillisecond(time, LocalTime.of(10, 30, 0, 200_000))).isZero();
+        Assertions.assertThat(FeelTemporals.compare(time, LocalTime.of(10, 30, 0, 200_000))).isNegative();
+        Assertions.assertThat(FeelTemporals.compareToTheMillisecond(time, LocalTime.of(10, 30, 0, 1_000_000))).isNegative();
+        var instant = ZonedDateTime.of(2025, 7, 1, 12, 0, 0, 999_999, ZoneId.of("Europe/Paris"));
+        Assertions.assertThat(FeelTemporals.compareToTheMillisecond(instant, instant.withNano(0).withZoneSameInstant(ZoneOffset.UTC)))
+                .isZero();
+        Assertions.assertThat(FeelTemporals.compareToTheMillisecond(OffsetTime.of(9, 0, 0, 1, ZoneOffset.ofHours(1)),
+                LocalTime.of(9, 0))).isZero();
+        Assertions.assertThat(FeelTemporals.compareToTheMillisecond(BigDecimal.ONE, BigDecimal.TEN)).isNegative();
+    }
+
+    @Test
     void a_value_without_a_zone_takes_the_offset_of_the_one_it_is_compared_with() {
         // DMN 1.5, Table 54: "If one input has a null timezone offset, that input uses the timezone offset of the other input"
         var eight = LocalTime.of(8, 0);

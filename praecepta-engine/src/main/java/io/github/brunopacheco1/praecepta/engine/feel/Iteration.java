@@ -9,18 +9,21 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.RandomAccess;
 import java.util.function.Predicate;
 
 /**
  * The iteration contexts of {@code for}, {@code some} and {@code every} (DMN 1.5, 10.3.2.14): each variable takes
  * each element of its list in turn, the later ones varying fastest, a later list being evaluated in the scope of the
  * earlier variables. It loops with arrays of its own rather than recursing, however many variables there are, and
- * counts every iteration as a step ({@link Env#MAX_STEPS}).
+ * counts every iteration as a step ({@link Env#MAX_STEPS}). A range of numbers or dates ({@code 1..10}) is a list
+ * that computes its elements as they are read, which costs a step an element when it is made.
  */
 final class Iteration {
 
@@ -80,7 +83,7 @@ final class Iteration {
             return list;
         }
         if (value != null) {
-            env.error("an iteration context is %s, not a list".formatted(FeelValues.text(value)));
+            env.error(() -> "an iteration context is %s, not a list".formatted(FeelValues.text(value)));
         }
         return NOT_A_LIST;
     }
@@ -97,26 +100,26 @@ final class Iteration {
     }
 
     /**
-     * The list {@code from..to} stands for in an iteration context: whole numbers or dates, ascending or descending;
-     * null, with an error, for any other endpoints or one that would take more than {@link Env#MAX_STEPS} steps.
+     * The list {@code from..to} stands for in an iteration context: whole numbers or dates, ascending or descending,
+     * computed as they are read, at a step an element; null, with an error, for any other endpoints or one of more than
+     * {@link Env#MAX_STEPS} elements.
      */
     static Object range(Object from, Object to, Env env) {
-        if (from instanceof BigDecimal a && to instanceof BigDecimal b && isWhole(a) && isWhole(b)) {
-            return numbers(a.toBigIntegerExact(), b.toBigIntegerExact(), env);
+        var start = from instanceof Number number ? FeelNumbers.decimal(number) : null;
+        var end = to instanceof Number number ? FeelNumbers.decimal(number) : null;
+        if (start != null && end != null && isWhole(start) && isWhole(end)) {
+            return numbers(start.toBigIntegerExact(), end.toBigIntegerExact(), env);
         }
         if (from instanceof LocalDate a && to instanceof LocalDate b) {
             long days = ChronoUnit.DAYS.between(a, b);
             if (Math.abs(days) >= Env.MAX_STEPS) {
                 return tooMany(env);
             }
-            var dates = new ArrayList<Object>();
-            for (long day = 0; day <= Math.abs(days); day++) {
-                dates.add(a.plusDays(days < 0 ? -day : day));
-            }
-            return Collections.unmodifiableList(dates);
+            int size = (int) Math.abs(days) + 1;
+            return env.step(size) ? new Dates(a, days < 0 ? -1 : 1, size) : null;
         }
-        env.error("%s..%s: an iteration context's range is of whole numbers or dates".formatted(FeelValues.text(from), FeelValues.text(to)));
-        return null;
+        return env.error(() -> "%s..%s: an iteration context's range is of whole numbers or dates".formatted(FeelValues.text(from),
+                FeelValues.text(to)));
     }
 
     private static Object numbers(BigInteger from, BigInteger to, Env env) {
@@ -124,23 +127,61 @@ final class Iteration {
         if (span.compareTo(BigInteger.valueOf(Env.MAX_STEPS)) >= 0) {
             return tooMany(env);
         }
-        int count = span.intValueExact() + 1;
-        var step = from.compareTo(to) <= 0 ? BigInteger.ONE : BigInteger.ONE.negate();
-        var numbers = new ArrayList<Object>(count);
-        var number = from;
-        for (int i = 0; i < count; i++) {
-            numbers.add(new BigDecimal(number));
-            number = number.add(step);
-        }
-        return Collections.unmodifiableList(numbers);
+        int size = span.intValueExact() + 1;
+        return env.step(size) ? new Numbers(new BigDecimal(from), from.compareTo(to) <= 0 ? 1 : -1, size) : null;
     }
 
     private static Object tooMany(Env env) {
-        env.error("an iteration context's range has more than " + Env.MAX_STEPS + " elements");
-        return null;
+        return env.error("an iteration context's range has more than " + Env.MAX_STEPS + " elements");
     }
 
     private static boolean isWhole(BigDecimal number) {
         return number.signum() == 0 || number.stripTrailingZeros().scale() <= 0;
+    }
+
+    /** The whole numbers from {@code first}, a {@code step} of 1 or -1 apart: an immutable list that holds none of them. */
+    private static final class Numbers extends AbstractList<Object> implements RandomAccess {
+        private final BigDecimal first;
+        private final int step;
+        private final int size;
+
+        Numbers(BigDecimal first, int step, int size) {
+            this.first = first;
+            this.step = step;
+            this.size = size;
+        }
+
+        @Override
+        public Object get(int index) {
+            return first.add(BigDecimal.valueOf((long) step * java.util.Objects.checkIndex(index, size)));
+        }
+
+        @Override
+        public int size() {
+            return size;
+        }
+    }
+
+    /** The dates from {@code first}, a {@code step} of a day or minus a day apart: an immutable list that holds none of them. */
+    private static final class Dates extends AbstractList<Object> implements RandomAccess {
+        private final LocalDate first;
+        private final int step;
+        private final int size;
+
+        Dates(LocalDate first, int step, int size) {
+            this.first = first;
+            this.step = step;
+            this.size = size;
+        }
+
+        @Override
+        public Object get(int index) {
+            return first.plusDays((long) step * java.util.Objects.checkIndex(index, size));
+        }
+
+        @Override
+        public int size() {
+            return size;
+        }
     }
 }

@@ -42,6 +42,11 @@ import java.util.function.Function;
  * (10.3.4) are planned for 0.9 (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>): an
  * expression that invokes one parses, and {@link #unsupported()} names it.
  *
+ * <p><b>Values given.</b> A name's value is a FEEL value, null for a name with none; a {@link Number} that is not a
+ * {@code BigDecimal} ({@code Integer}, {@code Long}, {@code Double}...) is taken as the {@code BigDecimal} of its
+ * value. A {@link FeelFunction} is a function only if Praecepta made it: the value of a function definition an
+ * evaluation gave.
+ *
  * <p><b>Names.</b> A name may hold spaces, keywords and the additional name symbols {@code . / - ' + *}, so the
  * expression is parsed against the names in scope, the longest of which wins wherever the text holds one
  * ({@link #parse(String, Collection)}). A name not in scope is read as words up to a keyword or an operator.
@@ -49,23 +54,47 @@ import java.util.function.Function;
  * <p><b>Values.</b> FEEL's values as {@link FeelType} lists them: {@code String}, {@code BigDecimal}, {@code Boolean},
  * {@code LocalDate}, times, date-times, {@code Duration}, {@link YearsAndMonths}, {@code List}, {@code Map} (a
  * context, in entry order), {@link FeelRange} and {@link FeelFunction}; null is FEEL's null. Where FEEL defines no
- * value (operands it does not combine, a division by zero, an index beyond a list, an invalid date literal), the value
- * is null and an error is reported to whoever listens ({@link #evaluate(Function, Consumer)}, DMN 1.5, 10.3.2.15).
+ * value (operands it does not combine, a division by zero, an entry a context does not have, an invalid date literal),
+ * the value is null and an error is reported to whoever listens ({@link #evaluate(Function, Consumer)}, DMN 1.5,
+ * 10.3.2.16).
  *
- * <p><b>Limits.</b> An expression nests at most 300 levels, in its text and in its tree; deeper input is a syntax
- * error, so parsing and evaluating it take a bounded amount of the thread's stack, whatever its length. One evaluation
- * takes at most 1,000,000 steps (iterations of its {@code for}, {@code some} and {@code every} and the elements of the
- * ranges they iterate, function invocations, elements its filters test), nests at most 800 levels (its own depth and
- * that of the function bodies it invokes, each within the other), and makes no string longer than 10,000,000
- * characters; beyond any of these, its value is null, with an error.
+ * <p><b>Limits.</b> An expression's tree nests at most 300 levels, and its text at most 300 levels of parentheses,
+ * brackets and braces, fewer of {@code if}, {@code for}, {@code some}, {@code every}, {@code function}, filters and
+ * invocations, which take more of the parser's stack; deeper input is a syntax error, so parsing and evaluating it take
+ * a bounded amount of the thread's stack, whatever its length. One evaluation takes at most 1,000,000 steps
+ * (iterations of its {@code for}, {@code some} and {@code every} and the elements of the ranges they iterate, function
+ * invocations, the elements its filters test, its paths project and its {@code in} looks through, and the values its
+ * equalities and {@code instance of} look at), nests at most 800 levels (its own depth and that of the function bodies
+ * it invokes, each within the other), and makes strings of at most 10,000,000 characters in all with {@code +}; beyond
+ * any of these, its value is null, with an error. It reports at most 100 errors, and then one that counts the others.
  * An expression is immutable and thread-safe.
  */
 public final class FeelExpression {
 
+    /**
+     * What DMN 1.5 defines but Praecepta does not evaluate yet ({@link #unsupported()}), and the release that plans it.
+     *
+     * @param feature what it is: {@code the built-in function 'string length'}, {@code an external function (Java or PMML)}
+     * @param release the release that plans it: {@code 0.9}
+     * @param issue   the GitHub issue that plans it: 117
+     */
+    public record Unsupported(String feature, String release, int issue) {
+        public Unsupported {
+            java.util.Objects.requireNonNull(feature, "feature");
+            java.util.Objects.requireNonNull(release, "release");
+        }
+
+        /** As messages name it: {@code the built-in function 'string length', planned for 0.9 (#117)}. */
+        @Override
+        public String toString() {
+            return "%s, planned for %s (#%d)".formatted(feature, release, issue);
+        }
+    }
+
     private final String text;
     private final Node root;
     private final List<String> names;
-    private final List<String> unsupported;
+    private final List<Unsupported> unsupported;
     private final int depth;
 
     private FeelExpression(String text, FeelParser.Parsed parsed) {
@@ -100,11 +129,11 @@ public final class FeelExpression {
 
     /**
      * Parses an expression with names in scope, and the types a model defines (its item definitions), which
-     * {@code instance of} and a function's parameters may name.
+     * {@code instance of} and a function's parameters may name. A type that is neither FEEL's nor one of them makes
+     * what names it null, with an error (DMN 1.5, Table 61), and its type {@link FeelType#NULL}.
      *
      * @param types the types, by name
-     * @throws ExpressionSyntaxException if it is not a FEEL expression, nests too deeply, or names a type that is
-     *                                   neither FEEL's nor one of {@code types}
+     * @throws ExpressionSyntaxException if it is not a FEEL expression, or nests too deeply
      */
     public static FeelExpression parse(String text, Collection<String> names, Map<String, FeelType> types) {
         return parse(text, scope(names, types));
@@ -113,8 +142,7 @@ public final class FeelExpression {
     /**
      * Parses an expression in a scope made once for many expressions ({@link #scope}), as a decision model's names are.
      *
-     * @throws ExpressionSyntaxException if it is not a FEEL expression, nests too deeply, or names a type that is
-     *                                   neither FEEL's nor one of the scope's
+     * @throws ExpressionSyntaxException if it is not a FEEL expression, or nests too deeply
      */
     public static FeelExpression parse(String text, Scope scope) {
         Objects.requireNonNull(text, "text");
@@ -180,11 +208,11 @@ public final class FeelExpression {
     }
 
     /**
-     * What the expression uses that DMN 1.5 defines but Praecepta does not evaluate yet, each naming the release that
+     * What the expression uses that DMN 1.5 defines but Praecepta does not evaluate yet, each with the release that
      * plans it: a built-in function ({@code the built-in function 'string', planned for 0.9 (#117)}) or an external
-     * function. Empty if it uses none; where it uses one, its value there is null, with an error.
+     * function (0.11, #119). Empty if it uses none; where it uses one, its value there is null, with an error.
      */
-    public List<String> unsupported() {
+    public List<Unsupported> unsupported() {
         return unsupported;
     }
 
@@ -221,15 +249,21 @@ public final class FeelExpression {
     }
 
     /**
-     * Evaluates the expression, telling {@code errors} of each error FEEL reports on the way (DMN 1.5, 10.3.2.15): where
-     * it defines no value, as for operands it does not combine, and the part's value is null.
+     * Evaluates the expression, telling {@code errors} of each error FEEL reports on the way (DMN 1.5, 10.3.2.16): where
+     * it defines no value, as for operands it does not combine, and the part's value is null. Beyond 100 errors, one
+     * more message, at the end, says how many others there were.
      *
      * @param values the value of each name it reads, of its type; null for a name with no value
      * @param errors receives each error's message; may be null
      * @return its value, null for FEEL's null
      */
     public Object evaluate(Function<String, Object> values, Consumer<String> errors) {
-        return root.evaluate(Env.root(Objects.requireNonNull(values, "values"), errors, depth));
+        var env = Env.root(Objects.requireNonNull(values, "values"), errors, depth);
+        try {
+            return env.result(root.evaluate(env));
+        } finally {
+            env.finish();
+        }
     }
 
     /** The expression as written. */

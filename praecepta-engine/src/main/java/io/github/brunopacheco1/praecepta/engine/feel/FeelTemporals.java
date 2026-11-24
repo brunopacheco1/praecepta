@@ -17,6 +17,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoField;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.Temporal;
 
 /**
@@ -45,8 +46,18 @@ import java.time.temporal.Temporal;
  * {@code time("23:59:00z") + duration("PT2M") = time("00:01:00@Etc/UTC")} true, so such a time is the time at that
  * offset, an {@link OffsetTime} ({@link #timeIn}, {@link #withFixedOffset}): {@link #parseTime} reads it as one, and
  * every comparison here takes a {@link ZonedTime} in such a zone as one.
+ *
+ * <p>Times and date-times are kept to the nanosecond, and FEEL's expressions compare them, equality included, to the
+ * millisecond ({@link #compareToTheMillisecond}): a fraction of a second below it is not looked at
+ * ({@code 10:30:00.0001} equals {@code 10:30:00.0002}). DMN 1.5 makes a time an XML Schema {@code time} and a date and
+ * time a {@code dateTime} (10.3.2.3.4, 10.3.2.3.6), whose precision XML Schema 1.0 leaves to the application, at least
+ * the millisecond, if it documents its limit; the DMN TCK's {@code 0068-feel-equality} expects such values equal
+ * (docs/DMN-CONFORMANCE.md, case 18). The difference of two such values keeps their nanoseconds. {@link #compare}
+ * orders them to the nanosecond, as the bitset index of a decision table's simple cells does.
  */
 public final class FeelTemporals {
+
+    private static final int NANOS_PER_MILLI = 1_000_000;
 
     /**
      * The largest offset from UTC a time or date and time may have, either way: 14:00. DMN 1.5 takes times and date-times
@@ -276,8 +287,8 @@ public final class FeelTemporals {
     }
 
     /**
-     * Orders two values of one column type as FEEL does: times and date-times that both have a zone by
-     * instant (so equal instants compare as 0, whatever their zones); when only one has a zone, the
+     * Orders two values of one column type as FEEL does, times and date-times to the nanosecond: those that both
+     * have a zone by instant (so equal instants compare as 0, whatever their zones); when only one has a zone, the
      * other takes its offset, so the two are ordered by their {@linkplain #local local} time; two times with a
      * zone id in the same zone by local time, a time in a zone with one fixed offset being the time at that offset
      * ({@link #withFixedOffset}); every
@@ -329,6 +340,28 @@ public final class FeelTemporals {
             return b instanceof ZonedTime y && x.zone().equals(y.zone());
         }
         return !(b instanceof ZonedTime);
+    }
+
+    /**
+     * Orders two values of one column type as {@link #compare} does, but times and date-times to the millisecond, as
+     * FEEL's expressions and the unary tests beyond the simple ones compare them (docs/DMN-CONFORMANCE.md, case 18).
+     *
+     * @throws IllegalArgumentException if the two are not {@linkplain #comparable comparable}
+     */
+    public static int compareToTheMillisecond(Object first, Object second) {
+        return compare(toMillisecond(withFixedOffset(first)), toMillisecond(withFixedOffset(second)));
+    }
+
+    /** A time or date and time without its fraction of a second below the millisecond; any other value as it is. */
+    private static Object toMillisecond(Object value) {
+        return switch (value) {
+            case LocalTime time when time.getNano() % NANOS_PER_MILLI != 0 -> time.truncatedTo(ChronoUnit.MILLIS);
+            case OffsetTime time when time.getNano() % NANOS_PER_MILLI != 0 -> time.truncatedTo(ChronoUnit.MILLIS);
+            case ZonedTime(var time, var zone) when time.getNano() % NANOS_PER_MILLI != 0 -> new ZonedTime(time.truncatedTo(ChronoUnit.MILLIS), zone);
+            case LocalDateTime dateTime when dateTime.getNano() % NANOS_PER_MILLI != 0 -> dateTime.truncatedTo(ChronoUnit.MILLIS);
+            case ZonedDateTime dateTime when dateTime.getNano() % NANOS_PER_MILLI != 0 -> dateTime.truncatedTo(ChronoUnit.MILLIS);
+            case null, default -> value;
+        };
     }
 
     /** -1, 1 or 0 as a value is before, after or at the same instant as another. */

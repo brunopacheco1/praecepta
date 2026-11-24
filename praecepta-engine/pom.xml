@@ -73,7 +73,31 @@
                 <configuration>
                     <!-- @{argLine} keeps JaCoCo's agent -->
                     <argLine>@{argLine} --add-modules java.logging --add-reads ${praecepta.test.reads}</argLine>
+                    <excludes>
+                        <exclude>**/*$*</exclude>
+                        <!-- run by the feel-stack execution, in a JVM of its own -->
+                        <exclude>**/FeelExpressionStackTest.java</exclude>
+                    </excludes>
                 </configuration>
+                <executions>
+                    <!-- FEEL's stack bounds, checked in an interpreted JVM, whose frames are the largest a method has, so
+                         that the check does not depend on the tests that ran before or on how warm the JIT is -->
+                    <execution>
+                        <id>feel-stack</id>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <argLine>@{argLine} --add-modules java.logging --add-reads ${praecepta.test.reads} -Xint</argLine>
+                            <excludes combine.self="override">
+                                <exclude>**/*$*</exclude>
+                            </excludes>
+                            <includes combine.self="override">
+                                <include>**/FeelExpressionStackTest.java</include>
+                            </includes>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

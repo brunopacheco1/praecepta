@@ -32,17 +32,32 @@ final class FeelValues {
     /** How deep a value's lists, contexts and ranges may nest for equality and {@code instance of} to look into them. */
     private static final int MAX_DEPTH = 256;
     /**
-     * How many values equality and {@code instance of} look at, at most, for two values: a value may share its parts
-     * ({@code {a: [1], b: [a, a], c: [b, b]}}), so that its tree is exponentially larger than the value. Beyond it,
-     * equality is null, and {@code instance of} false.
+     * How many values equality and {@code instance of} look at, at most, for two values outside an evaluation: a value
+     * may share its parts ({@code {a: [1], b: [a, a], c: [b, b]}}), so that its tree is exponentially larger than the
+     * value. Beyond it, equality is null, and {@code instance of} false. Inside an evaluation, each value looked at is a
+     * step of the evaluation ({@link Env#MAX_STEPS}), so that comparing long lists in a loop is bounded too.
      */
     private static final int MAX_WORK = 1_000_000;
+    private static final String TIME_OFFSET = "time offset";
+    private static final String TIMEZONE = "timezone";
+    /** The characters of a string a message quotes, at most; a longer one is cut, and ends with an ellipsis. */
+    private static final int MAX_QUOTED = 64;
 
-    /** What a comparison of two values may still look at. */
-    private static final class Work {
+    /**
+     * What equality and {@code instance of} may still look at: one element of a list, or entry of a context, each time
+     * {@link #spend} is true.
+     */
+    interface Budget {
+        /** Counts one value looked at; false once there is no more to spend. */
+        boolean spend();
+    }
+
+    /** The budget of a comparison outside an evaluation. */
+    private static final class Work implements Budget {
         private int remaining = MAX_WORK;
 
-        boolean spend() {
+        @Override
+        public boolean spend() {
             return --remaining >= 0;
         }
     }
@@ -60,7 +75,8 @@ final class FeelValues {
         return switch (value) {
             case null -> null;
             case String text -> ColumnType.STRING;
-            case Number number -> ColumnType.NUMBER;
+            case BigDecimal number -> ColumnType.NUMBER;
+            case Number number -> FeelNumbers.decimal(number) != null ? ColumnType.NUMBER : null;
             case Boolean bool -> ColumnType.BOOLEAN;
             case LocalDate date -> ColumnType.DATE;
             case LocalTime time -> ColumnType.TIME;
@@ -104,11 +120,16 @@ final class FeelValues {
         return isInstance(value, type, 0, new Work());
     }
 
-    private static boolean isInstance(Object value, FeelType type, int depth, Work work) {
+    /** Whether a value is an instance of a type, as {@link #isInstance(Object, FeelType)}, spending a budget. */
+    static boolean isInstance(Object value, FeelType type, Budget budget) {
+        return isInstance(value, type, 0, budget);
+    }
+
+    private static boolean isInstance(Object value, FeelType type, int depth, Budget work) {
         if (value == null) {
             return type instanceof FeelType.Null;
         }
-        if (depth > MAX_DEPTH || !work.spend()) {
+        if (depth > MAX_DEPTH) {
             return false;
         }
         return switch (type) {
@@ -116,12 +137,12 @@ final class FeelValues {
             case FeelType.Null nothing -> false;
             case FeelType.Simple(var simple) -> simple == simpleType(value);
             case FeelType.ListOf(var element) -> value instanceof List<?> list
-                    && list.stream().allMatch(item -> item == null || isInstance(item, element, depth + 1, work));
+                    && list.stream().allMatch(item -> work.spend() && (item == null || isInstance(item, element, depth + 1, work)));
             case FeelType.Context(var components) -> value instanceof Map<?, ?> context
-                    && components.entrySet().stream().allMatch(component -> context.containsKey(component.getKey())
+                    && components.entrySet().stream().allMatch(component -> work.spend() && context.containsKey(component.getKey())
                             && (context.get(component.getKey()) == null
                                     || isInstance(context.get(component.getKey()), component.getValue(), depth + 1, work)));
-            case FeelType.RangeOf(var element) -> value instanceof FeelRange range
+            case FeelType.RangeOf(var element) -> value instanceof FeelRange range && work.spend() && work.spend()
                     && (range.start() == null || isInstance(range.start(), element, depth + 1, work))
                     && (range.end() == null || isInstance(range.end(), element, depth + 1, work));
             case FeelType.FunctionOf function -> value instanceof FeelFunction f && f.type().conformsTo(function);
@@ -134,27 +155,33 @@ final class FeelValues {
      * {@code a = b} (DMN 1.5, Table 53): true for two nulls, false for null and any other value; null for values of two
      * types (a number and a string, a list and a single value: the TCK's {@code 0068-feel-equality} has
      * {@code [100] = 100} null), but for two zero durations of the two kinds, which are equal; numbers by value,
-     * times and date-times as {@link FeelTemporals#compare} orders them, durations by their length, lists element by
-     * element, contexts entry by entry whatever their order, ranges by their endpoints and how they are written, and
-     * functions by identity. Lists and contexts are equal when every element or entry is; false if one is not; null if
-     * none is not but one is null.
+     * times and date-times as {@link FeelTemporals#compareToTheMillisecond} orders them, durations by their
+     * length, lists element by element, contexts entry by entry whatever their order, ranges by their endpoints and
+     * how they are written, and functions as their {@code equals} has them (a function definition's values when they
+     * have the same parameters and body and were defined in the same scope, Table 53). Lists and contexts are equal
+     * when every element or entry is; false if one is not; null if none is not but one is null.
      */
-    static Object equal(Object a, Object b) {
-        return equal(a, b, 0, new Work());
+    static Object equality(Object a, Object b) {
+        return equality(a, b, 0, new Work());
     }
 
-    private static Object equal(Object a, Object b, int depth, Work work) {
+    /** {@code a = b}, as {@link #equality(Object, Object)}, spending a budget. */
+    static Object equality(Object a, Object b, Budget budget) {
+        return equality(a, b, 0, budget);
+    }
+
+    private static Object equality(Object a, Object b, int depth, Budget work) {
         if (a == null || b == null) {
             return a == null && b == null;
         }
-        if (depth > MAX_DEPTH || !work.spend()) {
+        if (depth > MAX_DEPTH) {
             return null;
         }
         return switch (a) {
             case List<?> x -> b instanceof List<?> y ? listsEqual(x, y, depth, work) : null;
             case Map<?, ?> x -> b instanceof Map<?, ?> y ? contextsEqual(x, y, depth, work) : null;
             case FeelRange x -> b instanceof FeelRange y ? rangesEqual(x, y, depth, work) : null;
-            case FeelFunction x -> b instanceof FeelFunction ? x == b : null;
+            case FeelFunction x -> b instanceof FeelFunction ? x.equals(b) : null;
             default -> simpleEqual(a, b);
         };
     }
@@ -167,8 +194,8 @@ final class FeelValues {
         }
         return switch (typeA) {
             case STRING, BOOLEAN, DATE, YEAR_MONTH_DURATION, DAY_TIME_DURATION -> a.equals(b);
-            case NUMBER -> ((BigDecimal) a).compareTo((BigDecimal) b) == 0;
-            default -> FeelTemporals.comparable(a, b) ? FeelTemporals.compare(a, b) == 0 : null;
+            case NUMBER -> FeelNumbers.decimal((Number) a).compareTo(FeelNumbers.decimal((Number) b)) == 0;
+            default -> FeelTemporals.comparable(a, b) ? FeelTemporals.compareToTheMillisecond(a, b) == 0 : null;
         };
     }
 
@@ -176,13 +203,16 @@ final class FeelValues {
         return value instanceof Duration duration && duration.isZero() || value instanceof YearsAndMonths(var months) && months == 0;
     }
 
-    private static Object listsEqual(List<?> x, List<?> y, int depth, Work work) {
+    private static Object listsEqual(List<?> x, List<?> y, int depth, Budget work) {
         if (x.size() != y.size()) {
             return false;
         }
         boolean unknown = false;
         for (int i = 0; i < x.size(); i++) {
-            var equal = equal(x.get(i), y.get(i), depth + 1, work);
+            if (!work.spend()) {
+                return null;
+            }
+            var equal = equality(x.get(i), y.get(i), depth + 1, work);
             if (Boolean.FALSE.equals(equal)) {
                 return false;
             }
@@ -191,13 +221,16 @@ final class FeelValues {
         return unknown ? null : Boolean.TRUE;
     }
 
-    private static Object contextsEqual(Map<?, ?> x, Map<?, ?> y, int depth, Work work) {
+    private static Object contextsEqual(Map<?, ?> x, Map<?, ?> y, int depth, Budget work) {
         if (!x.keySet().equals(y.keySet())) {
             return false;
         }
         boolean unknown = false;
         for (var entry : x.entrySet()) {
-            var equal = equal(entry.getValue(), y.get(entry.getKey()), depth + 1, work);
+            if (!work.spend()) {
+                return null;
+            }
+            var equal = equality(entry.getValue(), y.get(entry.getKey()), depth + 1, work);
             if (Boolean.FALSE.equals(equal)) {
                 return false;
             }
@@ -206,13 +239,17 @@ final class FeelValues {
         return unknown ? null : Boolean.TRUE;
     }
 
-    private static Object rangesEqual(FeelRange x, FeelRange y, int depth, Work work) {
+    private static Object rangesEqual(FeelRange x, FeelRange y, int depth, Budget work) {
         if (x.startIncluded() != y.startIncluded() || x.endIncluded() != y.endIncluded()
                 || !Objects.equals(x.comparison(), y.comparison())) {
             return false;
         }
-        var start = equal(x.start(), y.start(), depth + 1, work);
-        var end = equal(x.end(), y.end(), depth + 1, work);
+        // a range's endpoints may be ranges, shared by both ends ((= (= 1)) has one twice): each looked at is spent
+        if (!work.spend() || !work.spend()) {
+            return null;
+        }
+        var start = equality(x.start(), y.start(), depth + 1, work);
+        var end = equality(x.end(), y.end(), depth + 1, work);
         if (Boolean.FALSE.equals(start) || Boolean.FALSE.equals(end)) {
             return false;
         }
@@ -220,8 +257,8 @@ final class FeelValues {
     }
 
     /**
-     * How two values compare (DMN 1.5, Table 54): numbers, strings, dates, times, date-times and durations of one kind
-     * are ordered; any other pair, null included, is not.
+     * How two values compare (DMN 1.5, Table 54): numbers, strings, dates, times, date-times (to the millisecond) and
+     * durations of one kind are ordered; any other pair, null included, is not.
      *
      * @return a negative number, zero or a positive number as {@code a} is before, at or after {@code b}; null if they
      *         are not ordered
@@ -231,7 +268,10 @@ final class FeelValues {
         if (type == null || type == ColumnType.BOOLEAN || type != simpleType(b) || !FeelTemporals.comparable(a, b)) {
             return null;
         }
-        return FeelTemporals.compare(a, b);
+        if (type == ColumnType.NUMBER) {
+            return FeelNumbers.decimal((Number) a).compareTo(FeelNumbers.decimal((Number) b));
+        }
+        return FeelTemporals.compareToTheMillisecond(a, b);
     }
 
     /**
@@ -240,11 +280,11 @@ final class FeelValues {
      * or not. Null where a comparison is: an endpoint or the value null, or of another type.
      */
     static Object inRange(Object value, FeelRange range) {
-        if ("=".equals(range.comparison())) {
-            return equal(value, range.start());
+        if (range.comparison() == FeelRange.Comparison.EQUAL) {
+            return equality(value, range.start());
         }
-        if ("!=".equals(range.comparison())) {
-            return not(equal(value, range.start()));
+        if (range.comparison() == FeelRange.Comparison.NOT_EQUAL) {
+            return not(equality(value, range.start()));
         }
         Object above = Boolean.TRUE;
         if (range.comparison() == null || range.start() != null) {
@@ -317,7 +357,7 @@ final class FeelValues {
     static final Object NO_PROPERTY = new Object();
 
     private static final Set<String> DATE_PROPERTIES = Set.of("year", "month", "day", "weekday");
-    private static final Set<String> TIME_PROPERTIES = Set.of("hour", "minute", "second", "time offset", "timezone");
+    private static final Set<String> TIME_PROPERTIES = Set.of("hour", "minute", "second", TIME_OFFSET, TIMEZONE);
     /** The properties of each simple type that has some (Table 65). */
     private static final Map<ColumnType, Set<String>> PROPERTIES = Map.of(
             ColumnType.DATE, DATE_PROPERTIES,
@@ -336,8 +376,8 @@ final class FeelValues {
     static FeelType propertyType(FeelType type, String name) {
         return switch (type) {
             case FeelType.Simple(var simple) when PROPERTIES.getOrDefault(simple, Set.of()).contains(name) -> switch (name) {
-                case "time offset" -> FeelType.of(ColumnType.DAY_TIME_DURATION);
-                case "timezone" -> FeelType.of(ColumnType.STRING);
+                case TIME_OFFSET -> FeelType.of(ColumnType.DAY_TIME_DURATION);
+                case TIMEZONE -> FeelType.of(ColumnType.STRING);
                 default -> FeelType.of(ColumnType.NUMBER);
             };
             case FeelType.RangeOf(var element) -> switch (name) {
@@ -373,8 +413,8 @@ final class FeelValues {
             case "hour" -> BigDecimal.valueOf(time.getHour());
             case "minute" -> BigDecimal.valueOf(time.getMinute());
             case "second" -> BigDecimal.valueOf(time.getSecond()).add(BigDecimal.valueOf(time.getNano(), 9)).stripTrailingZeros();
-            case "time offset" -> offset == null ? null : Duration.ofSeconds(offset.getTotalSeconds());
-            case "timezone" -> zone;
+            case TIME_OFFSET -> offset == null ? null : Duration.ofSeconds(offset.getTotalSeconds());
+            case TIMEZONE -> zone;
             default -> NO_PROPERTY;
         };
     }
@@ -403,12 +443,13 @@ final class FeelValues {
     // ---- text --------------------------------------------------------------------------------------
 
     /**
-     * A value as messages name it: a simple value's text, a string quoted, null as {@code null}, a short list of simple
-     * values in full, any other list by its size.
+     * A value as messages name it: a simple value's text, a string quoted (its first 64 characters and an ellipsis if
+     * it is longer), null as {@code null}, a short list of simple values in full, any other list by its size.
      */
     static String text(Object value) {
         return switch (value) {
             case null -> "null";
+            case String text when text.length() > MAX_QUOTED -> "\"" + text.substring(0, MAX_QUOTED) + "…\"";
             case String text -> "\"" + text + "\"";
             case List<?> list -> list.size() > 8 || list.stream().anyMatch(item -> item != null && simpleType(item) == null)
                     ? "a list of " + list.size() : String.valueOf(list.stream().map(FeelValues::text).toList());

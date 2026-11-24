@@ -771,6 +771,23 @@ class DecisionGraphTest {
     }
 
     @Test
+    void a_function_a_decision_gives_reports_its_errors_to_the_decision_that_invokes_it() {
+        // DMN 1.5, 10.3.2.13: a function value closes over the names in scope where it is defined, not over the
+        // evaluation that defined it; its body is evaluated, and its errors reported, where it is invoked
+        var graph = DecisionGraph.builder().logValidationReport(false)
+                .literalDecision("A", "function(x) x + \"a\"")
+                .literalDecision("B", "A(1)")
+                .literalDecision("C", "A(\"b\")")
+                .build();
+
+        var outcome = graph.evaluateWithErrors("B", Map.of());
+        assertThat(outcome.value()).isNull();
+        assertThat(outcome.errorsOf("B")).singleElement().asString().contains("does not combine a number and a string");
+        assertThat(outcome.errorsOf("A")).isEmpty();
+        assertThat(graph.evaluateWithErrors("C", Map.of())).isEqualTo(new DecisionGraph.Outcome("ba", Map.of()));
+    }
+
+    @Test
     void a_long_chain_of_decisions_is_built_and_evaluated_without_recursion() throws InterruptedException {
         // on a thread whose stack holds far fewer frames than the chain is long, as Linux's smaller default thread stack may
         onSmallStack(() -> {

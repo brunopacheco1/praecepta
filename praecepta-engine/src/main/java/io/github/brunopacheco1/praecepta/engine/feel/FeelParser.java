@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
-import java.util.regex.Pattern;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLexer.Kind;
@@ -46,32 +45,57 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelArithmetic.Operator;
  * <p><b>Literals.</b> An invocation of {@code date}, {@code time}, {@code date and time} or {@code duration} whose
  * arguments are literals is a date time literal (grammar rule 60), evaluated here, as is an at-literal
  * ({@code @"2025-01-31"}); one that gives no valid value is null, with an error, when it is evaluated (the DMN TCK's
- * {@code 1115-feel-date-function} to {@code 1120-feel-duration-function}). A date and time at hour 24
- * ({@code 2021-01-01T24:00:00}) is midnight of the next day, as XML Schema's {@code dateTime} reads it (the TCK's
- * {@code 0100-arithmetic}).
+ * {@code 1115-feel-date-function} to {@code 1120-feel-duration-function}). Hour 24 is read as {@link TemporalLiterals}
+ * reads it. A number literal is rounded to 34 significant digits (10.3.2.3.1).
  *
- * <p><b>Limits.</b> The parser recurses a few calls a level of nesting, and the evaluator one call a level of the
- * tree, so both nesting and the tree's depth are bounded by {@link #MAX_DEPTH}: deeper input is a syntax error,
- * whatever the thread's stack.
+ * <p><b>Limits.</b> The evaluator recurses one call a level of the tree, whose depth is bounded by {@link #MAX_DEPTH}.
+ * The parser recurses through several calls a level of nesting, as many as the construct takes: seven for
+ * parentheses, eight for an {@code if}, nine for a {@code for}, and so on; it counts them against {@link #MAX_CALLS},
+ * which lets parentheses nest {@link #MAX_PARENTHESES} levels and the other constructs fewer. Deeper input is a syntax
+ * error, whatever the thread's stack: so every construct, nested as deeply as it may be, is parsed, typed and evaluated
+ * on a stack of 448 KiB (FeelExpressionStackTest).
  */
 final class FeelParser {
 
-    /** The deepest an expression may nest, in its text and in its tree. */
+    /** The deepest an expression's tree may nest. */
     static final int MAX_DEPTH = 300;
+    /** The deepest parentheses, brackets and braces may nest in an expression's text. */
+    static final int MAX_PARENTHESES = 250;
+    /**
+     * How many of the parser's calls the text's nesting may take at once: an expression's own, and those of
+     * {@link #MAX_PARENTHESES} levels of parentheses, which take seven a level ({@code expression}, {@code binary},
+     * {@code unary}, {@code postfix}, {@code primary}, {@code symbol}, {@code parenthesis}).
+     */
+    static final int MAX_CALLS = 1 + 7 * MAX_PARENTHESES;
+    /** A minus sign: one call, but counted as two, as a long run of them takes a large frame each. */
+    private static final int MINUS = 2;
+    /** The calls a level of each construct takes, from the {@code expression} it is in to the one it holds. */
+    private static final int PARENTHESES = 6;
+    private static final int OPERAND = 2;
+    private static final int KEYWORD = 7;
+    private static final int ITERATION = 8;
+    private static final int FILTER = 4;
+    private static final int ARGUMENTS = 6;
+    private static final int TESTS = 5;
+    private static final int UNARY_RANGE = 6;
+    /** Two calls ({@code type}, {@code parameterType}), counted as three, as a type's frames are large. */
+    private static final int TYPE = 3;
+    private static final String UNEXPECTED = "unexpected '";
+    private static final String NESTS_MORE_THAN = "it nests more than ";
+    private static final String LEVELS = " levels";
+    private static final String FUNCTION = "function";
 
     /** Words that end a name read word by word: FEEL's keywords and the words of its operators. */
     private static final Set<String> STOP_WORDS = Set.of("and", "or", "in", "between", "instance", "then", "else", "return",
-            "satisfies", "if", "for", "some", "every", "function", "true", "false", "null");
+            "satisfies", "if", "for", "some", "every", FUNCTION, "true", "false", "null");
     /** The keywords that start an expression. */
-    private static final Set<String> KEYWORDS = Set.of("if", "for", "some", "every", "function", "true", "false", "null");
+    private static final Set<String> KEYWORDS = Set.of("if", "for", "some", "every", FUNCTION, "true", "false", "null");
     /** FEEL's names of its built-in types (10.3.2.9.1). */
     private static final Map<String, FeelType> TYPE_NAMES = Map.of(
             "number", FeelType.of(ColumnType.NUMBER), "string", FeelType.of(ColumnType.STRING),
             "boolean", FeelType.of(ColumnType.BOOLEAN), "date", FeelType.of(ColumnType.DATE), "time", FeelType.of(ColumnType.TIME),
             "date and time", FeelType.of(ColumnType.DATE_TIME), "days and time duration", FeelType.of(ColumnType.DAY_TIME_DURATION),
             "years and months duration", FeelType.of(ColumnType.YEAR_MONTH_DURATION), "Any", FeelType.ANY, "Null", FeelType.NULL);
-    private static final Pattern HOUR_24 = Pattern.compile("([+-]?\\d{4,}-\\d{2}-\\d{2})T24:00:00(?:\\.0+)?(.*)", Pattern.DOTALL);
-
     private static final int OR = 1;
     private static final int AND = 2;
     private static final int COMPARISON = 3;
@@ -92,13 +116,14 @@ final class FeelParser {
     private static final Names BUILT_INS = new Names(BuiltInFunctions.NAMES);
 
     /** What parsing gives. */
-    record Parsed(Node root, List<String> names, List<String> unsupported, int depth) {
+    record Parsed(Node root, List<String> names, List<FeelExpression.Unsupported> unsupported, int depth) {
     }
 
     /**
      * What parsing unary tests gives: the tests, whether they are negated ({@code not(...)}); no tests for {@code -}.
      */
-    record ParsedTests(List<Node.Test> tests, boolean negated, List<String> names, List<String> unsupported, int depth) {
+    record ParsedTests(List<Node.Test> tests, boolean negated, List<String> names, List<FeelExpression.Unsupported> unsupported,
+            int depth) {
     }
 
     /** A name in scope, as tokens, for matching against the text. */
@@ -138,11 +163,14 @@ final class FeelParser {
     private final Map<String, FeelType> types;
     private final Deque<Names> locals = new ArrayDeque<>();
     private final Set<String> free = new LinkedHashSet<>();
-    private final Set<String> unsupported = new LinkedHashSet<>();
+    private final Set<FeelExpression.Unsupported> unsupported = new LinkedHashSet<>();
     private int at;
-    private int depth;
+    /** The parser's calls the nesting at the current token takes ({@link #MAX_CALLS}). */
+    private int calls;
     private int filters;
     private int questionMarks;
+    /** The first type name read that is neither FEEL's nor one the model defines; null if none was. */
+    private String unknownType;
 
     private FeelParser(String text, Names names, Map<String, FeelType> types) {
         this.text = text;
@@ -155,27 +183,27 @@ final class FeelParser {
      * Parses an expression.
      *
      * @param names the names in scope
-     * @param types the types the model names, which {@code instance of} and parameters may name; null to read any
-     *              unknown type name as {@code Any}, as a check of syntax alone does
-     * @throws ExpressionSyntaxException if it is not a FEEL expression, or nests more than {@link #MAX_DEPTH} levels
+     * @param types the types the model names, which {@code instance of} and parameters may name; null for none
+     * @throws ExpressionSyntaxException if it is not a FEEL expression, or nests too deeply ({@link #MAX_DEPTH},
+     *                                   {@link #MAX_CALLS})
      */
     static Parsed parse(String text, Names names, Map<String, FeelType> types) {
         var parser = new FeelParser(text, names, types);
         var root = parser.all();
         int depth = depthOf(root);
         if (depth > MAX_DEPTH) {
-            throw parser.error("it nests more than " + MAX_DEPTH + " levels");
+            throw parser.tooDeep();
         }
         return new Parsed(root, List.copyOf(parser.free), List.copyOf(parser.unsupported), depth);
     }
 
     /**
      * Parses unary tests (DMN 1.5, grammar rules 13 to 17), as a decision table's input entry holds them: {@code -}; or
-     * positive unary tests, each an expression (rule 15), separated by commas; or those inside {@code not(...)}, which
+     * positive unary tests, each an expression (rule 13), separated by commas; or those inside {@code not(...)}, which
      * must then be the whole text. A test written {@code = e} or {@code != e} is the comparison {@code ? = e} or
      * {@code ? != e} of the value tested, so that {@code = null} holds for a missing value as {@code null} does.
      *
-     * @throws ExpressionSyntaxException if it is not unary tests, or nests more than {@link #MAX_DEPTH} levels
+     * @throws ExpressionSyntaxException if it is not unary tests, or nests too deeply
      */
     static ParsedTests parseUnaryTests(String text, Names names, Map<String, FeelType> types) {
         var negation = new FeelParser(text, names, types);
@@ -207,11 +235,11 @@ final class FeelParser {
             expect(CLOSE_PARENTHESIS);
         }
         if (peek().kind() != Kind.END) {
-            throw error("unexpected '" + text.substring(peek().start()) + "'");
+            throw error(UNEXPECTED + text.substring(peek().start()) + "'");
         }
         int depth = depthOf(new Node.In(new Node.Name(QUESTION_MARK), tests));
         if (depth > MAX_DEPTH) {
-            throw error("it nests more than " + MAX_DEPTH + " levels");
+            throw tooDeep();
         }
         return new ParsedTests(List.copyOf(tests), negated, List.copyOf(free), List.copyOf(unsupported), depth);
     }
@@ -223,11 +251,11 @@ final class FeelParser {
         }
         var operator = next().text();
         locals.push(new Names(List.of(QUESTION_MARK)));
-        enter();
+        enter(1);
         try {
-            return new Node.Test(new Node.Equality(operator.equals("="), binary(ADDITIVE)), true);
+            return new Node.Test(new Node.Equality(operator.equals("!="), binary(ADDITIVE)), true);
         } finally {
-            leave();
+            leave(1);
             locals.pop();
         }
     }
@@ -262,7 +290,7 @@ final class FeelParser {
         }
         var root = expression();
         if (peek().kind() != Kind.END) {
-            throw error("unexpected '" + text.substring(peek().start()) + "'");
+            throw error(UNEXPECTED + text.substring(peek().start()) + "'");
         }
         return root;
     }
@@ -303,14 +331,20 @@ final class FeelParser {
         return peek().kind() == Kind.END ? "at the end" : "at '" + text.substring(peek().start()) + "'";
     }
 
-    private void enter() {
-        if (++depth > 2 * MAX_DEPTH) {
-            throw error("it nests more than " + MAX_DEPTH + " levels");
+    /** Enters a level of nesting that takes that many of the parser's calls; a syntax error beyond {@link #MAX_CALLS}. */
+    private void enter(int levelCalls) {
+        calls += levelCalls;
+        if (calls > MAX_CALLS) {
+            throw tooDeep();
         }
     }
 
-    private void leave() {
-        depth--;
+    private void leave(int levelCalls) {
+        calls -= levelCalls;
+    }
+
+    private ExpressionSyntaxException tooDeep() {
+        return error(NESTS_MORE_THAN + MAX_DEPTH + LEVELS);
     }
 
     ExpressionSyntaxException error(String problem) {
@@ -320,11 +354,11 @@ final class FeelParser {
     // ---- operators ---------------------------------------------------------------------------------
 
     private Node expression() {
-        enter();
+        enter(1);
         try {
             return binary(OR);
         } finally {
-            leave();
+            leave(1);
         }
     }
 
@@ -362,16 +396,26 @@ final class FeelParser {
             }
             var operator = next().text();
             left = switch (operator) {
-                case "or", "and" -> new Node.Logical(operator.equals("and"), left, binary(precedence + 1));
+                case "or", "and" -> new Node.Logical(operator.equals("and"), left, operand(precedence + 1));
                 case "between" -> between(left);
                 case "in" -> new Node.In(left, tests());
                 case "instance" -> {
                     expectWord("of");
-                    yield new Node.InstanceOf(left, type());
+                    yield instanceOf(left);
                 }
-                case "=", "!=", "<", "<=", ">", ">=" -> new Node.Comparison(operator, left, binary(precedence + 1));
-                default -> new Node.Arithmetic(arithmetic(operator), left, binary(precedence + 1));
+                case "=", "!=", "<", "<=", ">", ">=" -> new Node.Comparison(operator, left, operand(precedence + 1));
+                default -> new Node.Arithmetic(arithmetic(operator), left, operand(precedence + 1));
             };
+        }
+    }
+
+    /** The right operand of a binary operator: two of the parser's calls, this and {@link #binary}. */
+    private Node operand(int minimum) {
+        enter(OPERAND);
+        try {
+            return binary(minimum);
+        } finally {
+            leave(OPERAND);
         }
     }
 
@@ -386,9 +430,14 @@ final class FeelParser {
     }
 
     private Node between(Node value) {
-        var low = binary(INSTANCE);
-        expectWord("and");
-        return new Node.Between(value, low, binary(INSTANCE));
+        enter(1);
+        try {
+            var low = operand(INSTANCE);
+            expectWord("and");
+            return new Node.Between(value, low, operand(INSTANCE));
+        } finally {
+            leave(1);
+        }
     }
 
     /**
@@ -396,16 +445,21 @@ final class FeelParser {
      */
     private List<Node.Test> tests() {
         if (!peek().is("(")) {
-            return List.of(test(() -> binary(ADDITIVE)));
+            enter(TESTS);
+            try {
+                return List.of(test(() -> binary(ADDITIVE)));
+            } finally {
+                leave(TESTS);
+            }
         }
         next();
-        enter();
+        enter(TESTS);
         var first = test(this::expression);
         if (peek().is(RANGE)) {
             next();
             var end = expression();
             var range = new Node.RangeLiteral(first.expression(), false, end, rangeClose());
-            leave();
+            leave(TESTS);
             return List.of(new Node.Test(range, first.questionMark()));
         }
         var tests = new ArrayList<Node.Test>();
@@ -415,7 +469,7 @@ final class FeelParser {
             tests.add(test(this::expression));
         }
         expect(CLOSE_PARENTHESIS);
-        leave();
+        leave(TESTS);
         return tests;
     }
 
@@ -431,18 +485,24 @@ final class FeelParser {
         }
     }
 
+    /**
+     * {@code -e}, or a primary expression. A minus written right before a number ({@code -1}) is folded into the
+     * number's literal; one with whitespace after it ({@code - 1}), which the simple unary tests of a decision table's
+     * cell do not read, is a negation, evaluated as one.
+     */
     private Node unary() {
         if (!peek().is("-")) {
             return postfix();
         }
         next();
-        enter();
+        boolean attached = !peek().spaceBefore();
+        enter(MINUS);
         try {
             var operand = unary();
-            return operand instanceof Node.Constant(BigDecimal number) ? new Node.Constant(FeelNumbers.negate(number))
+            return attached && operand instanceof Node.Constant(BigDecimal number) ? new Node.Constant(FeelNumbers.negate(number))
                     : new Node.Negation(operand);
         } finally {
-            leave();
+            leave(MINUS);
         }
     }
 
@@ -478,11 +538,13 @@ final class FeelParser {
     private Node filterCondition() {
         filters++;
         locals.push(new Names(List.of("item")));
+        enter(FILTER);
         try {
             var condition = expression();
             expect(CLOSE_BRACKET);
             return condition;
         } finally {
+            leave(FILTER);
             locals.pop();
             filters--;
         }
@@ -492,16 +554,29 @@ final class FeelParser {
         var arguments = new ArrayList<Node>();
         var names = new ArrayList<String>();
         arguments(arguments, names);
-        return new Node.Invocation(callee, arguments, names);
+        var twice = twice(names);
+        return twice == null ? new Node.Invocation(callee, arguments, names)
+                : new Node.Invalid("the invocation names the argument '%s' twice".formatted(twice));
+    }
+
+    /** A name that is twice among an invocation's named arguments, or null if none is. */
+    private static String twice(List<String> names) {
+        var unique = new HashSet<String>();
+        for (var name : names) {
+            if (!unique.add(name)) {
+                return name;
+            }
+        }
+        return null;
     }
 
     /** The arguments in parentheses, positional or named (grammar rules 40 to 43), which are not mixed. */
     private void arguments(List<Node> arguments, List<String> names) {
         expect("(");
-        enter();
+        enter(ARGUMENTS);
         if (peek().is(CLOSE_PARENTHESIS)) {
             next();
-            leave();
+            leave(ARGUMENTS);
             return;
         }
         boolean named = namedArgumentAhead();
@@ -519,7 +594,7 @@ final class FeelParser {
             arguments.add(expression());
         } while (peek().is(COMMA));
         expect(CLOSE_PARENTHESIS);
-        leave();
+        leave(ARGUMENTS);
     }
 
     /** Whether a name and a colon follow: a named argument. */
@@ -571,25 +646,25 @@ final class FeelParser {
             case "{" -> context();
             case "@" -> atLiteral();
             case "<", "<=", GREATER, ">=", "=", "!=" -> unaryRange(symbol);
-            default -> throw error("unexpected '" + text.substring(peek().start()) + "'");
+            default -> throw error(UNEXPECTED + text.substring(peek().start()) + "'");
         };
     }
 
     /** {@code < e}, {@code = e}...: a range of one endpoint, which may itself be one ({@code = = 1}). */
     private Node unaryRange(String operator) {
         next();
-        enter();
+        enter(UNARY_RANGE);
         try {
-            return new Node.UnaryRange(operator, binary(ADDITIVE));
+            return new Node.UnaryRange(FeelRange.Comparison.of(operator), binary(ADDITIVE));
         } finally {
-            leave();
+            leave(UNARY_RANGE);
         }
     }
 
     /** {@code (e)}, or a range open at its start, {@code (a..b]}. */
     private Node parenthesis() {
         next();
-        enter();
+        enter(PARENTHESES);
         var first = expression();
         Node node;
         if (peek().is(RANGE)) {
@@ -600,14 +675,14 @@ final class FeelParser {
             expect(CLOSE_PARENTHESIS);
             node = first;
         }
-        leave();
+        leave(PARENTHESES);
         return node;
     }
 
     /** {@code [a, b]}, a list, or {@code [a..b]}, a range closed at its start. */
     private Node bracket() {
         next();
-        enter();
+        enter(PARENTHESES);
         try {
             if (peek().is(CLOSE_BRACKET)) {
                 next();
@@ -628,19 +703,19 @@ final class FeelParser {
             expect(CLOSE_BRACKET);
             return new Node.ListLiteral(elements);
         } finally {
-            leave();
+            leave(PARENTHESES);
         }
     }
 
     /** {@code ]a..b]}: a range open at its start. */
     private Node openRange() {
         next();
-        enter();
+        enter(PARENTHESES);
         var start = expression();
         expect(RANGE);
         var end = expression();
         var range = new Node.RangeLiteral(start, false, end, rangeClose());
-        leave();
+        leave(PARENTHESES);
         return range;
     }
 
@@ -659,7 +734,7 @@ final class FeelParser {
     /** {@code {a: 1, "b": a + 1}}: a context, each entry in the scope of those before it. */
     private Node context() {
         next();
-        enter();
+        enter(PARENTHESES);
         locals.push(new Names(List.of()));
         try {
             var keys = new ArrayList<String>();
@@ -688,7 +763,7 @@ final class FeelParser {
             return new Node.ContextLiteral(keys, values);
         } finally {
             locals.pop();
-            leave();
+            leave(PARENTHESES);
         }
     }
 
@@ -720,22 +795,9 @@ final class FeelParser {
         }
         var string = next().text();
         try {
-            return new Node.Constant(TemporalLiterals.atLiteral(hour24(string)));
+            return new Node.Constant(TemporalLiterals.atLiteral(string));
         } catch (IllegalArgumentException | DateTimeException e) {
             return new Node.Invalid("@\"%s\" is not a valid date, time, date and time or duration".formatted(string));
-        }
-    }
-
-    /** A date and time at hour 24 as midnight of the next day, as XML Schema's {@code dateTime} reads it; any other text as it is. */
-    static String hour24(String iso) {
-        var matcher = HOUR_24.matcher(iso.strip());
-        if (!matcher.matches()) {
-            return iso;
-        }
-        try {
-            return FeelLiterals.text(FeelTemporals.parseDate(matcher.group(1)).plusDays(1)) + "T00:00:00" + matcher.group(2);
-        } catch (DateTimeException e) {
-            return iso;
         }
     }
 
@@ -844,13 +906,13 @@ final class FeelParser {
             case "null" -> new Node.Constant(null);
             case "if" -> ifExpression();
             case "for" -> forExpression();
-            case "function" -> functionDefinition();
+            case FUNCTION -> functionDefinition();
             default -> quantified(keyword.equals("every"));
         };
     }
 
     private Node ifExpression() {
-        enter();
+        enter(KEYWORD);
         try {
             var condition = expression();
             expectWord("then");
@@ -858,12 +920,12 @@ final class FeelParser {
             expectWord("else");
             return new Node.If(condition, then, expression());
         } finally {
-            leave();
+            leave(KEYWORD);
         }
     }
 
     private Node forExpression() {
-        enter();
+        enter(ITERATION);
         var scope = new Names(List.of());
         locals.push(scope);
         try {
@@ -875,12 +937,12 @@ final class FeelParser {
             return new Node.For(variables, domains, expression());
         } finally {
             locals.pop();
-            leave();
+            leave(ITERATION);
         }
     }
 
     private Node quantified(boolean every) {
-        enter();
+        enter(ITERATION);
         var scope = new Names(List.of());
         locals.push(scope);
         try {
@@ -891,7 +953,7 @@ final class FeelParser {
             return new Node.Quantified(every, variables, domains, expression());
         } finally {
             locals.pop();
-            leave();
+            leave(ITERATION);
         }
     }
 
@@ -914,13 +976,18 @@ final class FeelParser {
         } while (peek().is(COMMA));
     }
 
-    /** {@code function(a, b: number) body}; an external function (grammar rule 57) is not evaluated yet. */
+    /**
+     * {@code function(a, b: number) body}; an external function (grammar rule 57) is not evaluated yet. A parameter of a
+     * type that is neither FEEL's nor the model's makes the definition null, with an error, as {@code instance of} such a
+     * type is (Table 61).
+     */
     private Node functionDefinition() {
-        enter();
+        enter(KEYWORD);
         try {
             expect("(");
             var parameters = new ArrayList<String>();
             var parameterTypes = new ArrayList<FeelType>();
+            String unknown = null;
             while (!peek().is(CLOSE_PARENTHESIS)) {
                 if (!parameters.isEmpty()) {
                     expect(COMMA);
@@ -929,7 +996,9 @@ final class FeelParser {
                 FeelType type = FeelType.ANY;
                 if (peek().is(COLON)) {
                     next();
+                    unknownType = null;
                     type = type();
+                    unknown = unknown != null ? unknown : unknownType;
                 }
                 parameterTypes.add(type);
             }
@@ -937,20 +1006,32 @@ final class FeelParser {
             if (peek().isWord("external")) {
                 next();
                 var mapping = expression();
-                var what = "an external function (Java or PMML), planned for 0.11 (#119)";
+                var what = new FeelExpression.Unsupported("an external function (Java or PMML)", "0.11", 119);
                 unsupported.add(what);
                 return new Node.Unsupported(what, List.of(mapping));
             }
             locals.push(new Names(parameters));
             try {
                 var body = expression();
-                return new Node.FunctionDefinition(parameters, parameterTypes, body, depthOf(body));
+                return unknown != null ? new Node.Invalid(notAType(unknown))
+                        : new Node.FunctionDefinition(parameters, parameterTypes, body, depthOf(body));
             } finally {
                 locals.pop();
             }
         } finally {
-            leave();
+            leave(KEYWORD);
         }
+    }
+
+    /** {@code value instance of type}; null, with an error, for a type that is neither FEEL's nor the model's (Table 61). */
+    private Node instanceOf(Node value) {
+        unknownType = null;
+        var type = type();
+        return unknownType == null ? new Node.InstanceOf(value, type) : new Node.Invalid(notAType(unknownType));
+    }
+
+    private static String notAType(String name) {
+        return "'%s' is not a type: neither one of FEEL's nor one the model defines".formatted(name);
     }
 
     /**
@@ -962,20 +1043,21 @@ final class FeelParser {
         if (names.isEmpty() && TemporalLiterals.isLiteralFunction(name) && arguments.stream().allMatch(Node.Constant.class::isInstance)) {
             var values = new ArrayList<>();
             arguments.forEach(argument -> values.add(((Node.Constant) argument).value()));
-            if (name.equals("date and time") && values.size() == 1 && values.getFirst() instanceof String iso) {
-                values.set(0, hour24(iso));
-            }
             try {
                 return new Node.Constant(TemporalLiterals.invoke(name, values));
             } catch (IllegalArgumentException | DateTimeException | ArithmeticException e) {
                 return new Node.Invalid("%s(...) gives no value: %s".formatted(name, e.getMessage()));
             }
         }
+        var twice = twice(names);
+        if (twice != null) {
+            return new Node.Invalid("the invocation names the argument '%s' twice".formatted(twice));
+        }
         var function = BuiltInFunctions.lookup(name);
         if (function != null) {
             return new Node.Invocation(new Node.Constant(function), arguments, names);
         }
-        var what = "the built-in function '%s', planned for 0.9 (#117)".formatted(name);
+        var what = new FeelExpression.Unsupported("the built-in function '%s'".formatted(name), "0.9", 117);
         unsupported.add(what);
         return new Node.Unsupported(what, arguments);
     }
@@ -984,10 +1066,12 @@ final class FeelParser {
 
     /**
      * A type (grammar rule 54): {@code list<T>}, {@code range<T>}, {@code context<k: T, ...>},
-     * {@code function<T, ...>->R}, a built-in type's name, or a type the model names.
+     * {@code function<T, ...>->R}, a built-in type's name, or a type the model names. A name that is neither, such as
+     * {@code list} without its element's type (Table 61: "123 instance of list is null"), is read as {@code Any} and
+     * kept in {@link #unknownType}, which makes what declares it null.
      */
     private FeelType type() {
-        enter();
+        enter(TYPE);
         try {
             var token = peek();
             if (token.kind() == Kind.WORD && peek(1).is("<")) {
@@ -1001,7 +1085,7 @@ final class FeelParser {
                     case "context" -> {
                         return contextType();
                     }
-                    case "function" -> {
+                    case FUNCTION -> {
                         return functionType();
                     }
                     default -> {
@@ -1011,7 +1095,7 @@ final class FeelParser {
             }
             return namedType();
         } finally {
-            leave();
+            leave(TYPE);
         }
     }
 
@@ -1071,10 +1155,10 @@ final class FeelParser {
         if (words.isEmpty()) {
             throw error("a type is expected " + where());
         }
-        if (types == null) {
-            wordsName();
-            return FeelType.ANY;
+        var name = wordsName();
+        if (unknownType == null) {
+            unknownType = name;
         }
-        throw error("'%s' is not a type: neither one of FEEL's nor one the model defines".formatted(words.getFirst()));
+        return FeelType.ANY;
     }
 }
