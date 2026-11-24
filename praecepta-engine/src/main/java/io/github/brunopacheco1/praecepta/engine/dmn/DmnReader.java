@@ -166,7 +166,8 @@ public final class DmnReader {
      * <p>What Praecepta does not evaluate yet is rejected, naming the element and the release that plans it: business
      * knowledge models, knowledge requirements and invocations, and decision logic that is a boxed expression (a context,
      * an invocation, a function definition, a relation, a list, a conditional, an iteration, a quantified expression, a
-     * filter), planned for 0.10 (#118); literal expressions that invoke a built-in function, for 0.9 (#117); decision
+     * filter), planned for 0.10 (#118); literal expressions, and decision tables' entries and input expressions, that
+     * invoke a built-in function, for 0.9 (#117); decision
      * services, imports and external functions, for 0.11 (#119).
      *
      * @throws InvalidDecisionTableException if the model cannot be read (a literal expression that is not FEEL among
@@ -433,8 +434,8 @@ public final class DmnReader {
         var aggregation = aggregation(table.getAttribute("aggregation"), where);
 
         var lists = new HashSet<String>();
-        var elementNames = elementNames(decision.getOwnerDocument().getDocumentElement());
-        var expressionScope = FeelExpression.scope(elementNames, Map.of());
+        var elementNames = types.elementNames();
+        var expressionScope = types.expressionScope();
         var inputs = children(table, "input").stream()
                 .map(input -> inputColumn(input, types, model, lists, expressionScope, where)).toList();
         var outputElements = children(table, "output");
@@ -831,7 +832,7 @@ public final class DmnReader {
             return computed == null ? model.columnType(column) : model.expressionType(computed);
         }
         return computed == null ? Optional.empty()
-                : ModelTypes.of(input.getOwnerDocument().getDocumentElement(), types).expressionType(computed);
+                : types.modelTypes().expressionType(computed);
     }
 
     /**
@@ -1418,9 +1419,39 @@ public final class DmnReader {
         private final Map<String, Element> byName = new LinkedHashMap<>();
         /** Whether a function item is read as a function type, as {@link #all} reads them, rather than rejected. */
         private boolean functions;
+        private final Element root;
+        /** The names of the model's input data and decisions, found once for all its tables; null until asked for. */
+        private Set<String> elementNames;
+        private FeelExpression.Scope expressionScope;
+        private ModelTypes modelTypes;
 
         ItemDefinitions(Element root) {
+            this.root = root;
             children(root, "itemDefinition").forEach(definition -> byName.putIfAbsent(definition.getAttribute("name"), definition));
+        }
+
+        /** The names of the model's input data and decisions ({@link DmnReader#elementNames}), found once. */
+        Set<String> elementNames() {
+            if (elementNames == null) {
+                elementNames = DmnReader.elementNames(root);
+            }
+            return elementNames;
+        }
+
+        /** Those names in scope, for an input expression, indexed once. */
+        FeelExpression.Scope expressionScope() {
+            if (expressionScope == null) {
+                expressionScope = FeelExpression.scope(elementNames(), Map.of());
+            }
+            return expressionScope;
+        }
+
+        /** The declared types of the model's input data and decisions ({@link ModelTypes#of}), read once. */
+        ModelTypes modelTypes() {
+            if (modelTypes == null) {
+                modelTypes = ModelTypes.of(root, this);
+            }
+            return modelTypes;
         }
 
         /**

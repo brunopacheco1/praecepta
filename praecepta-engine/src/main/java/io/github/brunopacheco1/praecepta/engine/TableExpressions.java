@@ -41,7 +41,7 @@ final class TableExpressions {
     /** By rule (index in rule order), by output: the output entry that computes its value. */
     private final Map<Integer, Map<String, FeelExpression>> outputs = new HashMap<>();
     /**
-     * The names the expressions read, but for columns, each with the type of the column or output whose entry reads it
+     * The names the expressions read, columns among them, each with the type of the column or output whose entry reads it
      * first: the type of an input of the engine read from text, unless the engine is given its type.
      */
     private final Map<String, ColumnType> named = new LinkedHashMap<>();
@@ -152,7 +152,7 @@ final class TableExpressions {
         return outputs.get(ruleIndex);
     }
 
-    /** The names the expressions read, but for columns, each with the type of what reads it first, in the order first read. */
+    /** The names the expressions read, columns among them, each with the type of what reads it first, in the order first read. */
     Map<String, ColumnType> named() {
         return named;
     }

@@ -413,7 +413,9 @@ public final class PraeceptaEngine<I, O> {
      * Input column names: the bound columns in the order they were bound or, with an {@link InputStrategy},
      * the table's columns, then the other columns the rules test (in alphabetical order), then any other
      * columns named by input value lists and column types (in the order they were declared), then the
-     * inputs that cells compare with and that are not columns (in the order first named).
+     * inputs that cells compare with and that are not columns (in the order first named), then the other inputs the
+     * table's FEEL (its cells beyond the simple unary tests, input expressions and output entries) reads (in the order
+     * first read). A column whose input expression is an expression is among the table's columns, computed.
      */
     public List<String> inputs() {
         return inputs;

@@ -10,9 +10,10 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A parsed table cell: the subset of DMN FEEL "simple unary tests" Praecepta supports. Every test
- * looks at a single column value, which is what lets rules be indexed with bitmasks; a test that
- * compares with another input ({@link Name}, strict FEEL only) is decided when evaluating instead.
+ * A parsed table cell: the subset of DMN FEEL "simple unary tests" (DMN 1.5, grammar rule 7) that the bitset index
+ * evaluates. Every test looks at a single column value, which is what lets rules be indexed with bitmasks; a test that
+ * compares with another input ({@link Name}, strict FEEL only) is decided when evaluating instead, and so is a strict
+ * FEEL cell beyond these tests, which {@link FeelUnaryTests} reads.
  *
  * <p>Values are {@code String}, {@code BigDecimal}, {@code LocalDate}, {@code Boolean}, {@code LocalTime},
  * {@code OffsetTime} or {@link ZonedTime}, {@code LocalDateTime} or {@code ZonedDateTime}, {@code Duration} or

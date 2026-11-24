@@ -69,6 +69,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Test;
  * <p>The same syntax serves columns that hold lists, whose cells test the elements. In strict FEEL such
  * a cell is written with FEEL's list functions instead, as in {@code list contains(?, "PT")}; see
  * {@link #parseFeelList}.
+ *
+ * <p>These are the simple unary tests the bitset index evaluates. A strict FEEL cell beyond them (computed endpoints,
+ * {@code ?}, lists and ranges as values) is FEEL's unary tests, which {@link FeelUnaryTests#parseCell} reads where this
+ * parser rejects it.
  */
 public final class CellParser {
 

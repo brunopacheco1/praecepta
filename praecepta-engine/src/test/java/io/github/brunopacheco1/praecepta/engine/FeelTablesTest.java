@@ -255,6 +255,18 @@ class FeelTablesTest {
         Assertions.assertThat(lists.evaluate("Price", Map.of("Base", 10, "Rate", 2))).isEqualTo(List.of(BigDecimal.TEN, new BigDecimal("2")));
     }
 
+    /** An output of no type of its own is written without a {@code typeRef}, so the model reads back as it was. */
+    @Test
+    void an_untyped_output_is_written_without_a_type_and_reads_back_alike() {
+        var model = DmnReader.readModel(stream(PRICES.formatted("", "Base * Rate", "\"none\"")));
+        var table = ((io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic.Table) model.decisions().getFirst().logic()).table();
+        Assertions.assertThat(table.outputs().getFirst().typed()).isFalse();
+        Assertions.assertThat(table.rules().get(1).output().expressions()).as("its literal, kept as FEEL").containsEntry("value", "\"none\"");
+        var written = DmnWriter.write(model);
+        Assertions.assertThat(written).contains("<output id=\"decision_0_output_0\" name=\"value\"/>");
+        Assertions.assertThat(DmnReader.readModel(stream(written))).isEqualTo(model);
+    }
+
     /** A value that does not conform to the output's type is null (DMN 1.5, 10.3.2.9.4), which the report warns of. */
     @Test
     void an_output_entry_of_another_type_than_its_output_is_null() {

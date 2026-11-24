@@ -119,7 +119,9 @@ public record ValidationReport(List<Issue> issues) {
          * null, DMN 1.5, 10.3.2.15, Tables 56 to 59), or
          * its logic gives values of a type that does not conform to the type its variable declares (10.3.2.9.4, binding
          * contexts). The decision is evaluated, to null, and so are the decisions that require it; the detail names the
-         * decision and both types.
+         * decision and both types. In a decision table's report, an output entry whose value is so null: its operands
+         * do not combine, or it gives values of another type than its output's; the rule is evaluated, the output null,
+         * and the issue names the rule ({@code ruleIds}) and the output.
          */
         ALWAYS_NULL(Severity.WARNING);
 
