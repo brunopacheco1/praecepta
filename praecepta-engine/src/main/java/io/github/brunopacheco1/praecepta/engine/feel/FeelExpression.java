@@ -161,8 +161,8 @@ public final class FeelExpression {
     }
 
     /**
-     * Names in scope, where any type name that is not FEEL's reads as {@code Any}, as a check of syntax alone reads it:
-     * for finding which names expressions read, without the types of the model they belong to.
+     * Names in scope, without the types of the model they belong to: for finding which names expressions read. As with
+     * no scope, a type name that is not FEEL's makes its construct null with an error.
      */
     public static Scope namesScope(Collection<String> names) {
         return new Scope(List.copyOf(names), null);
