@@ -434,18 +434,12 @@ public final class DmnReader {
         var aggregation = aggregation(table.getAttribute("aggregation"), where);
 
         var lists = new HashSet<String>();
-        var elementNames = types.elementNames();
-        var expressionScope = types.expressionScope();
-        var inputs = children(table, "input").stream()
-                .map(input -> inputColumn(input, types, model, lists, expressionScope, where)).toList();
+        var inputs = children(table, "input").stream().map(input -> inputColumn(input, types, model, lists, where)).toList();
         var outputElements = children(table, "output");
         if (outputElements.isEmpty()) {
             throw new InvalidDecisionTableException(where + ": the decision table has no output");
         }
-        var scopeNames = new LinkedHashSet<>(elementNames);
-        // a column that is an expression is no name: its text would read as itself
-        inputs.stream().filter(input -> CellParser.isName(input.name())).forEach(input -> scopeNames.add(input.name()));
-        var scope = FeelExpression.scope(scopeNames, Map.of());
+        var scope = new TableScope(types, inputs);
         // a single unnamed output is the decision's result, named after the decision, and typed by it
         var single = outputElements.size() == 1;
         var unnamedOutput = single ? name : "";
@@ -478,7 +472,7 @@ public final class DmnReader {
      * A table's rules, as written, with its inputs, those that hold lists, and the names in scope, for typing its output
      * entries.
      */
-    private record Entries(List<Element> rules, List<InputColumn> inputs, Set<String> lists, FeelExpression.Scope scope) {
+    private record Entries(List<Element> rules, List<InputColumn> inputs, Set<String> lists, TableScope scope) {
 
         /** The type of a name an entry reads: a column's, else an input data's or a decision's; null if unknown. */
         FeelType type(String name, Map<String, FeelType> model) {
@@ -488,6 +482,32 @@ public final class DmnReader {
                 }
             }
             return model.get(name);
+        }
+    }
+
+    /**
+     * The names in scope for a table's entries: those of the model's input data and decisions, and of the table's inputs
+     * that are names, found and indexed when an entry first needs them, so a table whose entries are all literals and
+     * simple tests reads no names.
+     */
+    private static final class TableScope {
+        private final ItemDefinitions types;
+        private final List<InputColumn> inputs;
+        private FeelExpression.Scope scope;
+
+        TableScope(ItemDefinitions types, List<InputColumn> inputs) {
+            this.types = types;
+            this.inputs = inputs;
+        }
+
+        FeelExpression.Scope get() {
+            if (scope == null) {
+                var names = new LinkedHashSet<>(types.elementNames());
+                // a column that is an expression is no name: its text would read as itself
+                inputs.stream().filter(input -> CellParser.isName(input.name())).forEach(input -> names.add(input.name()));
+                scope = FeelExpression.scope(names, Map.of());
+            }
+            return scope;
         }
     }
 
@@ -626,7 +646,7 @@ public final class DmnReader {
                 return FeelType.of(literal.get());
             }
             try {
-                var type = FeelExpression.parse(text, entries.scope()).type(name -> entries.type(name, types));
+                var type = FeelExpression.parse(text, entries.scope().get()).type(name -> entries.type(name, types));
                 return type instanceof FeelType.Null ? null : type;
             } catch (ExpressionSyntaxException e) {
                 return null; // reported when the rule is read
@@ -786,18 +806,17 @@ public final class DmnReader {
      * A column; one whose type is a collection is added to {@code lists}, and its allowed values (those of
      * its item type) apply to the list's elements. Its input expression is its name: a name of an input variable, or
      * any FEEL expression ({@code Age * 12}), whose value the engine computes from the inputs it reads, typed, where it
-     * declares no type, as FEEL types it in a model.
-     *
-     * @param scope the names of the model's input data and decisions, in scope for an input expression
+     * declares no type, as FEEL types it in a model; the names of the model's input data and decisions are in scope for
+     * it.
      */
     private static InputColumn inputColumn(Element input, ItemDefinitions types, ModelTypes model, Set<String> lists,
-            FeelExpression.Scope scope, String where) {
+            String where) {
         var expression = child(input, "inputExpression");
         var column = expression == null ? "" : textOf(expression).strip();
         if (column.isEmpty()) {
             column = input.getAttribute(LABEL).strip();
         }
-        var computed = CellParser.isName(column) ? null : inputExpression(column, scope, where);
+        var computed = CellParser.isName(column) ? null : inputExpression(column, types.expressionScope(), where);
         var typeRef = expression == null ? "" : expression.getAttribute(TYPE_REF);
         var name = column;
         var type = typeRef.isBlank()
@@ -868,7 +887,7 @@ public final class DmnReader {
      *                  {@linkplain OutputColumn#typed() typed}, unless it has an output value list
      */
     private static OutputColumn outputColumn(Element output, String unnamed, Optional<ColumnType> untypedAs, ItemDefinitions types,
-            FeelExpression.Scope scope, String where) {
+            TableScope scope, String where) {
         var column = nameOr(output, LABEL);
         if (column.isBlank()) {
             column = unnamed;
@@ -947,20 +966,20 @@ public final class DmnReader {
      *
      * @param values the output's value list, as plain text; empty if it has none
      */
-    private static LiteralOutput defaultValue(Element output, ColumnType type, List<String> values, FeelExpression.Scope scope,
+    private static LiteralOutput defaultValue(Element output, ColumnType type, List<String> values, TableScope scope,
             String where) {
         var text = nonBlankText(output, "defaultOutputEntry");
         if (text == null) {
             return null;
         }
         var literal = literalOutput(text, type);
-        if (literal == null && isSimple(text.strip(), scope)) {
+        if (literal == null && isSimple(text.strip(), scope.get())) {
             // a literal of another type, or a name: no value of the output's type
             throw new InvalidDecisionTableException("%s: default output '%s' is not supported; a default output must be a literal %s"
                     .formatted(where, text.strip(), type.feelName()));
         }
         if (literal == null) {
-            literal = constantOutput(text.strip(), type, scope, where);
+            literal = constantOutput(text.strip(), type, scope.get(), where);
         }
         var given = literal;
         if (given.text() != null && !values.isEmpty() && values.stream().noneMatch(value -> sameValue(value, given.text(), type))) {
@@ -1045,7 +1064,7 @@ public final class DmnReader {
      *
      * @param lists the inputs that hold lists
      */
-    private record Columns(List<InputColumn> inputs, List<OutputColumn> outputs, Set<String> lists, FeelExpression.Scope scope) {
+    private record Columns(List<InputColumn> inputs, List<OutputColumn> outputs, Set<String> lists, TableScope scope) {
 
         /** Whether an input is one of the table's columns. */
         boolean isInput(String name) {
@@ -1100,13 +1119,13 @@ public final class DmnReader {
      * @throws UnsupportedFeatureException  if it invokes a built-in function (0.9, #117)
      * @throws InvalidDecisionTableException if it is neither
      */
-    private static UnaryTests ruleCell(String text, ColumnType type, boolean list, FeelExpression.Scope scope, String where) {
+    private static UnaryTests ruleCell(String text, ColumnType type, boolean list, TableScope scope, String where) {
         try {
             return list ? CellParser.parseFeelList(text, type) : CellParser.parseFeel(text, type);
         } catch (CellSyntaxException rejected) {
             FeelUnaryTests tests;
             try {
-                tests = FeelUnaryTests.parseCell(text, scope, rejected);
+                tests = FeelUnaryTests.parseCell(text, scope.get(), rejected);
             } catch (CellSyntaxException e) {
                 throw new InvalidDecisionTableException(where + ": " + e.getMessage());
             }
@@ -1137,9 +1156,9 @@ public final class DmnReader {
                 values.put(column.name(), literal.text());
             } else {
                 // an entry that names an input the cells compare with is a reference (see checkComputedOutputs)
-                parseExpression(text, columns.scope(), outputWhere);
+                parseExpression(text, columns.scope().get(), outputWhere);
                 if (column.typed()) {
-                    rejectLiteralOfAnotherType(text, column.type(), columns.scope(), outputWhere);
+                    rejectLiteralOfAnotherType(text, column.type(), columns.scope().get(), outputWhere);
                 }
                 expressions.put(column.name(), text);
             }
