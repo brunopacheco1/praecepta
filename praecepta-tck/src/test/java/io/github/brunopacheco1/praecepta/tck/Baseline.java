@@ -33,6 +33,9 @@ final class Baseline {
     /** The tag of a node that passes through the graph. */
     static final String GRAPH = "graph";
 
+    /** How to mend a baseline that cannot be read. */
+    private static final String FIX = "fix it, or regenerate it with -Dtck.update=true";
+
     private static final String HEADER = """
             # SPDX-FileCopyrightText: Bruno Pacheco
             #
@@ -92,12 +95,11 @@ final class Baseline {
         var key = tab < 0 ? line : line.substring(0, tab);
         var tag = tab < 0 ? "" : line.substring(tab + 1);
         if (!update && !tag.isEmpty() && !tag.equals(GRAPH)) {
-            throw new IllegalStateException("%s tags '%s' with '%s', which is not '%s'; fix it, or regenerate it with -Dtck.update=true"
-                    .formatted(file.toAbsolutePath(), key, tag, GRAPH));
+            throw new IllegalStateException("%s tags '%s' with '%s', which is not '%s'; %s"
+                    .formatted(file.toAbsolutePath(), key, tag, GRAPH, FIX));
         }
         if (keys.put(key, tag) != null && !update) {
-            throw new IllegalStateException("%s lists '%s' twice; fix it, or regenerate it with -Dtck.update=true"
-                    .formatted(file.toAbsolutePath(), key));
+            throw new IllegalStateException("%s lists '%s' twice; %s".formatted(file.toAbsolutePath(), key, FIX));
         }
     }
 

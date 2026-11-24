@@ -360,17 +360,7 @@ final class GraphAnalysis {
             if (!table.feelCells()) {
                 throw invalid(decision, rejected);
             }
-            var text = rule.input().values().get(input.name());
-            var tests = parsed.cells().get(text);
-            if (tests == null) {
-                try {
-                    tests = FeelUnaryTests.parseCell(text, parsed.scope(), rejected);
-                } catch (CellSyntaxException e) {
-                    throw invalid(decision, e);
-                }
-                parsed.cells().put(text, tests);
-            }
-            expressions.addAll(tests.names());
+            expressions.addAll(parseCell(decision, rule.input().values().get(input.name()), rejected, parsed).names());
             return;
         }
         for (var name : UnaryTests.names(cell)) {
@@ -383,6 +373,20 @@ final class GraphAnalysis {
                         .formatted(decision, name, previous.feelName(), input.type().feelName()));
             }
         }
+    }
+
+    /** A cell of a table beyond the simple unary tests, parsed once whatever the rules that hold it, into {@code parsed}. */
+    private static FeelUnaryTests parseCell(String decision, String text, CellSyntaxException rejected, TableExpressions.Parsed parsed) {
+        var tests = parsed.cells().get(text);
+        if (tests == null) {
+            try {
+                tests = FeelUnaryTests.parseCell(text, parsed.scope(), rejected);
+            } catch (CellSyntaxException e) {
+                throw invalid(decision, e);
+            }
+            parsed.cells().put(text, tests);
+        }
+        return tests;
     }
 
     /** An expression of a table, parsed once whatever the rules that hold it, into {@code parsed}. */
