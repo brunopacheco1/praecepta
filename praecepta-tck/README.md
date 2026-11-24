@@ -114,8 +114,6 @@ feature; 0.8 retired their parser, so the kit's expressions it read are listed, 
 - `0100-arithmetic`, `exponent_lhs_number_exp_rhs_number_005`: a power that is not whole, which the kit gives to
   13 significant digits, where FEEL's numbers have 34 (DMN 1.5, 10.3.2.3.1 and Table 60), as output expressions
   keep them (#71).
-- `0068-feel-equality`, `time_005` and `datetime_003_a`: times and date-times that differ below the millisecond,
-  which the kit expects equal, where DMN 1.5 compares their values whole (docs/DMN-CONFORMANCE.md, case 18).
 - `0008-LX-arithmetic`, the three payments: a literal expression over a structured input data
   (`(loan.principal*loan.rate/12)/(1-(1+loan.rate/12)**-loan.termMonths)`), evaluated through the graph since 0.7,
   whose power is not whole: Praecepta computes FEEL's 34 digits (`2778.693549432766768088520383236299`) where the kit

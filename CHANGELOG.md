@@ -24,8 +24,8 @@ analysed as before, and one beyond them is applied to the rules the bitset index
 evaluates as fast as before and the analysis reports nothing it cannot prove; the build plugins and the framework
 integrations compile and load such tables, and the graphs of files whose literal expressions use FEEL. FEEL's
 built-in functions come next, in 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)); FEEL that
-invokes one is rejected, naming that release. Of the DMN TCK's 3,511 result nodes, 2,273 now pass (64.7 %, from 454
-in 0.7), 2,273 of the 2,279 Praecepta evaluates, and 1,287 of the 1,289 of FEEL's own feature area; the
+invokes one is rejected, naming that release. Of the DMN TCK's 3,511 result nodes, 2,275 now pass (64.8 %, from 454
+in 0.7), 2,275 of the 2,279 Praecepta evaluates, and all 1,289 of FEEL's own feature area; the
 decision-table checks still pass 83 of 86 ([RESULTS.md](praecepta-tck/RESULTS.md)). Build dependencies were updated
 (the versions-maven-plugin 2.25.2, Maven 3.10.1 in the Maven wrapper, and the GitHub Actions the workflows pin); no
 published module's dependencies changed. Read *Changed* before upgrading if your code calls
@@ -53,7 +53,10 @@ report is checked at `fail-on`).
   Table 65, `Birth.year`), filters (`xs[item > 3]`, `xs[1]`, `xs[-1]`, `xs[a > 1]` on contexts), `for` with
   `partial` and iteration ranges (`1..3`, dates), `some` and `every`, invocations of function values with positional
   or named arguments, unary minus, comments, and date and time literals, an at-literal or a date and time function
-  of literal arguments, hour 24 included (`2021-01-01T24:00:00` is midnight of the next day, as the DMN TCK has it).
+  of literal arguments, hour 24 included (`24:00:00` is `00:00:00`, as XML Schema's time reads it, and
+  `2021-01-01T24:00:00` midnight of the next day, as the DMN TCK has it; [DMN conformance](docs/DMN-CONFORMANCE.md),
+  case 19). Number literals are rounded to FEEL's 34 significant digits (10.3.2.3.1). Times and date-times keep their
+  nanoseconds and compare to the millisecond in FEEL (case 18).
   A backslash in a string that starts no escape sequence is a character of the string (`"\s"`, grammar rule 64).
   Names may hold spaces, keywords and the additional name symbols `. / - ' + *`: an expression is parsed against the
   names of its decision's requirements, the longest in scope winning wherever the text holds one, so
@@ -88,29 +91,44 @@ report is checked at `fail-on`).
   - **In decision graphs, the framework integrations and the build plugins** such tables work as any other: a file
     whose tables use the full FEEL language loads and compiles as a file of simple cells does, its decisions served
     as graphs where their files are graphs (see *Changed* for what 0.7 rejected, and what is still rejected).
-- **FEEL's errors** (DMN 1.5, 10.3.2.15): where FEEL defines no value (operands it does not combine, a null operand of
-  arithmetic, a division by zero, values of two types compared, an index beyond a list, an entry a context does not
-  have, an invalid date literal, an invocation of what is not a function), the value is null and an error is
-  reported. `DecisionGraph.evaluateWithErrors(decision, inputData)` gives a decision's value with the errors each
-  decision reported (`DecisionGraph.Outcome`); `evaluate` is unchanged. The DMN TCK counts such an error where it
-  expects one (`errorResult`).
-- **Limits that keep evaluation bounded**: an expression nests at most 300 levels (deeper is a syntax error), one
-  evaluation takes at most 1,000,000 steps (iterations of its `for`, `some` and `every` and the elements of the
-  ranges they iterate, function invocations, elements its filters test), nests function invocations at most 800
-  levels with the expression itself, and makes no string longer than 10,000,000 characters; beyond any of these the
-  value is null, with an error ([DMN conformance](docs/DMN-CONFORMANCE.md), case 23). Parsing and evaluating take a
-  bounded amount of the thread's stack, checked on a 512 KiB stack.
+- **FEEL's errors** (DMN 1.5, 10.3.2.16): where FEEL defines no value (operands it does not combine, a null operand of
+  arithmetic, a division by zero, values of two types compared, an entry a context does not have, an invalid date
+  literal, an invocation of what is not a function, `instance of` a type FEEL does not have), the value is null and an
+  error is reported; an index beyond a list is null without one, as the DMN TCK has it
+  ([DMN conformance](docs/DMN-CONFORMANCE.md), case 20). `DecisionGraph.evaluateWithErrors(decision, inputData)` gives
+  a decision's value with the errors each decision reported (`DecisionGraph.Outcome`); `evaluate` is unchanged. The
+  DMN TCK counts such an error where it expects one (`errorResult`).
+- **Limits that keep evaluation bounded** ([DMN conformance](docs/DMN-CONFORMANCE.md), case 23): an expression's tree
+  nests at most 300 levels, and its text at most 250 levels of parentheses, fewer of constructs that take more of the
+  parser's stack (`if`, `for`, filters...); deeper is a syntax error, so every construct, nested as deeply as it may
+  be, is parsed and evaluated on a 448 KiB stack, an eighth less than 512 KiB (checked in an interpreted JVM, so
+  whatever the JIT does). One evaluation takes at most 1,000,000 steps (iterations of its `for`, `some` and `every`
+  and each element of the ranges they iterate, function invocations, and the elements its filters test, its paths
+  project, its `in` looks through and its equalities and `instance of` look at), makes strings of at most 10,000,000
+  characters in all with `+`, and nests function invocations at most 800 levels with the expression itself; beyond
+  the steps or the characters it stops and its value is null, with an error. It reports at most 100 errors, quoting
+  each string by its first 64 characters, then one that counts the others.
 - **`FeelExpression`**, the FEEL language as a public entry point of `io.github.brunopacheco1.praecepta.engine.feel`:
   `parse(text)` or `parse(text, names)` (or against a `FeelExpression.Scope` of names and types made once for many
   expressions), then `names()` (the names it reads), `unsupported()` (what it uses that Praecepta does not evaluate
-  yet), `literals()`, `type(types)` (its static type, `FeelType.NULL` where it is always null, with the reason) and
-  `evaluate(values)` or `evaluate(values, errors)`. With it come the value types `FeelRange` and `FeelFunction`, and
-  `FeelType.RangeOf`, `FeelType.FunctionOf`, `FeelType.Null` and `FeelType.conformsTo` (10.3.2.9.2), which decision
-  tables use too.
+  yet, each a `FeelExpression.Unsupported` of the feature, the release and the issue that plan it), `literals()`,
+  `type(types)` (its static type, `FeelType.NULL` where it is always null, with the reason) and `evaluate(values)` or
+  `evaluate(values, errors)`, which take an `Integer`, a `Long` or a `Double` as the `BigDecimal` of its value. With
+  it come the value types `FeelRange` (whose `comparison()` is a `FeelRange.Comparison`, checked against its
+  endpoints) and `FeelFunction`, and `FeelType.RangeOf`, `FeelType.FunctionOf`, `FeelType.Null` and
+  `FeelType.conformsTo` (10.3.2.9.2), which decision tables use too. **Upgrade note:** `FeelFunction` is sealed: only
+  Praecepta makes function values, the values of function definitions an evaluation gives (and, from 0.9, the
+  built-in functions); an object of a class of your own cannot implement it, and is no function in FEEL (invoking it
+  is null, with an error, and `instance of function<...>` false). A function value an evaluation gave may be given
+  back as input data, or invoked from Java with `invoke(arguments, errors)`, each invocation an evaluation of its
+  own, with its own limits, from any number of threads at once.
 - **`FeelUnaryTests`**, FEEL's unary tests as a public entry point of the same package: `parse(text, scope)`, then
   `names()`, `unsupported()`, `literals()`, `isSimple()` (whether `CellParser`'s simple unary tests, which the bitset
   index evaluates, read it) and `matches(value, values, errors)`; `parseCell(text, scope, rejected)` reads a cell the
-  simple unary tests rejected, as a decision table does.
+  simple unary tests rejected, as a decision table does. A test whose value is a function is satisfied when it is
+  true applied to the value (DMN 1.5, 7.3.2(c)); `- 1` and `> - 1`, which the simple unary tests do not read, are
+  FEEL, and so is a cell or an input expression of words FEEL reads as an expression (`? instance of tAmount`,
+  `if Flag then Low else High`), which `CellParser.isName` no longer takes for another input's name.
 - **Two Jazzer fuzz targets**, run in every build on their saved inputs and by ClusterFuzzLite and the fuzzing
   workflow: `FeelExpressionFuzzer` checks that any text parses or is a syntax error, and is typed and evaluated
   without throwing, and `FeelUnaryTestsFuzzer` does the same for unary tests, read as a decision table reads its
@@ -118,10 +136,10 @@ report is checked at `fail-on`).
 - **`DecisionModel.types()`**, the item definitions a model's literal expressions may name in `instance of`, which
   `DmnReader.readModel` reads (a function item as a `FeelType.FunctionOf`), `DmnWriter.write(model)` writes and
   `DecisionGraph.Builder.type(name, type)` adds in code.
-- **The DMN TCK**: 2,273 of its 3,511 result nodes pass (64.7 %, from 454), 6 fail and 1,232 need a later release.
-  Of the 1,289 nodes of FEEL's feature area, 1,287 pass; the other two are equalities of times and date-times that
-  differ below the millisecond, which the TCK expects equal and DMN 1.5 does not
-  ([DMN conformance](docs/DMN-CONFORMANCE.md), case 18). Nodes of other areas pass where they need FEEL alone, such
+- **The DMN TCK**: 2,275 of its 3,511 result nodes pass (64.8 %, from 454), 4 fail and 1,232 need a later release.
+  All 1,289 nodes of FEEL's feature area pass, the equalities of times and date-times that differ below the
+  millisecond among them, which FEEL compares to the millisecond ([DMN conformance](docs/DMN-CONFORMANCE.md),
+  case 18). Nodes of other areas pass where they need FEEL alone, such
   as `0074-feel-properties`, `0082-feel-coercion` and the error cases of `1115-feel-date-function` to
   `1120-feel-duration-function`. Decision tables in the full FEEL language change none of these numbers: the kit's
   tables pass 83 of 86 checks as before (the other three need business knowledge models, 0.10), and its nodes not
