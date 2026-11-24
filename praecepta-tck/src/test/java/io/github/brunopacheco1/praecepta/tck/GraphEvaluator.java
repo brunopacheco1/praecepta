@@ -33,7 +33,9 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationExc
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelFunction;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelRange;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
@@ -46,15 +48,16 @@ import io.github.brunopacheco1.praecepta.tck.TckSuite.Invocable;
  * test case's input data and computes the decisions it requires. A decision whose value the test case gives is input
  * data instead, as the kit means it: the graph is built with that decision replaced by an input data of its type.
  *
- * <p>It takes a node only when everything the node needs is something Praecepta reads, and the model as a whole is one
- * {@link DmnReader#readModel} reads (a model with a business knowledge model, a decision service or an import, even one
- * the node does not use, is not). The nodes it does not take go to the next evaluator ({@link ModelEvaluator#orElse}),
- * {@link SingleDecisionEvaluator}, which evaluates a decision on its own; the needs it gives are those of
- * {@link SingleDecisionEvaluator#needsBesideGraphs}, as it computes required decisions.
+ * <p>It takes a node when the model as a whole is one {@link DmnReader#readModel} reads (a model with a business
+ * knowledge model, a decision service or an import, even one the node does not use, is not) and the graph evaluates the
+ * decision: what is not supported is what the engine rejects, a decision its validation report does not let it
+ * evaluate (one that invokes a built-in function, planned for 0.9, say). The nodes it does not take go to the next
+ * evaluator ({@link ModelEvaluator#orElse}), {@link SingleDecisionEvaluator}, which evaluates a decision on its own and
+ * names what the node needs.
  *
  * <p>As {@link DecisionTableEvaluator} does, it reports a hit policy violation or an input outside its value list as an
- * {@link Evaluation.Error}; and as {@link LiteralExpressionEvaluator} does, a literal expression's null where the kit
- * expects an error is not supported, as Praecepta reports no errors for expressions.
+ * {@link Evaluation.Error}; a null value where FEEL reported an error is an {@link Evaluation.Error} too, where the kit
+ * expects one ({@link #evaluation}).
  */
 final class GraphEvaluator implements ModelEvaluator {
 
@@ -80,12 +83,10 @@ final class GraphEvaluator implements ModelEvaluator {
         if (check.kind() != Invocable.DECISION || check.model().decision(check.decision()) == null) {
             return new Evaluation.Unsupported(single.needsBesideGraphs(check, List.of()));
         }
-        if (!single.needsBesideGraphs(check, List.of()).isEmpty()) {
-            return new Evaluation.Unsupported(besideGraphs(check));
-        }
         var read = read(check.model());
         if (read.rejected() != null) {
-            return notTaken(check, read.rejected());
+            return single.needsBesideGraphs(check, List.of()).isEmpty() ? notTaken(check, read.rejected())
+                    : new Evaluation.Unsupported(besideGraphs(check));
         }
         DecisionGraph graph;
         try {
@@ -97,18 +98,28 @@ final class GraphEvaluator implements ModelEvaluator {
         if (!graph.canEvaluate(decision)) {
             return notTaken(check, REPORTED);
         }
-        Object value;
+        DecisionGraph.Outcome outcome;
         try {
-            value = graph.evaluate(decision, inputs(check, graph));
+            outcome = graph.evaluateWithErrors(decision, inputs(check, graph));
         } catch (HitPolicyViolationException | InvalidInputException e) {
             return new Evaluation.Error(e.getMessage());
         }
         var logic = graph.model().decision(decision).orElseThrow().logic();
-        if (value == null && check.expectsError() && logic instanceof DecisionLogic.LiteralExpression) {
-            return new Evaluation.Unsupported(LiteralExpressionEvaluator.EXPRESSION_ERRORS);
-        }
         boolean ordered = !(logic instanceof DecisionLogic.Table(var table, var type) && table.hitPolicy() == HitPolicy.COLLECT);
-        return new Evaluation.Value(value(value), ordered);
+        return evaluation(check, outcome, ordered);
+    }
+
+    /**
+     * What a graph's outcome is for the kit: the error FEEL reported, where the decision's value is null, its own logic
+     * reported one and the kit expects an error (DMN 1.5, 10.3.2.15: the value is null, and the error is reported);
+     * otherwise the value.
+     */
+    static Evaluation evaluation(Check check, DecisionGraph.Outcome outcome, boolean ordered) {
+        var errors = outcome.errorsOf(check.decision());
+        if (outcome.value() == null && check.expectsError() && !errors.isEmpty()) {
+            return new Evaluation.Error(String.join("; ", errors));
+        }
+        return new Evaluation.Value(value(outcome.value()), ordered);
     }
 
     /** The model of a file, read once, and its graph. */
@@ -158,7 +169,7 @@ final class GraphEvaluator implements ModelEvaluator {
             decision.requiredDecisions().stream().filter(given::contains).forEach(requiredInputs::add);
             decisions.add(new DecisionModel.Decision(decision.name(), requiredDecisions, requiredInputs, decision.logic()));
         }
-        return new DecisionModel(read.model().name(), inputData, decisions);
+        return new DecisionModel(read.model().name(), inputData, decisions, read.model().types());
     }
 
     /** The test case's inputs as the graph takes them: values of simple types as text, typed by the kit where undeclared. */
@@ -173,7 +184,7 @@ final class GraphEvaluator implements ModelEvaluator {
         return values;
     }
 
-    private static Object input(TckValue given, FeelType type) {
+    static Object input(TckValue given, FeelType type) {
         return switch (given) {
             case TckValue.Nil nil -> null;
             case TckValue.Simple simple when type instanceof FeelType.Any -> typed(simple);
@@ -226,6 +237,8 @@ final class GraphEvaluator implements ModelEvaluator {
             case ZonedDateTime dateTime -> new TckValue.Simple("dateTime", FeelLiterals.text(dateTime));
             case Duration duration -> new TckValue.Simple("duration", FeelLiterals.text(duration));
             case YearsAndMonths duration -> new TckValue.Simple("duration", FeelLiterals.text(duration));
+            case FeelRange range -> new TckValue.Simple("", range.toString());
+            case FeelFunction function -> new TckValue.Simple("", function.toString());
             default -> new TckValue.Simple("", FeelLiterals.text(value));
         };
     }
@@ -234,8 +247,8 @@ final class GraphEvaluator implements ModelEvaluator {
 
     /**
      * What a node needs that Praecepta cannot read, beside graphs: the reasons {@link SingleDecisionEvaluator} gives,
-     * the more precise about the decision's own logic (a date and time literal FEEL gives null for, say), without
-     * {@link Feature#REQUIRED_DECISIONS}, which this evaluator has.
+     * the more precise about the decision's own logic, without {@link Feature#REQUIRED_DECISIONS}, which this evaluator
+     * has.
      */
     private List<Feature> besideGraphs(Check check) {
         if (single.evaluate(check) instanceof Evaluation.Unsupported alone) {
@@ -287,7 +300,7 @@ final class GraphEvaluator implements ModelEvaluator {
             case 118 -> message.startsWith("DMN model has the business knowledge model") || message.contains("requires business knowledge")
                     ? Feature.KNOWLEDGE_MODELS : Feature.boxed("boxed expressions elsewhere in the model");
             case 117 -> new Feature(Feature.Area.BUILT_IN_FUNCTIONS, "function calls elsewhere in the model");
-            default -> Feature.feel("FEEL beyond the expression subset elsewhere in the model");
+            default -> Feature.feel("FEEL Praecepta does not read elsewhere in the model");
         };
     }
 }

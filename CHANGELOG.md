@@ -11,6 +11,87 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+### Added
+- **The full FEEL language in literal expressions** ([#116](https://github.com/brunopacheco1/praecepta/issues/116)):
+  a decision requirement graph's literal expression decisions are now FEEL as DMN 1.5, chapter 10, defines it,
+  where 0.7 took the arithmetic subset of output entries. Values are null, booleans with FEEL's three-valued `and`
+  and `or` (Table 50), numbers (decimals of 34 digits), strings, dates, times, date-times and durations, lists,
+  contexts (`{a: 1, "b c": a + 1}`, each entry seeing those before it), ranges (`[1..10)`, `(< 10)`, `(= 10)`) and
+  functions (`function(a, b) a + b`, closing over their scope). The expressions are `if then else`, comparisons with
+  FEEL's equality and order and their null rules (Tables 53 and 54: `null = null` is true, `1 = "1"` is null),
+  `between`, `in` with positive unary tests (lists, ranges, `?`), `instance of` with FEEL's types (`list<number>`,
+  `context<a: number>`, `range<date>`, `function<number>->number`, `Any`, `Null`, and the model's item definitions),
+  paths (`a.b.c`, projections over lists of contexts, and the properties of dates, times, durations and ranges of
+  Table 65, `Birth.year`), filters (`xs[item > 3]`, `xs[1]`, `xs[-1]`, `xs[a > 1]` on contexts), `for` with
+  `partial` and iteration ranges (`1..3`, dates), `some` and `every`, invocations of function values with positional
+  or named arguments, unary minus, comments, and date and time literals, an at-literal or a date and time function
+  of literal arguments, hour 24 included (`2021-01-01T24:00:00` is midnight of the next day, as the DMN TCK has it).
+  A backslash in a string that starts no escape sequence is a character of the string (`"\s"`, grammar rule 64).
+  Names may hold spaces, keywords and the additional name symbols `. / - ' + *`: an expression is parsed against the
+  names of its decision's requirements, the longest in scope winning wherever the text holds one, so
+  `Another Date and Time` and `Date-Time` read as the input data they name. Every expression is parsed and typed
+  once, when the graph is built.
+- **`FeelExpression`**, the FEEL language as a public entry point of `io.github.brunopacheco1.praecepta.engine.feel`:
+  `parse(text)` or `parse(text, names)` (or against a `FeelExpression.Scope` of names and types made once for many
+  expressions), then `names()` (the names it reads), `unsupported()` (what it uses that Praecepta does not evaluate
+  yet), `type(types)` (its static type, `FeelType.NULL` where it is always null, with the reason) and
+  `evaluate(values)` or `evaluate(values, errors)`. With it come the value types `FeelRange` and `FeelFunction`, and
+  `FeelType.RangeOf`, `FeelType.FunctionOf`, `FeelType.Null` and `FeelType.conformsTo` (10.3.2.9.2). Decision
+  tables adopt it next, in 0.8.
+- **FEEL's errors** (DMN 1.5, 10.3.2.15): where FEEL defines no value (operands it does not combine, a null operand of
+  arithmetic, a division by zero, values of two types compared, an index beyond a list, an entry a context does not
+  have, an invalid date literal, an invocation of what is not a function), the value is null and an error is
+  reported. `DecisionGraph.evaluateWithErrors(decision, inputData)` gives a decision's value with the errors each
+  decision reported (`DecisionGraph.Outcome`); `evaluate` is unchanged. The DMN TCK counts such an error where it
+  expects one (`errorResult`).
+- **Limits that keep evaluation bounded**: an expression nests at most 300 levels (deeper is a syntax error), one
+  evaluation takes at most 1,000,000 steps (iterations of its `for`, `some` and `every` and the elements of the
+  ranges they iterate, function invocations, elements its filters test), nests function invocations at most 800
+  levels with the expression itself, and makes no string longer than 10,000,000 characters; beyond any of these the
+  value is null, with an error (docs/DMN-CONFORMANCE.md, case 23). Parsing and evaluating take a bounded amount of
+  the thread's stack, checked on a 512 KiB stack, and a new Jazzer fuzz target (`FeelExpressionFuzzer`) checks that
+  any text parses or is a syntax error, and is typed and evaluated without throwing.
+- **`DecisionModel.types()`**, the item definitions a model's literal expressions may name in `instance of`, which
+  `DmnReader.readModel` reads (a function item as a `FeelType.FunctionOf`), `DmnWriter.write(model)` writes and
+  `DecisionGraph.Builder.type(name, type)` adds in code.
+- **The DMN TCK**: 2,273 of its 3,511 result nodes pass (64.7 %, from 454), 6 fail and 1,232 need a later release.
+  Of the 1,289 nodes of FEEL's feature area, 1,287 pass; the other two are equalities of times and date-times that
+  differ below the millisecond, which the TCK expects equal and DMN 1.5 does not ([DMN conformance](docs/DMN-CONFORMANCE.md),
+  case 18). Nodes of other areas pass where they need FEEL alone, such as `0074-feel-properties`,
+  `0082-feel-coercion` and the error cases of `1115-feel-date-function` to `1120-feel-duration-function`. See
+  [RESULTS.md](praecepta-tck/RESULTS.md).
+
+### Changed
+- **`DecisionLogic.LiteralExpression.expression()` returns a `FeelExpression`**, parsed with no names in scope, where
+  it returned an `OutputExpression`; the constructor accepts any FEEL expression, and rejects one that is not FEEL
+  with an `IllegalArgumentException` saying why. **Upgrade note:** code that called `expression()` and used the
+  `OutputExpression` it returned (`names()`, `type(...)`, `evaluate(...)`) uses `FeelExpression`'s methods of the
+  same names instead, after parsing the text with the names in scope (`FeelExpression.parse(literal.text(), names)`),
+  as a name with spaces or keywords reads as words otherwise. `OutputExpression` itself is unchanged, as decision
+  tables' output entries still use it.
+- **`DecisionModel` has a fourth component, `types`**; the three-component constructor remains, with no types.
+  **Upgrade note:** a record pattern over `DecisionModel` needs the fourth component.
+- **`FeelType` has three more records, `RangeOf`, `FunctionOf` and `Null`.** **Upgrade note:** a `switch` over
+  `FeelType` that is exhaustive without a `default` branch must handle them; the types `DmnReader` gives an input
+  data or a decision are still simple types, lists, contexts and `Any`.
+- **A literal expression's operands FEEL does not combine, and a path to a component its type does not have, are
+  WARNINGs** (`ALWAYS_NULL`, naming the reason), and evaluate to null, as FEEL has them, where a path to a missing
+  component was a `TYPE_MISMATCH` ERROR that stopped the decision. A decision table's column that reads such a path
+  is still a `TYPE_MISMATCH`. **Upgrade note:** a decision whose literal expression reads `Applicant.age` where the
+  item definition of `Applicant` has no `age` is now evaluated, to null, rather than reported as an ERROR.
+- **A path to a property of a date, time or duration in a literal expression** (`Birth.year`) is evaluated (Table
+  65), where 0.7 reported it as `UNSUPPORTED_FEATURE`.
+- **Files whose literal expressions use FEEL beyond 0.7's subset load as graphs** in the framework integrations and
+  compile as graphs in the build plugins, where 0.7 loaded or compiled their decision tables alone: their literal
+  expressions are decisions now. **Upgrade note:** the graph's report is checked at `fail-on` as any graph's is. A
+  file whose literal expression invokes a built-in function (planned for 0.9) is still rejected by
+  `DmnReader.readModel` with an `UnsupportedFeatureException` (0.9, #117), and its decision tables still load alone,
+  logged as before.
+
+### Fixed
+- **`time(date)`**, of a date literal, is the time of that date at UTC midnight, `00:00:00Z` (DMN 1.5, 10.3.2.3.5,
+  and the DMN TCK's `1116-feel-time-function`), in cells and expressions alike, where it was rejected.
+
 ## [0.7.0] - 2026-11-14
 
 Decision requirement graphs, the first step of Praecepta's plan to grow from a decision-table engine into a full DMN

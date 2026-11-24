@@ -181,9 +181,9 @@ An engine is **immutable** once built: any number of threads may share it withou
 
 ## Decision requirement graphs (#14)
 A DMN model whose decisions require other decisions and input data is a decision requirements graph (DMN 1.5,
-chapter 6). 0.7 evaluates graphs whose decisions are decision tables or literal expressions in the expression
-subset output entries take; later releases add the other kinds of logic as further implementations of the same
-types (see *Growing it* below).
+chapter 6). 0.7 evaluates graphs whose decisions are decision tables or literal expressions, which since 0.8 are full
+FEEL ([FEEL expressions](#feel-expressions-116) below); later releases add the other kinds of logic as further
+implementations of the same types (see *Growing it* below).
 
 ```
  DMN file ──(DmnReader.readModel)──► DecisionModel ──► DecisionGraph.Builder ──► DecisionGraph ──► evaluate(decision, inputData)
@@ -192,13 +192,15 @@ types (see *Growing it* below).
  DecisionModel ──(DmnWriter.write)──► DMN                            └──► validationReport(decision): each table's own analysis
 ```
 
-**The model** (`beans`, plain records, no behaviour): `DecisionModel(name, inputData, decisions)`; an
+**The model** (`beans`, plain records, no behaviour): `DecisionModel(name, inputData, decisions, types)`, `types`
+being the item definitions a literal expression's `instance of` may name; an
 `InputData(name, FeelType type)`; a `Decision(name, requiredDecisions, requiredInputs, DecisionLogic logic)`, whose
 requirements are names of the model's elements (the information requirements of DMN 1.5, 6.3.13). `DecisionLogic` is
 a sealed interface with two kinds today: `Table(DecisionTable)`, named after its decision, and
-`LiteralExpression(text, declared FeelType)`, checked to be in the expression subset when it is made
-(`OutputExpression`). `FeelType` (`feel`) is the type of a value passed between elements: `Simple(ColumnType)`,
-`ListOf(FeelType)`, `Context(components by name, ordered)`, or `Any` where the model declares none. The model
+`LiteralExpression(text, declared FeelType)`, checked to be FEEL when it is made (`FeelExpression.parse`).
+`FeelType` (`feel`) is the type of a value: `Simple(ColumnType)`, `ListOf(FeelType)`, `Context(components by name,
+ordered)`, `RangeOf(FeelType)`, `FunctionOf(parameter types, result type)`, `Null`, or `Any` where the model declares
+none. The model
 rejects two elements of one name (6.3.7, 6.3.11), and nothing else: a model may be ill-formed, which the graph reports.
 
 **Reading and writing.** `DmnReader.readModel` reads every `inputData` (its variable's `typeRef`, resolved through
@@ -212,8 +214,8 @@ component a path names), an output by the decision's variable (its component of 
 outputs), else by its output entries when they are all literals of one type. What later releases bring is rejected
 whole with an `UnsupportedFeatureException`, whose `release()` and `issue()` name the release that plans it, so that
 callers fall back by its type, never by its message: business knowledge models, knowledge requirements and boxed
-expressions as logic (#118), FEEL beyond the subset (#116, function calls #117), decision services, imports and
-references into other models (#119). Knowledge sources, authority requirements,
+expressions as logic (#118), literal expressions that invoke a built-in function (#117), decision services,
+imports, external functions and references into other models (#119). Knowledge sources, authority requirements,
 annotations and diagrams take no part in evaluation and are ignored. `DmnWriter.write(DecisionModel)` writes DMN 1.3
 with ids by position (`input_data_0`, `decision_0`, and `decision_0_` before the ids of a decision's table, so the
 tables of a model never share an id), item definitions for list and context types, and literal expressions as
@@ -223,21 +225,21 @@ and `readAll(dmn)` read single tables as before.
 **Building** (`DecisionGraph`, with the package-private `GraphAnalysis`, `GraphNodes` and `GraphValues`). Every
 input data and decision gets a *slot*: input data first, then decisions, in the model's order. `GraphAnalysis` then:
 1. checks each requirement exists and is of its kind (`MISSING_REQUIREMENT`);
-2. resolves each name a decision's logic reads (a table's columns and the inputs its cells compare with, a literal
-   expression's names) among that decision's requirements: the requirement so named, else the one named by its
-   longest part before a dot, the rest being a path into its value (`Pricing.discount`, `Loan.principal`), as
-   `DecisionModel.elementOf` resolves names for every part of Praecepta; a name no requirement provides is a
-   `MISSING_REQUIREMENT` (7.3.4), and a path to a date's, time's or duration's property (`Birth.year`), which the
-   full FEEL language brings, an `UNSUPPORTED_FEATURE`;
+2. parses each literal expression with the names of its decision's requirements in scope (a `FeelExpression.Scope`),
+   so that names with spaces and keywords read as the requirements they are, and resolves each name a decision's
+   logic reads (a table's columns and the inputs its cells compare with, a literal expression's free names) among
+   that decision's requirements: the requirement so named, else the one named by its longest part before a dot, the
+   rest being a path into its value (`Pricing.discount` in a table column), as `DecisionModel.elementOf` resolves
+   names for every part of Praecepta; a name no requirement provides is a `MISSING_REQUIREMENT` (7.3.4), and a
+   built-in function a literal expression invokes an `UNSUPPORTED_FEATURE` (0.9, #117);
 3. finds cycles among required decisions (Tarjan's algorithm with an explicit stack), reported with the cycle's
    path (`DECISION_CYCLE`), and orders the other decisions so each comes after those it requires (Kahn's algorithm);
 4. works out types: an input data without a `typeRef` takes the type of the table columns that read it whole, when
    they agree; a table's value is its one output's type, or a context of its outputs, a list of that under a hit
-   policy with several results and no aggregation, a number for COUNT; a literal expression's comes from the types
-   of the names it reads (single strings, numbers, dates, times or durations), or is the type of the one name it is,
-   or is known only when it is evaluated where a name it reads has no type (the expression is then typed from its
-   values, `GraphNodes.LiteralNode`); operands FEEL's arithmetic does not combine make it null (`ALWAYS_NULL`, a
-   WARNING). Either value is then bound to the decision's declared type as DMN 1.5, 10.3.2.9.4, binds it
+   policy with several results and no aggregation, a number for COUNT; a literal expression's is its
+   `FeelExpression.type` from the types of the names it reads, `Any` where only the values tell; an expression whose
+   type is `Null`, as one combining operands FEEL does not combine, is always null (`ALWAYS_NULL`, a WARNING, with
+   the reason). Either value is then bound to the decision's declared type as DMN 1.5, 10.3.2.9.4, binds it
    (`GraphValues.Binding`): as it is where it conforms (10.3.2.9.2), a date to a date and time, a value to a list
    of one, a list of one to its element, checked when evaluated where its type is known only then, and anything
    else that does not conform to null (`ALWAYS_NULL`);
@@ -255,7 +257,8 @@ graph's slots: each column is bound with a getter that reads its slot and path (
 package-private, of `Zoning.EITHER`, as map-based inputs are, so each table's validation report is the one the
 framework integrations' map-based engines report), and whose output strategy gives the table's value (each output
 converted from text to its type once, when the engine is built, for rules that compute nothing). A literal expression
-is parsed once (`GraphNodes.LiteralNode`) and reads its names through resolved slots and paths.
+is parsed once (`GraphNodes.LiteralNode`) and reads its names through resolved slots and paths;
+`evaluateWithErrors` hands each node a receiver for FEEL's errors, which `evaluate` does not.
 
 **Evaluating.** `evaluate(decision, inputData)` takes the decision's *plan*, worked out the first time and cached:
 the slots of the input data it needs and the decisions it needs, itself last, in dependency order. It fills an
@@ -280,14 +283,59 @@ decision can be generated from `requiredInputData` and `inputData()`'s types; an
 pass maps of text, as simple types take text. The values a graph gives are the `FeelType` value classes listed in
 its Javadoc, immutable.
 
-**Growing it.** Each later layer adds to these types rather than replacing them: full FEEL (0.8, #116) replaces
-`LiteralExpression`'s subset parser and `GraphNodes.LiteralNode` with a FEEL interpreter over the same slots, and
-`FeelType` with FEEL's full type system (ranges, functions); built-in functions (0.9, #117) are names that
-resolve to the built-in context; boxed expressions and business knowledge models (0.10, #118) are further
+**Growing it.** Each later layer adds to these types rather than replacing them: full FEEL (0.8, #116) gave
+literal expressions a FEEL interpreter over the same slots, and `FeelType` FEEL's full type system; decision tables'
+cells and output entries adopt the same interpreter next; built-in functions (0.9, #117) are registered in
+`BuiltInFunctions`, where the parser resolves their names; boxed expressions and business knowledge models (0.10, #118) are further
 `DecisionLogic` kinds with nodes of their own, and invocables become elements with slots that hold functions,
 required through knowledge requirements, with the same cycle and type checks; decision services and imports (0.11,
 #119) add elements and qualified names to the resolution of step 2. The reader rejects each of them by name until
 then.
+
+## FEEL expressions (#116)
+`FeelExpression` (`feel`) is the FEEL language of DMN 1.5, chapter 10, as one public entry point: `parse` a text
+once, against a `Scope` of names (and a model's types), then `names()`, `unsupported()`, `type(types)` and
+`evaluate(values)` (or `evaluate(values, errors)`) as often as needed, from any thread.
+
+```
+ text ──(FeelLexer)──► tokens ──(FeelParser, names in scope)──► Node tree ──► type(TypeEnv)   : FeelType, reasons for Null
+                                                                    └───────► evaluate(Env)   : value, errors
+```
+
+- **Lexing** (`FeelLexer`) splits words, numbers, strings (escapes resolved) and symbols, drops comments, and
+  records whether whitespace came before each token. A word is made of name characters (grammar rules 28 to 30),
+  `'` included.
+- **Parsing** (`FeelParser`) is recursive descent with precedence climbing for the binary operators (`or`, `and`,
+  comparisons with `between` and `in`, `instance of`, `+ -`, `* /`, `**`), unary minus binding tighter than `**`,
+  and paths, filters and invocations after a primary expression. **Names** are the hard part: FEEL names may hold
+  spaces, keywords and `. / - ' + *`, so a name is matched, token by token, against the names in scope, the longest
+  winning: the names given (indexed once by their first word, `FeelParser.Names`, so a graph of thousands of names
+  parses each decision in time of its own length), the names the expression binds (iteration variables, `partial`,
+  parameters, earlier context entries, a filter's `item`, a test's `?`) and the built-in functions where invoked.
+  Whitespace must be where the name has a space and absent where it has none, so `Date-Time` is a name where it is
+  in scope and a subtraction where only `Date` and `Time` are. A name in no scope is read as words up to a keyword,
+  and is a free name the caller resolves, but inside a filter, where it may name an element's entry. Date and time
+  functions of literal arguments are folded into literals while parsing (`TemporalLiterals`, as cells read them),
+  an invalid one into a node that is null with an error; a built-in function Praecepta does not evaluate yet into
+  an `Unsupported` node, which `unsupported()` lists.
+- **Evaluation** (`Node.evaluate(Env)`): each node evaluates its children in a scope (`Env`: frames of bound names,
+  innermost first, then the values given), giving FEEL's values (`FeelValues` holds equality, order, `instance of`
+  and the properties of Table 65; `FeelArithmetic` the arithmetic tables cells already used). Where FEEL defines no
+  value the node gives null and reports an error to the receiver, if any. Function definitions evaluate to closures
+  (`Closure`, a `FeelFunction`) over their scope; a context's entries are bound as they are evaluated, so a function
+  in a context may invoke itself. Iterations (`Iteration`) loop with arrays of their own, however many variables.
+- **Types** (`Node.type(TypeEnv)`) follow the same tree: `Any` where only values tell, `Null` where the value is
+  null whatever the inputs, with the reason; `GraphAnalysis` turns `Null` into `ALWAYS_NULL`.
+- **Limits.** Parsing recurses a few calls per level of nesting, and evaluation one call per level of the tree, so
+  both are bounded: the tree's depth, each node weighted by the stack it takes (`Node.weight`: an iteration or a
+  filter evaluates its children through calls of its own), at most 300, else a syntax error; the nesting of function
+  bodies being invoked, with the expression's own depth, at most 800; iterations, a million an evaluation. Beyond
+  either evaluation limit the value is null with an error. `FeelExpressionStackTest` checks all of them on a 512 KiB
+  thread, and `FeelExpressionFuzzer` that any text parses or is a syntax error, and evaluates without throwing.
+- **Tables next.** Decision tables still read cells with `CellParser` and output entries with `OutputExpression`
+  (0.6's subset). They adopt `FeelExpression` by parsing a cell as positive unary tests against the table's names
+  (`Node.Test` already evaluates them for `in`) and an output entry as an expression, both once when the engine is
+  built, with the table's column types as the names' types.
 
 ## The compiler and the build plugins
 `TableCompiler` (in `praecepta-compiler`) compiles one table, described by a `TableDefinition`, with

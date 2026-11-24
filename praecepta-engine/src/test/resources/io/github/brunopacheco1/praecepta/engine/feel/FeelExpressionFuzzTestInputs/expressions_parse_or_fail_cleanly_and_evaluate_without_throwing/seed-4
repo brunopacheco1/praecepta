@@ -1,0 +1,1 @@
+for i in 1..3, j in [x, 2] return i * j + partial[-1]

@@ -15,19 +15,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import io.github.brunopacheco1.praecepta.engine.GraphAnalysis.ColumnRead;
 import io.github.brunopacheco1.praecepta.engine.GraphAnalysis.Resolution;
-import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
-import io.github.brunopacheco1.praecepta.engine.feel.ExpressionTypeException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
-import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 
 /**
  * The decisions of a {@link DecisionGraph}, ready to evaluate: built once, with everything parsed and resolved, so an
@@ -42,8 +41,12 @@ final class GraphNodes {
     /** A decision's logic, evaluated from the values of the graph's slots. */
     interface Node {
 
-        /** The decision's value; the slots of the decisions and input data it requires hold theirs. */
-        Object evaluate(Object[] values);
+        /**
+         * The decision's value; the slots of the decisions and input data it requires hold theirs.
+         *
+         * @param errors receives the errors FEEL reports on the way (DMN 1.5, 10.3.2.15); null to ignore them
+         */
+        Object evaluate(Object[] values, Consumer<String> errors);
 
         /** The validation report of its decision table; empty for other logic. */
         ValidationReport report();
@@ -146,7 +149,7 @@ final class GraphNodes {
         }
 
         @Override
-        public Object evaluate(Object[] values) {
+        public Object evaluate(Object[] values, Consumer<String> errors) {
             var results = engine.evaluate(values);
             if (results.isEmpty()) {
                 return null; // DMN 1.5, 10.3.2.10, step 2: no rule matches and no default output
@@ -243,54 +246,38 @@ final class GraphNodes {
 
     /** A literal expression, parsed once, whose names read the graph's slots. */
     static final class LiteralNode implements Node {
-        private final OutputExpression expression;
+        private final FeelExpression expression;
         private final Map<String, Function<Object[], Object>> readers = new HashMap<>();
         private final GraphValues.Binding binding;
         private final FeelType declared;
-        private final boolean dynamic;
 
         /**
          * @param names    where each name it reads is, among the graph's slots
          * @param binding  how its value is bound to its decision
          * @param declared the type its decision declares
-         * @param dynamic  whether a name it reads has a type known only when it is evaluated, so its operands are typed then
          */
-        LiteralNode(OutputExpression expression, Map<String, Resolution> names, GraphValues.Binding binding, FeelType declared, boolean dynamic) {
+        LiteralNode(FeelExpression expression, Map<String, Resolution> names, GraphValues.Binding binding, FeelType declared) {
             this.expression = expression;
             names.forEach((name, resolution) -> readers.put(name, reader(resolution)));
             this.binding = binding;
             this.declared = declared;
-            this.dynamic = dynamic;
         }
 
         @Override
-        public Object evaluate(Object[] values) {
-            if (binding == GraphValues.Binding.NULL) {
+        public Object evaluate(Object[] values, Consumer<String> errors) {
+            if (binding == GraphValues.Binding.NULL && errors == null) {
                 return null; // DMN 1.5 defines its value as null whatever its inputs
             }
-            Function<String, Object> inputs = name -> readers.get(name).apply(values);
-            if (dynamic && !combines(inputs)) {
-                return null; // operands FEEL's arithmetic does not combine, or a missing one (DMN 1.5, 10.3.2.15)
+            Function<String, Object> inputs = name -> {
+                var reader = readers.get(name);
+                return reader == null ? null : reader.apply(values);
+            };
+            var value = GraphValues.literalValue(expression.evaluate(inputs, errors));
+            var bound = GraphValues.bind(value, binding, declared);
+            if (bound == null && value != null && errors != null) {
+                errors.accept("its value is not a %s, the type its decision declares (DMN 1.5, 10.3.2.9.4)".formatted(declared.feelName()));
             }
-            return GraphValues.bind(GraphValues.literalValue(expression.evaluate(inputs)), binding, declared);
-        }
-
-        /** Whether the values the expression reads combine as FEEL's arithmetic has them, typed as they are now. */
-        private boolean combines(Function<String, Object> inputs) {
-            var types = new HashMap<String, ColumnType>();
-            for (var name : readers.keySet()) {
-                var type = GraphValues.arithmeticType(inputs.apply(name));
-                if (type == null) {
-                    return false;
-                }
-                types.put(name, type);
-            }
-            try {
-                expression.type(types::get);
-                return true;
-            } catch (ExpressionTypeException e) {
-                return false;
-            }
+            return bound;
         }
 
         @Override

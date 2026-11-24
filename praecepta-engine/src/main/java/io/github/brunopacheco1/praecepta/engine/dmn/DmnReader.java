@@ -132,7 +132,7 @@ public final class DmnReader {
     /**
      * Reads a whole decision model, for {@code DecisionGraph}: its input data, with their types, and its decisions, with
      * their information requirements and their logic, a decision table (read as {@link #read(InputStream, String)} reads
-     * it) or a literal expression in Praecepta's expression subset ({@link DecisionLogic.LiteralExpression}). An input
+     * it) or a literal expression in FEEL ({@link DecisionLogic.LiteralExpression}), whose syntax is checked. An input
      * data's type is its variable's {@code typeRef}: a built-in type, or an item definition, which may be a collection or
      * have components (a context), nested up to {@value #MAX_TYPE_DEPTH} levels; none if it has no {@code typeRef}. A
      * literal expression's type is the decision variable's {@code typeRef} (or the literal expression's own, where the
@@ -145,16 +145,18 @@ public final class DmnReader {
      * requirement names a decision or an input data of the model by its {@code href} ({@code #id}); one that refers to
      * no element of the model is kept as the {@code id} it refers to, which {@code DecisionGraph} reports as a missing
      * requirement. Knowledge sources and authority requirements, which do not take part in evaluation, text annotations,
-     * groups and diagrams are ignored.
+     * groups and diagrams are ignored. The model's item definitions are its {@linkplain DecisionModel#types() types}, by name,
+     * which a literal expression's {@code instance of} may name; a function item among them is a function type.
      *
      * <p>What Praecepta does not evaluate yet is rejected, naming the element and the release that plans it: business
      * knowledge models, knowledge requirements and invocations, and decision logic that is a boxed expression (a context,
      * an invocation, a function definition, a relation, a list, a conditional, an iteration, a quantified expression, a
-     * filter), planned for 0.10 (#118); literal expressions beyond Praecepta's expression subset, for 0.8 (#116) and,
-     * for function calls, 0.9 (#117); decision services and imports, for 0.11 (#119).
+     * filter), planned for 0.10 (#118); literal expressions that invoke a built-in function, for 0.9 (#117); decision
+     * services, imports and external functions, for 0.11 (#119).
      *
-     * @throws InvalidDecisionTableException if the model cannot be read, uses what Praecepta does not support yet, or
-     *                                       names two of its decisions and input data alike
+     * @throws InvalidDecisionTableException if the model cannot be read (a literal expression that is not FEEL among
+     *                                       other things), uses what Praecepta does not support yet, or names two of its
+     *                                       decisions and input data alike
      */
     public static DecisionModel readModel(InputStream dmn) {
         var root = parseModel(dmn);
@@ -183,10 +185,28 @@ public final class DmnReader {
             decisions.add(decision(decision, types, model, elements));
         }
         try {
-            return new DecisionModel(root.getAttribute("name"), inputData, decisions);
+            return new DecisionModel(root.getAttribute("name"), inputData, decisions, namedTypes(types, decisions));
         } catch (IllegalArgumentException e) {
             throw new InvalidDecisionTableException("DMN model: " + e.getMessage());
         }
+    }
+
+    /**
+     * The model's item definitions that its literal expressions may name (in {@code instance of}, or a function's
+     * parameters): those whose name one of their texts holds.
+     */
+    private static Map<String, FeelType> namedTypes(ItemDefinitions types, List<DecisionModel.Decision> decisions) {
+        var texts = decisions.stream().map(DecisionModel.Decision::logic).filter(DecisionLogic.LiteralExpression.class::isInstance)
+                .map(logic -> ((DecisionLogic.LiteralExpression) logic).text()).toList();
+        var named = new LinkedHashMap<String, FeelType>();
+        if (!texts.isEmpty()) {
+            types.all().forEach((name, type) -> {
+                if (texts.stream().anyMatch(text -> text.contains(name))) {
+                    named.put(name, type);
+                }
+            });
+        }
+        return named;
     }
 
     /** Rejects the elements of a model that Praecepta does not evaluate yet, naming the release that plans them. */
@@ -207,7 +227,6 @@ public final class DmnReader {
         }
     }
 
-    private static final Planned FEEL = new Planned("0.8", 116);
     private static final Planned FUNCTIONS = new Planned("0.9", 117);
     private static final Planned BOXED = new Planned("0.10", 118);
     private static final Planned IMPORTS = new Planned("0.11", 119);
@@ -327,12 +346,19 @@ public final class DmnReader {
             typeRef = literal.getAttribute(TYPE_REF);
         }
         var type = types.feelType(typeRef, where);
+        DecisionLogic.LiteralExpression literalExpression;
         try {
-            return new DecisionLogic.LiteralExpression(text, type);
+            literalExpression = new DecisionLogic.LiteralExpression(text, type);
         } catch (IllegalArgumentException e) {
-            var planned = e.getCause() != null && String.valueOf(e.getCause().getMessage()).contains("function call") ? FUNCTIONS : FEEL;
-            throw planned.exception(where + ": " + e.getMessage());
+            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }
+        var unsupported = literalExpression.expression().unsupported();
+        if (!unsupported.isEmpty()) {
+            var planned = unsupported.getFirst().contains("#119") ? IMPORTS : FUNCTIONS;
+            throw planned.exception("%s: its literal expression uses %s, which Praecepta does not support yet".formatted(where,
+                    String.join(" and ", unsupported)));
+        }
+        return literalExpression;
     }
 
     /** The {@code typeRef} of a decision's variable, blank if it has none. */
@@ -1094,7 +1120,9 @@ public final class DmnReader {
      * collections of collections and function types are rejected.
      */
     private static final class ItemDefinitions {
-        private final Map<String, Element> byName = new HashMap<>();
+        private final Map<String, Element> byName = new LinkedHashMap<>();
+        /** Whether a function item is read as a function type, as {@link #all} reads them, rather than rejected. */
+        private boolean functions;
 
         ItemDefinitions(Element root) {
             children(root, "itemDefinition").forEach(definition -> byName.putIfAbsent(definition.getAttribute("name"), definition));
@@ -1189,13 +1217,50 @@ public final class DmnReader {
             return type;
         }
 
+        /**
+         * Every type the model's item definitions define, by name, for FEEL's {@code instance of} and function parameters
+         * (DMN 1.5, 10.3.2.9): function types (a {@code functionItem}) among them; a definition Praecepta cannot read is
+         * left out.
+         */
+        Map<String, FeelType> all() {
+            var all = new LinkedHashMap<String, FeelType>();
+            functions = true;
+            try {
+                for (var name : byName.keySet()) {
+                    try {
+                        all.put(name, typeOf(name, "Item definition '" + name + "'", 0, new HashSet<>()));
+                    } catch (InvalidDecisionTableException e) {
+                        // a type Praecepta cannot read: an expression that names it is reported
+                    }
+                }
+            } finally {
+                functions = false;
+            }
+            return all;
+        }
+
+        /** A function item's type (DMN 1.5, 7.3.4): its parameters' types and its output's, {@code Any} where it names none. */
+        private FeelType functionType(Element function, String where, int depth, Set<String> enclosing) {
+            var parameters = new ArrayList<FeelType>();
+            for (var parameter : children(function, "parameters")) {
+                var typeRef = parameter.getAttribute(TYPE_REF);
+                parameters.add(typeRef.isBlank() ? FeelType.ANY : typeOf(typeRef, where, depth + 1, enclosing));
+            }
+            var output = function.getAttribute("outputTypeRef");
+            return new FeelType.FunctionOf(parameters, output.isBlank() ? FeelType.ANY : typeOf(output, where, depth + 1, enclosing));
+        }
+
         /** The type an item definition, or one of its components, defines. */
         private FeelType definitionType(Element definition, String name, String where, int depth, Set<String> enclosing) {
             if (depth > MAX_TYPE_DEPTH) {
                 throw new InvalidDecisionTableException("%s: type '%s' nests more than %d levels of item definitions and components"
                         .formatted(where, name, MAX_TYPE_DEPTH));
             }
-            if (child(definition, "functionItem") != null) {
+            var function = child(definition, "functionItem");
+            if (function != null && functions) {
+                return functionType(function, where, depth, enclosing);
+            }
+            if (function != null) {
                 throw BOXED.exception(("%s: type '%s' is a function type, which Praecepta does not support yet: "
                         + "business knowledge models and functions are planned for 0.10 (#118)").formatted(where, name));
             }

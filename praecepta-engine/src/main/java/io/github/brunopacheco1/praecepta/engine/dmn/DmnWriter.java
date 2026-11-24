@@ -102,7 +102,8 @@ public final class DmnWriter {
      * {@code inputData} per input data, typed by its type (an item definition for a list or a context, and no
      * {@code typeRef} for {@link FeelType#ANY any type}), and a {@code decision} per decision, with an
      * {@code informationRequirement} per requirement and its logic: a decision table, written as {@link #write(DecisionTable)}
-     * writes it, or a {@code literalExpression}, as written; the type the decision declares is its variable's. Elements are
+     * writes it, or a {@code literalExpression}, as written; the type the decision declares is its variable's; and an item
+     * definition per type the model names ({@link DecisionModel#types()}), under its name. Elements are
      * identified by their position ({@code input_data_0}, {@code decision_0}), so that any names may be told apart.
      *
      * @throws InvalidDecisionTableException if a decision requires a decision or an input data the model does not have,
@@ -114,6 +115,7 @@ public final class DmnWriter {
         var xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         xml.append("<definitions").append(attribute("xmlns", NAMESPACE)).append(idAndName("definitions_" + id, model.name()))
            .append(attribute("namespace", "https://github.com/brunopacheco1/praecepta/" + id)).append(">\n");
+        model.types().forEach((name, type) -> namedType(xml, name, type));
         var ids = new HashMap<String, String>();
         var inputData = model.inputData();
         var decisions = model.decisions();
@@ -146,6 +148,39 @@ public final class DmnWriter {
         }
         xml.append("</definitions>\n");
         return xml.toString();
+    }
+
+    /**
+     * An item definition for a type the model names ({@link DecisionModel#types()}): a function type as a
+     * {@code functionItem}, whose parameters and output are of simple types or {@code Any}; any other type as
+     * {@link #itemDefinition} writes it. A range, or the type of null, has no item definition, and is not written.
+     */
+    private static void namedType(StringBuilder xml, String name, FeelType type) {
+        switch (type) {
+            case FeelType.RangeOf range -> {
+                // no item definition holds a range type
+            }
+            case FeelType.Null nothing -> {
+                // nor the type of null
+            }
+            case FeelType.FunctionOf(var parameters, var result) -> {
+                xml.append("  <itemDefinition").append(attribute("name", name)).append(">\n    <functionItem")
+                   .append(attribute("outputTypeRef", simpleTypeRef(result))).append(">\n");
+                for (int i = 0; i < parameters.size(); i++) {
+                    xml.append("      <parameters").append(attribute("name", "p" + i)).append(attribute(TYPE_REF, simpleTypeRef(parameters.get(i))))
+                       .append("/>\n");
+                }
+                xml.append("    </functionItem>\n  </itemDefinition>\n");
+            }
+            case FeelType.Simple(var simple) -> xml.append("  <itemDefinition").append(attribute("name", name)).append(">\n    <typeRef>")
+                    .append(typeName(simple)).append(TYPE_REF_END).append("  </itemDefinition>\n");
+            default -> itemDefinition(xml, "itemDefinition", name, type, "  ", "type '" + name + "'");
+        }
+    }
+
+    /** A simple type's name, or {@code Any} for any other type. */
+    private static String simpleTypeRef(FeelType type) {
+        return type instanceof FeelType.Simple(var simple) ? typeName(simple) : "Any";
     }
 
     /** The item definitions of a table's columns of lists. */

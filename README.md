@@ -25,8 +25,8 @@ on its own or as beans in Spring Boot, Quarkus or Micronaut.
 
 > **Status: 0.x.** The API may still change between minor versions until 1.0. Praecepta is growing from
 > a decision-table engine into a full DMN 1.5 engine, one layer per release
-> ([#120](https://github.com/brunopacheco1/praecepta/issues/120)). 0.7 covers decision tables and the
-> decision requirement graphs of tables and literal expressions, not yet the full FEEL language, its
+> ([#120](https://github.com/brunopacheco1/praecepta/issues/120)). 0.8 covers decision tables and the
+> decision requirement graphs of tables and literal expressions in the full FEEL language, not yet FEEL's
 > built-in functions or business knowledge models; see [what Praecepta is not](#what-praecepta-is-not).
 
 # Features
@@ -117,12 +117,11 @@ tables or literal expressions in the arithmetic of output entries
 layer per release ([#120](https://github.com/brunopacheco1/praecepta/issues/120), see the
 [roadmap](docs/ROADMAP.md)), but it is not one yet. It does not have these yet; when you need one of them
 before its release, use an engine that has it, such as Camunda or Drools:
-- **Full FEEL** (0.8, [#116](https://github.com/brunopacheco1/praecepta/issues/116)): list and context
-  expressions, `if`, `for`, filters, `and` and `or`, and tests that compute (e.g. `income > 2 * rent`).
-  Praecepta's input entries are FEEL *simple unary tests*: in DMN they may compare with another
-  input (`> limit`) or test a list's elements, but not compute. Output entries and literal expressions may
-  compute with `+`, `-`, `*`, `/` and `**` on strings, numbers, dates, times and durations, and hold no
-  comparison or `if`.
+- **Full FEEL in decision tables** (the rest of 0.8, [#116](https://github.com/brunopacheco1/praecepta/issues/116)):
+  literal expressions are full FEEL since 0.8, but a table's input entries are still FEEL *simple unary tests*:
+  they may compare with another input (`> limit`) or test a list's elements, but not compute (e.g.
+  `income > 2 * rent`); and its output entries compute with `+`, `-`, `*`, `/` and `**` on strings, numbers,
+  dates, times and durations, and hold no comparison or `if`.
 - **FEEL's built-in functions** (0.9, [#117](https://github.com/brunopacheco1/praecepta/issues/117)), such as
   `string length(...)`, `sum(...)` or `max(...)`: nothing is called but the date and time literals
   `date(...)`, `time(...)`, `date and time(...)` and `duration(...)`.
@@ -450,11 +449,20 @@ graph.validationReport();                      // cycles, missing requirements, 
 graph.validationReport("Credit Limit");                    // that table's own analysis
 ```
 
-- **Decisions** are decision tables, or literal expressions in the subset output entries take: literals and
-  names joined with `+`, `-`, `*`, `/` and `**` (`"Hello " + Full Name`, `Credit Limit / 12`,
-  `Order Total * (1 - Pricing.discount)`, `Start + duration("P14D")`), or a name alone, which gives the value it
-  reads whatever its type. Operands FEEL's arithmetic does not combine (a string and a number, a list) give null,
-  as in FEEL; a name of an input data without a type is typed when the decision is evaluated.
+- **Decisions** are decision tables, or literal expressions in the full FEEL language (since 0.8,
+  [#116](https://github.com/brunopacheco1/praecepta/issues/116); DMN 1.5, chapter 10): arithmetic
+  (`"Hello " + Full Name`, `Start + duration("P14D")`), comparisons, `and`, `or`, `between`, `in` with unary tests
+  (`Age in [18..65)`, `Country in ("PT", "ES")`), `instance of` (`x instance of list<number>`), `if then else`,
+  `for`, `some` and `every`, lists, contexts (`{rate: 0.1, fee: Amount * rate}`), ranges, paths
+  (`Pricing.discount`, `Birth.year`, over lists of contexts), filters (`Orders[amount > 100]`, `Orders[1]`) and
+  function definitions with their invocations (`{double: function(x) x * 2, r: double(Amount)}.r`). Names may hold
+  spaces and keywords (`Another Date and Time`), and are read against the names the decision's requirements
+  provide, the longest first. Where FEEL defines no value, such as for operands it does not combine (a string and
+  a number), a division by zero or an index beyond a list, the value is null, and
+  `graph.evaluateWithErrors(decision, inputData)` gives FEEL's errors with it. FEEL's built-in functions are 0.9's
+  ([#117](https://github.com/brunopacheco1/praecepta/issues/117)): `date(...)`, `time(...)`,
+  `date and time(...)` and `duration(...)` of literal arguments are date and time literals, and nothing else is
+  called. `FeelExpression` parses and evaluates FEEL on its own.
 - **Values.** A table with one output gives its value, with several a context (a `Map` of its outputs), whose
   components a decision reads by path (`Pricing.discount`), and under RULE ORDER, OUTPUT ORDER or COLLECT
   without an aggregation a list of those, which a list column downstream takes (`Checks.code` is the list of
@@ -471,9 +479,10 @@ graph.validationReport("Credit Limit");                    // that table's own a
   a cycle (`DECISION_CYCLE`), a requirement the model does not have or a name no requirement provides
   (`MISSING_REQUIREMENT`), a value that does not fit where it goes, such as a string into a number column or
   a list into a column of single values (`TYPE_MISMATCH`), and what Praecepta does not evaluate yet, such as a
-  date's `.year`, naming the release that plans it (`UNSUPPORTED_FEATURE`). Such a decision, and every decision
+  built-in function, naming the release that plans it (`UNSUPPORTED_FEATURE`). Such a decision, and every decision
   that requires it, cannot be evaluated; the others can. A decision whose value DMN 1.5 defines as null whatever
-  its inputs (operands FEEL does not combine, a value that does not conform to the declared type) is a WARNING
+  its inputs (operands FEEL does not combine, a path to a component its type does not have, a value that does
+  not conform to the declared type) is a WARNING
   (`ALWAYS_NULL`), and evaluates to null. `DecisionGraph.builder().failOn(Severity.ERROR)` rejects the graph
   instead. Each table keeps its own analysis.
 - **In code**, `DecisionGraph.builder()` assembles a graph from input data, `DecisionTable`s and literal
@@ -485,8 +494,7 @@ graph.validationReport("Credit Limit");                    // that table's own a
   ([Spring Boot](#decision-requirement-graphs-in-the-framework-integrations)).
 
 Business knowledge models, invocations and boxed expressions (0.10,
-[#118](https://github.com/brunopacheco1/praecepta/issues/118)), the full FEEL language (0.8,
-[#116](https://github.com/brunopacheco1/praecepta/issues/116)) and its built-in functions (0.9,
+[#118](https://github.com/brunopacheco1/praecepta/issues/118)), FEEL's built-in functions (0.9,
 [#117](https://github.com/brunopacheco1/praecepta/issues/117)), decision services and imports (0.11,
 [#119](https://github.com/brunopacheco1/praecepta/issues/119)) come later: a model that uses them is rejected
 when it is read with an `UnsupportedFeatureException`, whose message, `release()` and `issue()` name the feature's
@@ -614,7 +622,7 @@ DecisionGraph graph = CreditModel.graph();     // the whole graph, e.g. to evalu
 - The graph's issues fail the build at `<failOn>` (its ERRORs, and at `WARNING` its WARNINGs too, such as a
   decision that is always null); below it they are logged, and a decision that cannot be evaluated gets no
   classes. A file with business knowledge models, boxed expressions, decision
-  services, imports or FEEL beyond the expression subset is no graph Praecepta evaluates yet: its decision table
+  services, imports or literal expressions that invoke built-in functions is no graph Praecepta evaluates yet: its decision table
   compiles alone, as before, and the build logs one line at info level per such file, naming it, what it uses and
   the release that plans it (`.../fees.dmn: its decision table is compiled alone, without its decision requirements
   graph, which needs Praecepta 0.10 (#118): ...`); without one the build fails, naming the release that plans what
@@ -764,8 +772,8 @@ and each table's analysis as the graph evaluates it, stop the startup at `praece
 build plugins, or are logged as `Decision model Credit: ERROR ...`; the endpoint lists each model under `models`, with its input data
 and issues, and gives each of its decisions its `model`, `logic`, `type`, `requiredDecisions`, `inputData` and
 `canEvaluate`. Files without such decisions load exactly as before, and so does a file with what later releases
-bring (business knowledge models, boxed expressions, decision services, imports, FEEL beyond the expression
-subset): its decision tables load alone, as in 0.6, and nothing else of it, and the startup logs one line at INFO
+bring (business knowledge models, boxed expressions, decision services, imports, literal expressions that invoke
+built-in functions): its decision tables load alone, as in 0.6, and nothing else of it, and the startup logs one line at INFO
 per such file, naming it, what it uses and the release that plans it (`rules/fees.dmn: its decision tables are
 loaded alone, without its decision requirements graph, which needs Praecepta 0.10 (#118): ...`); without one, it
 fails, naming the release that plans what it uses.

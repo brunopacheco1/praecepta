@@ -1,0 +1,1 @@
+date("2025-01-31").weekday + time("10:20:30+02:00").time offset.hours

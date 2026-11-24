@@ -91,6 +91,33 @@ final class TemporalLiterals {
         return new Read(value, reader.position);
     }
 
+    /**
+     * The value of an at-literal's string ({@code @"2025-01-31"}), its type told by its syntax (10.3.4.1), as
+     * {@link FeelExpression} reads one.
+     *
+     * @throws IllegalArgumentException if it is not a valid date, time, date and time or duration
+     */
+    static Object atLiteral(String value) {
+        return new TemporalLiterals(value, 0, null).atLiteralValue(value);
+    }
+
+    /**
+     * The value of an invocation of {@code date}, {@code time}, {@code date and time} or {@code duration} whose
+     * arguments are literals (Table 72), as {@link FeelExpression} folds one.
+     *
+     * @param function  the function's name
+     * @param arguments the arguments' values
+     * @throws IllegalArgumentException if the arguments do not make a valid value of the function's type
+     */
+    static Object invoke(String function, List<Object> arguments) {
+        return new TemporalLiterals(function, 0, null).invocation(function, arguments);
+    }
+
+    /** Whether a name is one of the functions a date time literal invokes: {@code date}, {@code time}, {@code date and time}, {@code duration}. */
+    static boolean isLiteralFunction(String name) {
+        return FUNCTIONS.contains(name);
+    }
+
     /** The column type of a value: of a date time literal, or a string, number or boolean. */
     static ColumnType typeOf(Object value) {
         return switch (value) {
@@ -165,7 +192,7 @@ final class TemporalLiterals {
             if (!text.startsWith("\"", position)) {
                 throw new IllegalArgumentException("@ must be followed by a string, as in @\"2025-01-31\"");
             }
-            value = atLiteral(string());
+            value = atLiteralValue(string());
         } else {
             var name = function(text, position);
             if (name == null) {
@@ -257,7 +284,7 @@ final class TemporalLiterals {
     // ---- values ----------------------------------------------------------------------------------
 
     /** An at-literal's value: its string's syntax says which type it has (10.3.4.1). */
-    private Object atLiteral(String value) {
+    private Object atLiteralValue(String value) {
         var iso = value.strip();
         if (DATE.matcher(iso).matches()) {
             return date(iso);
@@ -311,6 +338,8 @@ final class TemporalLiterals {
                 case OffsetTime time -> time;
                 case ZonedTime time -> FeelTemporals.withFixedOffset(time);
                 case LocalDateTime dateTime -> dateTime.toLocalTime();
+                // a date as the date and time it converts to, UTC midnight (10.3.2.3.5), whose time is 00:00:00Z
+                case LocalDate date -> OffsetTime.of(LocalTime.MIDNIGHT, ZoneOffset.UTC);
                 // at an offset, or in a zone with one fixed offset (Etc/UTC), the time at that offset (Table 72)
                 case ZonedDateTime dateTime -> FeelTemporals.timeIn(dateTime.toLocalTime(), dateTime.getZone());
                 case null, default -> throw takes("time", "a time string, a time or a date and time");

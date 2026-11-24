@@ -106,15 +106,17 @@ public record ValidationReport(List<Issue> issues) {
          */
         TYPE_MISMATCH(Severity.ERROR),
         /**
-         * Logic of a decision model that DMN 1.5 defines but Praecepta does not evaluate yet, such as a path to a
-         * property of a date, time or duration ({@code Birth.year}, DMN 1.5, Table 65), which the full FEEL language
-         * brings. The model is not wrong: the detail names the decision, what it uses and the release that plans it.
+         * Logic of a decision model that DMN 1.5 defines but Praecepta does not evaluate yet, such as a built-in
+         * function a literal expression invokes (DMN 1.5, 10.3.4, planned for 0.9), or a path a decision table's column
+         * reads to a property of a date, time or duration ({@code Birth.year}, Table 65). The model is not wrong: the
+         * detail names the decision, what it uses and the release that plans it.
          * The decision cannot be evaluated, nor can any decision that requires it.
          */
         UNSUPPORTED_FEATURE(Severity.ERROR),
         /**
          * A decision whose value DMN 1.5 defines as null whatever its inputs: its literal expression combines operands FEEL
-         * does not combine, such as a string and a number (FEEL gives null, DMN 1.5, 10.3.2.15, Tables 56 to 59), or
+         * does not combine, such as a string and a number, or reads a component its type does not have (FEEL gives
+         * null, DMN 1.5, 10.3.2.15, Tables 56 to 59), or
          * its logic gives values of a type that does not conform to the type its variable declares (10.3.2.9.4, binding
          * contexts). The decision is evaluated, to null, and so are the decisions that require it; the detail names the
          * decision and both types.
