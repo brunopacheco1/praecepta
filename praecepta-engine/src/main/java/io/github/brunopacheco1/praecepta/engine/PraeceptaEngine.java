@@ -125,6 +125,10 @@ public final class PraeceptaEngine<I, O> {
     private final BitsetIndex.ColumnReader<I> extractorReader;
     /** Reads a column from the input strategy's map; null with per-column bindings. */
     private final BitsetIndex.ColumnReader<Map<String, String>> mapReader;
+    /** {@link #extractorReader}, computing each computed column once per evaluation; null if none is computed. */
+    private final BitsetIndex.ColumnReader<Computing<I>> computingExtractorReader;
+    /** {@link #mapReader}, computing each computed column once per evaluation; null if none is computed. */
+    private final BitsetIndex.ColumnReader<Computing<Map<String, String>>> computingMapReader;
 
     private final OutputStrategy<O> outputStrategy;
 
@@ -155,7 +159,10 @@ public final class PraeceptaEngine<I, O> {
     private final Map<String, Integer> nameReads;
     /** The values a graph gives, by {@link #nameReads}' index. */
     private final List<Function<Object, Object>> givenValues;
-    /** By column (evaluation order): how its value is computed from other inputs, or null for one read from the input. */
+    /**
+     * By column (evaluation order): how its value is computed from other inputs, or null for one read from the input;
+     * empty if none is computed.
+     */
     private final ComputedColumn[] computedColumns;
     /** The issues found in the rules' output entries (one always null, say), which the validation report lists. */
     private final List<Issue> outputIssues = new ArrayList<>();
@@ -185,7 +192,7 @@ public final class PraeceptaEngine<I, O> {
 
         var types = columnTypes(builder, rules);
         var lists = listInputs(builder);
-        var expressions = new TableExpressions(scope(builder, types));
+        var expressions = new TableExpressions(scope(builder, types), builder.types, builder.parsed);
         var computed = computedColumns(builder, types, expressions);
         var cells = parseCells(rules, types, builder.feelCells, lists, expressions);
         for (int r = 0; r < rules.size(); r++) {
@@ -221,8 +228,10 @@ public final class PraeceptaEngine<I, O> {
         inputStrategy = builder.inputStrategy;
         computedColumns = computedColumns(computed, evaluationOrder, types, lists);
         // readers return raw values; each column converts them (see ColumnIndex#maskFor)
-        extractorReader = inputStrategy == null ? computing(extractorReader(builder.bindings, evaluationOrder)) : null;
-        mapReader = inputStrategy == null ? null : computing(mapReader(evaluationOrder));
+        extractorReader = inputStrategy == null ? extractorReader(builder.bindings, evaluationOrder) : null;
+        mapReader = inputStrategy == null ? null : mapReader(evaluationOrder);
+        computingExtractorReader = extractorReader == null || computedColumns.length == 0 ? null : new ComputingReader<>(extractorReader);
+        computingMapReader = mapReader == null || computedColumns.length == 0 ? null : new ComputingReader<>(mapReader);
 
         outputStrategy = builder.outputStrategy;
         int ruleCount = rules.size();
@@ -253,7 +262,9 @@ public final class PraeceptaEngine<I, O> {
         feelCellsByBit = feelCellsByBit(expressions, bitToRule, evaluationOrder);
         variableRules = variableRules(variableCellsByBit, feelCellsByBit, words);
         hasVariableCells = !BitsetIndex.isEmpty(variableRules);
-        var analysed = analyse(index, rules, hitPolicy, variableRules, numericOutputs, builder.defaultOutput != null, outputIssues);
+        // a rule that tests a computed column tests the columns it is computed from, which the index sees as unrelated
+        var unanalysed = computedColumnRules(builder.feelCells ? cells.keySet() : computed.keySet(), cells, bitToRule, variableRules);
+        var analysed = analyse(index, rules, hitPolicy, unanalysed, numericOutputs, builder.defaultOutput != null, outputIssues);
         report = enforce(analysed, builder.failOn, builder.logValidationReport);
     }
 
@@ -326,9 +337,15 @@ public final class PraeceptaEngine<I, O> {
      * @param errors receives each error's message; null to ignore them
      */
     List<O> evaluate(I input, Consumer<String> errors) {
-        return inputStrategy == null
-                ? evaluate(input, extractorReader, errors)
-                : evaluate(inputStrategy.transform(input).values(), mapReader, errors);
+        if (inputStrategy == null) {
+            return computingExtractorReader == null
+                    ? evaluate(input, extractorReader, errors)
+                    : evaluate(new Computing<>(input, computedColumns.length), computingExtractorReader, errors);
+        }
+        var values = inputStrategy.transform(input).values();
+        return computingMapReader == null
+                ? evaluate(values, mapReader, errors)
+                : evaluate(new Computing<>(values, computedColumns.length), computingMapReader, errors);
     }
 
     /** Whether a result of {@link #evaluate} is the default output: no rule matched (DMN 1.5, 10.3.2.10, step 2). */
@@ -396,7 +413,7 @@ public final class PraeceptaEngine<I, O> {
             } else {
                 var computed = output(bit, input, reader, errors);
                 output = transform(computed);
-                if (aggregatedOutput != null && computed.text().values().get(aggregatedOutput) == null) {
+                if (aggregatedOutput != null && computed.isNull(aggregatedOutput)) {
                     return List.of(output);
                 }
             }
@@ -548,6 +565,32 @@ public final class PraeceptaEngine<I, O> {
     }
 
     /**
+     * The rules the analysis leaves out ({@link TableAnalysis#analyse}): those with cells that compare with another input
+     * or are in the full FEEL language ({@code variableRules}), and those that test a column computed from other inputs
+     * ({@code Age * 12}), which the index sees as a column of its own, unrelated to the inputs it is computed from, so
+     * that {@code < 18} on {@code Age} and {@code >= 216} on {@code Age * 12} would seem to overlap.
+     *
+     * @param columns the columns that may be computed: those whose input expressions are expressions, bound to a getter
+     *                or not, in a strict FEEL table, else those the engine computes
+     * @param cells   the cells by column, in rule order, those beyond the index {@code -}
+     */
+    private static long[] computedColumnRules(Set<String> columns, Map<String, List<UnaryTests>> cells, int[] bitToRule,
+            long[] variableRules) {
+        var computed = columns.stream().filter(TableExpressions::isExpression).toList();
+        if (computed.isEmpty()) {
+            return variableRules;
+        }
+        var mask = variableRules.clone();
+        for (int bit = 0; bit < bitToRule.length; bit++) {
+            int rule = bitToRule[bit];
+            if (computed.stream().anyMatch(column -> !(cells.get(column).get(rule) instanceof UnaryTests.Any))) {
+                BitsetIndex.set(mask, bit);
+            }
+        }
+        return mask;
+    }
+
+    /**
      * Clears the matches whose cells that compare with other inputs, or are in the full FEEL language, fail for this
      * input.
      *
@@ -600,7 +643,11 @@ public final class PraeceptaEngine<I, O> {
         if (at == null) {
             return null;
         }
-        return at >= 0 ? valueOf(at, input, reader) : givenValues.get(-1 - at).apply(input);
+        if (at >= 0) {
+            return valueOf(at, input, reader);
+        }
+        // a graph gives its values from its own input, which an evaluation that computes columns wraps
+        return givenValues.get(-1 - at).apply(input instanceof Computing<?> computing ? computing.input : input);
     }
 
     // ---- the full FEEL language: cells beyond the index and computed columns -----------------------
@@ -614,7 +661,7 @@ public final class PraeceptaEngine<I, O> {
         var byBit = new FeelCell[bitToRule.length][];
         for (int bit = 0; bit < bitToRule.length; bit++) {
             var ruleCells = expressions.cells(bitToRule[bit]);
-            if (ruleCells != null) {
+            if (!ruleCells.isEmpty()) {
                 byBit[bit] = ruleCells.entrySet().stream()
                         .map(cell -> new FeelCell(evaluationOrder.indexOf(cell.getKey()), cell.getValue()))
                         .toArray(FeelCell[]::new);
@@ -625,11 +672,18 @@ public final class PraeceptaEngine<I, O> {
 
     /**
      * A column whose input expression computes its value from other inputs ({@code Age * 12}): its value is the
-     * expression's, which must be of the column's type (a value of another type is rejected, as a getter's is).
+     * expression's, which must be of the column's type (a value of another type is rejected, as a getter's is); for a
+     * column of lists, a single value is a list of one (DMN 1.5, 10.3.2.9.4, "to singleton list").
      *
      * @param type the column's type, or a list of it for a column of lists
      */
     private record ComputedColumn(String name, FeelExpression expression, FeelType type) {
+
+        /** The column's value, given the expression's. */
+        Object value(Object computed) {
+            var value = computed == null || computed instanceof Collection<?> || !(type instanceof FeelType.ListOf) ? computed : List.of(computed);
+            return GraphValues.normalise(value, type, name);
+        }
     }
 
     /**
@@ -660,11 +714,11 @@ public final class PraeceptaEngine<I, O> {
         return expressions.columns();
     }
 
-    /** The computed columns by position in evaluation order, null where a column is read; null if none is computed. */
+    /** The computed columns by position in evaluation order, null where a column is read; empty if none is computed. */
     private static ComputedColumn[] computedColumns(Map<String, FeelExpression> computed, List<String> evaluationOrder,
             Map<String, ColumnType> types, Set<String> lists) {
         if (computed.isEmpty()) {
-            return null;
+            return new ComputedColumn[0];
         }
         var byColumn = new ComputedColumn[evaluationOrder.size()];
         computed.forEach((column, expression) -> {
@@ -674,20 +728,47 @@ public final class PraeceptaEngine<I, O> {
         return byColumn;
     }
 
-    /** A reader that computes the computed columns from the others, which {@code reader} reads; {@code reader} if there are none. */
-    private <T> BitsetIndex.ColumnReader<T> computing(BitsetIndex.ColumnReader<T> reader) {
-        var computed = computedColumns;
-        if (computed == null) {
-            return reader;
+    /** Marks a computed column's value as not computed yet in {@link Computing#values}. */
+    private static final Object NOT_COMPUTED = new Object();
+
+    /**
+     * An input being evaluated by a table that computes columns, with the values of those it has computed, so that each
+     * is computed once per evaluation however often it is read: by the index, by FEEL cells and by output entries. A
+     * class, not a record: it holds an array and is never compared.
+     */
+    private static final class Computing<T> {
+        private final T input;
+        /** By column (evaluation order): a computed column's value, or {@link #NOT_COMPUTED}. */
+        private final Object[] values;
+
+        Computing(T input, int columns) {
+            this.input = input;
+            this.values = new Object[columns];
+            Arrays.fill(values, NOT_COMPUTED);
         }
-        return (input, column) -> {
-            var computedColumn = computed[column];
+    }
+
+    /** Reads the columns {@code reader} reads, and computes the computed ones from them, once per evaluation. */
+    private final class ComputingReader<T> implements BitsetIndex.ColumnReader<Computing<T>> {
+        private final BitsetIndex.ColumnReader<T> reader;
+
+        ComputingReader(BitsetIndex.ColumnReader<T> reader) {
+            this.reader = reader;
+        }
+
+        @Override
+        public Object read(Computing<T> computing, int column) {
+            var computedColumn = computedColumns[column];
             if (computedColumn == null) {
-                return reader.read(input, column);
+                return reader.read(computing.input, column);
             }
-            var value = computedColumn.expression().evaluate(name -> read(name, input, reader));
-            return GraphValues.normalise(value, computedColumn.type(), computedColumn.name());
-        };
+            var value = computing.values[column];
+            if (value == NOT_COMPUTED) {
+                value = computedColumn.value(computedColumn.expression().evaluate(name -> PraeceptaEngine.this.read(name, computing, this)));
+                computing.values[column] = value;
+            }
+            return value;
+        }
     }
 
     /**
@@ -714,14 +795,20 @@ public final class PraeceptaEngine<I, O> {
     /**
      * Where each name the table's FEEL reads is: a column, by position in evaluation order, or a value a graph gives.
      *
-     * @throws InvalidDecisionTableException if a computed column reads another computed column
+     * @throws InvalidDecisionTableException if a computed column reads another computed column, or a name is neither a
+     *                                       column nor a value a graph gives
      */
-    private static Map<String, Integer> nameReads(TableExpressions expressions, List<String> evaluationOrder, List<String> given,
+    static Map<String, Integer> nameReads(TableExpressions expressions, List<String> evaluationOrder, List<String> given,
             Map<String, FeelExpression> computed) {
         var reads = new HashMap<String, Integer>();
         for (var name : expressions.names()) {
             int column = evaluationOrder.indexOf(name);
-            reads.put(name, column >= 0 ? column : -1 - given.indexOf(name));
+            int value = given.indexOf(name);
+            if (column < 0 && value < 0) {
+                throw new InvalidDecisionTableException(
+                        "The table's expressions read '%s', which is neither an input of the table nor a value given to it".formatted(name));
+            }
+            reads.put(name, column >= 0 ? column : -1 - value);
         }
         computed.forEach((column, expression) -> {
             for (var name : expression.names()) {
@@ -772,10 +859,13 @@ public final class PraeceptaEngine<I, O> {
      */
     private static final class ComputedOutputs {
         private final Map<String, String> values;
+        /** The outputs that read no input, as {@link ValueOutputs} takes them beside the values of the others. */
+        private final PraeceptaOutput literals;
         private final Computed[] computed;
 
         ComputedOutputs(Map<String, String> values, Computed[] computed) {
             this.values = values;
+            this.literals = new PraeceptaOutput(values);
             this.computed = computed;
         }
     }
@@ -813,14 +903,11 @@ public final class PraeceptaEngine<I, O> {
         rule.output().references().forEach((output, input) -> computed.add(new Computed(output, null,
                 inputColumn(rule, output, input, context.evaluationOrder(), context.lists()), context.binding(output),
                 outputType(context, output))));
-        var expressions = context.expressions().outputs(ruleIndex);
-        if (expressions != null) {
-            expressions.forEach((output, expression) -> {
-                var binding = context.binding(output);
-                checkOutput(rule, output, expression, binding, context);
-                computed.add(new Computed(output, expression, -1, binding, outputType(context, output)));
-            });
-        }
+        context.expressions().outputs(ruleIndex).forEach((output, expression) -> {
+            var binding = context.binding(output);
+            checkOutput(rule, output, expression, binding, context);
+            computed.add(new Computed(output, expression, -1, binding, outputType(context, output)));
+        });
         return new ComputedOutputs(rule.output().values(), computed.toArray(Computed[]::new));
     }
 
@@ -891,14 +978,11 @@ public final class PraeceptaEngine<I, O> {
                     numeric.add(output);
                 }
             });
-            var computed = expressions.outputs(r);
-            if (computed != null) {
-                computed.forEach((output, expression) -> {
-                    if (number.equals(expression.type(nameTypes::get))) {
-                        numeric.add(output);
-                    }
-                });
-            }
+            expressions.outputs(r).forEach((output, expression) -> {
+                if (number.equals(expression.type(nameTypes::get))) {
+                    numeric.add(output);
+                }
+            });
         }
         declared.forEach((output, type) -> {
             if (type == ColumnType.NUMBER) {
@@ -949,49 +1033,80 @@ public final class PraeceptaEngine<I, O> {
     }
 
     /**
-     * The outputs of a rule that reads inputs, as text, and the values of those it computes. A class, not a record: it
-     * holds a map that is never compared.
+     * The outputs of a rule that reads inputs: the values of those it computes, and, written only when asked for, all of
+     * them as text, which an output strategy other than {@link ValueOutputs} takes. A class, not a record: it holds an
+     * array and is never compared.
      */
     private static final class Output {
-        private final PraeceptaOutput text;
-        private final Map<String, Object> values;
+        private final ComputedOutputs outputs;
+        /** By computed output: its value, bound to its output. */
+        private final Object[] values;
+        private PraeceptaOutput text;
 
-        Output(PraeceptaOutput text, Map<String, Object> values) {
-            this.text = text;
+        Output(ComputedOutputs outputs, Object[] values) {
+            this.outputs = outputs;
             this.values = values;
         }
 
+        /**
+         * The outputs as text, the computed ones filled in with the text of their values; a computed number has no
+         * trailing zeros, since FEEL numbers are values. An output that names an input gives the input's value as
+         * {@link FeelLiterals#text} writes it, a number keeping its scale, as a literal output keeps it.
+         */
         PraeceptaOutput text() {
+            if (text == null) {
+                var texts = new HashMap<>(outputs.values);
+                for (int i = 0; i < values.length; i++) {
+                    var computed = outputs.computed[i];
+                    texts.put(computed.output(), values[i] == null ? null : PraeceptaEngine.text(values[i], computed));
+                }
+                text = new PraeceptaOutput(texts);
+            }
             return text;
         }
-    }
 
-    /** Converts computed outputs with the output strategy, giving it their values where it takes them ({@link ValueOutputs}). */
-    private O transform(Output output) {
-        return outputStrategy instanceof ValueOutputs<O> values
-                ? values.transform(output.text, output.values)
-                : outputStrategy.transform(output.text);
+        /** The values of the computed outputs, by output; null for one that is null. */
+        Map<String, Object> values() {
+            var byOutput = new HashMap<String, Object>();
+            for (int i = 0; i < values.length; i++) {
+                byOutput.put(outputs.computed[i].output(), values[i]);
+            }
+            return byOutput;
+        }
+
+        /** Whether an output is missing: null as written, or computed to null. */
+        boolean isNull(String output) {
+            for (int i = 0; i < values.length; i++) {
+                if (outputs.computed[i].output().equals(output)) {
+                    return values[i] == null;
+                }
+            }
+            return outputs.values.get(output) == null;
+        }
     }
 
     /**
-     * The outputs of a rule that reads inputs, filled in with the text of the input's values and of the
-     * expressions' values; a computed number has no trailing zeros, since FEEL numbers are values. An
-     * output that names an input gives the input's value as {@link FeelLiterals#text} writes it, a number
-     * keeping its scale, as a literal output keeps it.
+     * Converts computed outputs with the output strategy: their values, and the other outputs' text, for one that takes
+     * values ({@link ValueOutputs}), which so never has them written as text; else all of them as text.
      */
+    private O transform(Output output) {
+        return outputStrategy instanceof ValueOutputs<O> values
+                ? values.transform(output.outputs.literals, output.values())
+                : outputStrategy.transform(output.text());
+    }
+
+    /** The outputs of a rule that reads inputs, computed: the value of the input each names, or of its expression. */
     private <T> Output output(int bit, T input, BitsetIndex.ColumnReader<T> reader, Consumer<String> errors) {
         var computedOutputs = computedByBit[bit];
-        var texts = new HashMap<>(computedOutputs.values);
-        var values = new HashMap<String, Object>();
-        for (var computed : computedOutputs.computed) {
+        var values = new Object[computedOutputs.computed.length];
+        for (int i = 0; i < values.length; i++) {
+            var computed = computedOutputs.computed[i];
             var value = computed.reference()
                     ? valueOf(computed.column(), input, reader)
                     : computed.expression().evaluate(name -> read(name, input, reader), errors);
-            value = bound(value, computed, errors);
-            values.put(computed.output(), value);
-            texts.put(computed.output(), value == null ? null : text(value, computed));
+            values[i] = bound(value, computed, errors);
         }
-        return new Output(new PraeceptaOutput(texts), values);
+        return new Output(computedOutputs, values);
     }
 
     /** A computed output's value as text: a computed number without trailing zeros, the value an output names as it is written. */
@@ -1020,31 +1135,80 @@ public final class PraeceptaEngine<I, O> {
 
     /** The deepest lists and contexts an output's text writes out; deeper ones are written {@code [...]} or <code>{...}</code>. */
     private static final int MAX_TEXT_DEPTH = 64;
+    /**
+     * The most characters an output's text writes of a list or a context; the rest is written {@code ...}. A value may
+     * hold one list many times over ({@code {a: [1, 1], b: [a, a], c: [b, b]}.c}), which its text writes out each time,
+     * so the text of a small value could be exponentially long.
+     */
+    static final int MAX_TEXT_LENGTH = 1 << 16;
 
     /**
      * The text of an output's value: a simple value's plain text ({@link FeelLiterals#text}), and a list, a context or a
      * range as FEEL writes it, its values as literals ({@code ["PT", "BR"]}, {@code {a: 1}}), as list inputs are read
-     * from text.
+     * from text; of a list or a context, at most {@value #MAX_TEXT_LENGTH} characters, then {@code ...}.
      */
     static String outputText(Object value) {
-        return switch (value) {
-            case List<?> list -> literalText(list, 0);
-            case Map<?, ?> context -> literalText(context, 0);
-            default -> FeelLiterals.text(value);
-        };
+        if (!(value instanceof List<?>) && !(value instanceof Map<?, ?>)) {
+            return FeelLiterals.text(value);
+        }
+        var text = new StringBuilder();
+        if (!appendLiteral(text, value, 0)) {
+            text.setLength(Math.min(text.length(), MAX_TEXT_LENGTH));
+            text.append("...");
+        }
+        return text.toString();
     }
 
-    private static String literalText(Object value, int depth) {
+    /**
+     * Writes a value as a literal. Each call writes a character at least before it calls itself, so the calls are no
+     * more than the characters written, which {@link #MAX_TEXT_LENGTH} bounds, whatever the value's size.
+     *
+     * @return false if the text reached {@link #MAX_TEXT_LENGTH} characters before the value was written out
+     */
+    private static boolean appendLiteral(StringBuilder text, Object value, int depth) {
+        if (text.length() >= MAX_TEXT_LENGTH) {
+            return false;
+        }
         if (value instanceof List<?> list) {
-            return depth >= MAX_TEXT_DEPTH ? "[...]"
-                    : list.stream().map(element -> literalText(element, depth + 1)).collect(Collectors.joining(", ", "[", "]"));
+            if (depth >= MAX_TEXT_DEPTH) {
+                text.append("[...]");
+                return true;
+            }
+            text.append('[');
+            var separator = "";
+            for (var element : list) {
+                text.append(separator);
+                separator = ", ";
+                if (!appendLiteral(text, element, depth + 1)) {
+                    return false;
+                }
+            }
+            text.append(']');
+            return true;
         }
         if (value instanceof Map<?, ?> context) {
-            return depth >= MAX_TEXT_DEPTH ? "{...}" : context.entrySet().stream()
-                    .map(entry -> FeelLiterals.literal(String.valueOf(entry.getKey())) + ": " + literalText(entry.getValue(), depth + 1))
-                    .collect(Collectors.joining(", ", "{", "}"));
+            return appendContext(text, context, depth);
         }
-        return value == null || isSimpleValue(value) ? FeelLiterals.literal(value) : value.toString();
+        text.append(value == null || isSimpleValue(value) ? FeelLiterals.literal(value) : value.toString());
+        return true;
+    }
+
+    private static boolean appendContext(StringBuilder text, Map<?, ?> context, int depth) {
+        if (depth >= MAX_TEXT_DEPTH) {
+            text.append("{...}");
+            return true;
+        }
+        text.append('{');
+        var separator = "";
+        for (var entry : context.entrySet()) {
+            text.append(separator).append(FeelLiterals.literal(String.valueOf(entry.getKey()))).append(": ");
+            separator = ", ";
+            if (!appendLiteral(text, entry.getValue(), depth + 1)) {
+                return false;
+            }
+        }
+        text.append('}');
+        return true;
     }
 
     /** Whether a value is one of a simple type, which {@link FeelLiterals#literal} writes. */
@@ -1500,6 +1664,10 @@ public final class PraeceptaEngine<I, O> {
         private final Map<String, Function<? super I, ?>> expressionInputs = new LinkedHashMap<>();
         /** Their types. */
         private final Map<String, FeelType> expressionInputTypes = new HashMap<>();
+        /** For {@link DecisionGraph}: the types its model defines (item definitions), which the table's FEEL may name. */
+        private Map<String, FeelType> types = Map.of();
+        /** For {@link DecisionGraph}: the table's FEEL as its analysis parsed it, and the scope it parsed it in. */
+        private TableExpressions.Parsed parsed = TableExpressions.Parsed.NONE;
 
         private OutputStrategy<O> outputStrategy;
         private final Map<String, List<String>> outputPriority = new LinkedHashMap<>();
@@ -1862,6 +2030,24 @@ public final class PraeceptaEngine<I, O> {
             return this;
         }
 
+        /**
+         * For {@link DecisionGraph}: the types its model defines (its item definitions), by name, which the table's FEEL
+         * may name ({@code Amount instance of tAmount}).
+         */
+        Builder<I, O> types(Map<String, FeelType> types) {
+            this.types = Map.copyOf(types);
+            return this;
+        }
+
+        /**
+         * For {@link DecisionGraph}: the table's FEEL as the graph's analysis parsed it, which the engine takes instead of
+         * parsing it again, and the scope it was parsed in, which the engine parses the rest in.
+         */
+        Builder<I, O> parsed(TableExpressions.Parsed parsed) {
+            this.parsed = Objects.requireNonNull(parsed, "parsed");
+            return this;
+        }
+
         /** Test hook: stores the masks in this form instead of choosing by density ({@link Masks.Form#AUTO}). */
         Builder<I, O> maskForm(Masks.Form form) {
             this.maskForm = Objects.requireNonNull(form, "form");
@@ -1899,8 +2085,10 @@ public final class PraeceptaEngine<I, O> {
         }
 
         private void checkInputBindings() {
-            // a table without input columns, which a graph gives what its expressions read, needs no binding
-            boolean noColumns = tableTypes != null && tableTypes.isEmpty() && inputStrategy == null;
+            // a table without input columns, or only with computed ones, which a graph gives what its expressions read,
+            // needs no binding
+            boolean noColumns = tableTypes != null && tableTypes.keySet().stream().allMatch(TableExpressions::isExpression)
+                    && inputStrategy == null;
             require(bindings.isEmpty() != (inputStrategy == null) || noColumns,
                     "bind inputs either per column with input(...) or with inputs(...), not both and not neither");
             require(columnTypes.isEmpty() || inputStrategy != null,

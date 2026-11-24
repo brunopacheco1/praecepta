@@ -84,11 +84,13 @@ final class GraphAnalysis {
      * What a decision table reads: its columns that name what they read, and the inputs its simple cells compare with
      * ({@link ColumnRead}s, each read as a value of its column's type); its columns whose input expressions are
      * expressions ({@code Age * 12}), parsed; and the names its FEEL (cells beyond the simple ones, input expressions,
-     * output entries) reads beside its columns, whose values it reads as they are.
+     * output entries) reads beside its columns, whose values it reads as they are; and that FEEL, parsed, which the
+     * table's engine takes rather than parse it again.
      */
-    record TableReads(List<ColumnRead> columns, Map<String, FeelExpression> computed, Set<String> expressions) {
+    record TableReads(List<ColumnRead> columns, Map<String, FeelExpression> computed, Set<String> expressions,
+            TableExpressions.Parsed parsed) {
 
-        static final TableReads NONE = new TableReads(List.of(), Map.of(), Set.of());
+        static final TableReads NONE = new TableReads(List.of(), Map.of(), Set.of(), TableExpressions.Parsed.NONE);
 
         /** Every name read, columns first. */
         Set<String> names() {
@@ -251,14 +253,15 @@ final class GraphAnalysis {
     /**
      * Parses a decision's literal expression with the names of its requirements in scope (DMN 1.5, 7.3.4 and 10.3.2.11),
      * and the types the model defines; reports what it uses that Praecepta does not evaluate yet (a built-in function,
-     * planned for 0.9), and a type it names that neither FEEL nor the model defines.
+     * planned for 0.9), and an expression that is not FEEL, or names a type that neither FEEL nor the model defines
+     * ({@link Kind#INVALID_EXPRESSION}).
      */
     private void parseLiteral(int d, DecisionLogic.LiteralExpression literal, Set<String> scope) {
         var decision = model.decisions().get(d).name();
         try {
             expressions[d] = FeelExpression.parse(literal.text(), scope, model.types());
         } catch (ExpressionSyntaxException e) {
-            report(d, Kind.MISSING_REQUIREMENT, "decision '%s': %s".formatted(decision, e.getMessage()));
+            report(d, Kind.INVALID_EXPRESSION, "decision '%s': %s".formatted(decision, e.getMessage()));
             return;
         }
         for (var what : expressions[d].unsupported()) {
@@ -276,17 +279,13 @@ final class GraphAnalysis {
 
     /**
      * The names a decision's logic reads: a table's columns and the inputs its cells compare with, or the names a literal
-     * expression reads, parsed with {@code scope} in scope (none if it does not parse so).
+     * expression reads, parsed with {@code scope} in scope (none if it does not parse so), and the model's {@code types}.
      */
-    static Set<String> namesRead(Decision decision, Set<String> names, FeelExpression.Scope scope) {
+    static Set<String> namesRead(Decision decision, Set<String> names, FeelExpression.Scope scope, Map<String, FeelType> types) {
         var read = new LinkedHashSet<String>();
         switch (decision.logic()) {
-            case DecisionLogic.Table(var table, var type) -> {
-                var tableNames = new LinkedHashSet<>(names);
-                table.inputs().stream().filter(input -> !TableExpressions.isExpression(input.name()))
-                        .forEach(input -> tableNames.add(input.name()));
-                read.addAll(tableReads(decision.name(), table, FeelExpression.scope(tableNames, Map.of())).names());
-            }
+            case DecisionLogic.Table(var table, var type) ->
+                    read.addAll(tableReads(decision.name(), table, tableScope(names, table, types)).names());
             case DecisionLogic.LiteralExpression literal -> {
                 try {
                     read.addAll(FeelExpression.parse(literal.text(), scope).names());
@@ -322,10 +321,11 @@ final class GraphAnalysis {
         var computed = new LinkedHashMap<String, FeelExpression>();
         var expressions = new LinkedHashSet<String>();
         var columnNames = new HashSet<String>();
+        var parsed = new TableExpressions.Parsed(scope, new HashMap<>(), new HashMap<>());
         for (var input : table.inputs()) {
             columnNames.add(input.name());
             if (TableExpressions.isExpression(input.name())) {
-                var expression = parse(decision, input.name(), scope);
+                var expression = parse(decision, input.name(), parsed);
                 computed.put(input.name(), expression);
                 expressions.addAll(expression.names());
             } else {
@@ -335,23 +335,24 @@ final class GraphAnalysis {
         var named = new LinkedHashMap<String, ColumnType>();
         for (var rule : table.rules()) {
             for (var input : table.inputs()) {
-                cellReads(decision, table, rule, input, scope, named, expressions);
+                cellReads(decision, table, rule, input, parsed, named, expressions);
             }
-            rule.output().expressions().values().forEach(text -> expressions.addAll(parse(decision, text, scope).names()));
+            rule.output().expressions().values().forEach(text -> expressions.addAll(parse(decision, text, parsed).names()));
         }
         named.keySet().removeAll(columnNames);
         named.forEach((name, type) -> columns.add(new ColumnRead(name, type, table.listInputs().contains(name))));
         expressions.removeAll(columnNames);
         expressions.removeAll(named.keySet());
-        return new TableReads(List.copyOf(columns), Collections.unmodifiableMap(computed), Collections.unmodifiableSet(expressions));
+        return new TableReads(List.copyOf(columns), Collections.unmodifiableMap(computed), Collections.unmodifiableSet(expressions),
+                new TableExpressions.Parsed(scope, Map.copyOf(parsed.cells()), Map.copyOf(parsed.expressions())));
     }
 
     /**
      * Adds what a cell reads: to {@code named} the inputs a simple cell compares with, of its column's type; to
-     * {@code expressions} the names a cell in the full FEEL language reads.
+     * {@code expressions} the names a cell in the full FEEL language reads, which it parses into {@code parsed}.
      */
     private static void cellReads(String decision, DecisionTable table, Praeceptum rule, DecisionTable.InputColumn input,
-            FeelExpression.Scope scope, Map<String, ColumnType> named, Set<String> expressions) {
+            TableExpressions.Parsed parsed, Map<String, ColumnType> named, Set<String> expressions) {
         UnaryTests cell;
         try {
             cell = table.cell(rule, input);
@@ -359,11 +360,17 @@ final class GraphAnalysis {
             if (!table.feelCells()) {
                 throw invalid(decision, rejected);
             }
-            try {
-                expressions.addAll(FeelUnaryTests.parseCell(rule.input().values().get(input.name()), scope, rejected).names());
-            } catch (CellSyntaxException e) {
-                throw invalid(decision, e);
+            var text = rule.input().values().get(input.name());
+            var tests = parsed.cells().get(text);
+            if (tests == null) {
+                try {
+                    tests = FeelUnaryTests.parseCell(text, parsed.scope(), rejected);
+                } catch (CellSyntaxException e) {
+                    throw invalid(decision, e);
+                }
+                parsed.cells().put(text, tests);
             }
+            expressions.addAll(tests.names());
             return;
         }
         for (var name : UnaryTests.names(cell)) {
@@ -378,12 +385,18 @@ final class GraphAnalysis {
         }
     }
 
-    private static FeelExpression parse(String decision, String text, FeelExpression.Scope scope) {
-        try {
-            return FeelExpression.parse(text, scope);
-        } catch (ExpressionSyntaxException e) {
-            throw invalid(decision, e);
+    /** An expression of a table, parsed once whatever the rules that hold it, into {@code parsed}. */
+    private static FeelExpression parse(String decision, String text, TableExpressions.Parsed parsed) {
+        var expression = parsed.expressions().get(text);
+        if (expression == null) {
+            try {
+                expression = FeelExpression.parse(text, parsed.scope());
+            } catch (ExpressionSyntaxException e) {
+                throw invalid(decision, e);
+            }
+            parsed.expressions().put(text, expression);
         }
+        return expression;
     }
 
     private static InvalidDecisionTableException invalid(String decision, IllegalArgumentException e) {

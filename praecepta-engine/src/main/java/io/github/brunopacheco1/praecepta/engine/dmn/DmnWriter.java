@@ -491,8 +491,8 @@ public final class DmnWriter {
     /** A strict FEEL cell beyond the simple unary tests ({@link FeelUnaryTests}): as written, once checked. */
     private static String beyondSimple(String cell, CellSyntaxException rejected, String where) {
         try {
-            // no names in scope: a cell's names are read as words, which is all checking it needs
-            FeelUnaryTests.parseCell(cell, FeelExpression.scope(List.of(), Map.of()), rejected);
+            // no names in scope, nor types: its names are read as words and its types as any, which is all checking it needs
+            FeelUnaryTests.parseCell(cell, FeelExpression.namesScope(List.of()), rejected);
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }

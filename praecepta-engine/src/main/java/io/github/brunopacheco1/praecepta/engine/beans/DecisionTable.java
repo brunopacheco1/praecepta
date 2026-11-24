@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
@@ -105,19 +106,36 @@ public record DecisionTable(
      * table, those its other cells ({@link FeelUnaryTests}), its input expressions that are expressions
      * ({@code Age * 12}) and its output entries that compute their value read ({@code > Limit * 2},
      * {@code Base + Rate}), each with the type of the column or output whose entry reads it first, which is the type an
-     * engine reading its inputs from text reads it with. Empty unless {@link #feelCells}.
+     * engine reading its inputs from text reads it with. Empty unless {@link #feelCells}. Worked out once per table, as
+     * it parses every cell: the map is unmodifiable, and a table equal to one asked before gives the same.
+     * A type an expression names ({@code instance of}) is not checked here, as the table holds no model's types.
      *
      * @throws IllegalArgumentException if a cell is invalid, or columns of different types compare with one input
      */
     public Map<String, ColumnType> namedInputs() {
-        var named = new LinkedHashMap<String, ColumnType>();
         if (!feelCells) {
-            return named;
+            return Map.of();
         }
+        var named = NAMED_INPUTS.get(this);
+        if (named == null) {
+            named = Collections.unmodifiableMap(findNamedInputs());
+            NAMED_INPUTS.put(this, named);
+        }
+        return named;
+    }
+
+    /**
+     * The {@link #namedInputs} of the tables asked for them, while those tables are in use; computed outside the lock, so
+     * that two threads may both work out the same, equal, inputs.
+     */
+    private static final Map<DecisionTable, Map<String, ColumnType>> NAMED_INPUTS = Collections.synchronizedMap(new WeakHashMap<>());
+
+    private Map<String, ColumnType> findNamedInputs() {
+        var named = new LinkedHashMap<String, ColumnType>();
         var columns = inputs.stream().map(InputColumn::name).collect(Collectors.toSet());
         var read = new LinkedHashMap<String, ColumnType>();
         // a column that is an expression is no name: its text would read as itself
-        var scope = FeelExpression.scope(columns.stream().filter(CellParser::isName).toList(), Map.of());
+        var scope = FeelExpression.namesScope(columns.stream().filter(CellParser::isName).toList());
         var outputTypes = new HashMap<String, ColumnType>();
         outputs.forEach(output -> outputTypes.put(output.name(), output.type()));
         for (var rule : rules) {

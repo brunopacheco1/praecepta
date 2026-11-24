@@ -23,7 +23,8 @@ import java.util.stream.Collectors;
  *
  * <p>A {@link DecisionGraph} reports what is wrong with its decision model the same way: cycles of required decisions,
  * missing requirements and type mismatches ({@link Kind#DECISION_CYCLE}, {@link Kind#MISSING_REQUIREMENT},
- * {@link Kind#TYPE_MISMATCH}), what it does not evaluate yet ({@link Kind#UNSUPPORTED_FEATURE}) and decisions whose
+ * {@link Kind#TYPE_MISMATCH}), what it does not evaluate yet ({@link Kind#UNSUPPORTED_FEATURE}), literal expressions
+ * that are not valid FEEL ({@link Kind#INVALID_EXPRESSION}, since 0.8) and decisions whose
  * value is always null ({@link Kind#ALWAYS_NULL}), beside each of its tables' own reports. Later releases add kinds, as
  * each layer of DMN brings its own issues: a {@code switch} over {@link Kind} should keep a {@code default} branch.
  *
@@ -114,6 +115,15 @@ public record ValidationReport(List<Issue> issues) {
          */
         UNSUPPORTED_FEATURE(Severity.ERROR),
         /**
+         * A decision of a decision model whose literal expression is not valid FEEL (DMN 1.5, chapter 10): a syntax error,
+         * or a type its {@code instance of} or a function's parameters name that neither FEEL nor the model's item
+         * definitions define. A decision table with such an entry is rejected when the graph is built
+         * ({@code InvalidDecisionTableException}), as one read alone is. The decision cannot be evaluated, nor can any
+         * decision that requires it; the detail names the decision and the error. Since 0.8, before which it was reported
+         * as a {@link #MISSING_REQUIREMENT}.
+         */
+        INVALID_EXPRESSION(Severity.ERROR),
+        /**
          * A decision whose value DMN 1.5 defines as null whatever its inputs: its literal expression combines operands FEEL
          * does not combine, such as a string and a number, or reads a component its type does not have (FEEL gives
          * null, DMN 1.5, 10.3.2.15, Tables 56 to 59), or
@@ -143,7 +153,8 @@ public record ValidationReport(List<Issue> issues) {
      * @param detail  for gaps, the uncovered region, e.g. {@code country = "FR", age in (18..21)};
      *                columns not mentioned may take any declared value; for the issues of a decision model
      *                ({@link Kind#DECISION_CYCLE}, {@link Kind#MISSING_REQUIREMENT}, {@link Kind#TYPE_MISMATCH},
-     *                {@link Kind#UNSUPPORTED_FEATURE}, {@link Kind#ALWAYS_NULL}), what is found, naming the decision. Null
+     *                {@link Kind#UNSUPPORTED_FEATURE}, {@link Kind#INVALID_EXPRESSION}, {@link Kind#ALWAYS_NULL}), what is
+     *                found, naming the decision. Null
      *                otherwise.
      * @param example for gaps, one concrete uncovered input (columns not mentioned: any value).
      *                Empty otherwise.
@@ -172,7 +183,7 @@ public record ValidationReport(List<Issue> issues) {
                 case GAP -> "WARNING no rule matches " + detail;
                 case UNREACHABLE_DEFAULT_OUTPUT -> "ERROR every input matches a rule, so the default output is never given "
                         + "(a complete table declares no default output: DMN 1.5, 10.3.2.10)";
-                case DECISION_CYCLE, MISSING_REQUIREMENT, TYPE_MISMATCH, UNSUPPORTED_FEATURE -> "ERROR " + detail;
+                case DECISION_CYCLE, MISSING_REQUIREMENT, TYPE_MISMATCH, UNSUPPORTED_FEATURE, INVALID_EXPRESSION -> "ERROR " + detail;
                 case ALWAYS_NULL -> "WARNING " + detail;
             };
         }
