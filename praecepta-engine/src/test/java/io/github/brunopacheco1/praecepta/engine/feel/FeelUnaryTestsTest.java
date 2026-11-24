@@ -90,7 +90,8 @@ class FeelUnaryTestsTest {
 
     @Test
     void what_is_not_evaluated_yet_is_named() {
-        assertThat(parse("> count(Limit)").unsupported()).containsExactly(new FeelExpression.Unsupported("the built-in function 'count'", "0.9", 117));
+        assertThat(parse("> count(Limit)").unsupported())
+                .containsExactly(new FeelExpression.Unsupported("the built-in function 'count'", "0.9", 117));
         assertThat(parse("> Limit").unsupported()).isEmpty();
     }
 
