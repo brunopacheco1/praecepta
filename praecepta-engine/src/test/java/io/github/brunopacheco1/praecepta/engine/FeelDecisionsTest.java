@@ -145,7 +145,7 @@ class FeelDecisionsTest {
                 """);
 
         assertThat(model.types()).containsOnlyKeys("tAmounts", "tRule");
-        assertThat(model.types().get("tRule")).isEqualTo(new FeelType.FunctionOf(List.of(FeelType.of(ColumnType.NUMBER)),
+        assertThat(model.types()).containsEntry("tRule", new FeelType.FunctionOf(List.of(FeelType.of(ColumnType.NUMBER)),
                 FeelType.of(ColumnType.BOOLEAN)));
         assertThat(graph(model).evaluate("Typed", Map.of("Amounts", List.of(1, 2)))).isEqualTo(List.of(true, true));
         assertThat(graph(model).evaluate("Typed", Map.of("Amounts", List.of("x")))).isEqualTo(List.of(false, true));

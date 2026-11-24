@@ -48,6 +48,12 @@ class FeelExpressionTest {
         assertThat(FeelValues.equality(actual, wanted)).as("%s is %s, not %s", expression, actual, expected).isEqualTo(Boolean.TRUE);
     }
 
+    /** Whether the expression's value is null and its evaluation reports at least one error. */
+    private static void assertNullWithAnError(String expression) {
+        assertThat(value(expression)).isNull();
+        assertThat(errors(expression)).isNotEmpty();
+    }
+
     /** The errors an evaluation reports. */
     private static List<String> errors(String expression) {
         var errors = new ArrayList<String>();
@@ -153,8 +159,7 @@ class FeelExpressionTest {
     void operands_feel_does_not_combine_give_null_with_an_error(String expression) {
         // DMN 1.5, 10.3.2.15 and the text before Tables 56 and 58: "if input values are not of the listed types, the
         // result is null"; the DMN TCK's 0100-arithmetic reports each as an error, null operands included
-        assertThat(value(expression)).isNull();
-        assertThat(errors(expression)).isNotEmpty();
+        assertNullWithAnError(expression);
     }
 
     // ---- comparisons and logic (10.3.2.2, Tables 50, 53 and 54) ---------------------------------------
@@ -191,8 +196,7 @@ class FeelExpressionTest {
     @ValueSource(strings = {"1 = \"1\"", "[1] = 1", "true < false", "1 < \"a\"", "null between 1 and 10", "@\"P1Y\" = @\"P365D\""})
     void values_of_two_types_compare_to_null_with_an_error(String expression) {
         // DMN 1.5, Tables 53 and 54; the DMN TCK's 0068-feel-equality and 0071-feel-between
-        assertThat(value(expression)).isNull();
-        assertThat(errors(expression)).isNotEmpty();
+        assertNullWithAnError(expression);
     }
 
     @Test
@@ -332,9 +336,9 @@ class FeelExpressionTest {
     @ValueSource(strings = {"some x in [null, 1] satisfies x > 2", "every x in [1, null] satisfies x > 0", "every x in [1, 2] satisfies null",
         "some x in [1] satisfies 1", "every x in [true, null] satisfies x", "some x in null satisfies true", "every x in null satisfies true"})
     void some_and_every_are_or_and_and_of_three_values(String expression) {
-        // DMN 1.5, Table 49: some ... satisfies e is "false or FEEL(e, s') or ...", every ... "true and FEEL(e, s') and
-        // ...", with Table 50's or and and, so a condition that is null, or not a boolean, and decides nothing is null;
-        // the DMN TCK's 1153-feel-some and 1154-feel-every (test 006)
+        // DMN 1.5, Table 49 reads some as false or-ed with the condition for each element, and every as true and-ed with
+        // it, by the or and the and of Table 50, so a condition that is null, or not a boolean, and decides nothing gives
+        // null, as the DMN TCK's 1153-feel-some and 1154-feel-every (test 006) have it
         assertThat(value(expression)).isNull();
     }
 
@@ -344,8 +348,7 @@ class FeelExpressionTest {
     void an_iteration_over_what_is_not_a_list_or_too_long_is_null_with_an_error(String expression) {
         // the DMN TCK's 0084-feel-for-loops; DMN 1.5, 10.3.2.14: a range iterates whole numbers; and Praecepta's bound of a
         // million steps an evaluation
-        assertThat(value(expression)).isNull();
-        assertThat(errors(expression)).isNotEmpty();
+        assertNullWithAnError(expression);
     }
 
     // ---- lists, contexts, paths and filters (10.3.2.5, 10.3.2.6, Table 65) ---------------------------
@@ -389,8 +392,7 @@ class FeelExpressionTest {
     @ValueSource(strings = {"{a: 1}.b", "null.a", "@\"P1Y\".days", "{a: 1, a: 2}"})
     void a_missing_entry_or_property_is_null_with_an_error(String expression) {
         // the DMN TCK's 0057-feel-context and 0074-feel-properties
-        assertThat(value(expression)).isNull();
-        assertThat(errors(expression)).isNotEmpty();
+        assertNullWithAnError(expression);
     }
 
     @ParameterizedTest
@@ -431,8 +433,7 @@ class FeelExpressionTest {
     @ValueSource(strings = {"(function(a) a)(1, 2)", "(function(a) a)(b: 1)", "1(2)", "(function(a: number) a)(\"x\")",
         "{f: function(n) f(n), r: f(1)}.r", "(function(a, b) a)(a: 1, a: 2)"})
     void an_invocation_feel_does_not_define_is_null_with_an_error(String expression) {
-        assertThat(value(expression)).isNull();
-        assertThat(errors(expression)).isNotEmpty();
+        assertNullWithAnError(expression);
     }
 
     @ParameterizedTest

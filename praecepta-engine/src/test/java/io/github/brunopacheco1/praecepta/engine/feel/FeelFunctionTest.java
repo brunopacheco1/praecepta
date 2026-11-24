@@ -58,7 +58,8 @@ class FeelFunctionTest {
         var wrong = new AtomicInteger();
         for (int i = 0; i < 2_000; i++) {
             pool.submit(() -> {
-                if (!BigDecimal.valueOf(50).equals(function.invoke(List.of(BigDecimal.valueOf(50)), null))) {
+                if (!(function.invoke(List.of(BigDecimal.valueOf(50)), null) instanceof BigDecimal result)
+                        || result.compareTo(BigDecimal.valueOf(50)) != 0) {
                     wrong.incrementAndGet();
                 }
             });
@@ -114,7 +115,9 @@ class FeelFunctionTest {
         // invoked inside an evaluation, it counts against that evaluation, and reports to it
         var env = Env.root(name -> null, errors::add, 1);
         assertThat(Node.Invocation.call(substring, List.of("foobar", BigDecimal.ONE), env)).isEqualTo("foobar");
-        assertThatThrownBy(() -> new BuiltInFunction("f", List.of(), BuiltInFunction.Arity.fixed(1), FeelType.of(ColumnType.STRING),
-                (arguments, e) -> null)).isInstanceOf(IllegalArgumentException.class);
+        var none = List.<String>of();
+        var one = BuiltInFunction.Arity.fixed(1);
+        var string = FeelType.of(ColumnType.STRING);
+        assertThatThrownBy(() -> new BuiltInFunction("f", none, one, string, (arguments, e) -> null)).isInstanceOf(IllegalArgumentException.class);
     }
 }

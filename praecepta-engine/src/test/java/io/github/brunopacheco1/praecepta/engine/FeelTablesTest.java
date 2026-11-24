@@ -28,6 +28,7 @@ import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
 /**
@@ -442,7 +443,10 @@ class FeelTablesTest {
     void a_name_read_from_nowhere_is_rejected() {
         var expressions = new TableExpressions(List.of("x"), Map.of(), TableExpressions.Parsed.NONE);
         expressions.column("x + 1", ColumnType.NUMBER);
-        Assertions.assertThatThrownBy(() -> PraeceptaEngine.nameReads(expressions, List.of("y"), List.of("z"), Map.of()))
+        var order = List.of("y");
+        var given = List.of("z");
+        var computed = Map.<String, FeelExpression>of();
+        Assertions.assertThatThrownBy(() -> PraeceptaEngine.nameReads(expressions, order, given, computed))
                 .isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("'x'");
         Assertions.assertThat(PraeceptaEngine.nameReads(expressions, List.of("y"), List.of("z", "x"), Map.of())).containsEntry("x", -2);
     }
