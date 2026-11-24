@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine.feel;
 
 import java.math.BigDecimal;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -20,7 +21,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelArithmetic.Operator;
  * evaluates itself in a scope ({@link Env}, 10.3.2) and gives its static type in a scope of types ({@link TypeEnv},
  * 10.3.2.9). Evaluating a node recurses over its children, one call a level; the parser bounds the tree's depth
  * ({@link FeelParser#MAX_DEPTH}), and {@link Env} the nesting of function invocations, so evaluation takes a bounded
- * amount of the thread's stack. Where FEEL defines no value, a node gives null and reports an error (10.3.2.15).
+ * amount of the thread's stack. Where FEEL defines no value, a node gives null and reports an error (10.3.2.16); the
+ * messages quote values shortly ({@link FeelValues#text}), and are built only where the evaluation reports errors.
  */
 sealed interface Node {
 
@@ -70,6 +72,68 @@ sealed interface Node {
         return List.copyOf(literals);
     }
 
+    /**
+     * Whether two trees are the same, node for node: of the same kinds, holding the same values beside their children
+     * (a constant's value, an operator, a name, a function's parameters and their types...), with the same children, in
+     * order. Compared with a stack of its own, as deep as the trees are.
+     */
+    static boolean sameTree(Node a, Node b) {
+        var pending = new java.util.ArrayDeque<Node[]>();
+        pending.push(new Node[] {a, b});
+        while (!pending.isEmpty()) {
+            var pair = pending.pop();
+            if (pair[0] == pair[1]) {
+                continue;
+            }
+            if (pair[0].getClass() != pair[1].getClass() || !sameAttributes(pair[0], pair[1])) {
+                return false;
+            }
+            var x = pair[0].children();
+            var y = pair[1].children();
+            if (x.size() != y.size()) {
+                return false;
+            }
+            for (int i = 0; i < x.size(); i++) {
+                pending.push(new Node[] {x.get(i), y.get(i)});
+            }
+        }
+        return true;
+    }
+
+    /** Whether two nodes of one kind hold the same values beside their children. */
+    private static boolean sameAttributes(Node a, Node b) {
+        return switch (a) {
+            case Constant(var value) -> java.util.Objects.equals(value, ((Constant) b).value());
+            case Invalid(var message) -> message.equals(((Invalid) b).message());
+            case Unsupported(var what, var arguments) -> what.equals(((Unsupported) b).what());
+            case Name(var name) -> name.equals(((Name) b).name());
+            case Arithmetic(var operator, var left, var right) -> operator == ((Arithmetic) b).operator();
+            case Comparison(var operator, var left, var right) -> operator.equals(((Comparison) b).operator());
+            case Logical(var and, var left, var right) -> and == ((Logical) b).and();
+            case Equality(var negated, var value) -> negated == ((Equality) b).negated();
+            case In(var value, var tests) -> tests.stream().map(Test::questionMark).toList()
+                    .equals(((In) b).tests().stream().map(Test::questionMark).toList());
+            case InstanceOf(var value, var of) -> of.equals(((InstanceOf) b).of());
+            case ContextLiteral(var keys, var values) -> keys.equals(((ContextLiteral) b).keys());
+            case RangeLiteral(var start, var startIncluded, var end, var endIncluded) -> startIncluded == ((RangeLiteral) b).startIncluded()
+                    && endIncluded == ((RangeLiteral) b).endIncluded();
+            case UnaryRange(var operator, var endpoint) -> operator == ((UnaryRange) b).operator();
+            case Path(var target, var name) -> name.equals(((Path) b).name());
+            case FunctionDefinition(var parameters, var types, var body, var depth) -> parameters.equals(((FunctionDefinition) b).parameters())
+                    && types.equals(((FunctionDefinition) b).types());
+            case Invocation(var callee, var arguments, var names) -> names.equals(((Invocation) b).names());
+            case For(var variables, var domains, var body) -> variables.equals(((For) b).variables());
+            case Quantified(var every, var variables, var domains, var condition) -> every == ((Quantified) b).every()
+                    && variables.equals(((Quantified) b).variables());
+            case Negation n -> true;
+            case Between n -> true;
+            case If n -> true;
+            case ListLiteral n -> true;
+            case Filter n -> true;
+            case IterationRange n -> true;
+        };
+    }
+
     // ---- literals and names ------------------------------------------------------------------------
 
     /** A literal value: a string, a number, a boolean, a date and time literal, {@code null}. */
@@ -102,9 +166,9 @@ sealed interface Node {
      * What DMN 1.5 defines but Praecepta does not evaluate yet, such as a built-in function (0.9, #117): its value is
      * null, with an error; {@link FeelExpression#unsupported()} names it, so a decision that uses it is reported.
      *
-     * @param what what it is, naming the release that plans it
+     * @param what what it is, and the release that plans it
      */
-    record Unsupported(String what, List<Node> arguments) implements Node {
+    record Unsupported(FeelExpression.Unsupported what, List<Node> arguments) implements Node {
         @Override
         public Object evaluate(Env env) {
             return env.error(what + " is not supported yet");
@@ -140,11 +204,11 @@ sealed interface Node {
     record Negation(Node operand) implements Node {
         @Override
         public Object evaluate(Env env) {
-            var value = operand.evaluate(env);
+            var value = FeelNumbers.normalise(operand.evaluate(env));
             var type = FeelValues.simpleType(value);
             if (type == null || FeelArithmetic.negationType(type) == null) {
-                return env.reporting() ? env.error("-%s: FEEL negates numbers and durations, not a %s"
-                        .formatted(FeelValues.text(value), FeelValues.typeName(value))) : null;
+                return env.error(() -> "-%s: FEEL negates numbers and durations, not a %s"
+                        .formatted(FeelValues.text(value), FeelValues.typeName(value)));
             }
             return FeelArithmetic.negate(value);
         }
@@ -174,22 +238,20 @@ sealed interface Node {
     record Arithmetic(Operator operator, Node left, Node right) implements Node {
         @Override
         public Object evaluate(Env env) {
-            var a = left.evaluate(env);
-            var b = right.evaluate(env);
+            var a = FeelNumbers.normalise(left.evaluate(env));
+            var b = FeelNumbers.normalise(right.evaluate(env));
             var typeA = FeelValues.simpleType(a);
             var typeB = FeelValues.simpleType(b);
             if (typeA == null || typeB == null || FeelArithmetic.type(operator, typeA, typeB) == null) {
-                return env.reporting() ? env.error("%s %s %s: FEEL's arithmetic does not combine a %s and a %s".formatted(
-                        FeelValues.text(a), operator.symbol(), FeelValues.text(b), FeelValues.typeName(a), FeelValues.typeName(b))) : null;
+                return env.error(() -> "%s %s %s: FEEL's arithmetic does not combine a %s and a %s".formatted(
+                        FeelValues.text(a), operator.symbol(), FeelValues.text(b), FeelValues.typeName(a), FeelValues.typeName(b)));
             }
-            if (a instanceof String x && b instanceof String y && x.length() + (long) y.length() > Env.MAX_STRING) {
-                return env.error("the string %s makes would be longer than %d characters".formatted(operator.symbol(), Env.MAX_STRING));
+            if (a instanceof String x && b instanceof String y && !env.characters(x.length() + (long) y.length())) {
+                return null;
             }
             var value = FeelArithmetic.apply(operator, a, b);
-            if (value == null && env.reporting()) {
-                env.error("%s %s %s has no value in FEEL".formatted(FeelValues.text(a), operator.symbol(), FeelValues.text(b)));
-            }
-            return value;
+            return value != null ? value
+                    : env.error(() -> "%s %s %s has no value in FEEL".formatted(FeelValues.text(a), operator.symbol(), FeelValues.text(b)));
         }
 
         @Override
@@ -226,7 +288,7 @@ sealed interface Node {
 
     /**
      * {@code left operator right}, a comparison (DMN 1.5, Tables 53 and 54): {@code =} and {@code !=} as
-     * {@link FeelValues#equal} has them, {@code <}, {@code <=}, {@code >}, {@code >=} of values FEEL orders; null,
+     * {@link FeelValues#equality} has them, {@code <}, {@code <=}, {@code >}, {@code >=} of values FEEL orders; null,
      * with an error, otherwise.
      */
     record Comparison(String operator, Node left, Node right) implements Node {
@@ -235,16 +297,17 @@ sealed interface Node {
             var a = left.evaluate(env);
             var b = right.evaluate(env);
             var value = switch (operator) {
-                case "=" -> FeelValues.equal(a, b);
-                case "!=" -> FeelValues.not(FeelValues.equal(a, b));
+                case "=" -> FeelValues.equality(a, b, env);
+                case "!=" -> FeelValues.not(FeelValues.equality(a, b, env));
                 default -> {
                     var order = FeelValues.compare(a, b);
                     yield order == null ? null : holds(order);
                 }
             };
-            if (value == null && env.reporting()) {
-                env.error("%s %s %s: FEEL does not compare a %s and a %s".formatted(FeelValues.text(a), operator, FeelValues.text(b),
-                        FeelValues.typeName(a), FeelValues.typeName(b)));
+            // a null of an evaluation that ran out of steps needs no error of its own: the evaluation reported one
+            if (value == null && !env.stopped()) {
+                env.error(() -> "%s %s %s: FEEL does not compare a %s and a %s".formatted(FeelValues.text(a), operator,
+                        FeelValues.text(b), FeelValues.typeName(a), FeelValues.typeName(b)));
             }
             return value;
         }
@@ -303,13 +366,13 @@ sealed interface Node {
      * A decision table's test {@code = e} or {@code != e} (DMN 1.5, grammar rule 7, and Table 53): whether the value tested,
      * {@code ?}, equals {@code e}, or does not; so {@code = null} holds for a missing value.
      *
-     * @param equal whether it is {@code =}, else {@code !=}
+     * @param negated whether it is {@code !=}, else {@code =}
      */
-    record Equality(boolean equal, Node value) implements Node {
+    record Equality(boolean negated, Node value) implements Node {
         @Override
         public Object evaluate(Env env) {
-            var equals = FeelValues.equal(env.lookup("?"), value.evaluate(env));
-            return equal ? equals : FeelValues.not(equals);
+            var equals = FeelValues.equality(env.lookup("?"), value.evaluate(env), env);
+            return negated ? FeelValues.not(equals) : equals;
         }
 
         @Override
@@ -324,15 +387,27 @@ sealed interface Node {
         }
     }
 
-    /** {@code value between low and high}: {@code value >= low and value <= high} (DMN 1.5, Table 55). */
+    /**
+     * {@code value between low and high}: {@code value >= low and value <= high} (DMN 1.5, Table 55), so false, not null,
+     * when one comparison is false and the other null (Table 50).
+     */
     record Between(Node value, Node low, Node high) implements Node {
         @Override
         public Object evaluate(Env env) {
             var v = value.evaluate(env);
-            var from = FeelValues.compare(v, low.evaluate(env));
-            var to = FeelValues.compare(v, high.evaluate(env));
-            var result = FeelValues.and(from == null ? null : from >= 0, to == null ? null : to <= 0);
-            return result == null ? env.error("between compares values FEEL does not order: " + FeelValues.text(v)) : result;
+            var result = within(v, low.evaluate(env), true, high.evaluate(env), true);
+            return result == null ? env.error(() -> "between compares values FEEL does not order: " + FeelValues.text(v)) : result;
+        }
+
+        /**
+         * {@code value >= from and value <= to}, or {@code >} and {@code <} where an endpoint is excluded, with FEEL's
+         * three-valued {@code and}: a comparison with null, or of values FEEL does not order, is null.
+         */
+        static Object within(Object value, Object from, boolean fromIncluded, Object to, boolean toIncluded) {
+            var above = FeelValues.compare(value, from);
+            var below = FeelValues.compare(value, to);
+            return FeelValues.and(above == null ? null : above > 0 || above == 0 && fromIncluded,
+                    below == null ? null : below < 0 || below == 0 && toIncluded);
         }
 
         @Override
@@ -348,32 +423,59 @@ sealed interface Node {
     }
 
     /**
-     * A positive unary test after {@code in} (DMN 1.5, 10.3.2.10 and Table 55): an expression that names {@code ?}
-     * holds when it is true with {@code ?} bound to the value; one whose value is a list holds when the value is in it,
-     * each element taken as a test (a range holds what is in it, any other element what equals it), and is false, not
-     * null, when none holds, as {@code list contains} is (the DMN TCK's {@code 0072-feel-in} has
-     * {@code true in [false, 2, 3]} false); a range holds what is in it, and a range that is null (an invalid one) holds
-     * nothing known; any other value holds what equals it.
+     * A positive unary test (DMN 1.5, 7.3.2, 10.3.2.10 and Table 55), after {@code in} or in a decision table's cell:
+     * <ul>
+     * <li>an expression that names {@code ?} holds when it is true with {@code ?} bound to the value (7.3.2(d));</li>
+     * <li>a range written {@code [e2..e3]}, {@code (e2..e3)}... is Table 55's {@code e1 >= e2 and e1 <= e3} (or
+     * {@code >} and {@code <} for an excluded endpoint), so false, not null, when one comparison is false and the
+     * other null: {@code 15 in [null..10]} is false, {@code 5 in [null..10]} null, {@code 5 in [10..1]} false. In a
+     * cell, a missing endpoint makes the test null, as a simple cell's interval of inputs is
+     * (docs/DMN-CONFORMANCE.md, case 3);</li>
+     * <li>an expression whose value is a function holds when the function, applied to the value, is true
+     * (7.3.2(c));</li>
+     * <li>one whose value is a list holds when the value is in it (7.3.2(b)), each element taken as a test (a range
+     * holds what is in it, any other element what equals it), and is false, not null, when none holds, as
+     * {@code list contains} is (the DMN TCK's {@code 0072-feel-in} has {@code true in [false, 2, 3]} false);</li>
+     * <li>a range holds what is in it, and a range of one endpoint that is null ({@code < null}) holds nothing
+     * known;</li>
+     * <li>any other value holds what equals it (7.3.2(a)).</li>
+     * </ul>
      */
     record Test(Node expression, boolean questionMark) {
-        Object holds(Object value, Env env) {
+
+        /**
+         * Whether the test holds for a value: true, false or null.
+         *
+         * @param cell whether it is a decision table's cell, in which a range's missing endpoint makes it null
+         */
+        Object holds(Object value, Env env, boolean cell) {
             if (questionMark) {
                 return test(expression.evaluate(env.with(Collections.singletonMap("?", value))));
             }
+            if (expression instanceof RangeLiteral range) {
+                return range.holds(value, env, cell);
+            }
             var test = expression.evaluate(env);
-            if (test instanceof List<?> list) {
-                for (var element : list) {
-                    var holds = element instanceof FeelRange range ? FeelValues.inRange(value, range) : FeelValues.equal(value, element);
-                    if (Boolean.TRUE.equals(holds)) {
-                        return true;
-                    }
+            return switch (test) {
+                case null -> expression instanceof UnaryRange ? null : FeelValues.equality(value, null, env);
+                case List<?> list -> inList(value, list, env);
+                case FeelRange range -> FeelValues.inRange(value, range);
+                case FeelFunction function -> test(Invocation.call(function, Collections.singletonList(value), env));
+                default -> FeelValues.equality(value, test, env);
+            };
+        }
+
+        private static Object inList(Object value, List<?> list, Env env) {
+            for (var element : list) {
+                if (!env.step()) {
+                    return null;
                 }
-                return false;
+                var holds = element instanceof FeelRange range ? FeelValues.inRange(value, range) : FeelValues.equality(value, element, env);
+                if (Boolean.TRUE.equals(holds)) {
+                    return true;
+                }
             }
-            if (test == null && (expression instanceof RangeLiteral || expression instanceof UnaryRange)) {
-                return null;
-            }
-            return test instanceof FeelRange range ? FeelValues.inRange(value, range) : FeelValues.equal(value, test);
+            return false;
         }
     }
 
@@ -384,12 +486,13 @@ sealed interface Node {
             var v = value.evaluate(env);
             Object result = false;
             for (var test : tests) {
-                result = FeelValues.or(result, test.holds(v, env));
+                result = FeelValues.or(result, test.holds(v, env, false));
                 if (Boolean.TRUE.equals(result)) {
                     return result;
                 }
             }
-            return result == null ? env.error("in tests " + FeelValues.text(v) + " against values FEEL does not compare it with") : result;
+            return result == null && !env.stopped()
+                    ? env.error(() -> "in tests " + FeelValues.text(v) + " against values FEEL does not compare it with") : result;
         }
 
         @Override
@@ -416,7 +519,7 @@ sealed interface Node {
     record InstanceOf(Node value, FeelType of) implements Node {
         @Override
         public Object evaluate(Env env) {
-            return FeelValues.isInstance(value.evaluate(env), of);
+            return FeelValues.isInstance(value.evaluate(env), of, env);
         }
 
         @Override
@@ -528,11 +631,26 @@ sealed interface Node {
             if (from != null && to != null) {
                 var order = FeelValues.compare(from, to);
                 if (order == null || order > 0) {
-                    return env.error("a range's endpoints %s and %s are not of one type FEEL orders, in order"
+                    return env.error(() -> "a range's endpoints %s and %s are not of one type FEEL orders, in order"
                             .formatted(FeelValues.text(from), FeelValues.text(to)));
                 }
             }
             return FeelRange.between(from, startIncluded, to, endIncluded);
+        }
+
+        /**
+         * Whether a value is in it, as a positive unary test: Table 55's {@code e1 >= e2 and e1 <= e3}, the endpoints
+         * evaluated and compared with the value, whether or not they make a range.
+         *
+         * @param cell whether it is a decision table's cell, in which a missing endpoint makes it null (case 3)
+         */
+        Object holds(Object value, Env env, boolean cell) {
+            var from = start.evaluate(env);
+            var to = end.evaluate(env);
+            if (cell && (from == null || to == null)) {
+                return null;
+            }
+            return Between.within(value, from, startIncluded, to, endIncluded);
         }
 
         @Override
@@ -547,11 +665,11 @@ sealed interface Node {
     }
 
     /** {@code < e}, {@code <= e}, {@code > e}, {@code >= e}, {@code = e}, {@code != e}: a range of one endpoint (DMN 1.5, 10.3.2.7). */
-    record UnaryRange(String operator, Node endpoint) implements Node {
+    record UnaryRange(FeelRange.Comparison operator, Node endpoint) implements Node {
         @Override
         public Object evaluate(Env env) {
             var value = endpoint.evaluate(env);
-            return value == null ? env.error("the endpoint of " + operator + " is null") : FeelRange.comparison(operator, value);
+            return value == null ? env.error(() -> "the endpoint of " + operator.symbol() + " is null") : FeelRange.comparison(operator, value);
         }
 
         @Override
@@ -577,10 +695,13 @@ sealed interface Node {
         public Object evaluate(Env env) {
             var value = target.evaluate(env);
             return switch (value) {
-                case null -> env.error("null has no '" + name + "'");
+                case null -> env.error(() -> "null has no '" + name + "'");
                 case Map<?, ?> context -> context.containsKey(name) ? context.get(name)
-                        : env.error("the context has no entry '" + name + "'");
+                        : env.error(() -> "the context has no entry '" + name + "'");
                 case List<?> list -> {
+                    if (!env.step(list.size())) {
+                        yield null;
+                    }
                     var values = new ArrayList<>(list.size());
                     list.forEach(element -> values.add(element instanceof Map<?, ?> context ? context.get(name) : null));
                     yield Collections.unmodifiableList(values);
@@ -588,7 +709,7 @@ sealed interface Node {
                 default -> {
                     var property = FeelValues.property(value, name);
                     yield property != FeelValues.NO_PROPERTY ? property
-                            : env.error("a %s has no property '%s'".formatted(FeelValues.typeName(value), name));
+                            : env.error(() -> "a %s has no property '%s'".formatted(FeelValues.typeName(value), name));
                 }
             };
         }
@@ -618,10 +739,12 @@ sealed interface Node {
 
     /**
      * {@code target[condition]} (DMN 1.5, 10.3.2.5): with a number, the element at that position, counted from 1, or
-     * from the end when negative (null, with an error, where there is none); else the elements for which the condition
-     * is true, each tested in a scope with {@code item} bound to it and, for a context, its entries, which come first.
-     * A value that is not a list is filtered as a list of one (the DMN TCK's {@code 0069-feel-list}). Whether the
-     * condition is a number is told by its value for the first element.
+     * from the end when negative, and null where there is none (the DMN TCK's {@code 0069-feel-list} has
+     * {@code [1, 2, 3][4]} null, not an error); else the elements for which the condition is true, each tested in a
+     * scope with {@code item} bound to it and, for a context, its entries, which come first. A value that is not a list
+     * is filtered as a list of one (10.3.2.9.4: a singleton list; Table 45 has {@code 3[item > 2]} be {@code [3]}).
+     * Whether the condition is a number is told by its value for the first element; for an empty list, by its value
+     * with {@code item} null, whose errors are not reported, as no element is tested.
      */
     record Filter(Node target, Node condition) implements Node {
         @Override
@@ -632,8 +755,8 @@ sealed interface Node {
             }
             List<?> list = value instanceof List<?> l ? l : List.of(value);
             if (list.isEmpty()) {
-                var test = condition.evaluate(env.with(Collections.singletonMap("item", null)));
-                return test instanceof BigDecimal ? env.error("an empty list has no element " + test) : List.of();
+                var test = condition.evaluate(env.quiet().with(Collections.singletonMap("item", null)));
+                return env.stopped() || test instanceof Number ? null : List.of();
             }
             var selected = new ArrayList<>();
             for (int i = 0; i < list.size(); i++) {
@@ -642,8 +765,9 @@ sealed interface Node {
                 }
                 var element = list.get(i);
                 var test = condition.evaluate(env.with(itemScope(element)));
-                if (i == 0 && test instanceof BigDecimal index) {
-                    return element(list, index, env);
+                var index = i == 0 && test instanceof Number number ? FeelNumbers.decimal(number) : null;
+                if (index != null) {
+                    return element(list, index);
                 }
                 if (Boolean.TRUE.equals(test)) {
                     selected.add(element);
@@ -662,13 +786,14 @@ sealed interface Node {
             return scope;
         }
 
-        private static Object element(List<?> list, BigDecimal index, Env env) {
+        /** The element at a position, counted from 1, or from the end when negative; null where there is none. */
+        private static Object element(List<?> list, BigDecimal index) {
             int size = list.size();
             if (index.signum() != 0 && index.stripTrailingZeros().scale() <= 0 && index.abs().compareTo(BigDecimal.valueOf(size)) <= 0) {
                 int position = index.intValueExact();
                 return list.get(position > 0 ? position - 1 : size + position);
             }
-            return env.error("a list of %d has no element %s".formatted(size, index.toPlainString()));
+            return null;
         }
 
         @Override
@@ -702,7 +827,7 @@ sealed interface Node {
 
     /**
      * {@code function(a, b: number) body}: a function definition (DMN 1.5, 10.3.2.13), whose value is a function that
-     * closes over the scope it is evaluated in.
+     * closes over the scope of names it is evaluated in.
      *
      * @param types each parameter's declared type, {@link FeelType#ANY} where it declares none
      * @param depth the depth of the body's tree, which invoking it adds to the nesting {@link Env} bounds
@@ -710,7 +835,7 @@ sealed interface Node {
     record FunctionDefinition(List<String> parameters, List<FeelType> types, Node body, int depth) implements Node {
         @Override
         public Object evaluate(Env env) {
-            return new Closure(this, env);
+            return new Closure(this, env.scope());
         }
 
         @Override
@@ -730,46 +855,66 @@ sealed interface Node {
 
     /**
      * {@code callee(arguments)} or {@code callee(name: argument)}: an invocation (DMN 1.5, 10.3.2.13), of a function the
-     * callee evaluates to. Positional arguments must be as many as its parameters; named ones each name a parameter,
-     * those not named being null. Otherwise, or for a callee that is not a function, it is null, with an error.
+     * callee evaluates to. Positional arguments must be as many as it takes; named ones each name a parameter, once,
+     * those not named being null (10.3.2.13.5). Otherwise, or for a callee that is not a function, it is null, with an
+     * error. The function counts against this evaluation's limits, and reports its errors to it.
      *
-     * @param names the arguments' names, in order; empty for positional arguments
+     * @param names the arguments' names, in order, none twice (the parser makes an invocation that names one twice
+     *              {@link Invalid}); empty for positional arguments
      */
     record Invocation(Node callee, List<Node> arguments, List<String> names) implements Node {
         @Override
         public Object evaluate(Env env) {
             var function = callee.evaluate(env);
             if (!(function instanceof FeelFunction f)) {
-                return env.error(FeelValues.text(function) + " is not a function, and cannot be invoked");
+                return env.error(() -> FeelValues.text(function) + " is not a function, and cannot be invoked");
             }
-            var parameters = f.parameters();
-            List<Object> values;
             if (names.isEmpty()) {
-                if (arguments.size() != parameters.size()) {
-                    return env.error("the function takes %d arguments, not %d".formatted(parameters.size(), arguments.size()));
-                }
-                values = new ArrayList<>(arguments.size());
+                var values = new ArrayList<>(arguments.size());
                 for (var argument : arguments) {
                     values.add(argument.evaluate(env));
                 }
-            } else {
-                values = new ArrayList<>(Collections.nCopies(parameters.size(), null));
-                for (int i = 0; i < names.size(); i++) {
-                    int position = parameters.indexOf(names.get(i));
-                    if (position < 0) {
-                        return env.error("the function has no parameter '" + names.get(i) + "'");
-                    }
-                    values.set(position, arguments.get(i).evaluate(env));
-                }
+                return call(f, values, env);
             }
-            return f instanceof Closure closure ? closure.call(values, env) : f.invoke(values, env.errors());
+            var parameters = f.parameters();
+            var positions = new int[names.size()];
+            int highest = -1;
+            for (int i = 0; i < names.size(); i++) {
+                positions[i] = parameters.indexOf(names.get(i));
+                if (positions[i] < 0) {
+                    var name = names.get(i);
+                    return env.error(() -> "the function has no parameter '" + name + "'");
+                }
+                highest = Math.max(highest, positions[i]);
+            }
+            int count = switch (f) {
+                case Closure closure -> parameters.size();
+                case BuiltInFunction builtIn -> Math.max(highest + 1, builtIn.arity().required());
+            };
+            var values = new ArrayList<>(Collections.nCopies(count, null));
+            for (int i = 0; i < names.size(); i++) {
+                values.set(positions[i], arguments.get(i).evaluate(env));
+            }
+            return call(f, values, env);
+        }
+
+        /** Invokes a function from an evaluation, which it counts against and reports its errors to. */
+        static Object call(FeelFunction function, List<Object> arguments, Env env) {
+            return switch (function) {
+                case Closure closure -> closure.call(arguments, env);
+                case BuiltInFunction builtIn -> builtIn.call(arguments, env);
+            };
         }
 
         @Override
         public FeelType type(TypeEnv env) {
             var callee = this.callee.type(env);
             arguments.forEach(argument -> argument.type(env));
-            return callee instanceof FeelType.FunctionOf(var parameters, var result) ? result : FeelType.ANY;
+            return switch (callee) {
+                case FeelType.FunctionOf(var parameters, var result) -> result;
+                case FeelType.Null nothing -> env.alwaysNull("null is not a function, and cannot be invoked");
+                default -> FeelType.ANY;
+            };
         }
 
         @Override
@@ -814,20 +959,43 @@ sealed interface Node {
     /**
      * {@code for a in as, b in bs return body} (DMN 1.5, 10.3.2.14): the list of the body's values for every
      * combination of the iteration variables, the later ones varying fastest, each bound in the scope of the earlier;
-     * {@code partial} is the list of the values so far.
+     * {@code partial} is the list of the values before the current one, as it is then: a value of its own, which the
+     * values after it do not change, so {@code for i in 1..3 return partial} is {@code [[], [[]], [[], [[]]]]}.
      */
     record For(List<String> variables, List<Node> domains, Node body) implements Node {
         @Override
         public Object evaluate(Env env) {
             var results = new ArrayList<>();
-            var partial = Collections.unmodifiableList(results);
             boolean complete = Iteration.over(variables, domains, env, scope -> {
-                var bound = new LinkedHashMap<String, Object>();
-                bound.put("partial", partial);
-                results.add(body.evaluate(scope.with(bound)));
+                var value = body.evaluate(scope.with(Collections.singletonMap("partial", new Prefix(results, results.size()))));
+                results.add(value);
                 return true;
             });
-            return complete ? Collections.unmodifiableList(new ArrayList<>(results)) : null;
+            return complete ? Collections.unmodifiableList(results) : null;
+        }
+
+        /**
+         * The first {@code size} values of a list that is only ever appended to: an immutable list, made without
+         * copying them.
+         */
+        private static final class Prefix extends AbstractList<Object> implements java.util.RandomAccess {
+            private final List<Object> values;
+            private final int size;
+
+            Prefix(List<Object> values, int size) {
+                this.values = values;
+                this.size = size;
+            }
+
+            @Override
+            public Object get(int index) {
+                return values.get(java.util.Objects.checkIndex(index, size));
+            }
+
+            @Override
+            public int size() {
+                return size;
+            }
         }
 
         @Override
@@ -851,22 +1019,23 @@ sealed interface Node {
     }
 
     /**
-     * {@code some a in as satisfies condition}, {@code every a in as satisfies condition} (DMN 1.5, 10.3.2.14): whether
-     * the condition is true for some, or every, combination of the iteration variables.
+     * {@code some a in as satisfies condition}, {@code every a in as satisfies condition} (DMN 1.5, 10.3.2.14 and
+     * Table 49): {@code false or c1 or c2 or ...} and {@code true and c1 and c2 and ...}, the condition's values for
+     * every combination of the iteration variables, with FEEL's three-valued {@code or} and {@code and} (Table 50): so
+     * {@code some} is true if one is true, false if all are false, and null otherwise, as for a condition that is null
+     * or not a boolean for some combination and true for none; {@code every} likewise. It stops at the first value that
+     * decides it.
      */
     record Quantified(boolean every, List<String> variables, List<Node> domains, Node condition) implements Node {
         @Override
         public Object evaluate(Env env) {
-            boolean[] found = {every};
+            Object[] result = {every};
             boolean complete = Iteration.over(variables, domains, env, scope -> {
-                boolean holds = Boolean.TRUE.equals(condition.evaluate(scope));
-                if (holds != every) {
-                    found[0] = holds;
-                    return false;
-                }
-                return true;
+                var holds = test(condition.evaluate(scope));
+                result[0] = every ? FeelValues.and(result[0], holds) : FeelValues.or(result[0], holds);
+                return !Boolean.valueOf(!every).equals(result[0]);
             });
-            return complete ? found[0] : null;
+            return complete ? result[0] : null;
         }
 
         @Override

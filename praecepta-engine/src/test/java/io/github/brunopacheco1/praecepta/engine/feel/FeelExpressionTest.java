@@ -35,11 +35,17 @@ class FeelExpressionTest {
         return FeelExpression.parse(expression).evaluate(name -> null);
     }
 
-    /** Whether the expression's value is that of the expected literal ({@code null} for null), by FEEL's equality. */
+    /**
+     * Whether the expression's value is that of the expected literal ({@code null} for null), by FEEL's equality; the
+     * expected literal is checked to have a value, so that an equality of two nulls passes only where null is expected.
+     */
     private static void assertFeel(String expression, String expected) {
         var actual = value(expression);
         var wanted = value(expected);
-        assertThat(FeelValues.equal(actual, wanted)).as("%s is %s, not %s", expression, actual, expected).isEqualTo(Boolean.TRUE);
+        if (!expected.equals("null")) {
+            assertThat(wanted).as("the expected value %s", expected).isNotNull();
+        }
+        assertThat(FeelValues.equality(actual, wanted)).as("%s is %s, not %s", expression, actual, expected).isEqualTo(Boolean.TRUE);
     }
 
     /** The errors an evaluation reports. */
@@ -62,9 +68,39 @@ class FeelExpressionTest {
         "@\"P1Y2M\"                 | duration(\"P14M\")",
         "date(2025, 1, 31)          | @\"2025-01-31\"",
         "date and time(\"2021-01-01T24:00:00\") | @\"2021-01-02T00:00:00\"",
+        "1.00000000000000000000000000000000001 = 1 | true",
+        "123456789012345678901234567890123456789 | 123456789012345678901234567890123500000",
     })
     void literals_are_feel_values(String expression, String expected) {
+        // DMN 1.5, 10.3.2.3.1: a number is a decimal128, so a literal of more than 34 significant digits is rounded
         assertFeel(expression, expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        "time(\"24:00:00\")             | time(\"00:00:00\")",
+        "@\"24:00:00\"                  | @\"00:00:00\"",
+        "@\"24:00:00.000Z\"             | @\"00:00:00Z\"",
+        "@\"2021-01-01T24:00:00@Europe/Paris\" | @\"2021-01-02T00:00:00@Europe/Paris\"",
+    })
+    void hour_24_is_midnight_as_xml_schema_reads_a_time(String expression, String expected) {
+        // DMN 1.5, 10.3.4.1: a time string is in XML Schema's lexical form for time, which takes 24:00:00 as 00:00:00;
+        // a date time string is a date string, T and a time string, which the DMN TCK's 0100-arithmetic reads as the next day
+        assertFeel(expression, expected);
+        assertThat(FeelExpression.parse(expression).type(name -> null)).isNotEqualTo(FeelType.NULL);
+    }
+
+    @Test
+    void times_and_date_times_compare_to_the_millisecond_and_keep_their_nanoseconds() {
+        // DMN 1.5, 10.3.2.3.4 and 10.3.2.3.6: XML Schema's time and dateTime, whose precision XML Schema 1.0 (3.2.6) leaves
+        // to the application, at least the millisecond; the DMN TCK's 0068-feel-equality (time_005, datetime_003_a)
+        assertFeel("time(\"10:30:00.0001\") = time(\"10:30:00.0002\")", "true");
+        assertFeel("date and time(\"2018-12-08T00:00:00.0001\") = date and time(\"2018-12-08T00:00:00.0000\")", "true");
+        assertFeel("@\"10:30:00.0001Z\" < @\"10:30:00.0009Z\"", "false");
+        assertFeel("@\"10:30:00.001\" > @\"10:30:00.0009\"", "true");
+        assertFeel("@\"10:30:00.0005\" in [@\"10:30:00\"..@\"10:30:00\"]", "true");
+        assertFeel("@\"10:30:00.123456789\".second", "0.123456789");
+        assertFeel("@\"10:30:00.0002\" - @\"10:30:00.0001\"", "@\"PT0.0001S\"");
     }
 
     @Test
@@ -186,12 +222,35 @@ class FeelExpressionTest {
         assertFeel(expression, expected);
     }
 
-    @Test
-    void in_against_a_range_with_a_null_endpoint_is_null() {
-        // the DMN TCK's 0072-feel-in: (null..10] has no start to compare with; [1..null] is no range at all
-        assertThat(value("5 in (null..10]")).isNull();
-        assertThat(value("5 in [1..null]")).isNull();
-        assertThat(errors("5 in [1..null]")).isNotEmpty();
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        "5 in (null..10]      | null",
+        "5 in [1..null]       | null",
+        "5 in [null..10]      | null",
+        "15 in [null..10]     | false",
+        "-5 in [1..null]      | false",
+        "5 in [10..1]         | false",
+        "5 in [1..\"a\"]      | null",
+        "5 between null and 1 | false",
+    })
+    void in_a_range_is_table_55s_comparisons_with_its_endpoints(String expression, String expected) {
+        // DMN 1.5, Table 55: e1 in [e2..e3] is e1 >= e2 and e1 <= e3, three-valued as Table 50 has and; the DMN TCK's
+        // 0072-feel-in has 5 in (null..10] null, and 5 in [1..null] an error
+        assertFeel(expression, expected);
+        assertThat(errors(expression)).hasSize(expected.equals("null") ? 1 : 0);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        "5 in (function(x) x > 3)                 | true",
+        "2 in (function(x) x > 3)                 | false",
+        "5 in (function(x) x)                     | null",
+        "{f: function(x) x > 3, r: 5 in f}.r      | true",
+    })
+    void a_function_is_a_test_its_value_applied_to_holds(String expression, String expected) {
+        // DMN 1.5, 7.3.2(c): a unary test is satisfied when "one of the expressions ... evaluates to true when the
+        // implicit value is applied to it"
+        assertFeel(expression, expected);
     }
 
     // ---- instance of (10.3.2.9) --------------------------------------------------------------------
@@ -212,18 +271,32 @@ class FeelExpressionTest {
         "(function(a: number) a + 1) instance of function<number>->number | true",
         "(function(a: number) \"x\") instance of function<number>->number | false",
         "(function(a: context<a: string>) {b: 1}) instance of function<context<a: string, b: string>>->context<b: number> | true",
+        "(< 10) instance of range<number>                      | true",
     })
     void instance_of_tests_a_value_against_a_type(String expression, String expected) {
         assertFeel(expression, expected);
     }
 
     @Test
-    void instance_of_reads_the_types_the_model_defines() {
+    void instance_of_reads_the_types_the_model_defines_and_no_other() {
         var types = Map.<String, FeelType>of("tAmounts", FeelType.listOf(ColumnType.NUMBER));
         var expression = FeelExpression.parse("x instance of tAmounts", List.of("x"), types);
         assertThat(expression.evaluate(Map.of("x", List.of(BigDecimal.ONE))::get)).isEqualTo(true);
-        assertThatThrownBy(() -> FeelExpression.parse("x instance of tOther", List.of("x"), types))
-                .isInstanceOf(ExpressionSyntaxException.class).hasMessageContaining("'tOther' is not a type");
+        var errors = new ArrayList<String>();
+        var other = FeelExpression.parse("x instance of tOther", List.of("x"), types);
+        assertThat(other.evaluate(Map.of("x", BigDecimal.ONE)::get, errors::add)).isNull();
+        assertThat(errors).singleElement().asString().contains("'tOther' is not a type");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"5 instance of foo", "5 instance of list", "[5] instance of list<foo>", "(function(a: foo) a)(1)",
+        "5 instance of context"})
+    void instance_of_a_type_feel_does_not_have_is_null_with_an_error(String expression) {
+        // DMN 1.5, Table 61: "If e2 cannot be mapped to a node in the lattice L, the result is null", and "123 instance
+        // of list is null as a list type requires parameters"; a parameter of such a type likewise
+        assertThat(value(expression)).isNull();
+        assertThat(errors(expression).getFirst()).contains("is not a type");
+        assertThat(FeelExpression.parse(expression).type(name -> null)).isEqualTo(FeelType.NULL);
     }
 
     // ---- if, for, some, every (10.3.2.13, 10.3.2.14) --------------------------------------------------
@@ -238,20 +311,39 @@ class FeelExpressionTest {
         "for i in [1, 2], j in [10, 20] return i + j              | [11, 21, 12, 22]",
         "for x in [[1, 2], [3]], y in x return y                  | [1, 2, 3]",
         "for i in 0..4 return if i = 0 then 1 else i * partial[-1] | [1, 1, 2, 6, 24]",
+        "for i in 1..3 return partial                             | [[], [[]], [[], [[]]]]",
+        "(for i in 1..3 return partial)[1] = []                   | true",
         "for d in @\"2025-01-30\"..@\"2025-02-01\" return d.day     | [30, 31, 1]",
         "some x in [1, 2, 3] satisfies x > 2                      | true",
         "every x in [1, 2, 3] satisfies x > 2                     | false",
         "every x in [] satisfies x > 2                            | true",
+        "some x in [] satisfies x > 2                             | false",
+        "some x in [1, 2], y in [3, 4] satisfies x + y = 6        | true",
+        "every x in [1, 2], y in [3, 4] satisfies x < y           | true",
+        "some x in [null, true] satisfies x                       | true",
+        "every x in [false, null] satisfies x                     | false",
     })
     void conditionals_and_iterations(String expression, String expected) {
+        // DMN 1.5, 10.3.2.14 and Table 49: partial is the list of the values before the current one
         assertFeel(expression, expected);
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"some x in [null, 1] satisfies x > 2", "every x in [1, null] satisfies x > 0", "every x in [1, 2] satisfies null",
+        "some x in [1] satisfies 1", "every x in [true, null] satisfies x", "some x in null satisfies true", "every x in null satisfies true"})
+    void some_and_every_are_or_and_and_of_three_values(String expression) {
+        // DMN 1.5, Table 49: some ... satisfies e is "false or FEEL(e, s') or ...", every ... "true and FEEL(e, s') and
+        // ...", with Table 50's or and and, so a condition that is null, or not a boolean, and decides nothing is null;
+        // the DMN TCK's 1153-feel-some and 1154-feel-every (test 006)
+        assertThat(value(expression)).isNull();
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"for i in \"a\"..\"z\" return i", "for i in [1..2] return i", "for i in 1 return i",
-        "for i in 1..10000000 return i", "for i in 1..2000, j in 1..2000 return i"})
+        "for i in 1..10000000 return i", "for i in 1..2000, j in 1..2000 return i", "for i in 1.5..3 return i"})
     void an_iteration_over_what_is_not_a_list_or_too_long_is_null_with_an_error(String expression) {
-        // the DMN TCK's 0084-feel-for-loops; and Praecepta's bound of a million iterations an evaluation
+        // the DMN TCK's 0084-feel-for-loops; DMN 1.5, 10.3.2.14: a range iterates whole numbers; and Praecepta's bound of a
+        // million steps an evaluation
         assertThat(value(expression)).isNull();
         assertThat(errors(expression)).isNotEmpty();
     }
@@ -268,14 +360,22 @@ class FeelExpressionTest {
         "[{x: 1}, {x: null}][x < 2]                    | [{x: 1}]",
         "[1, 2][true]                                  | [1, 2]",
         "100[1]                                        | 100",
+        "3[item > 2]                                   | [3]",
         "true[false]                                   | []",
         "[{a: 1}, {b: 2}].b                            | [null, 2]",
+        "[1, 2].a                                      | [null, null]",
         "{a: 1 + 2, b: a * 2}.b                        | 6",
         "{a b: 1, c: a b + 1}.c                        | 2",
         "{\"a-b\": 1}                                   | {\"a-b\": 1}",
         "{a: {b: {c: 3}}}.a.b.c                        | 3",
         "@\"2025-01-31\".weekday                        | 5",
         "@\"2025-01-31T10:20:30+02:00\".time offset     | @\"PT2H\"",
+        "@\"2025-01-31T10:00:00@Europe/Paris\".timezone | \"Europe/Paris\"",
+        "@\"10:20:30-01:00\".time offset                | @\"-PT1H\"",
+        "@\"2025-01-31T10:20:30\".time offset           | null",
+        "@\"2025-01-31T10:20:30\".timezone              | null",
+        "@\"10:20:30\".time offset                      | null",
+        "@\"10:20:30Z\".timezone                        | null",
         "@\"P1Y14M\".years                              | 2",
         "@\"PT36H\".days                                | 1",
         "[1..10).end included                          | false",
@@ -286,11 +386,26 @@ class FeelExpressionTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"[1, 2, 3][0]", "[1, 2, 3][4]", "{a: 1}.b", "null.a", "@\"P1Y\".days", "{a: 1, a: 2}", "[][1]"})
-    void a_missing_element_entry_or_property_is_null_with_an_error(String expression) {
-        // the DMN TCK's 0069-feel-list, 0057-feel-context and 0074-feel-properties
+    @ValueSource(strings = {"{a: 1}.b", "null.a", "@\"P1Y\".days", "{a: 1, a: 2}"})
+    void a_missing_entry_or_property_is_null_with_an_error(String expression) {
+        // the DMN TCK's 0057-feel-context and 0074-feel-properties
         assertThat(value(expression)).isNull();
         assertThat(errors(expression)).isNotEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"[1, 2, 3][0]", "[1, 2, 3][4]", "[1, 2, 3][-4]", "[][1]"})
+    void an_index_beyond_a_list_is_null(String expression) {
+        // the DMN TCK's 0069-feel-list (decision002, decision003, decision008): null, not an error result
+        assertThat(value(expression)).isNull();
+        assertThat(errors(expression)).isEmpty();
+    }
+
+    @Test
+    void a_filter_of_an_empty_list_reports_no_error_of_its_condition() {
+        // no element is tested: the condition's value with item null only tells an index from a test
+        assertThat(errors("[][item > 1]")).isEmpty();
+        assertFeel("[][item > 1]", "[]");
     }
 
     // ---- functions (10.3.2.13) ---------------------------------------------------------------------
@@ -303,29 +418,77 @@ class FeelExpressionTest {
         "{y: 10, f: function(x) x + y, r: f(1)}.r                      | 11",
         "{f: function(n) if n = 0 then 1 else n * f(n - 1), r: f(5)}.r | 120",
         "(function(xs: list<number>) xs[1])(7)                         | 7",
+        "(function(a: number) a)([7])                                  | 7",
+        "(function(a, b) b)(b: 2)                                      | 2",
         "(function(d: date and time) d)(@\"2025-01-31\")                | @\"2025-01-31T00:00:00Z\"",
     })
     void functions_close_over_their_scope_and_take_positional_or_named_arguments(String expression, String expected) {
+        // DMN 1.5, 10.3.2.13 and 10.3.2.9.4: a list of one is bound to a parameter of its element's type
         assertFeel(expression, expected);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"(function(a) a)(1, 2)", "(function(a) a)(b: 1)", "1(2)", "(function(a: number) a)(\"x\")",
-        "{f: function(n) f(n), r: f(1)}.r"})
+        "{f: function(n) f(n), r: f(1)}.r", "(function(a, b) a)(a: 1, a: 2)"})
     void an_invocation_feel_does_not_define_is_null_with_an_error(String expression) {
         assertThat(value(expression)).isNull();
         assertThat(errors(expression)).isNotEmpty();
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        "(function(x) x) = (function(x) x)                                | true",
+        "{a: function(x) x + 1, b: function(x) x + 1, r: a = b}.r          | true",
+        "(function(x) x) = (function(y) y)                                | false",
+        "(function(x) x) = (function(x) x + 0)                            | false",
+        "(function(x: number) x) = (function(x) x)                        | false",
+        "(for i in [1, 2] return function(x) x)[1] = (for i in [1, 2] return function(x) x)[2] | false",
+        "{f: function(x) x, g: f, r: f = g}.r                             | true",
+    })
+    void functions_are_equal_with_the_same_parameters_body_and_scope(String expression, String expected) {
+        // DMN 1.5, Table 53: internal functions are equal when they have the "same parameters, body and scope"; each
+        // iteration of a for is a scope of its own
+        assertFeel(expression, expected);
     }
 
     @Test
     void a_built_in_function_parses_and_is_named_as_planned_for_0_9() {
         var expression = FeelExpression.parse("string length(Name) + count([1])", List.of("Name"));
         assertThat(expression.names()).containsExactly("Name");
-        assertThat(expression.unsupported()).containsExactly("the built-in function 'string length', planned for 0.9 (#117)",
-                "the built-in function 'count', planned for 0.9 (#117)");
+        assertThat(expression.unsupported()).containsExactly(new FeelExpression.Unsupported("the built-in function 'string length'", "0.9", 117),
+                new FeelExpression.Unsupported("the built-in function 'count'", "0.9", 117));
+        assertThat(expression.unsupported().getFirst()).hasToString("the built-in function 'string length', planned for 0.9 (#117)");
         assertThat(expression.evaluate(name -> "abc")).isNull();
-        assertThat(FeelExpression.parse("function(a) external {java: {class: \"x\"}}").unsupported()).singleElement()
-                .asString().contains("0.11 (#119)");
+        assertThat(FeelExpression.parse("function(a) external {java: {class: \"x\"}}").unsupported())
+                .containsExactly(new FeelExpression.Unsupported("an external function (Java or PMML)", "0.11", 119));
+    }
+
+    @Test
+    void a_function_value_invoked_from_java_is_an_evaluation_of_its_own() {
+        var function = (FeelFunction) value("function(x) x + \"a\"");
+        var errors = new ArrayList<String>();
+        assertThat(function.invoke(List.of("b"), errors::add)).isEqualTo("ba");
+        assertThat(function.invoke(List.of(BigDecimal.ONE), errors::add)).isNull();
+        assertThat(errors).singleElement().asString().contains("does not combine");
+        assertThat(function.parameters()).containsExactly("x");
+        assertThat(function.type()).isEqualTo(new FeelType.FunctionOf(List.of(FeelType.ANY), FeelType.ANY));
+    }
+
+    @Test
+    void a_number_given_as_a_java_number_is_a_feel_number() {
+        // a value given to an evaluation as an Integer, a Long or a Double is the decimal of its value
+        var values = Map.<String, Object>of("i", 1, "l", 2L, "d", 2.5, "f", 0.5f, "s", (short) 3);
+        for (var expression : List.of("i = 1", "i < 2", "i + l = 3", "d * 2 = 5", "f + f = 1", "i in [1..2]", "l between 1 and 3",
+                "s in (1, 3)", "i instance of number", "[i][1] = 1", "(for k in i..l return k) = [1, 2]")) {
+            assertThat(FeelExpression.parse(expression, values.keySet()).evaluate(values::get)).as(expression).isEqualTo(true);
+        }
+        assertThat(FeelExpression.parse("i", List.of("i")).evaluate(values::get)).isEqualTo(BigDecimal.ONE);
+        // nested in a list, it compares and computes as one too
+        var nested = Map.<String, Object>of("xs", List.of(1, 2L, 3.0));
+        assertThat(FeelExpression.parse("xs[1] + xs[2] = xs[3] and xs[3] > 2 and xs = [1, 2, 3]", nested.keySet()).evaluate(nested::get))
+                .isEqualTo(true);
+        assertThat(FeelExpression.parse("d", List.of("d")).evaluate(Map.of("d", Double.NaN)::get, null)).isEqualTo(Double.NaN);
+        assertThat(FeelExpression.parse("d + 1", List.of("d")).evaluate(Map.of("d", Double.NaN)::get, null)).isNull();
     }
 
     // ---- names (10.3.1.2) ----------------------------------------------------------------------------

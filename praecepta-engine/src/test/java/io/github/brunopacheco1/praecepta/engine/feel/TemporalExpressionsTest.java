@@ -152,14 +152,15 @@ class TemporalExpressionsTest {
     @Test
     void date_time_literals_are_read_as_cells_read_them() {
         Assertions.assertThat(parse("date(2025, 1, 31) + @\"P1D\"").evaluate(any -> null)).isEqualTo(LocalDate.of(2025, 2, 1));
-        // an invalid date literal is null, with an error (DMN 1.5, 10.3.2.15; the TCK's 1115-feel-date-function)
+        // an invalid date literal is null, with an error (DMN 1.5, 10.3.2.16; the TCK's 1115-feel-date-function)
         var errors = new java.util.ArrayList<String>();
         Assertions.assertThat(parse("date(\"2025-02-30\") + @\"P1D\"").evaluate(any -> null, errors::add)).isNull();
         Assertions.assertThat(errors).isNotEmpty();
         // the date and time functions of other arguments, and the other built-in functions, are planned for 0.9 (#117)
-        Assertions.assertThat(parse("date(x)").unsupported()).containsExactly("the built-in function 'date', planned for 0.9 (#117)");
-        Assertions.assertThat(parse("years and months duration(due, due)").unsupported())
-                .containsExactly("the built-in function 'years and months duration', planned for 0.9 (#117)");
+        Assertions.assertThat(parse("date(x)").unsupported())
+                .containsExactly(new FeelExpression.Unsupported("the built-in function 'date'", "0.9", 117));
+        Assertions.assertThat(parse("years and months duration(due, due)").unsupported()).singleElement()
+                .hasToString("the built-in function 'years and months duration', planned for 0.9 (#117)");
     }
 
     private static FeelExpression parse(String text) {

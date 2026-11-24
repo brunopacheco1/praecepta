@@ -387,9 +387,9 @@ public final class DmnReader {
         }
         var unsupported = literalExpression.expression().unsupported();
         if (!unsupported.isEmpty()) {
-            var planned = unsupported.getFirst().contains("#119") ? IMPORTS : FUNCTIONS;
+            var planned = unsupported.getFirst().issue() == 119 ? IMPORTS : FUNCTIONS;
             throw planned.exception("%s: its literal expression uses %s, which Praecepta does not support yet".formatted(where,
-                    String.join(" and ", unsupported)));
+                    String.join(" and ", unsupported.stream().map(Object::toString).toList())));
         }
         return literalExpression;
     }
@@ -894,10 +894,11 @@ public final class DmnReader {
     }
 
     /** Rejects an expression that uses what Praecepta does not evaluate yet, naming the release that plans it. */
-    private static void rejectUnsupported(String where, List<String> unsupported) {
+    private static void rejectUnsupported(String where, List<FeelExpression.Unsupported> unsupported) {
         if (!unsupported.isEmpty()) {
-            var planned = unsupported.getFirst().contains("#119") ? IMPORTS : FUNCTIONS;
-            throw planned.exception("%s uses %s, which Praecepta does not support yet".formatted(where, String.join(" and ", unsupported)));
+            var planned = unsupported.getFirst().issue() == 119 ? IMPORTS : FUNCTIONS;
+            throw planned.exception("%s uses %s, which Praecepta does not support yet".formatted(where,
+                    String.join(" and ", unsupported.stream().map(Object::toString).toList())));
         }
     }
 

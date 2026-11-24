@@ -20,26 +20,29 @@ import java.util.function.Function;
  * tests.matches(new BigDecimal("25"), Map.of("Limit", BigDecimal.TEN, "Low", BigDecimal.ONE)::get, null); // true
  * }</pre>
  *
- * <p><b>The tests</b> (DMN 1.5, 10.3.2.10 and Table 55, as FEEL's {@code in} applies a positive unary test):
+ * <p><b>The tests</b> (DMN 1.5, 7.3.2, 10.3.2.10 and Table 55, as FEEL's {@code in} applies a positive unary test):
  * {@code -} is satisfied by every value, a missing one included. Positive unary tests {@code t1, t2, ...} are satisfied
  * when one of them is true, FEEL's three-valued {@code or}; {@code not(t1, t2, ...)} when that is false, so neither a
  * test nor its {@code not(...)} is satisfied where the test is null, as for a comparison with a missing value. Each
- * positive unary test is an expression (grammar rule 15), whose endpoints and values may be any expression: names, as
+ * positive unary test is an expression (grammar rule 13), whose endpoints and values may be any expression: names, as
  * of other inputs, arithmetic, paths, date and time literals, lists and ranges:
  * <ul>
- * <li>one that names {@code ?}, the value tested, is true where its value is true ({@code ? > 5 and ? < 10});</li>
+ * <li>one that names {@code ?}, the value tested, is true where its value is true ({@code ? > 5 and ? < 10},
+ * 7.3.2(d));</li>
  * <li>{@code = e} and {@code != e} compare the value with {@code e}, {@code ? = e} and {@code ? != e}, as Table 53
  * defines them, so {@code = null} is true for a missing value;</li>
- * <li>any other one is evaluated, and is true when its value is a range that holds the value ({@code < e},
- * {@code [a..b]}), a list one of whose elements holds it (a range element) or equals it (any other), or a value that
- * equals it, as Table 53 has {@code =}: {@code true} is satisfied by {@code true} alone. A comparison FEEL does not
- * define (a number and a string) is null.</li>
+ * <li>an interval {@code [a..b]} is Table 55's {@code ? >= a and ? <= b}; a missing endpoint makes it null, as for a
+ * simple cell's interval of inputs (docs/DMN-CONFORMANCE.md, case 3);</li>
+ * <li>any other one is evaluated, and is true when its value is a range that holds the value ({@code < e}), a
+ * function that is true applied to the value ({@code function(x) x > 3}, 7.3.2(c)), a list one of whose elements holds
+ * it (a range element) or equals it (any other, 7.3.2(b)), or a value that equals it, as Table 53 has {@code =}
+ * (7.3.2(a)): {@code true} is satisfied by {@code true} alone, and so is a test that does not name {@code ?} but gives
+ * a boolean (docs/DMN-CONFORMANCE.md, case 24). A comparison FEEL does not define (a number and a string) is null.</li>
  * </ul>
- * Where DMN 1.5 leaves how a test that does not name {@code ?} but gives a boolean applies, it is compared, as any other
- * value is (docs/DMN-CONFORMANCE.md, case 24).
  *
- * <p>The limits of {@link FeelExpression} apply to each test: the tests nest at most 300 levels, and one application
- * takes at most a million steps. FEEL's built-in functions are planned for 0.9
+ * <p>The limits of {@link FeelExpression} apply to each application of the tests, which is an evaluation of its own:
+ * the tests nest as deeply as an expression may, and one application takes at most a million steps; beyond them, the
+ * tests are not satisfied. FEEL's built-in functions are planned for 0.9
  * (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>): {@link #unsupported()} names those a test
  * invokes. Immutable and thread-safe.
  */
@@ -49,7 +52,7 @@ public final class FeelUnaryTests {
     private final List<Node.Test> tests;
     private final boolean negated;
     private final List<String> names;
-    private final List<String> unsupported;
+    private final List<FeelExpression.Unsupported> unsupported;
     private final int depth;
 
     private FeelUnaryTests(String text, FeelParser.ParsedTests parsed) {
@@ -116,7 +119,7 @@ public final class FeelUnaryTests {
      * What the tests use that DMN 1.5 defines but Praecepta does not evaluate yet, each naming the release that plans it,
      * as {@link FeelExpression#unsupported()} names it; empty if they use none.
      */
-    public List<String> unsupported() {
+    public List<FeelExpression.Unsupported> unsupported() {
         return unsupported;
     }
 
@@ -128,7 +131,8 @@ public final class FeelUnaryTests {
     /**
      * Whether every test is one of DMN 1.5's simple positive unary tests (grammar rule 7), or {@code null}: a literal or a
      * name, a comparison with one, or an interval between two, which {@link CellParser} reads into the tests the bitset
-     * index of a decision table evaluates.
+     * index of a decision table evaluates. A negative number is a literal written with its minus attached ({@code -1});
+     * {@code - 1} is a negation, which is FEEL beyond them.
      */
     public boolean isSimple() {
         return tests.stream().allMatch(FeelUnaryTests::simple);
@@ -170,21 +174,27 @@ public final class FeelUnaryTests {
      * is null for it (a comparison FEEL does not define, or with a missing value) is not satisfied, and neither is its
      * {@code not(...)}.
      *
-     * @param value  the value tested, {@code ?}; null for a missing one
+     * @param value  the value tested, {@code ?}; null for a missing one; a {@link Number} is taken as the
+     *               {@code BigDecimal} of its value
      * @param values the value of each name the tests read, of its type; null for a name with no value
-     * @param errors receives each error FEEL reports on the way (DMN 1.5, 10.3.2.15); may be null
+     * @param errors receives each error FEEL reports on the way (DMN 1.5, 10.3.2.16); may be null
      */
     public boolean matches(Object value, Function<String, Object> values, Consumer<String> errors) {
         if (tests.isEmpty()) {
             return true;
         }
+        var tested = FeelNumbers.normalise(value);
         var env = Env.root(Objects.requireNonNull(values, "values"), errors, depth);
         Object result = false;
-        for (var test : tests) {
-            result = FeelValues.or(result, test.holds(value, env));
-            if (Boolean.TRUE.equals(result)) {
-                break;
+        try {
+            for (var test : tests) {
+                result = env.result(FeelValues.or(result, test.holds(tested, env, true)));
+                if (Boolean.TRUE.equals(result)) {
+                    break;
+                }
             }
+        } finally {
+            env.finish();
         }
         return negated ? Boolean.FALSE.equals(result) : Boolean.TRUE.equals(result);
     }
