@@ -33,7 +33,10 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException
 import io.github.brunopacheco1.praecepta.integration.Decisions;
 import io.github.brunopacheco1.praecepta.integration.TableLocations;
 import io.github.brunopacheco1.praecepta.loader.csv.CsvLoader;
+import it.nativeapp.generated.Band;
+import it.nativeapp.generated.BandInput;
 import it.nativeapp.generated.CreditModel;
+import it.nativeapp.generated.FeelModel;
 import it.nativeapp.generated.Fees;
 import it.nativeapp.generated.FeesInput;
 import it.nativeapp.generated.MonthlyLimit;
@@ -42,6 +45,8 @@ import it.nativeapp.generated.RiskCategory;
 import it.nativeapp.generated.RiskCategoryInput;
 import it.nativeapp.generated.Shipping;
 import it.nativeapp.generated.ShippingInput;
+import it.nativeapp.generated.Summary;
+import it.nativeapp.generated.SummaryInput;
 
 /**
  * An application that uses Praecepta the ways a native executable would: classes the Maven plugin generated
@@ -68,6 +73,7 @@ public final class NativeApp {
         generatedFromCsv();
         generatedFromDmn();
         generatedFromGraph();
+        generatedFromFeelGraph();
         dmnReadAtRuntime();
         csvLoadedAtRuntime();
         integrationDefaultLocation();
@@ -111,6 +117,20 @@ public final class NativeApp {
                 new BigDecimal(50));
         check("Risk Category", () -> RiskCategory.evaluate(new RiskCategoryInput(new BigDecimal(20))), "High");
         check("Credit model report", () -> CreditModel.validationReport().isEmpty(), true);
+    }
+
+    /**
+     * The decisions of rules/feel.dmn (0.8, #116): a decision table in the full FEEL language, whose column Age * 12 is
+     * computed, whose cells compare with Limit * 12, and whose outputs are a string, a number or a list, read by a literal
+     * expression.
+     */
+    private void generatedFromFeelGraph() {
+        check("Band, within the limit", () -> Band.evaluate(new BandInput(new BigDecimal(30), new BigDecimal(100))), new BigDecimal(360));
+        check("Band, over the limit", () -> Band.evaluate(new BandInput(new BigDecimal(30), new BigDecimal(20))), "over the limit");
+        check("Band, a list", () -> Band.evaluate(new BandInput(new BigDecimal(10), new BigDecimal(20))),
+                List.of(new BigDecimal(10), new BigDecimal(20)));
+        check("Summary", () -> Summary.evaluate(new SummaryInput(new BigDecimal(30), new BigDecimal(100))), true);
+        check("Feel model report", () -> FeelModel.validationReport().isEmpty(), true);
     }
 
     /**

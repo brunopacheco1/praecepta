@@ -121,6 +121,60 @@ class PraeceptaPluginFunctionalTest {
         Assertions.assertThat(generated).isEqualTo(read(GOLDEN.resolve("fees")));
     }
 
+    /**
+     * Decision tables in the full FEEL language (0.8, #116), compiled as a decision requirements graph: FEEL cells, a
+     * column computed by its input expression, and output entries of several types, read by a literal expression.
+     */
+    @Test
+    void a_decision_table_in_the_full_feel_language_compiles_and_runs() throws IOException, URISyntaxException {
+        var project = project("feel", """
+                plugins {
+                    id 'application'
+                    id 'io.github.brunopacheco1.praecepta' version '%s'
+                }
+                dependencies {
+                    implementation 'io.github.brunopacheco1:praecepta-engine:%s'
+                }
+                application {
+                    mainClass = 'app.Main'
+                }
+                praecepta {
+                    packageName = 'com.acme.feel'
+                    tables {
+                        register('feel') {
+                            source = file('src/main/rules/feel.dmn')
+                        }
+                    }
+                }
+                """.formatted(VERSION, VERSION));
+        var rules = Files.createDirectories(project.resolve("src/main/rules"));
+        Files.copy(Path.of(PraeceptaPluginFunctionalTest.class.getResource("/tables/feel.dmn").toURI()), rules.resolve("feel.dmn"));
+        write(project.resolve("src/main/java/app/Main.java"), """
+                package app;
+
+                import java.math.BigDecimal;
+
+                import com.acme.feel.Band;
+                import com.acme.feel.BandInput;
+                import com.acme.feel.Summary;
+                import com.acme.feel.SummaryInput;
+
+                public class Main {
+                    public static void main(String[] args) {
+                        System.out.println("band: " + Band.evaluate(new BandInput(new BigDecimal(30), new BigDecimal(100))));
+                        System.out.println("over: " + Band.evaluate(new BandInput(new BigDecimal(30), new BigDecimal(20))));
+                        System.out.println("list: " + Band.evaluate(new BandInput(new BigDecimal(10), new BigDecimal(20))));
+                        System.out.println("summary: " + Summary.evaluate(new SummaryInput(new BigDecimal(30), new BigDecimal(100))));
+                    }
+                }
+                """);
+
+        var result = gradle(project, "run").build();
+
+        Assertions.assertThat(result.task(":generatePraecepta").getOutcome()).isEqualTo(TaskOutcome.SUCCESS);
+        Assertions.assertThat(result.getOutput()).contains("band: 360", "over: over the limit", "list: [10, 20]", "summary: true");
+    }
+
     @Test
     void the_task_is_up_to_date_and_comes_from_the_build_cache_in_another_directory() throws IOException {
         var cache = directory.resolve("build-cache");

@@ -239,6 +239,24 @@ class PraeceptaAutoConfigurationTest {
                 Assertions.assertThat(context).hasNotFailed());
     }
 
+    /**
+     * A decision table in the full FEEL language (0.8, #116): a column computed by its input expression, cells beyond the
+     * simple unary tests and output entries of several types, read by a literal expression, loads with no issue.
+     */
+    @Test
+    void a_decision_table_in_the_full_feel_language_is_evaluated_through_the_decisions_bean() {
+        runner.withPropertyValues("praecepta.locations=classpath:feel-graphs/*.dmn", "praecepta.fail-on=ERROR").run(context -> {
+            Assertions.assertThat(context).hasNotFailed();
+            var decisions = context.getBean(Decisions.class);
+            Assertions.assertThat(decisions.names()).containsExactly("Band", "Summary");
+            Assertions.assertThat(decisions.evaluate("Band", Map.of("Age", "30", "Limit", "100"))).containsExactly(Map.of("Band", "360"));
+            Assertions.assertThat(decisions.evaluate("Band", Map.of("Age", "30", "Limit", "20")))
+                    .containsExactly(Map.of("Band", "over the limit"));
+            Assertions.assertThat(decisions.evaluate("Summary", Map.of("Age", "30", "Limit", "100"))).containsExactly(Map.of("Summary", "true"));
+            Assertions.assertThat(decisions.evaluate("Summary", Map.of("Age", "10", "Limit", "20"))).containsExactly(Map.of("Summary", "false"));
+        });
+    }
+
     @Test
     void a_decision_requirements_graph_with_a_cycle_stops_startup_naming_it_unless_fail_on_is_none() {
         var cycle = "praecepta.locations=classpath:broken-graphs/cycle.dmn";
