@@ -12,8 +12,8 @@ import java.util.Map;
  * to the engine's output type.
  *
  * <p>An output may instead name an input column, as a DMN output entry {@code a} returns the input
- * {@code a}, or compute its value with an expression, as in {@code Symptom + " is listed"} (see
- * {@code OutputExpression}). The engine fills such outputs in from each evaluated input, with the text
+ * {@code a}, or compute its value with a FEEL expression, as in {@code Symptom + " is listed"} (see
+ * {@code FeelExpression}). The engine fills such outputs in from each evaluated input, with the text
  * of the input's value or of the expression's ({@code null} if it is missing), so the
  * {@code OutputStrategy} only ever sees {@link #values}.
  *

@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
-import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression.Operator;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelArithmetic.Operator;
 
 /**
  * A parsed FEEL expression (DMN 1.5, 10.3.1.2), as {@link FeelParser} builds it: a tree of these nodes, each of which
@@ -45,6 +45,29 @@ sealed interface Node {
 
     private static Object test(Object value) {
         return value instanceof Boolean ? value : null;
+    }
+
+    /**
+     * The values of the constants in trees, in the order written, but null, found with a stack of their own: a
+     * constant of a function value (a built-in function) is no literal and is left out.
+     */
+    static List<Object> literals(List<Node> roots) {
+        var literals = new ArrayList<>();
+        var pending = new java.util.ArrayDeque<Node>();
+        for (int i = roots.size() - 1; i >= 0; i--) {
+            pending.push(roots.get(i));
+        }
+        while (!pending.isEmpty()) {
+            var node = pending.pop();
+            if (node instanceof Constant(var value) && value != null && !(value instanceof FeelFunction)) {
+                literals.add(value);
+            }
+            var children = node.children();
+            for (int i = children.size() - 1; i >= 0; i--) {
+                pending.push(children.get(i));
+            }
+        }
+        return List.copyOf(literals);
     }
 
     // ---- literals and names ------------------------------------------------------------------------
@@ -273,6 +296,31 @@ sealed interface Node {
         @Override
         public List<Node> children() {
             return List.of(left, right);
+        }
+    }
+
+    /**
+     * A decision table's test {@code = e} or {@code != e} (DMN 1.5, grammar rule 7, and Table 53): whether the value tested,
+     * {@code ?}, equals {@code e}, or does not; so {@code = null} holds for a missing value.
+     *
+     * @param equal whether it is {@code =}, else {@code !=}
+     */
+    record Equality(boolean equal, Node value) implements Node {
+        @Override
+        public Object evaluate(Env env) {
+            var equals = FeelValues.equal(env.lookup("?"), value.evaluate(env));
+            return equal ? equals : FeelValues.not(equals);
+        }
+
+        @Override
+        public FeelType type(TypeEnv env) {
+            value.type(env);
+            return FeelType.of(ColumnType.BOOLEAN);
+        }
+
+        @Override
+        public List<Node> children() {
+            return List.of(value);
         }
     }
 

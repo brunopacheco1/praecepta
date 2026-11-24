@@ -442,9 +442,16 @@ class DecisionGraphPropertiesTest {
             }
             try {
                 var table = tables.get(i);
-                outcomes.add(new Value(table.aggregation() != null
-                        ? aggregate(table, engine(s, matching(table)).evaluate(input))
-                        : value(table, engine(s, table).evaluate(input))));
+                Object value;
+                if (table.aggregation() != null) {
+                    value = aggregate(table, engine(s, matching(table)).evaluate(input));
+                } else if (!hasOneResult(table) && table.defaultOutput().isPresent() && engine(s, matching(table)).evaluate(input).isEmpty()) {
+                    // DMN 1.5, 10.3.2.10, step 2: the default output, a single value, which a decision of no declared type keeps
+                    value = result(table, engine(s, table).evaluate(input).getFirst());
+                } else {
+                    value = value(table, engine(s, table).evaluate(input));
+                }
+                outcomes.add(new Value(value));
             } catch (RuntimeException e) {
                 outcomes.add(new Thrown(Set.of(e.getClass())));
             }

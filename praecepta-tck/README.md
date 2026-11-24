@@ -60,8 +60,10 @@ give them; a structured one as a map of its components, a list as a list; one of
 test file's `xsi:type`. It takes a node when the model as a whole is one `readModel` reads and the graph evaluates
 the decision: what is not supported is what the engine rejects. A model with a business knowledge model, a decision
 service, an import, or a literal expression that invokes a built-in function (0.9) is not read, and a decision the
-graph's validation report blocks is not evaluated. Literal expressions are the full FEEL language since 0.8
-([#116](https://github.com/brunopacheco1/praecepta/issues/116)). Where a decision's value is null and its own logic
+graph's validation report blocks is not evaluated. Literal expressions, and decision tables' input expressions,
+input entries and output entries, are the full FEEL language since 0.8
+([#116](https://github.com/brunopacheco1/praecepta/issues/116)); a table entry that invokes a built-in function is
+not read either. Where a decision's value is null and its own logic
 reported an error (`DecisionGraph.evaluateWithErrors`), the node counts as an error where the kit expects one
 (DMN 1.5, 10.3.2.15), and as its null value otherwise.
 
@@ -103,7 +105,10 @@ node needs, not a proof.
 
 A node's **feature area**, in RESULTS.md, is the latest area among the features its content uses, whether
 Praecepta reads them or not, so it does not change as Praecepta grows: the area's row shows how far that layer is
-done. *What each release unlocks* counts the not-supported nodes by the latest area among what they need.
+done. *What each release unlocks* counts the not-supported nodes by the latest area among what they need. A literal
+expression of the arithmetic of names and literals that the output expressions of 0.6 and 0.7 read counts as no
+feature; 0.8 retired their parser, so the kit's expressions it read are listed, as it read them, in
+`src/test/resources/subset-expressions.txt`.
 
 ## Known failures
 - `0100-arithmetic`, `exponent_lhs_number_exp_rhs_number_005`: a power that is not whole, which the kit gives to
@@ -129,19 +134,17 @@ done. *What each release unlocks* counts the not-supported nodes by the latest a
   list), or when its decision's value is null and its literal expression reported an error, which FEEL does where
   it defines no value (10.3.2.15); it fails otherwise.
 
-## Output expressions
+## Output entries
 `OutputExpressionsTckTest` evaluates the literal expressions of the arithmetic test cases
-(`compliance-level-3/0099-arithmetic-negation` and `0100-arithmetic`) as output expressions, which
-output entries are: every expression Praecepta reads must give the kit's result, or be one the engine
-would reject when it is built (operands of types FEEL does not combine) where the kit expects null; the
-test counts the two apart, as a rejected expression gives no result at all. Of the 1,101 checks,
-Praecepta reads 489: 276 give the kit's result, 212 are rejected where the kit expects null, and one
-differs (below). An expression in `string(...)` is evaluated without it and compared as FEEL's text of the value.
-Expressions outside Praecepta's subset (functions, lists, contexts, booleans, `null` operands, hour 24)
-are counted as not supported, and one check is known to differ: a power that is not whole, which the kit
-gives to 13 digits where FEEL's numbers have 34. The whole-kit run scores the same expressions as decisions in
-the full FEEL language (see *How a model is evaluated*), where all but that one, and those that invoke built-in
-functions, pass.
+(`compliance-level-3/0099-arithmetic-negation` and `0100-arithmetic`) as the output entry of a decision table, which
+is any FEEL expression since 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)): a one-rule table
+whose output declares no type, so that each value keeps its own (DMN 1.5, 10.3.2.10, step 3c), evaluated through a
+`DecisionGraph`. Every expression must give the kit's result. Of the 1,101 checks, 1,100 do, 826 of them null, which
+FEEL gives for operands it does not combine (0.7 rejected such a table when it was built), and one is known to differ:
+a power that is not whole, which the kit gives to 13 digits where FEEL's numbers have 34. An expression in
+`string(...)` is evaluated without it and compared as FEEL's text of the value. The whole-kit run scores the same
+expressions as literal expression decisions (see *How a model is evaluated*), where all but that one, and those that
+invoke built-in functions, pass.
 
 ## Decision requirement graphs
 `DecisionGraph` (0.7, [#14](https://github.com/brunopacheco1/praecepta/issues/14)) evaluates whole models whose

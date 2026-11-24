@@ -22,8 +22,10 @@ import java.util.Set;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
+import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
-import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelUnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 
@@ -113,8 +115,8 @@ final class TimeZones {
                 continue;
             }
             for (var cell : cells(table, column)) {
-                UnaryTests.names(cell).forEach(name -> groups.join(column.name(), name));
-                literals(cell).forEach(value -> kinds.computeIfAbsent(column.name(), any -> EnumSet.noneOf(Kind.class)).add(kind(value)));
+                cell.names().forEach(name -> groups.join(column.name(), name));
+                cell.literals().forEach(value -> kinds.computeIfAbsent(column.name(), any -> EnumSet.noneOf(Kind.class)).add(kind(value)));
             }
         }
 
@@ -134,16 +136,44 @@ final class TimeZones {
         return inputKinds;
     }
 
+    /**
+     * What a cell reads, for its column's kind: the names of the inputs it compares with, and its literals of the
+     * column's type (a cell in the full FEEL language may hold others, such as a duration added to a time).
+     */
+    private record CellReads(List<String> names, List<Object> literals) {
+    }
+
     /** A column's cells, rule by rule (a list column's test its elements), and its allowed values as one more, if it has them. */
-    private static List<UnaryTests> cells(DecisionTable table, DecisionTable.InputColumn column) {
-        var cells = new ArrayList<UnaryTests>();
+    private static List<CellReads> cells(DecisionTable table, DecisionTable.InputColumn column) {
+        var cells = new ArrayList<CellReads>();
+        var scope = scope(table);
         for (var rule : table.rules()) {
-            cells.add(table.cell(rule, column));
+            try {
+                var cell = table.cell(rule, column);
+                cells.add(new CellReads(UnaryTests.names(cell), literals(cell)));
+            } catch (CellSyntaxException rejected) {
+                var tests = FeelUnaryTests.parseCell(rule.input().values().get(column.name()), scope, rejected);
+                cells.add(new CellReads(tests.names(), ofType(tests.literals(), column.type())));
+            }
         }
         if (column.allowedValues() != null) {
-            cells.add(CellParser.parse(column.allowedValues(), column.type()));
+            var allowed = CellParser.parse(column.allowedValues(), column.type());
+            cells.add(new CellReads(List.of(), literals(allowed)));
         }
         return cells;
+    }
+
+    /** The names a table's FEEL may read, in scope when it is parsed: its columns and the other inputs it reads. */
+    private static FeelExpression.Scope scope(DecisionTable table) {
+        var names = new ArrayList<String>();
+        table.inputs().forEach(column -> names.add(column.name()));
+        names.addAll(table.namedInputs().keySet());
+        return FeelExpression.scope(names, Map.of());
+    }
+
+    /** The values of a type among literals. */
+    private static List<Object> ofType(List<Object> literals, ColumnType type) {
+        return literals.stream().filter(value -> typeOf(value) == type).toList();
     }
 
     private static Map<String, Kind> outputKinds(DecisionTable table, Map<String, Kind> inputKinds) {
@@ -177,7 +207,7 @@ final class TimeZones {
             if (input != null) {
                 kinds.add(inputKinds.getOrDefault(input, Kind.LOCAL));
             } else if (expression != null) {
-                expressionKinds(OutputExpression.parse(expression), output.type(), inputTypes(table), inputKinds, kinds);
+                expressionKinds(FeelExpression.parse(expression, scope(table)), output.type(), inputTypes(table), inputKinds, kinds);
             } else if (text != null) {
                 kinds.add(kind(parse(text, output.type(), table, output.name())));
             }
@@ -186,27 +216,15 @@ final class TimeZones {
     }
 
     /**
-     * Adds the kinds of an expression's operands of the output's type, which give the kind of its value: FEEL adds a
-     * duration to a time or a date and time without changing its zone (DMN 1.5, Table 57), and no other operation of
-     * Praecepta's expressions gives a time or a date and time.
+     * Adds the kinds of an expression's literals and inputs of the output's type, which give the kind of its value: FEEL
+     * adds a duration to a time or a date and time without changing its zone (DMN 1.5, Table 57), and an expression
+     * that gives a time or a date and time gives one of those it holds or reads.
      */
-    private static void expressionKinds(OutputExpression expression, ColumnType type, Map<String, ColumnType> inputTypes,
+    private static void expressionKinds(FeelExpression expression, ColumnType type, Map<String, ColumnType> inputTypes,
             Map<String, Kind> inputKinds, Set<Kind> kinds) {
-        switch (expression) {
-            case OutputExpression.Literal(var value) when typeOf(value) == type -> kinds.add(kind(value));
-            case OutputExpression.Name(var name) when inputTypes.get(name) == type -> kinds.add(inputKinds.getOrDefault(name, Kind.LOCAL));
-            case OutputExpression.Literal literal -> {
-                // of another type: not the output's value
-            }
-            case OutputExpression.Name name -> {
-                // an input of another type: not the output's value
-            }
-            case OutputExpression.Negation(var operand) -> expressionKinds(operand, type, inputTypes, inputKinds, kinds);
-            case OutputExpression.Arithmetic(var operator, var left, var right) -> {
-                expressionKinds(left, type, inputTypes, inputKinds, kinds);
-                expressionKinds(right, type, inputTypes, inputKinds, kinds);
-            }
-        }
+        ofType(expression.literals(), type).forEach(value -> kinds.add(kind(value)));
+        expression.names().stream().filter(name -> inputTypes.get(name) == type)
+                .forEach(name -> kinds.add(inputKinds.getOrDefault(name, Kind.LOCAL)));
     }
 
     /** The time or date-and-time type of a literal; null for any other. */
@@ -269,8 +287,8 @@ final class TimeZones {
     }
 
     /** The literal values of a cell, in the order written; names of other inputs are left out. */
-    private static List<Comparable<?>> literals(UnaryTests cell) {
-        var values = new ArrayList<Comparable<?>>();
+    private static List<Object> literals(UnaryTests cell) {
+        var values = new ArrayList<Object>();
         cell.tests().forEach(test -> values.addAll(UnaryTests.values(test)));
         values.removeIf(UnaryTests.Name.class::isInstance);
         return values;

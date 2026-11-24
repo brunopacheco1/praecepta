@@ -66,6 +66,37 @@ class FeelExpressionStackTest {
         }
     }
 
+    /** What unary tests, as a table's cell holds them, give on a small stack: whether they hold for 1, or the exception. */
+    private static String testsOnSmallStack(String cell) throws InterruptedException {
+        var result = new AtomicReference<String>();
+        var thread = new Thread(null, () -> {
+            try {
+                var tests = FeelUnaryTests.parse(cell, FeelExpression.scope(List.of(), java.util.Map.of()));
+                result.set(String.valueOf(tests.matches(java.math.BigDecimal.ONE, name -> null, null)));
+            } catch (ExpressionSyntaxException e) {
+                result.set("syntax: " + e.getMessage());
+            } catch (StackOverflowError e) {
+                result.set("stack overflow");
+            }
+        }, "small stack", STACK);
+        thread.start();
+        thread.join();
+        return result.get();
+    }
+
+    @Test
+    void unary_tests_nest_as_deep_as_expressions_and_no_deeper() throws InterruptedException {
+        int depth = FeelParser.MAX_DEPTH - 2;
+        assertThat(testsOnSmallStack("(".repeat(depth) + "1" + ")".repeat(depth))).isEqualTo("true");
+        assertThat(testsOnSmallStack("not(" + "(".repeat(depth) + "2" + ")".repeat(depth) + ")")).isEqualTo("true");
+        for (var deep : List.of("(".repeat(50_000) + "1" + ")".repeat(50_000), "not(" + "[".repeat(50_000) + "]".repeat(50_000) + ")",
+                "? > " + "-".repeat(50_000) + "1", "= " + "(".repeat(50_000) + "1" + ")".repeat(50_000))) {
+            assertThat(testsOnSmallStack(deep)).startsWith("syntax: ").endsWith("it nests more than 300 levels");
+        }
+        // many tests are a loop, not recursion
+        assertThat(testsOnSmallStack(String.join(", ", Collections.nCopies(100_000, "2")) + ", 1")).isEqualTo("true");
+    }
+
     @Test
     void a_long_flat_expression_takes_no_stack() throws InterruptedException {
         // a list or a context of many entries, and many iteration contexts, are loops, not recursion

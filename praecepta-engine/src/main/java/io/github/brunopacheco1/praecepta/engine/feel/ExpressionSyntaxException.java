@@ -8,8 +8,7 @@ package io.github.brunopacheco1.praecepta.engine.feel;
 import java.io.Serial;
 
 /**
- * An output expression is outside the supported subset; one that parses but whose types do not go
- * together is reported with an {@link ExpressionTypeException}.
+ * Text that is not FEEL (DMN 1.5, 10.3.1.2): an expression or unary tests that do not parse, or nest too deeply.
  */
 public class ExpressionSyntaxException extends IllegalArgumentException {
 

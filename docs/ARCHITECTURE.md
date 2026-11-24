@@ -50,10 +50,11 @@ the reactor's POM as its parent, and its Java package is `io.github.brunopacheco
    NUMBER, DATE, BOOLEAN, TIME, DATE_TIME, DAY_TIME_DURATION, YEAR_MONTH_DURATION; times and
    date-times with or without a time zone), into `UnaryTests`: the subset of DMN FEEL *simple unary
    tests* that looks at one column value (lists, `not(...)`, comparisons, `=` and `!=`, intervals, `null`,
-   "any"). In a DMN table (strict FEEL) a cell may also compare with another input (`> limit`); the
-   index sees such a cell as "any value", and the engine checks it on the rules the index leaves,
-   with the inputs' values. The analysis then never counts those rules as overlapping or hiding
-   others, and skips gaps. A column
+   "any"). In a DMN table (strict FEEL) a cell may also compare with another input (`> limit`), or be any
+   FEEL unary tests (`> Limit * 2`, `? > 5 and ? < 10`; `FeelUnaryTests`, read where `CellParser` rejects a
+   cell, see [Decision tables in FEEL](#decision-tables-in-feel-116)); the index sees such a cell as "any
+   value", and the engine checks it on the rules the index leaves, with the inputs' values. The analysis then
+   never counts those rules as overlapping or hiding others, and skips gaps. A column
    may also hold **lists** (`DecisionTable.listInputs`): its cells keep the same syntax and hold when
    some element passes a test (`not(...)`: when none does), as FEEL's `list contains` would; a cell
    that names a list input asks whether the value is in that list.
@@ -168,11 +169,11 @@ An engine is **immutable** once built: any number of threads may share it withou
   from none: with several outputs, defaults that are all `null` still make a default output, of nulls.
   It uses the JDK's own XML parser (`DocumentBuilderFactory.newDefaultInstance()`, never one JAXP finds
   on the class path) with DTDs and external entities disabled. Anything it does not
-  support (function calls) is rejected
-  with an error naming the decision, rule and column. Output entries may be expressions of
-  literals (dates, times and durations included) and inputs with `+ - * / **` (`OutputExpression`): they are kept as written, parsed and
-  type-checked when the engine is built, and evaluated only for matching rules, like outputs that
-  name an input; `DmnWriter` writes them back unchanged. Strict FEEL compares a list with a unary test
+  support (FEEL's built-in functions, 0.9) is rejected
+  with an error naming the decision, rule and column. Output entries may be any FEEL expression
+  (`FeelExpression`): they are kept as written, parsed and typed when the engine is built, and evaluated only
+  for matching rules, like outputs that name an input; `DmnWriter` writes them back unchanged, and so a cell
+  beyond the simple unary tests, and an input expression that is an expression. Strict FEEL compares a list with a unary test
   as a whole, so a list column's entries are written with FEEL's list functions
   (`list contains(?, "PT") or some x in ? satisfies x >= 18`); `CellParser.parseFeelList` reads
   exactly those forms back into the same tests Praecepta's own syntax writes `"PT", >= 18`.
@@ -211,7 +212,8 @@ table or a literal expression, each with the type the decision variable's `typeR
 none), which its value is bound to. A table is read as `read(dmn, decision)` reads it, except that what declares no
 `typeRef` is typed from the model (`ModelTypes`): an input expression by the input data or decision it names (or the
 component a path names), an output by the decision's variable (its component of the output's name, for several
-outputs), else by its output entries when they are all literals of one type. What later releases bring is rejected
+outputs), else by the one type its output entries give, as FEEL types them, and else not at all (`typed` false: each
+entry gives its own type). What later releases bring is rejected
 whole with an `UnsupportedFeatureException`, whose `release()` and `issue()` name the release that plans it, so that
 callers fall back by its type, never by its message: business knowledge models, knowledge requirements and boxed
 expressions as logic (#118), literal expressions that invoke a built-in function (#117), decision services,
@@ -235,8 +237,10 @@ input data and decision gets a *slot*: input data first, then decisions, in the 
 3. finds cycles among required decisions (Tarjan's algorithm with an explicit stack), reported with the cycle's
    path (`DECISION_CYCLE`), and orders the other decisions so each comes after those it requires (Kahn's algorithm);
 4. works out types: an input data without a `typeRef` takes the type of the table columns that read it whole, when
-   they agree; a table's value is its one output's type, or a context of its outputs, a list of that under a hit
-   policy with several results and no aggregation, a number for COUNT; a literal expression's is its
+   they agree; a table's value is its one output's type (`Any` for one that is not `typed`), or a context of its
+   outputs, a list of that under a hit policy with several results and no aggregation (`Any` where such a table has a
+   default output and its decision declares no type, as the default is a single value), a number for COUNT; a literal
+   expression's is its
    `FeelExpression.type` from the types of the names it reads, `Any` where only the values tell; an expression whose
    type is `Null`, as one combining operands FEEL does not combine, is always null (`ALWAYS_NULL`, a WARNING, with
    the reason). Either value is then bound to the decision's declared type as DMN 1.5, 10.3.2.9.4, binds it
@@ -285,7 +289,8 @@ its Javadoc, immutable.
 
 **Growing it.** Each later layer adds to these types rather than replacing them: full FEEL (0.8, #116) gave
 literal expressions a FEEL interpreter over the same slots, and `FeelType` FEEL's full type system; decision tables'
-cells and output entries adopt the same interpreter next; built-in functions (0.9, #117) are registered in
+cells, input expressions and output entries adopted the same interpreter in 0.8 too ([Decision tables in
+FEEL](#decision-tables-in-feel-116)); built-in functions (0.9, #117) are registered in
 `BuiltInFunctions`, where the parser resolves their names; boxed expressions and business knowledge models (0.10, #118) are further
 `DecisionLogic` kinds with nodes of their own, and invocables become elements with slots that hold functions,
 required through knowledge requirements, with the same cycle and type checks; decision services and imports (0.11,
@@ -332,10 +337,57 @@ once, against a `Scope` of names (and a model's types), then `names()`, `unsuppo
   bodies being invoked, with the expression's own depth, at most 800; iterations, a million an evaluation. Beyond
   either evaluation limit the value is null with an error. `FeelExpressionStackTest` checks all of them on a 512 KiB
   thread, and `FeelExpressionFuzzer` that any text parses or is a syntax error, and evaluates without throwing.
-- **Tables next.** Decision tables still read cells with `CellParser` and output entries with `OutputExpression`
-  (0.6's subset). They adopt `FeelExpression` by parsing a cell as positive unary tests against the table's names
-  (`Node.Test` already evaluates them for `in`) and an output entry as an expression, both once when the engine is
-  built, with the table's column types as the names' types.
+- **Unary tests** (`FeelUnaryTests`, `FeelParser.parseUnaryTests`): `-`, positive unary tests separated by commas,
+  or `not(...)` of them, which must be the whole text (else the text is an expression invoking `not()`). Each test is
+  a `Node.Test`, as `in` has them; `= e` and `!= e` are `Node.Equality` of `?` and `e`, so `= null` holds for a missing
+  value. `isSimple()` tells the tests `CellParser` reads (literals, names, comparisons and intervals of them) from
+  the others by the shape of the tree. `literals()` walks the tree with a stack of its own.
+
+## Decision tables in FEEL (#116)
+The bitset index and the build-time analysis are what set Praecepta apart, so decision tables adopted the full FEEL
+language around them, not through them:
+
+```
+ cell ──(CellParser)──► simple unary tests ──► ColumnIndex: bitsets, analysed exactly as before
+   └── rejected ──(FeelUnaryTests.parseCell)──► FEEL unary tests ──► the rule's cell is "-" for the index; applied after it
+ input expression ── a name ──► a column, read from the input
+                  └── an expression ──(FeelExpression)──► a computed column, its value from the inputs it reads
+ output entry ── a literal or an input's name ──► as before (converted once, or the input's value)
+              └── an expression ──(FeelExpression)──► typed when built (ALWAYS_NULL), evaluated for the rules that match
+```
+
+- **Cells.** A strict FEEL cell is first read by `CellParser`, whose simple unary tests the index evaluates. Where it
+  rejects one, `FeelUnaryTests.parseCell` reads it as FEEL unary tests, unless they are simple themselves (a literal
+  of another type than the column's, an interval that starts after it ends): that rejection stands, as the cell is
+  wrong, not beyond the subset ([DMN conformance](DMN-CONFORMANCE.md), case 26). The engine (`TableExpressions`,
+  package-private) keeps such a cell by rule and column, gives the index `-` in its place, and adds the rule to the
+  mask of variable rules: `keepVariableMatches` applies it to the rules the index matched, with the column's value as
+  `?` and the names it reads. A table of literal cells has no such rule, so its evaluation is unchanged; the analysis
+  never counts such a rule as overlapping, hiding another or covering a default output, and looks for no gaps.
+- **Input expressions.** A column whose name is no FEEL name (`CellParser.isName`) is an expression. With per-column
+  bindings it needs none: the engine wraps its column reader (`computing`), which evaluates the expression from the
+  values of the names it reads and makes the value one of the column's type (`GraphValues.normalise`, which rejects
+  one of another type). A reader without computed columns is the reader itself, so the hot path is unchanged. A
+  `DecisionGraph` binds such a column itself, evaluating the expression over the graph's slots.
+- **Output entries.** An entry that is an expression is a `FeelExpression`, typed when the engine is built from the
+  types of the columns and of the values a graph gives: `FeelType.NULL`, or a type that cannot be bound to the
+  output's, is a WARNING (`ALWAYS_NULL`) with the rule's id. Its value is bound to the output's type: as it is for an
+  output that is not `typed` (each entry its own type, 10.3.2.10 step 3c), as text for a string output, else
+  `GraphValues.conform` (10.3.2.9.4). The output strategy gets the outputs as text (`PraeceptaOutput`), a computed
+  number without trailing zeros and a list or context as FEEL writes it; a strategy that implements the package-private
+  `ValueOutputs`, as the graph's `TableOutputs` does, also gets the values themselves.
+- **Names.** Each expression is parsed with the names in scope the engine reads: its columns but those that are
+  expressions (whose text would read as itself), the inputs bound to it, and the values a graph gives
+  (`Builder.expressionInput`, raw FEEL values of their requirement's type). A name it reads that is none of those is
+  added as an input of the engine, as an input a simple cell compares with is: a column of `-` cells, bound by its
+  getter, or read from text with the type `columnType(...)` gives, else that of the first column or output that reads
+  it (case 25). `nameReads` maps each name to its column, or to a value the graph gives, once.
+- **In a graph** (`GraphAnalysis.tableReads`): the columns that name what they read and the inputs simple cells
+  compare with are typed reads, checked against the requirement's type (`TYPE_MISMATCH`) as before; the names the
+  table's FEEL reads, parsed with the requirements in scope, are read as they are; a column that is an expression is
+  checked by its FEEL type, and one whose path reads a property of a date (`Birth.year`) is computed as FEEL reads it.
+  A table with several results gives its default output as the single value it is (`PraeceptaEngine.isDefault`), bound
+  to the decision's type (case 14).
 
 ## The compiler and the build plugins
 `TableCompiler` (in `praecepta-compiler`) compiles one table, described by a `TableDefinition`, with
@@ -356,9 +408,11 @@ Gradle plugin's `GeneratePraecepta` task turn each configured table into a `Tabl
    column whose written values have zone ids becomes the engine's `ZonedTime`, even if some have an offset
    (a zone id with one fixed offset counts as one, so a column of only such zone ids is an `OffsetTime`),
    and the generated code reads such outputs back with `FeelTemporals.parseZonedTime` or `parseOffsetTime`,
-   which take a time written either way. An output expression
-   counts by its operands of the output's type, the inputs it reads and its literals, since adding a
-   duration keeps a time's or a date and time's zone.
+   which take a time written either way. An output expression, and a cell in the full FEEL language,
+   counts by its literals of the column's or output's type and the inputs of that type it reads
+   (`FeelExpression.literals()`, `FeelUnaryTests.literals()`), since adding a duration keeps a time's or a date
+   and time's zone. A column whose input expression is an expression is no component of the input record: the
+   engine computes it from the inputs it reads, which are.
 
 At runtime, the generated code needs only `praecepta-engine`. The tool writes the result with
 `CompiledTable.write`, so every tool writes the same files.
@@ -583,13 +637,13 @@ a case open, what Praecepta does is recorded in [DMN-CONFORMANCE.md](DMN-CONFORM
   unreachable rules count missing lists and missing elements too.
 
 ### Output expressions (#71)
-- **A small subset, not a FEEL interpreter**: string, number and date time literals, input names, `+ - * / **`,
-  unary minus and parentheses (FEEL's arithmetic expressions, DMN 1.5 grammar rule 4). That covers string building and arithmetic (and the TCK's case) while
-  keeping the engine dependency-free; anything else is rejected by name, so a table never evaluates
-  differently from other engines in silence.
-- **Parsed and type-checked when the engine is built**, so a table that adds a string to a number
-  fails at build time, not at the first evaluation; the expression text is kept in
-  `PraeceptaOutput.expressions`, so `DmnWriter` writes back exactly what was read.
+- **A small subset, not a FEEL interpreter, until 0.8**: string, number and date time literals, input names,
+  `+ - * / **`, unary minus and parentheses (FEEL's arithmetic expressions, DMN 1.5 grammar rule 4), rejecting
+  anything else by name, so that a table never evaluated differently from other engines in silence. Since 0.8 (#116)
+  an output entry is any FEEL expression, evaluated by `FeelExpression`; `OutputExpression` was removed.
+- **Parsed and typed when the engine is built**, so a table that adds a string to a number is reported at build
+  time, not at the first evaluation: as an error until 0.8, as FEEL's null and a WARNING (`ALWAYS_NULL`) since; the
+  expression text is kept in `PraeceptaOutput.expressions`, so `DmnWriter` writes back exactly what was read.
 - **Evaluated only for matching rules**, through the same path as outputs that name an input; rules
   without such outputs keep their outputs converted once.
 - **FEEL's null and decimal semantics**: a missing operand or a division by zero gives null,

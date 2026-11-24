@@ -17,7 +17,6 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
-import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression.Operator;
 
 /**
  * FEEL's arithmetic on numbers, strings, dates, times, date-times and durations (DMN 1.5, Tables 57, 59, 60 and 62):
@@ -46,6 +45,22 @@ final class FeelArithmetic {
     private static final BigDecimal NANOS_PER_SECOND = BigDecimal.valueOf(1_000_000_000L);
 
     private FeelArithmetic() {
+    }
+
+    /** An arithmetic operator (DMN 1.5, grammar rule 4). */
+    enum Operator {
+        ADD("+"), SUBTRACT("-"), MULTIPLY("*"), DIVIDE("/"), POWER("**");
+
+        private final String symbol;
+
+        Operator(String symbol) {
+            this.symbol = symbol;
+        }
+
+        /** The operator as FEEL writes it. */
+        String symbol() {
+            return symbol;
+        }
     }
 
     /**

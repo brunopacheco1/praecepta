@@ -269,6 +269,46 @@ class GraphModelTest {
     }
 
     /**
+     * Decision tables in the full FEEL language (#116) load as graphs, their cells and output entries read as FEEL; a
+     * table entry that invokes a built-in function (0.9, #117) is rejected as a literal expression is, naming the release.
+     */
+    @Test
+    void tables_in_the_full_feel_language_load_as_graphs_and_built_in_functions_name_their_release() {
+        var file = """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
+                  <inputData id="age" name="Age"><variable name="Age" typeRef="number"/></inputData>
+                  <inputData id="limit" name="Limit"><variable name="Limit" typeRef="number"/></inputData>
+                  <decision id="band" name="Band"><variable name="Band" typeRef="string"/>
+                    <informationRequirement><requiredInput href="#age"/></informationRequirement>
+                    <informationRequirement><requiredInput href="#limit"/></informationRequirement>
+                    <decisionTable hitPolicy="FIRST">
+                      <input><inputExpression><text>Age * 12</text></inputExpression></input>
+                      <output/>
+                      <rule><inputEntry><text>&gt; Limit * 12</text></inputEntry><outputEntry><text>"over"</text></outputEntry></rule>
+                      <rule><inputEntry><text>-</text></inputEntry>
+                        <outputEntry><text>if Age &gt;= 18 then "adult" else "minor"</text></outputEntry></rule>
+                    </decisionTable>
+                  </decision>
+                  <decision id="label" name="Label">
+                    <informationRequirement><requiredDecision href="#band"/></informationRequirement>
+                    <literalExpression><text>"band: " + Band</text></literalExpression>
+                  </decision>
+                </definitions>""";
+        var decisions = Decisions.load(List.of(TableSource.of("feel.dmn", file.getBytes(StandardCharsets.UTF_8))), Severity.ERROR);
+        Assertions.assertThat(decisions.models()).hasSize(1);
+        Assertions.assertThat(decisions.evaluate("Label", Map.of("Age", "30", "Limit", "20"))).containsExactly(Map.of("Label", "band: over"));
+        Assertions.assertThat(decisions.evaluate("Label", Map.of("Age", "30", "Limit", "40"))).containsExactly(Map.of("Label", "band: adult"));
+        Assertions.assertThat(decisions.evaluate("Band", Map.of("Age", "10", "Limit", "40"))).containsExactly(Map.of("Band", "minor"));
+
+        var builtIn = file.replace("&gt; Limit * 12", "&gt; abs(Limit) * 12");
+        var sources = List.of(TableSource.of("built-in.dmn", builtIn.getBytes(StandardCharsets.UTF_8)));
+        Assertions.assertThatThrownBy(() -> Decisions.load(sources, Severity.ERROR))
+                .isInstanceOfSatisfying(DecisionsException.class, e -> Assertions.assertThat(e.problems()).singleElement().asString()
+                        .startsWith("built-in.dmn: ")
+                        .contains("the built-in function 'abs', planned for 0.9 (#117)"));
+    }
+
+    /**
      * A model with what a later release brings is no graph Praecepta evaluates: its decision tables load alone, as in
      * 0.6, and nothing else of it; without a decision table, the file fails naming the feature and its issue.
      */

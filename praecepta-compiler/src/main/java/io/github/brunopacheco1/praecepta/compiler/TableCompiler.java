@@ -27,6 +27,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
+import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.loader.csv.CsvLoader;
 import io.github.brunopacheco1.praecepta.loader.excel.ExcelLoader;
 
@@ -226,8 +227,9 @@ public final class TableCompiler {
         try {
             var zoned = TimeZones.of(table);
             var lists = table.listInputs();
-            table.inputs().forEach(column -> bind(builder, column.name(), column.type(), zoned.input(column.name()),
-                    lists.contains(column.name())));
+            // a column whose input expression is an expression is computed from the inputs it reads (named inputs)
+            table.inputs().stream().filter(column -> CellParser.isName(column.name()))
+                    .forEach(column -> bind(builder, column.name(), column.type(), zoned.input(column.name()), lists.contains(column.name())));
             table.namedInputs().forEach((name, type) -> bind(builder, name, type, zoned.input(name), lists.contains(name)));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(e.getMessage().startsWith("Table '") ? e.getMessage()

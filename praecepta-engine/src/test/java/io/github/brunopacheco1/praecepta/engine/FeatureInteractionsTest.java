@@ -22,6 +22,7 @@ import java.util.Set;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
@@ -31,7 +32,6 @@ import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
-import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 
 /**
  * The 0.4 features together: lists of times with a time zone (#25, #70), compact masks under list
@@ -168,23 +168,26 @@ class FeatureInteractionsTest {
     }
 
     @Test
-    void output_expressions_cannot_read_a_list_or_add_a_number_to_a_time() {
+    void output_expressions_that_combine_a_list_or_a_time_with_a_number_are_null_and_reported() {
+        // DMN 1.5, the text before Tables 56 and 58: operands FEEL does not combine give null, which the report warns of
         var list = PraeceptaEngine.<Booking, String>builder()
                 .hitPolicy(HitPolicy.FIRST)
                 .listInput("nationalities", Booking::nationalities)
-                .output(output -> output.values().get("total"))
-                .rules(List.of(expressionRule(1, Map.of(), "nationalities + \"!\"")));
-        Assertions.assertThatThrownBy(list::build)
-                .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessageContaining("'nationalities', which holds lists");
+                .output(output -> String.valueOf(output.values().get("total")))
+                .rules(List.of(expressionRule(1, Map.of(), "nationalities + \"!\""))).build();
+        Assertions.assertThat(list.validationReport().issues()).extracting(ValidationReport.Issue::kind).containsExactly(Kind.ALWAYS_NULL);
+        Assertions.assertThat(list.validationReport().issues().getFirst().detail())
+                .isEqualTo("rule 1, output 'total': 'nationalities + \"!\"' is null whatever its inputs: + combines a list<string> and a "
+                        + "string, which gives null in FEEL (DMN 1.5, 10.3.2.15)");
+        Assertions.assertThat(list.evaluate(new Booking(List.of("PT"), null, null))).containsExactly("null");
         var time = PraeceptaEngine.<Booking, String>builder()
                 .hitPolicy(HitPolicy.FIRST)
                 .offsetTimeInput("at", Booking::at)
-                .output(output -> output.values().get("total"))
-                .rules(List.of(expressionRule(1, Map.of(), "at + 1")));
-        Assertions.assertThatThrownBy(time::build)
-                .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessage("Rule 1, output 'total': + combines a time and a number, which gives null in FEEL");
+                .output(output -> String.valueOf(output.values().get("total")))
+                .rules(List.of(expressionRule(1, Map.of(), "at + 1"))).build();
+        Assertions.assertThat(time.validationReport().issues().getFirst().detail())
+                .isEqualTo("rule 1, output 'total': 'at + 1' is null whatever its inputs: + combines a time and a number, which gives "
+                        + "null in FEEL (DMN 1.5, 10.3.2.15)");
     }
 
     /**

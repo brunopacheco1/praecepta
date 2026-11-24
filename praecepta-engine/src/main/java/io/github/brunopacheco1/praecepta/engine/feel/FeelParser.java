@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLexer.Kind;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLexer.Token;
-import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression.Operator;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelArithmetic.Operator;
 
 /**
  * Parses a FEEL expression (DMN 1.5, 10.3.1.2) into a tree of {@link Node}s. Operators bind as FEEL's grammar has
@@ -95,6 +95,12 @@ final class FeelParser {
     record Parsed(Node root, List<String> names, List<String> unsupported, int depth) {
     }
 
+    /**
+     * What parsing unary tests gives: the tests, whether they are negated ({@code not(...)}); no tests for {@code -}.
+     */
+    record ParsedTests(List<Node.Test> tests, boolean negated, List<String> names, List<String> unsupported, int depth) {
+    }
+
     /** A name in scope, as tokens, for matching against the text. */
     private record Candidate(String name, List<Token> tokens) {
     }
@@ -161,6 +167,69 @@ final class FeelParser {
             throw parser.error("it nests more than " + MAX_DEPTH + " levels");
         }
         return new Parsed(root, List.copyOf(parser.free), List.copyOf(parser.unsupported), depth);
+    }
+
+    /**
+     * Parses unary tests (DMN 1.5, grammar rules 13 to 17), as a decision table's input entry holds them: {@code -}; or
+     * positive unary tests, each an expression (rule 15), separated by commas; or those inside {@code not(...)}, which
+     * must then be the whole text. A test written {@code = e} or {@code != e} is the comparison {@code ? = e} or
+     * {@code ? != e} of the value tested, so that {@code = null} holds for a missing value as {@code null} does.
+     *
+     * @throws ExpressionSyntaxException if it is not unary tests, or nests more than {@link #MAX_DEPTH} levels
+     */
+    static ParsedTests parseUnaryTests(String text, Names names, Map<String, FeelType> types) {
+        var negation = new FeelParser(text, names, types);
+        if (negation.peek().isWord("not") && negation.peek(1).is("(")) {
+            try {
+                return negation.unaryTests(true);
+            } catch (ExpressionSyntaxException e) {
+                // not(...) is not the whole text: the text is an expression that invokes the function not()
+            }
+        }
+        return new FeelParser(text, names, types).unaryTests(false);
+    }
+
+    private ParsedTests unaryTests(boolean negated) {
+        if (negated) {
+            next();
+            next();
+        } else if (peek().kind() == Kind.END || peek().is("-") && peek(1).kind() == Kind.END) {
+            return new ParsedTests(List.of(), false, List.of(), List.of(), 0);
+        }
+        var tests = new ArrayList<Node.Test>();
+        do {
+            if (!tests.isEmpty()) {
+                next();
+            }
+            tests.add(cellTest());
+        } while (peek().is(COMMA));
+        if (negated) {
+            expect(CLOSE_PARENTHESIS);
+        }
+        if (peek().kind() != Kind.END) {
+            throw error("unexpected '" + text.substring(peek().start()) + "'");
+        }
+        int depth = depthOf(new Node.In(new Node.Name(QUESTION_MARK), tests));
+        if (depth > MAX_DEPTH) {
+            throw error("it nests more than " + MAX_DEPTH + " levels");
+        }
+        return new ParsedTests(List.copyOf(tests), negated, List.copyOf(free), List.copyOf(unsupported), depth);
+    }
+
+    /** One positive unary test of a cell: {@code = e} and {@code != e} as comparisons of {@code ?}, anything else as {@link #test}. */
+    private Node.Test cellTest() {
+        if (!peek().is("=") && !peek().is("!=")) {
+            return test(this::expression);
+        }
+        var operator = next().text();
+        locals.push(new Names(List.of(QUESTION_MARK)));
+        enter();
+        try {
+            return new Node.Test(new Node.Equality(operator.equals("="), binary(ADDITIVE)), true);
+        } finally {
+            leave();
+            locals.pop();
+        }
     }
 
     /**

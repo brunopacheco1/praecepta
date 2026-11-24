@@ -146,6 +146,28 @@ class TableCompilerTest {
         }
     }
 
+    /**
+     * A table in the full FEEL language (#116), compiled on its own: its column computed from the input it reads is no
+     * component, which that input is, and so is the input its cells and output entries read beside it.
+     */
+    @Test
+    void a_table_in_the_full_feel_language_compiles_its_inputs_as_components() throws Exception {
+        var config = new TableDefinition(table("feel-table.dmn"), "Fees", null, null, null, List.of(), List.of());
+        var result = compile(config, PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("FeesInput"))
+                .contains("public record FeesInput(java.math.BigDecimal limit, java.math.BigDecimal age)");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".FeesInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Fees").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(new BigDecimal(25), new BigDecimal(30))))
+                    .get().hasToString("FeesOutput[fee=50]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(new BigDecimal(25), new BigDecimal(20))))
+                    .get().hasToString("FeesOutput[fee=0]");
+        }
+    }
+
     /** DMN 1.5, 10.3.2.10: when no rule matches, the table gives its default output values (#79). */
     @Test
     void a_dmn_tables_default_output_is_what_the_generated_class_gives_when_no_rule_matches() throws Exception {

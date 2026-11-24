@@ -29,6 +29,7 @@ import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException;
 
 /**
  * Output entries that compute their value (#71), as {@code Symptom + " is listed"}: parsed and type
@@ -179,21 +180,29 @@ class OutputExpressionsTest {
     }
 
     @Test
-    void expressions_are_checked_when_the_engine_is_built() {
-        var mixed = List.of(rule(1, Map.of(), Map.of(), Map.of("x", "country + price")));
-        Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, mixed))
-                .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessage("Rule 1, output 'x': + combines a string and a number, which gives null in FEEL");
-        var date = List.of(rule(1, Map.of(), Map.of(), Map.of("x", "day + 1")));
-        Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, date))
-                .hasMessage("Rule 1, output 'x': + combines a date and a number, which gives null in FEEL");
+    void expressions_are_typed_when_the_engine_is_built_and_one_always_null_is_reported() {
+        // DMN 1.5, the text before Tables 56 and 58: operands FEEL does not combine give null, which the report warns of
+        var mixed = byColumn(HitPolicy.FIRST, List.of(rule(1, Map.of(), Map.of(), Map.of("x", "country + price"))));
+        Assertions.assertThat(mixed.validationReport().issues()).extracting(ValidationReport.Issue::kind)
+                .containsExactly(ValidationReport.Kind.ALWAYS_NULL);
+        Assertions.assertThat(mixed.validationReport().issues().getFirst().ruleIds()).containsExactly(1);
+        Assertions.assertThat(mixed.validationReport().issues().getFirst().detail()).isEqualTo("rule 1, output 'x': 'country + price' "
+                + "is null whatever its inputs: + combines a string and a number, which gives null in FEEL (DMN 1.5, 10.3.2.15)");
+        Assertions.assertThat(mixed.evaluate(new Order("PT", null, null, null))).containsExactly(values("x", null));
+        var date = byColumn(HitPolicy.FIRST, List.of(rule(1, Map.of(), Map.of(), Map.of("x", "day + 1"))));
+        Assertions.assertThat(date.validationReport().issues().getFirst().detail())
+                .contains("+ combines a date and a number, which gives null in FEEL");
+        // a name that is not an input of the engine has no binding to read it with
         var unknown = List.of(rule(1, Map.of(), Map.of(), Map.of("x", "tax * 2")));
         Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, unknown))
-                .hasMessageStartingWith("Rule 1: output 'x' names 'tax', which is not an input column");
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("The table's expressions read 'tax', which has no input binding");
+        // FEEL's built-in functions are planned for 0.9 (#117)
         var call = List.of(rule(1, Map.of(), Map.of(), Map.of("x", "abs(price)")));
         Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, call))
-                .hasMessage("Rule 1, output 'x': 'abs(price)' is not a supported output expression: "
-                        + "function calls such as abs(...) are not supported");
+                .isInstanceOf(UnsupportedFeatureException.class)
+                .hasMessage("Rule 1, output 'x' uses the built-in function 'abs', planned for 0.9 (#117), which Praecepta does not "
+                        + "support yet");
     }
 
     @Test
@@ -231,22 +240,22 @@ class OutputExpressionsTest {
         Assertions.assertThat(written).contains("<text>Symptom + \" is in the list\"</text>", "<text>Days*24</text>", "<text>-Days / 2</text>");
         Assertions.assertThat(DmnWriter.write(read(written))).isEqualTo(written);
 
-        var engine = PraeceptaEngine.<Map<String, String>, Map<String, String>>builder()
-                .table(table)
-                .inputs(PraeceptaInput::new)
-                .output(PraeceptaOutput::values)
-                .build();
+        var engine = engine(table);
         Assertions.assertThat(engine.evaluate(Map.of("Symptom", "cough", "Days", "2")))
                 .containsExactly(values("text", "cough is in the list", "hours", "48"));
         Assertions.assertThat(engine.evaluate(Map.of("Symptom", "fever", "Days", "3"))).containsExactly(values("text", "-1.5", "hours", "0"));
 
-        var stringIntoNumber = xml.replace("Days*24", "Symptom + \"h\"");
-        Assertions.assertThatThrownBy(() -> read(stringIntoNumber))
-                .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessage("Decision 'p', rule 1, output 'hours': 'Symptom + \"h\"' gives a string, but the output is a number");
-        var mixed = xml.replace("Days*24", "Days + Symptom");
-        Assertions.assertThatThrownBy(() -> read(mixed))
-                .hasMessage("Decision 'p', rule 1, output 'hours': 'Days + Symptom' + combines a number and a string, which gives null in FEEL");
+        // an entry of another type than its output, or whose operands FEEL does not combine, is null (DMN 1.5, 10.3.2.9.4
+        // and the text before Tables 56 and 58), which the engine's report warns of
+        var stringIntoNumber = engine(read(xml.replace("Days*24", "Symptom + \"h\"")));
+        Assertions.assertThat(stringIntoNumber.validationReport().issues().getFirst().detail())
+                .isEqualTo("rule 1, output 'hours': 'Symptom + \"h\"' gives a string, but the output is a number, so its value is null "
+                        + "(DMN 1.5, 10.3.2.9.4)");
+        Assertions.assertThat(stringIntoNumber.evaluate(Map.of("Symptom", "cough", "Days", "2")))
+                .containsExactly(values("text", "cough is in the list", "hours", null));
+        var mixed = engine(read(xml.replace("Days*24", "Days + Symptom")));
+        Assertions.assertThat(mixed.validationReport().issues().getFirst().detail())
+                .contains("'Days + Symptom' is null whatever its inputs: + combines a number and a string");
     }
 
     // ---- helpers -------------------------------------------------------------------------------
@@ -274,6 +283,15 @@ class OutputExpressionsTest {
             values.put(keysAndValues[i], keysAndValues[i + 1]);
         }
         return values;
+    }
+
+    private static PraeceptaEngine<Map<String, String>, Map<String, String>> engine(DecisionTable table) {
+        return PraeceptaEngine.<Map<String, String>, Map<String, String>>builder()
+                .table(table)
+                .inputs(PraeceptaInput::new)
+                .output(PraeceptaOutput::values)
+                .logValidationReport(false)
+                .build();
     }
 
     private static DecisionTable read(String xml) {

@@ -211,7 +211,7 @@ class DefaultOutputsTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
-            "score + 1 | default output 'score + 1' is not supported; a default output must be a literal number",
+            "score + 1 | default output 'score + 1' reads 'score'; a default output is a value, which no input changes (DMN 1.5, Table 46)",
             "score     | default output 'score' is not supported; a default output must be a literal number",
             "\"5\"     | default output '\"5\"' is not supported; a default output must be a literal number",
     })
@@ -220,6 +220,23 @@ class DefaultOutputsTest {
         Assertions.assertThatThrownBy(() -> read(xml))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessage("Decision 'Fee', output 'Fee': " + message);
+    }
+
+    /**
+     * DMN 1.5, 10.3.2.10, step 2: "if a default output value d is specified, DTI=FEEL(d)": a FEEL expression that reads
+     * no input is the same value whatever the inputs, taken when the table is read and bound to the output's type.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', nullValues = "null", value = {
+            "2 * 5           | 10",
+            "-(1 + 1)        | -2",
+            "1 / 0           | null",
+            "\"a\" + 1     | null",
+    })
+    void a_default_that_reads_no_input_is_its_value(String text, String value) {
+        var table = read(FEES.formatted("SUM", text));
+        Assertions.assertThat(table.outputs().getFirst().hasDefault()).isTrue();
+        Assertions.assertThat(table.outputs().getFirst().defaultValue()).isEqualTo(value);
     }
 
     @Test

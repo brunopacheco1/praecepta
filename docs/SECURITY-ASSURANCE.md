@@ -63,7 +63,7 @@ tables to load and how strictly to check them.
 | Asset | Threat | Countered by |
 |---|---|---|
 | The host application's files and network | A crafted DMN document using XXE or a DTD to read files or make requests | DTDs disallowed, external entities off, secure processing on, always with the JDK's own parser (`DmnReader`) |
-| The host application's availability | Documents, models or cells crafted to crash the parser or exhaust memory | Fuzzing of the cell parser and DMN reader, decision models and their graphs included; JDK XML limits; a cell grammar without nesting (`not(...)` only wraps a whole cell) but for date and time literals, nested at most 8 deep (`date and time(date(...), time(...))`), output expressions and literal expressions of at most 1,000 operators and parentheses, and item definitions nested at most 32 deep, so parsing and evaluation depth is bounded; no walk over a decision requirement graph recurses, so a long chain of decisions or a cycle cannot overflow the stack (cycles are reported, not followed) |
+| The host application's availability | Documents, models or cells crafted to crash the parser or exhaust memory | Fuzzing of the cell parser, FEEL expressions, FEEL unary tests (cells beyond the simple ones) and the DMN reader, decision models and their graphs included; JDK XML limits; FEEL expressions and unary tests (literal expressions, and tables' input expressions, cells and output entries) that nest at most 300 levels, or are a syntax error, and evaluations of at most 1,000,000 steps and 800 levels of nested invocations, beyond which the value is null; item definitions nested at most 32 deep, so parsing and evaluation depth is bounded on a 512 KiB stack; no walk over a decision requirement graph recurses, so a long chain of decisions or a cycle cannot overflow the stack (cycles are reported, not followed) |
 | Correct decisions | Ambiguous or overlapping rules giving different answers than intended | Strict DMN hit policies; validation of overlaps, unreachable rules and gaps; the engine is tested against a reference implementation with property-based tests |
 | A build using the Maven or Gradle plugin | Table content injected into generated Java code | `JavaNames` sanitises identifiers (reserved words included); string literals are escaped; comments escape unicode escapes and comment terminators |
 | Users' supply chain | A tampered release or dependency | Signed releases with provenance; pinned CI actions; Dependabot, dependency review and OSV scans; a signed-commit, pull-request-only `main` |
@@ -82,10 +82,11 @@ tables to load and how strictly to check them.
    framework's own rules for endpoints allow it.
 
 ## Secure design principles applied
-- **Economy of mechanism:** cells are only *simple unary tests* on one column, and output entries and
-  the literal expressions of decision requirement graphs at most `+ - * / **` on literals and names, not
-  a general expression language with functions, so evaluating a table or a graph cannot run arbitrary
-  code; the engine has no runtime dependencies.
+- **Economy of mechanism:** FEEL is an expression language without side effects, input or output: the cells,
+  output entries and literal expressions of DMN files read the values they are given and compute values, and
+  the only functions they invoke are those they define themselves (FEEL's built-in functions, 0.9, are rejected;
+  external Java functions, 0.11, too), so evaluating a table or a graph cannot run arbitrary code; the engine has no
+  runtime dependencies.
 - **Fail-safe defaults:** unsupported DMN features, unknown cell syntax and undeclared values are
   rejected, not ignored; XML features are off unless needed.
 - **Complete mediation:** every table goes through the same parser and validation, whatever its

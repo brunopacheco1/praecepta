@@ -9,6 +9,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -82,10 +83,11 @@ public final class FeelExpression {
      * @throws ExpressionSyntaxException if it is not a FEEL expression, or nests too deeply
      */
     public static FeelExpression parse(String text) {
-        return new FeelExpression(Objects.requireNonNull(text, "text"), FeelParser.parse(text, NO_NAMES, null));
+        return new FeelExpression(Objects.requireNonNull(text, "text"), FeelParser.parse(text, NO_NAMES.names(), null));
     }
 
-    private static final FeelParser.Names NO_NAMES = new FeelParser.Names(List.of());
+    /** No names, indexed when first parsed against, so that loading this class does not load the parser. */
+    private static final Scope NO_NAMES = new Scope(List.of(), Map.of());
 
     /**
      * Parses an expression with names in scope: those its values will be given for (DMN 1.5, 10.3.2.11).
@@ -116,7 +118,7 @@ public final class FeelExpression {
      */
     public static FeelExpression parse(String text, Scope scope) {
         Objects.requireNonNull(text, "text");
-        return new FeelExpression(text, FeelParser.parse(text, scope.names, scope.types));
+        return new FeelExpression(text, FeelParser.parse(text, scope.names(), scope.types));
     }
 
     /**
@@ -127,17 +129,29 @@ public final class FeelExpression {
      * @param types the types the model defines, by name
      */
     public static Scope scope(Collection<String> names, Map<String, FeelType> types) {
-        return new Scope(new FeelParser.Names(List.copyOf(names)), Map.copyOf(types));
+        return new Scope(List.copyOf(names), Map.copyOf(types));
     }
 
     /** Names, and the types a model defines, in scope for parsing expressions; immutable and thread-safe. */
     public static final class Scope {
-        private final FeelParser.Names names;
-        private final Map<String, FeelType> types;
+        private final List<String> given;
+        final Map<String, FeelType> types;
+        /** The names, indexed when the first expression is parsed, so a scope no expression is parsed in costs nothing. */
+        private final AtomicReference<FeelParser.Names> names = new AtomicReference<>();
 
-        private Scope(FeelParser.Names names, Map<String, FeelType> types) {
-            this.names = names;
+        private Scope(List<String> given, Map<String, FeelType> types) {
+            this.given = given;
             this.types = types;
+        }
+
+        /** The names, indexed once; two threads may both index them, which gives equal indexes. */
+        FeelParser.Names names() {
+            var indexed = names.get();
+            if (indexed == null) {
+                indexed = new FeelParser.Names(given);
+                names.compareAndSet(null, indexed);
+            }
+            return indexed;
         }
     }
 
@@ -154,6 +168,15 @@ public final class FeelExpression {
      */
     public List<String> names() {
         return names;
+    }
+
+    /**
+     * The literal values the expression holds, in the order written: strings, numbers, booleans, and the dates, times,
+     * date-times and durations of its date and time literals ({@code @"10:30:00Z"}, {@code time("10:30:00")}); not
+     * {@code null}. A code generator reads from them, say, whether the times an expression gives have a time zone.
+     */
+    public List<Object> literals() {
+        return Node.literals(List.of(root));
     }
 
     /**
