@@ -120,8 +120,9 @@ layer per release ([#120](https://github.com/brunopacheco1/praecepta/issues/120)
 [roadmap](docs/ROADMAP.md)), but it is not one yet. It does not have these yet; when you need one of them
 before its release, use an engine that has it, such as Camunda or Drools:
 - **FEEL's built-in functions** (0.9, [#117](https://github.com/brunopacheco1/praecepta/issues/117)), such as
-  `string length(...)`, `sum(...)` or `max(...)`: nothing is called but the date and time literals
-  `date(...)`, `time(...)`, `date and time(...)` and `duration(...)`.
+  `string length(...)`, `sum(...)` or `max(...)`: an expression may define and invoke its own functions
+  (`function(x) x * 2`), but of the built-in functions only `date(...)`, `time(...)`, `date and time(...)` and
+  `duration(...)` of literal arguments are evaluated, as date and time literals.
 - **Business knowledge models and boxed expressions** (0.10,
   [#118](https://github.com/brunopacheco1/praecepta/issues/118)): invocations, function definitions, contexts,
   relations, lists, conditionals and the other boxed expressions.
@@ -1167,9 +1168,10 @@ Quarkus' tools can check it matches the application's Quarkus version. Its deplo
 Quarkus' build uses, brings `praecepta-compiler` and Apache POI; neither reaches the application.
 
 # Roadmap
-[docs/ROADMAP.md](docs/ROADMAP.md) has the plans for the next year: the full FEEL language in 0.8, its built-in
-functions in 0.9, boxed expressions and business knowledge models in 0.10, then decision services, imports and
-a DMN 1.5 conformance claim for 1.0 ([#120](https://github.com/brunopacheco1/praecepta/issues/120)); past
+[docs/ROADMAP.md](docs/ROADMAP.md) has the plans for the next year. 0.8 brought the full FEEL language; next come
+its built-in functions in 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)), boxed expressions
+and business knowledge models in 0.10, then decision services, imports and a DMN 1.5 conformance claim for 1.0
+([#120](https://github.com/brunopacheco1/praecepta/issues/120)); past
 decisions and their reasons are in
 [docs/MODERNISATION.md](docs/MODERNISATION.md).
 

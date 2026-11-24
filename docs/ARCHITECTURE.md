@@ -359,7 +359,7 @@ language around them, not through them:
 - **Cells.** A strict FEEL cell is first read by `CellParser`, whose simple unary tests the index evaluates. Where it
   rejects one, `FeelUnaryTests.parseCell` reads it as FEEL unary tests, unless they are simple themselves (a literal
   of another type than the column's, an interval that starts after it ends): that rejection stands, as the cell is
-  wrong, not beyond the subset ([DMN conformance](DMN-CONFORMANCE.md), case 26). The engine (`TableExpressions`,
+  wrong, not beyond the simple unary tests ([DMN conformance](DMN-CONFORMANCE.md), case 26). The engine (`TableExpressions`,
   package-private) keeps such a cell by rule and column, gives the index `-` in its place, and adds the rule to the
   mask of variable rules: `keepVariableMatches` applies it to the rules the index matched, with the column's value as
   `?` and the names it reads. A table of literal cells has no such rule, so its evaluation is unchanged; the analysis
@@ -654,9 +654,10 @@ a case open, what Praecepta does is recorded in [DMN-CONFORMANCE.md](DMN-CONFORM
   number is a value, not a scale. Literal outputs and outputs that name an input keep the text they
   were given (`1.50`), so the output strategy sees what the table says.
 - **Dates, times and durations (#85)** combine as Tables 57, 59 and 62 list them (`FeelArithmetic`): `type`
-  checks the pair of operand types against those tables, so a table that adds two dates fails when it is
-  built, and `evaluate` gives null where FEEL defines no value for the values themselves (a date-time with a
-  zone minus one without, a month without the date's day, a result out of range). Their literals are read
+  checks the pair of operand types against those tables, so a table that adds two dates is reported when it is
+  built (an error until 0.8, an `ALWAYS_NULL` WARNING since), and `evaluate` gives null where FEEL defines no
+  value for the values themselves (a date-time with a zone minus one without, a month without the date's day, a
+  result out of range). Their literals are read
   by `TemporalLiterals`, the reader cells use, so a cell and an output entry take the same forms. Two
   readings come from the DMN TCK's `0100-arithmetic`, which `praecepta-tck` evaluates in full
   (`OutputExpressionsTckTest`): a years and months duration scaled by a number keeps whole months, toward
