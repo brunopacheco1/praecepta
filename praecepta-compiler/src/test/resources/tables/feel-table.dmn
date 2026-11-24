@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="feelTable" name="Feel table" namespace="https://example.com/feel">
+  <!-- a decision table on its own in the full FEEL language (#116): a computed column, and cells and output entries that
+       read an input that is not a column -->
+  <inputData id="age" name="Age"><variable name="Age" typeRef="number"/></inputData>
+  <decision id="fee" name="Fee">
+    <decisionTable hitPolicy="FIRST">
+      <input><inputExpression><text>Age * 12</text></inputExpression></input>
+      <output name="fee" typeRef="number"/>
+      <rule><inputEntry><text>&gt;= Limit * 12</text></inputEntry><outputEntry><text>Limit * 2</text></outputEntry></rule>
+      <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>0</text></outputEntry></rule>
+    </decisionTable>
+  </decision>
+</definitions>

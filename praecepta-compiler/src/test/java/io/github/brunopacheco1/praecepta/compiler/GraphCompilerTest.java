@@ -235,6 +235,37 @@ class GraphCompilerTest {
         Assertions.assertThat(risk.reports()).containsOnlyKeys("RiskCategory");
     }
 
+    /**
+     * Decision tables in the full FEEL language (#116): a column computed from the input data it reads, cells beyond the
+     * simple unary tests, and output entries whose values are of several types, which the generated class gives as an
+     * {@code Object}, each entry its own type (DMN 1.5, 10.3.2.10, step 3c).
+     */
+    @Test
+    void tables_in_the_full_feel_language_compile_and_give_what_the_graph_gives() throws Exception {
+        var result = compile(TableDefinition.dmn(table("feel.dmn")), Severity.ERROR);
+        Assertions.assertThat(result.sources().get("BandInput"))
+                .contains("public record BandInput(java.math.BigDecimal age, java.math.BigDecimal limit)");
+        Assertions.assertThat(result.sources().get("Band")).contains("public static Object evaluate(BandInput input)");
+        var graph = graph("feel.dmn");
+        try (var loader = compileAndLoad(result)) {
+            var band = decision(loader, "Band");
+            var summary = decision(loader, "Summary");
+            for (var age : List.of(10, 18, 30, 70)) {
+                for (var limit : List.of(17, 40, 100)) {
+                    var inputData = Map.<String, Object>of("Age", BigDecimal.valueOf(age), "Limit", BigDecimal.valueOf(limit));
+                    Assertions.assertThat(band.evaluate(BigDecimal.valueOf(age), BigDecimal.valueOf(limit)))
+                            .isEqualTo(graph.evaluate("Band", inputData));
+                    Assertions.assertThat(summary.evaluate(BigDecimal.valueOf(age), BigDecimal.valueOf(limit)))
+                            .isEqualTo(graph.evaluate("Summary", inputData));
+                }
+            }
+            Assertions.assertThat(band.evaluate(new BigDecimal(30), new BigDecimal(100))).isEqualTo(new BigDecimal(360));
+            Assertions.assertThat(band.evaluate(new BigDecimal(30), new BigDecimal(20))).isEqualTo("over the limit");
+            Assertions.assertThat(band.evaluate(new BigDecimal(10), new BigDecimal(20)))
+                    .isEqualTo(List.of(new BigDecimal(10), new BigDecimal(20)));
+        }
+    }
+
     @Test
     void a_graphs_issues_fail_at_the_failing_severity_and_its_other_decisions_compile_below_it() throws Exception {
         var cycle = TableDefinition.dmn(table("cycle.dmn"));
