@@ -5,6 +5,7 @@
  */
 package io.github.brunopacheco1.praecepta.compiler;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetTime;
@@ -22,8 +23,11 @@ import java.util.Set;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
+import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
-import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelUnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 
@@ -85,8 +89,9 @@ final class TimeZones {
      *                                  with and without a time zone
      */
     static Zoned of(DecisionTable table) {
-        var inputs = inputKinds(table);
-        var outputs = outputKinds(table, inputs);
+        var context = new Context(table);
+        var inputs = inputKinds(context);
+        var outputs = outputKinds(context, inputs);
         return new Zoned(named(inputs, Kind.ZONED), named(outputs, Kind.ZONED), named(inputs, Kind.ZONE_ID), named(outputs, Kind.ZONE_ID));
     }
 
@@ -100,23 +105,54 @@ final class TimeZones {
         return names;
     }
 
-    /** The kind of each time and date-time input, in order; LOCAL for one that names no value with a zone. */
-    private static Map<String, Kind> inputKinds(DecisionTable table) {
-        var types = new LinkedHashMap<String, ColumnType>();
-        table.inputs().forEach(column -> types.put(column.name(), column.type()));
-        table.namedInputs().forEach(types::putIfAbsent);
+    /**
+     * What the table's FEEL is read with, worked out once for all its columns and outputs: the type of every input (its
+     * columns, then the other inputs its cells or outputs read), and the names in scope.
+     */
+    private record Context(DecisionTable table, Map<String, ColumnType> types, FeelExpression.Scope scope) {
 
+        Context(DecisionTable table) {
+            this(table, inputTypes(table));
+        }
+
+        private Context(DecisionTable table, Map<String, ColumnType> types) {
+            // a column that is an expression is no name: its text would read as itself
+            this(table, types, FeelExpression.namesScope(types.keySet().stream().filter(CellParser::isName).toList()));
+        }
+
+        /** The type of every input, in order: the table's columns, then the other inputs its cells or outputs read. */
+        private static Map<String, ColumnType> inputTypes(DecisionTable table) {
+            var types = new LinkedHashMap<String, ColumnType>();
+            table.inputs().forEach(column -> types.put(column.name(), column.type()));
+            table.namedInputs().forEach(types::putIfAbsent);
+            return types;
+        }
+
+        /** The names among {@code names} of inputs of the type: those whose values share a kind with a value of it. */
+        List<String> ofType(List<String> names, ColumnType type) {
+            return names.stream().filter(name -> types.get(name) == type).toList();
+        }
+    }
+
+    /**
+     * The kind of each time and date-time input, in order; LOCAL for one that names no value with a zone. A cell joins its
+     * column with the inputs of its type that it reads, and a column computed from other inputs ({@code start + @"PT1H"})
+     * with the inputs of its type that its expression reads, as their values have the same kind.
+     */
+    private static Map<String, Kind> inputKinds(Context context) {
+        var table = context.table();
         var groups = new Groups();
         var kinds = new HashMap<String, Set<Kind>>();
         for (var column : table.inputs()) {
-            if (!isTemporal(column.type())) {
-                continue;
-            }
-            for (var cell : cells(table, column)) {
-                UnaryTests.names(cell).forEach(name -> groups.join(column.name(), name));
-                literals(cell).forEach(value -> kinds.computeIfAbsent(column.name(), any -> EnumSet.noneOf(Kind.class)).add(kind(value)));
+            if (isTemporal(column.type())) {
+                var columnKinds = kinds.computeIfAbsent(column.name(), any -> EnumSet.noneOf(Kind.class));
+                columnReads(context, column).forEach(read -> {
+                    context.ofType(read.names(), column.type()).forEach(name -> groups.join(column.name(), name));
+                    read.literals().forEach(value -> columnKinds.add(kind(value)));
+                });
             }
         }
+        var types = context.types();
 
         var byGroup = new HashMap<String, Set<Kind>>();
         kinds.forEach((column, columnKinds) -> byGroup.computeIfAbsent(groups.root(column), any -> EnumSet.noneOf(Kind.class))
@@ -134,25 +170,54 @@ final class TimeZones {
         return inputKinds;
     }
 
-    /** A column's cells, rule by rule (a list column's test its elements), and its allowed values as one more, if it has them. */
-    private static List<UnaryTests> cells(DecisionTable table, DecisionTable.InputColumn column) {
-        var cells = new ArrayList<UnaryTests>();
+    /**
+     * What a cell reads, for its column's kind: the names of the inputs it compares with, and its literals of the
+     * column's type (a cell in the full FEEL language may hold others, such as a duration added to a time).
+     */
+    private record CellReads(List<String> names, List<Object> literals) {
+    }
+
+    /**
+     * What a column reads: its input expression, if it is computed, its cells, rule by rule (a list column's test its
+     * elements), and its allowed values as one more, if it has them.
+     */
+    private static List<CellReads> columnReads(Context context, DecisionTable.InputColumn column) {
+        var table = context.table();
+        var cells = new ArrayList<CellReads>();
+        var scope = context.scope();
+        if (table.feelCells() && !CellParser.isName(column.name())) {
+            var expression = FeelExpression.parse(column.name(), scope);
+            cells.add(new CellReads(expression.names(), ofType(expression.literals(), column.type())));
+        }
         for (var rule : table.rules()) {
-            cells.add(table.cell(rule, column));
+            try {
+                var cell = table.cell(rule, column);
+                cells.add(new CellReads(UnaryTests.names(cell), literals(cell)));
+            } catch (CellSyntaxException rejected) {
+                var tests = FeelUnaryTests.parseCell(rule.input().values().get(column.name()), scope, rejected);
+                cells.add(new CellReads(tests.names(), ofType(tests.literals(), column.type())));
+            }
         }
         if (column.allowedValues() != null) {
-            cells.add(CellParser.parse(column.allowedValues(), column.type()));
+            var allowed = CellParser.parse(column.allowedValues(), column.type());
+            cells.add(new CellReads(List.of(), literals(allowed)));
         }
         return cells;
     }
 
-    private static Map<String, Kind> outputKinds(DecisionTable table, Map<String, Kind> inputKinds) {
+    /** The values of a type among literals. */
+    private static List<Object> ofType(List<Object> literals, ColumnType type) {
+        return literals.stream().filter(value -> typeOf(value) == type).toList();
+    }
+
+    private static Map<String, Kind> outputKinds(Context context, Map<String, Kind> inputKinds) {
+        var table = context.table();
         var kinds = new LinkedHashMap<String, Kind>();
         for (var output : table.outputs()) {
             if (!isTemporal(output.type())) {
                 continue;
             }
-            var outputKinds = merged(outputKinds(table, output, inputKinds));
+            var outputKinds = merged(outputKinds(context, output, inputKinds));
             if (outputKinds.size() > 1) {
                 throw mixed(table, "output '" + output.name() + "'", output.type(), outputKinds);
             }
@@ -165,7 +230,8 @@ final class TimeZones {
      * The kinds of the values a time or date-time output takes: those of the inputs the rules name, of the rules'
      * literals, and of the output's default value.
      */
-    private static Set<Kind> outputKinds(DecisionTable table, DecisionTable.OutputColumn output, Map<String, Kind> inputKinds) {
+    private static Set<Kind> outputKinds(Context context, DecisionTable.OutputColumn output, Map<String, Kind> inputKinds) {
+        var table = context.table();
         var kinds = EnumSet.noneOf(Kind.class);
         if (output.defaultValue() != null) {
             kinds.add(kind(parse(output.defaultValue(), output.type(), table, output.name())));
@@ -177,7 +243,7 @@ final class TimeZones {
             if (input != null) {
                 kinds.add(inputKinds.getOrDefault(input, Kind.LOCAL));
             } else if (expression != null) {
-                expressionKinds(OutputExpression.parse(expression), output.type(), inputTypes(table), inputKinds, kinds);
+                expressionKinds(FeelExpression.parse(expression, context.scope()), output.type(), context, inputKinds, kinds);
             } else if (text != null) {
                 kinds.add(kind(parse(text, output.type(), table, output.name())));
             }
@@ -186,27 +252,29 @@ final class TimeZones {
     }
 
     /**
-     * Adds the kinds of an expression's operands of the output's type, which give the kind of its value: FEEL adds a
-     * duration to a time or a date and time without changing its zone (DMN 1.5, Table 57), and no other operation of
-     * Praecepta's expressions gives a time or a date and time.
+     * Adds the kinds of an expression's literals and inputs of the output's type, which give the kind of its value: FEEL
+     * adds a duration to a time or a date and time without changing its zone (DMN 1.5, Table 57), and an expression
+     * that gives a time or a date and time gives one of those it holds or reads. A date bound to a date and time output
+     * is a date and time at UTC midnight (DMN 1.5, 10.3.2.9.4), so an expression of a date and time output that may give
+     * a date (it is typed a date, or its type is unknown and it holds or reads dates) gives one with a zone.
      */
-    private static void expressionKinds(OutputExpression expression, ColumnType type, Map<String, ColumnType> inputTypes,
-            Map<String, Kind> inputKinds, Set<Kind> kinds) {
-        switch (expression) {
-            case OutputExpression.Literal(var value) when typeOf(value) == type -> kinds.add(kind(value));
-            case OutputExpression.Name(var name) when inputTypes.get(name) == type -> kinds.add(inputKinds.getOrDefault(name, Kind.LOCAL));
-            case OutputExpression.Literal literal -> {
-                // of another type: not the output's value
-            }
-            case OutputExpression.Name name -> {
-                // an input of another type: not the output's value
-            }
-            case OutputExpression.Negation(var operand) -> expressionKinds(operand, type, inputTypes, inputKinds, kinds);
-            case OutputExpression.Arithmetic(var operator, var left, var right) -> {
-                expressionKinds(left, type, inputTypes, inputKinds, kinds);
-                expressionKinds(right, type, inputTypes, inputKinds, kinds);
-            }
+    private static void expressionKinds(FeelExpression expression, ColumnType type, Context context, Map<String, Kind> inputKinds,
+            Set<Kind> kinds) {
+        ofType(expression.literals(), type).forEach(value -> kinds.add(kind(value)));
+        context.ofType(expression.names(), type).forEach(name -> kinds.add(inputKinds.getOrDefault(name, Kind.LOCAL)));
+        if (type == ColumnType.DATE_TIME && mayGiveDate(expression, context)) {
+            kinds.add(Kind.ZONED);
         }
+    }
+
+    /** Whether an expression may give a date: it is typed one, or its type is not known and it holds or reads one. */
+    private static boolean mayGiveDate(FeelExpression expression, Context context) {
+        var type = expression.type(name -> context.types().containsKey(name) ? FeelType.of(context.types().get(name)) : null);
+        if (type.equals(FeelType.of(ColumnType.DATE))) {
+            return true;
+        }
+        return type instanceof FeelType.Any && (expression.literals().stream().anyMatch(LocalDate.class::isInstance)
+                || !context.ofType(expression.names(), ColumnType.DATE).isEmpty());
     }
 
     /** The time or date-and-time type of a literal; null for any other. */
@@ -215,14 +283,6 @@ final class TimeZones {
             return ColumnType.TIME;
         }
         return value instanceof LocalDateTime || value instanceof ZonedDateTime ? ColumnType.DATE_TIME : null;
-    }
-
-    /** The type of every input: the table's columns, then the other inputs its cells or outputs name. */
-    private static Map<String, ColumnType> inputTypes(DecisionTable table) {
-        var types = new HashMap<String, ColumnType>();
-        table.inputs().forEach(column -> types.put(column.name(), column.type()));
-        table.namedInputs().forEach(types::putIfAbsent);
-        return types;
     }
 
     private static Object parse(String text, ColumnType type, DecisionTable table, String output) {
@@ -269,8 +329,8 @@ final class TimeZones {
     }
 
     /** The literal values of a cell, in the order written; names of other inputs are left out. */
-    private static List<Comparable<?>> literals(UnaryTests cell) {
-        var values = new ArrayList<Comparable<?>>();
+    private static List<Object> literals(UnaryTests cell) {
+        var values = new ArrayList<Object>();
         cell.tests().forEach(test -> values.addAll(UnaryTests.values(test)));
         values.removeIf(UnaryTests.Name.class::isInstance);
         return values;

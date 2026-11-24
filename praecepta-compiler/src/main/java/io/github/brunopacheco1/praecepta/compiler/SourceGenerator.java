@@ -236,8 +236,9 @@ final class SourceGenerator {
         this.inputType = className + "Input";
         this.outputType = className + "Output";
         var where = "Table '" + table.name() + "'";
-        // the table's columns, then the inputs its cells compare with (DMN only, as in > limit)
-        var inputColumns = new ArrayList<>(table.inputs());
+        // the table's columns, then the inputs its cells compare with (DMN only, as in > limit) and its FEEL reads; a
+        // column whose input expression is an expression (Age * 12) is computed from those, so it is no component
+        var inputColumns = new ArrayList<>(table.inputs().stream().filter(column -> CellParser.isName(column.name())).toList());
         table.namedInputs().forEach((name, type) -> inputColumns.add(new InputColumn(name, type)));
         var inputMembers = JavaNames.distinct(inputColumns.stream().map(InputColumn::name).toList(),
                 JavaNames::member, where + " inputs");

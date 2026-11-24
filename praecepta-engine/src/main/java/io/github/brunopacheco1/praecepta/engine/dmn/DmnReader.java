@@ -8,15 +8,26 @@ package io.github.brunopacheco1.praecepta.engine.dmn;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetTime;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -42,18 +53,21 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureExc
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
-import io.github.brunopacheco1.praecepta.engine.feel.ExpressionTypeException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
-import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelUnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
+import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
+import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 
 /**
  * Reads decision tables from DMN XML (DMN 1.1 to 1.5, as written by Camunda Modeler, Drools / KIE
  * tools, Trisotech and {@link DmnWriter}). Uses only the JDK's own XML parser, with DTDs and external
  * entities disabled, even when another JAXP implementation (such as Xerces) is on the class path.
  *
- * <p>Supported: decision tables whose input expressions name an input variable, with
+ * <p>Supported: decision tables whose input expressions name an input variable or are FEEL expressions
+ * ({@code Age * 12}, which the engine computes from the inputs it reads), with
  * {@code string}, {@code number} (or {@code integer}, {@code long}, {@code double}), {@code date},
  * {@code boolean}, {@code time}, {@code dateTime} (or {@code date and time}), {@code dayTimeDuration} and
  * {@code yearMonthDuration} (or their FEEL names) columns, times and date-times with or without a time zone
@@ -63,16 +77,20 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * columns typed by a collection of those ({@code isCollection="true"}), which hold lists and whose
  * entries test the elements ({@code list contains(?, "PT")}, see {@link CellParser#parseFeelList}), and
  * named inputs whose {@code inputData} is such a collection (see {@link DecisionTable#listInputs}); input
- * entries in Praecepta's FEEL subset (lists, {@code not(...)}, {@code null}, comparisons, {@code =} and {@code !=},
- * intervals, {@code -}), with FEEL's literals (numbers such as {@code 1.2e3}, at-literals, every form of the date and
- * time functions) and comments, as {@link CellParser} reads them; input and output value
+ * entries in the full FEEL language of unary tests (DMN 1.5, grammar rules 13 to 17): the simple ones as
+ * {@link CellParser} reads them (lists, {@code not(...)}, {@code null}, comparisons, {@code =} and {@code !=},
+ * intervals, {@code -}, with FEEL's literals and comments), which the bitset index evaluates, and any other
+ * ({@link FeelUnaryTests}: {@code > Limit * 2}, {@code ? > 5 and ? < 10}, {@code [1, 2, 3]}), which the engine applies to
+ * the rules the index matches; input and output value
  * lists; outputs' default values ({@code defaultOutputEntry}, see {@link DecisionTable#defaultOutput}) that are
- * literals, {@code null} included ({@link DecisionTable.OutputColumn#hasDefault}); output entries that are
+ * literals, {@code null} included ({@link DecisionTable.OutputColumn#hasDefault}), or FEEL expressions that read no
+ * input, evaluated when the table is read; output entries that are
  * literals or name one of the table's inputs (of the output's type, or
  * any input for a string output; an input is a column or an input the cells compare with, and holds single
- * values), or that combine literals (strings, numbers, dates, times and durations) and the table's inputs with
- * {@code +}, {@code -}, {@code *}, {@code /} and {@code **} ({@link OutputExpression}, kept as written in
- * {@link PraeceptaOutput#expressions()}); every hit policy; SUM, MIN, MAX and COUNT aggregation. Anything else is rejected with an
+ * values), or any other FEEL expression (DMN 1.5, chapter 10), kept as written in
+ * {@link PraeceptaOutput#expressions()}, which the engine parses, types and evaluates; every hit policy; SUM, MIN, MAX
+ * and COUNT aggregation. An entry or input expression that invokes one of FEEL's built-in functions is rejected with an
+ * {@link UnsupportedFeatureException}, as they are planned for 0.9 (#117); anything else Praecepta does not read with an
  * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered
  * from 1 in table order.
  *
@@ -87,6 +105,10 @@ public final class DmnReader {
     private static final String DECISION_TABLE = "decisionTable";
     private static final String VARIABLE = "variable";
     private static final String LABEL = "label";
+    private static final String OUTPUT_ENTRY = "outputEntry";
+    private static final String DEFAULT_OUTPUT_ENTRY = "defaultOutputEntry";
+    private static final String AGGREGATION = "aggregation";
+    private static final String COUNT = "COUNT";
     /** At most this many levels of item definitions and components in the type of an input data or a decision. */
     public static final int MAX_TYPE_DEPTH = 32;
 
@@ -132,7 +154,7 @@ public final class DmnReader {
     /**
      * Reads a whole decision model, for {@code DecisionGraph}: its input data, with their types, and its decisions, with
      * their information requirements and their logic, a decision table (read as {@link #read(InputStream, String)} reads
-     * it) or a literal expression in Praecepta's expression subset ({@link DecisionLogic.LiteralExpression}). An input
+     * it) or a literal expression in FEEL ({@link DecisionLogic.LiteralExpression}), whose syntax is checked. An input
      * data's type is its variable's {@code typeRef}: a built-in type, or an item definition, which may be a collection or
      * have components (a context), nested up to {@value #MAX_TYPE_DEPTH} levels; none if it has no {@code typeRef}. A
      * literal expression's type is the decision variable's {@code typeRef} (or the literal expression's own, where the
@@ -145,16 +167,19 @@ public final class DmnReader {
      * requirement names a decision or an input data of the model by its {@code href} ({@code #id}); one that refers to
      * no element of the model is kept as the {@code id} it refers to, which {@code DecisionGraph} reports as a missing
      * requirement. Knowledge sources and authority requirements, which do not take part in evaluation, text annotations,
-     * groups and diagrams are ignored.
+     * groups and diagrams are ignored. The model's item definitions are its {@linkplain DecisionModel#types() types}, by name,
+     * which a literal expression's {@code instance of} may name; a function item among them is a function type.
      *
      * <p>What Praecepta does not evaluate yet is rejected, naming the element and the release that plans it: business
      * knowledge models, knowledge requirements and invocations, and decision logic that is a boxed expression (a context,
      * an invocation, a function definition, a relation, a list, a conditional, an iteration, a quantified expression, a
-     * filter), planned for 0.10 (#118); literal expressions beyond Praecepta's expression subset, for 0.8 (#116) and,
-     * for function calls, 0.9 (#117); decision services and imports, for 0.11 (#119).
+     * filter), planned for 0.10 (#118); literal expressions, and decision tables' entries and input expressions, that
+     * invoke a built-in function, for 0.9 (#117); decision
+     * services, imports and external functions, for 0.11 (#119).
      *
-     * @throws InvalidDecisionTableException if the model cannot be read, uses what Praecepta does not support yet, or
-     *                                       names two of its decisions and input data alike
+     * @throws InvalidDecisionTableException if the model cannot be read (a literal expression that is not FEEL among
+     *                                       other things), uses what Praecepta does not support yet, or names two of its
+     *                                       decisions and input data alike
      */
     public static DecisionModel readModel(InputStream dmn) {
         var root = parseModel(dmn);
@@ -183,10 +208,38 @@ public final class DmnReader {
             decisions.add(decision(decision, types, model, elements));
         }
         try {
-            return new DecisionModel(root.getAttribute("name"), inputData, decisions);
+            return new DecisionModel(root.getAttribute("name"), inputData, decisions, namedTypes(types, decisions));
         } catch (IllegalArgumentException e) {
             throw new InvalidDecisionTableException("DMN model: " + e.getMessage());
         }
+    }
+
+    /**
+     * The model's item definitions that its FEEL may name (in {@code instance of}, or a function's parameters): those whose
+     * name one of its texts holds, a literal expression or a decision table's entry or input expression.
+     */
+    private static Map<String, FeelType> namedTypes(ItemDefinitions types, List<DecisionModel.Decision> decisions) {
+        var texts = decisions.stream().flatMap(decision -> texts(decision.logic())).toList();
+        var named = new LinkedHashMap<String, FeelType>();
+        if (!texts.isEmpty()) {
+            types.all().forEach((name, type) -> {
+                if (texts.stream().anyMatch(text -> text.contains(name))) {
+                    named.put(name, type);
+                }
+            });
+        }
+        return named;
+    }
+
+    /** The FEEL texts of a decision's logic: a literal expression, or a table's input expressions, input and output entries. */
+    private static Stream<String> texts(DecisionLogic logic) {
+        return switch (logic) {
+            case DecisionLogic.LiteralExpression literal -> Stream.of(literal.text());
+            case DecisionLogic.Table(var table, var type) -> Stream.concat(
+                    table.inputs().stream().map(InputColumn::name),
+                    table.rules().stream().flatMap(rule -> Stream.concat(rule.input().values().values().stream(),
+                            rule.output().expressions().values().stream())).filter(Objects::nonNull));
+        };
     }
 
     /** Rejects the elements of a model that Praecepta does not evaluate yet, naming the release that plans them. */
@@ -207,7 +260,6 @@ public final class DmnReader {
         }
     }
 
-    private static final Planned FEEL = new Planned("0.8", 116);
     private static final Planned FUNCTIONS = new Planned("0.9", 117);
     private static final Planned BOXED = new Planned("0.10", 118);
     private static final Planned IMPORTS = new Planned("0.11", 119);
@@ -327,12 +379,19 @@ public final class DmnReader {
             typeRef = literal.getAttribute(TYPE_REF);
         }
         var type = types.feelType(typeRef, where);
+        DecisionLogic.LiteralExpression literalExpression;
         try {
-            return new DecisionLogic.LiteralExpression(text, type);
+            literalExpression = new DecisionLogic.LiteralExpression(text, type);
         } catch (IllegalArgumentException e) {
-            var planned = e.getCause() != null && String.valueOf(e.getCause().getMessage()).contains("function call") ? FUNCTIONS : FEEL;
-            throw planned.exception(where + ": " + e.getMessage());
+            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }
+        var unsupported = literalExpression.expression().unsupported();
+        if (!unsupported.isEmpty()) {
+            var planned = unsupported.getFirst().issue() == 119 ? IMPORTS : FUNCTIONS;
+            throw planned.exception("%s: its literal expression uses %s, which Praecepta does not support yet".formatted(where,
+                    String.join(" and ", unsupported.stream().map(Object::toString).toList())));
+        }
+        return literalExpression;
     }
 
     /** The {@code typeRef} of a decision's variable, blank if it has none. */
@@ -389,7 +448,7 @@ public final class DmnReader {
         var where = decisionWhere(name);
 
         var hitPolicy = hitPolicy(table.getAttribute("hitPolicy"), where);
-        var aggregation = aggregation(table.getAttribute("aggregation"), where);
+        var aggregation = aggregation(table.getAttribute(AGGREGATION), where);
 
         var lists = new HashSet<String>();
         var inputs = children(table, "input").stream().map(input -> inputColumn(input, types, model, lists, where)).toList();
@@ -397,6 +456,8 @@ public final class DmnReader {
         if (outputElements.isEmpty()) {
             throw new InvalidDecisionTableException(where + ": the decision table has no output");
         }
+        // a table read alone has no model, whose item definitions its FEEL could name
+        var scope = new TableScope(types, inputs, model != null);
         // a single unnamed output is the decision's result, named after the decision, and typed by it
         var single = outputElements.size() == 1;
         var unnamedOutput = single ? name : "";
@@ -405,12 +466,13 @@ public final class DmnReader {
         var outputs = new ArrayList<OutputColumn>();
         for (int o = 0; o < outputElements.size(); o++) {
             var output = outputElements.get(o);
-            var untypedAs = model == null ? resultType : model.untypedOutputType(decision, output, o, ruleElements, types, where);
-            outputs.add(outputColumn(output, unnamedOutput, untypedAs, types, where));
+            var untypedAs = model == null ? Optional.of(resultType)
+                    : model.untypedOutputType(decision, output, o, new Entries(ruleElements, inputs, lists, scope), types, where);
+            outputs.add(outputColumn(output, unnamedOutput, untypedAs, types, scope, where));
         }
 
         var rules = new ArrayList<Praeceptum>();
-        var columns = new Columns(inputs, outputs, lists);
+        var columns = new Columns(inputs, outputs, lists, scope);
         var names = new ArrayList<NamedInput>();
         for (int i = 0; i < ruleElements.size(); i++) {
             rules.add(rule(ruleElements.get(i), where + ", rule " + (i + 1), i + 1, columns, names));
@@ -420,8 +482,68 @@ public final class DmnReader {
         if (!named.isEmpty()) {
             lists.addAll(namedListInputs(decision.getOwnerDocument().getDocumentElement(), named, types, where));
         }
-        var checked = checkComputedOutputs(rules, inputs, named, lists, outputs, where);
+        var checked = checkComputedOutputs(rules, named, lists, outputs, where);
         return new DecisionTable(name, hitPolicy, aggregation, inputs, outputs, checked, true, lists);
+    }
+
+    /**
+     * A table's rules, as written, with its inputs, those that hold lists, and the names in scope, for typing its output
+     * entries.
+     */
+    private record Entries(List<Element> rules, List<InputColumn> inputs, Set<String> lists, TableScope scope) {
+
+        /** The type of a name an entry reads: a column's, else an input data's or a decision's; null if unknown. */
+        FeelType type(String name, Map<String, FeelType> model) {
+            for (var input : inputs) {
+                if (input.name().equals(name)) {
+                    return lists.contains(name) ? FeelType.listOf(input.type()) : FeelType.of(input.type());
+                }
+            }
+            return model.get(name);
+        }
+    }
+
+    /**
+     * The names in scope for a table's entries: those of the model's input data and decisions, and of the table's inputs
+     * that are names, found and indexed when an entry first needs them, so a table whose entries are all literals and
+     * simple tests reads no names.
+     */
+    private static final class TableScope {
+        private final ItemDefinitions types;
+        private final List<InputColumn> inputs;
+        /** Whether the table is read as part of a model, whose item definitions its FEEL may name. */
+        private final boolean model;
+        private FeelExpression.Scope scope;
+
+        TableScope(ItemDefinitions types, List<InputColumn> inputs, boolean model) {
+            this.types = types;
+            this.inputs = inputs;
+            this.model = model;
+        }
+
+        FeelExpression.Scope get() {
+            if (scope == null) {
+                var names = new LinkedHashSet<>(types.elementNames());
+                // a column that is an expression is no name: its text would read as itself
+                inputs.stream().filter(input -> CellParser.isName(input.name())).forEach(input -> names.add(input.name()));
+                scope = FeelExpression.scope(names, model ? types.all() : Map.of());
+            }
+            return scope;
+        }
+    }
+
+    /** The names of a model's input data and decisions, which its expressions may read. */
+    private static Set<String> elementNames(Element root) {
+        var names = new LinkedHashSet<String>();
+        for (var kind : List.of(INPUT_DATA, DECISION)) {
+            descendants(root, kind).forEach(element -> {
+                var name = element.getAttribute("name").strip();
+                if (!name.isEmpty()) {
+                    names.add(name);
+                }
+            });
+        }
+        return names;
     }
 
     /**
@@ -430,6 +552,38 @@ public final class DmnReader {
      */
     private static final class ModelTypes {
         private final Map<String, FeelType> types = new HashMap<>();
+
+        /**
+         * The declared types of a file's input data and decisions, those Praecepta can hold: what a table read alone, of
+         * a file that need be no model Praecepta reads, types its columns that compute their value with.
+         */
+        static ModelTypes of(Element root, ItemDefinitions items) {
+            var model = new ModelTypes();
+            for (var input : descendants(root, INPUT_DATA)) {
+                var variable = child(input, VARIABLE);
+                try {
+                    model.types.putIfAbsent(nameOr(input, "id"), items.feelType(variable == null ? "" : variable.getAttribute(TYPE_REF), ""));
+                } catch (InvalidDecisionTableException e) {
+                    // a type Praecepta cannot hold: what reads it is of any type
+                }
+            }
+            for (var decision : descendants(root, DECISION)) {
+                model.types.putIfAbsent(nameOr(decision, "id"), declaredTableType(decision, items, ""));
+            }
+            return model;
+        }
+
+        /**
+         * The type of a column whose input expression is an expression, as FEEL types it from the types of the input data
+         * and decisions it reads, when that is a simple type or a list of one.
+         */
+        Optional<Type> expressionType(FeelExpression expression) {
+            return switch (expression.type(types::get)) {
+                case FeelType.Simple(var simple) -> Optional.of(new Type(simple, null, false));
+                case FeelType.ListOf(FeelType.Simple(var simple)) -> Optional.of(new Type(simple, null, true));
+                default -> Optional.empty();
+            };
+        }
 
         /**
          * The type of a column that declares none, from what it reads: the input data or decision of its name, or of its
@@ -455,15 +609,69 @@ public final class DmnReader {
 
         /**
          * The type of an output that declares none ({@link #declaredOutputType}), else that of its literal entries
-         * ({@link #literalType}), else a string.
+         * ({@link #literalType}), else the one type its entries give, as FEEL types them ({@link #entriesType}): empty
+         * where they give several, or one Praecepta's columns do not hold (a list, a context), as each entry then gives a
+         * value of its own type (DMN 1.5, 10.3.2.10, step 3c). A COUNT's output, which says nothing of its value, is
+         * then a string.
          *
          * @param index the output's position among the table's outputs
-         * @param rules the table's rules
          */
-        ColumnType untypedOutputType(Element decision, Element output, int index, List<Element> rules, ItemDefinitions items, String where) {
-            return declaredOutputType(decision, output, items, where)
-                    .or(() -> literalType(rules, index, output))
-                    .orElse(ColumnType.STRING);
+        Optional<ColumnType> untypedOutputType(Element decision, Element output, int index, Entries entries, ItemDefinitions items,
+                String where) {
+            var declared = declaredOutputType(decision, output, items, where).or(() -> literalType(entries.rules(), index, output));
+            if (declared.isPresent()) {
+                return declared;
+            }
+            var table = child(decision, DECISION_TABLE);
+            if (COUNT.equalsIgnoreCase(table.getAttribute(AGGREGATION).strip())) {
+                return Optional.of(ColumnType.STRING);
+            }
+            return entriesType(entries, index, output);
+        }
+
+        /**
+         * The one simple type an output's entries and default give, each as FEEL types it from the types of the table's
+         * inputs and of the model's input data and decisions ({@code a + 1} is a number where {@code a} is one); empty
+         * where they give several, or another type, or one that only their values tell.
+         */
+        private Optional<ColumnType> entriesType(Entries entries, int index, Element output) {
+            var texts = new ArrayList<String>();
+            for (var rule : entries.rules()) {
+                var outputEntries = children(rule, OUTPUT_ENTRY);
+                if (index < outputEntries.size()) {
+                    texts.add(textOf(outputEntries.get(index)));
+                }
+            }
+            var defaultEntry = nonBlankText(output, DEFAULT_OUTPUT_ENTRY);
+            if (defaultEntry != null) {
+                texts.add(defaultEntry);
+            }
+            var found = new HashSet<FeelType>();
+            for (var text : texts) {
+                var type = entryType(text.strip(), entries);
+                if (type != null) {
+                    found.add(type);
+                }
+            }
+            return found.size() == 1 && found.iterator().next() instanceof FeelType.Simple(var simple) ? Optional.of(simple) : Optional.empty();
+        }
+
+        /** An entry's type: a literal's, else its expression's; null for a {@code null} or blank entry, and one that is no FEEL. */
+        private FeelType entryType(String text, Entries entries) {
+            if (text.isEmpty() || text.equals("null") || isNull(text, ColumnType.STRING)) {
+                return null;
+            }
+            var candidates = text.startsWith("\"") ? List.of(ColumnType.STRING) : UNQUOTED_OUTPUT_TYPES;
+            var literal = candidates.stream().filter(candidate -> literalValue(text, candidate).isPresent()).findFirst();
+            if (literal.isPresent()) {
+                return FeelType.of(literal.get());
+            }
+            try {
+                var type = FeelExpression.parse(text, entries.scope().get()).type(name -> entries.type(name, types));
+                return type instanceof FeelType.Null ? null : type;
+            } catch (ExpressionSyntaxException e) {
+                return null; // reported when the rule is read
+            }
         }
 
         /**
@@ -476,7 +684,7 @@ public final class DmnReader {
         private Optional<ColumnType> declaredOutputType(Element decision, Element output, ItemDefinitions items, String where) {
             var table = child(decision, DECISION_TABLE);
             boolean single = children(table, "output").size() == 1;
-            if (!output.getAttribute(TYPE_REF).isBlank() || single && "COUNT".equalsIgnoreCase(table.getAttribute("aggregation").strip())) {
+            if (!output.getAttribute(TYPE_REF).isBlank() || single && COUNT.equalsIgnoreCase(table.getAttribute(AGGREGATION).strip())) {
                 return Optional.empty();
             }
             var typeRef = table.getAttribute(TYPE_REF);
@@ -505,13 +713,13 @@ public final class DmnReader {
         private static Optional<ColumnType> literalType(List<Element> rules, int index, Element output) {
             var texts = new ArrayList<String>();
             for (var rule : rules) {
-                var entries = children(rule, "outputEntry");
+                var entries = children(rule, OUTPUT_ENTRY);
                 if (index >= entries.size()) {
                     return Optional.empty(); // reported when the rule is read
                 }
                 texts.add(textOf(entries.get(index)));
             }
-            var defaultEntry = nonBlankText(output, "defaultOutputEntry");
+            var defaultEntry = nonBlankText(output, DEFAULT_OUTPUT_ENTRY);
             if (defaultEntry != null) {
                 texts.add(defaultEntry);
             }
@@ -607,7 +815,7 @@ public final class DmnReader {
             case "SUM" -> AggregationOperator.SUM;
             case "MIN" -> AggregationOperator.MIN;
             case "MAX" -> AggregationOperator.MAX;
-            case "COUNT" -> AggregationOperator.COUNT;
+            case COUNT -> AggregationOperator.COUNT;
             default -> throw new InvalidDecisionTableException(
                     "%s: aggregation '%s' is not supported (SUM, MIN, MAX and COUNT are)".formatted(where, value));
         };
@@ -617,22 +825,23 @@ public final class DmnReader {
 
     /**
      * A column; one whose type is a collection is added to {@code lists}, and its allowed values (those of
-     * its item type) apply to the list's elements.
+     * its item type) apply to the list's elements. Its input expression is its name: a name of an input variable, or
+     * any FEEL expression ({@code Age * 12}), whose value the engine computes from the inputs it reads, typed, where it
+     * declares no type, as FEEL types it in a model; the names of the model's input data and decisions are in scope for
+     * it.
      */
-    private static InputColumn inputColumn(Element input, ItemDefinitions types, ModelTypes model, Set<String> lists, String where) {
+    private static InputColumn inputColumn(Element input, ItemDefinitions types, ModelTypes model, Set<String> lists,
+            String where) {
         var expression = child(input, "inputExpression");
         var column = expression == null ? "" : textOf(expression).strip();
         if (column.isEmpty()) {
             column = input.getAttribute(LABEL).strip();
         }
-        if (!CellParser.isName(column)) {
-            throw new InvalidDecisionTableException("%s: input expression '%s' is not supported; it must name an input variable"
-                    .formatted(where, column));
-        }
+        var computed = CellParser.isName(column) ? null : inputExpression(column, types.expressionScope(), where);
         var typeRef = expression == null ? "" : expression.getAttribute(TYPE_REF);
         var name = column;
-        var type = typeRef.isBlank() && model != null
-                ? model.columnType(column).orElseGet(() -> types.resolve("", inputWhere(where, name)))
+        var type = typeRef.isBlank()
+                ? untypedColumnType(column, computed, model, types).orElseGet(() -> types.resolve("", inputWhere(where, name)))
                 : types.resolve(typeRef, inputWhere(where, column));
         var values = nonBlankText(input, "inputValues");
         if (type.list()) {
@@ -651,10 +860,56 @@ public final class DmnReader {
     }
 
     /**
-     * @param untypedAs the type of an output whose {@code typeRef} is blank: a single output's
-     *                  {@link #resultType}, else a string
+     * The type of a column whose input expression declares none: in a model, that of what it reads, or of its expression
+     * as FEEL types it; in a table read alone, which keeps 0.6's typing of the columns that name what they read, that of
+     * an expression, typed from the file's input data and decisions as in a model; empty where nothing gives one.
+     *
+     * @param computed its input expression, if it is an expression rather than a name; else null
      */
-    private static OutputColumn outputColumn(Element output, String unnamed, ColumnType untypedAs, ItemDefinitions types, String where) {
+    private static Optional<Type> untypedColumnType(String column, FeelExpression computed, ModelTypes model,
+            ItemDefinitions types) {
+        if (model != null) {
+            return computed == null ? model.columnType(column) : model.expressionType(computed);
+        }
+        return computed == null ? Optional.empty()
+                : types.modelTypes().expressionType(computed);
+    }
+
+    /**
+     * An input expression that is not a name: a FEEL expression, checked.
+     *
+     * @throws UnsupportedFeatureException  if it invokes a built-in function (0.9, #117)
+     * @throws InvalidDecisionTableException if it is not FEEL
+     */
+    private static FeelExpression inputExpression(String text, FeelExpression.Scope scope, String where) {
+        FeelExpression expression;
+        try {
+            expression = FeelExpression.parse(text, scope);
+        } catch (ExpressionSyntaxException e) {
+            throw new InvalidDecisionTableException("%s: input expression '%s' is neither a name nor a FEEL expression: %s"
+                    .formatted(where, text, e.getMessage()));
+        }
+        rejectUnsupported(where + ", input expression '" + text + "'", expression.unsupported());
+        return expression;
+    }
+
+    /** Rejects an expression that uses what Praecepta does not evaluate yet, naming the release that plans it. */
+    private static void rejectUnsupported(String where, List<FeelExpression.Unsupported> unsupported) {
+        if (!unsupported.isEmpty()) {
+            var planned = unsupported.getFirst().issue() == 119 ? IMPORTS : FUNCTIONS;
+            throw planned.exception("%s uses %s, which Praecepta does not support yet".formatted(where,
+                    String.join(" and ", unsupported.stream().map(Object::toString).toList())));
+        }
+    }
+
+    /**
+     * @param untypedAs the type of an output whose {@code typeRef} is blank: a single output's {@link #resultType}, else a
+     *                  string; for a model's table, the type the model gives it ({@link ModelTypes#untypedOutputType}),
+     *                  empty for one whose entries each give a value of their own type, which is then not
+     *                  {@linkplain OutputColumn#typed() typed}, unless it has an output value list
+     */
+    private static OutputColumn outputColumn(Element output, String unnamed, Optional<ColumnType> untypedAs, ItemDefinitions types,
+            TableScope scope, String where) {
         var column = nameOr(output, LABEL);
         if (column.isBlank()) {
             column = unnamed;
@@ -664,8 +919,10 @@ public final class DmnReader {
         }
         var outputWhere = outputWhere(where, column);
         var typeRef = output.getAttribute(TYPE_REF);
-        ColumnType type = untypedAs;
+        ColumnType type = untypedAs.orElse(ColumnType.STRING);
+        boolean typed = untypedAs.isPresent() || nonBlankText(output, "outputValues") != null;
         if (!typeRef.isBlank()) {
+            typed = true;
             var resolved = types.resolve(typeRef, outputWhere);
             if (resolved.list()) {
                 throw new InvalidDecisionTableException("%s: type '%s' is a collection, which is not supported for outputs"
@@ -680,10 +937,12 @@ public final class DmnReader {
                     .orElseThrow(() -> new InvalidDecisionTableException(outputWhere + ": the output value list must be a list of values"))
                     .stream().map(FeelLiterals::text).toList();
         }
-        var defaultValue = defaultValue(output, type, values, outputWhere);
+        var defaultValue = defaultValue(output, type, values, scope, outputWhere);
+        // an output with a value list or a default keeps a type, a string where nothing else gives one: both are text
+        typed = typed || defaultValue != null;
         return defaultValue == null
-                ? new OutputColumn(column, type, values)
-                : new OutputColumn(column, type, values, defaultValue.text(), true);
+                ? new OutputColumn(column, type, values, null, false, typed)
+                : new OutputColumn(column, type, values, defaultValue.text(), true, typed);
     }
 
     /**
@@ -720,28 +979,98 @@ public final class DmnReader {
      * a literal output entry, whose text is null for a default of {@code null}; null if the output has none (no
      * {@code defaultOutputEntry}, or a blank one). A {@code null} default is a default: in a table with several
      * outputs, the default output is then a context with that output null (DMN 1.5, 10.3.2.10 and Table 46), where
-     * a table whose outputs have no default gives null. It must be a literal of the output's type: a default that
-     * names an input or computes a value is rejected, since the engine gives the default without evaluating
-     * anything. When the output has a value list, a default other than {@code null} must be one of its values (DMN
-     * 1.5, Table 46: "The default output value is one of the output values").
+     * a table whose outputs have no default gives null. It is a literal of the output's type, or a FEEL expression that
+     * reads no input ({@code -1}, {@code "N/" + "A"}), whose value, the same whatever the inputs, is taken when the table
+     * is read (DMN 1.5, 10.3.2.10, step 2: "DTI=FEEL(d)"), bound to the output's type as an output entry's is: a string
+     * output takes any value as its text, and another one a value of its type, else null. A default that reads an input
+     * is rejected: Table 46 has the default output value "one of the output values", which no input changes. When the
+     * output has a value list, a default other than {@code null} must be one of its values.
      *
      * @param values the output's value list, as plain text; empty if it has none
      */
-    private static LiteralOutput defaultValue(Element output, ColumnType type, List<String> values, String where) {
-        var text = nonBlankText(output, "defaultOutputEntry");
+    private static LiteralOutput defaultValue(Element output, ColumnType type, List<String> values, TableScope scope,
+            String where) {
+        var text = nonBlankText(output, DEFAULT_OUTPUT_ENTRY);
         if (text == null) {
             return null;
         }
         var literal = literalOutput(text, type);
-        if (literal == null) {
+        if (literal == null && isSimple(text.strip(), scope.get())) {
+            // a literal of another type, or a name: no value of the output's type
             throw new InvalidDecisionTableException("%s: default output '%s' is not supported; a default output must be a literal %s"
                     .formatted(where, text.strip(), type.feelName()));
         }
-        if (literal.text() != null && !values.isEmpty() && values.stream().noneMatch(value -> sameValue(value, literal.text(), type))) {
+        if (literal == null) {
+            literal = constantOutput(text.strip(), type, scope.get(), where);
+        }
+        var given = literal;
+        if (given.text() != null && !values.isEmpty() && values.stream().noneMatch(value -> sameValue(value, given.text(), type))) {
             throw new InvalidDecisionTableException("%s: default output '%s' is not in its output values %s"
                     .formatted(where, text.strip(), values));
         }
-        return literal;
+        return given;
+    }
+
+    /** Whether an entry is a single literal or a name, as simple unary tests hold them, rather than an expression. */
+    private static boolean isSimple(String text, FeelExpression.Scope scope) {
+        try {
+            var tests = FeelUnaryTests.parse(text, scope);
+            FeelExpression.parse(text, scope); // one test, not several
+            return !tests.isAny() && tests.isSimple();
+        } catch (ExpressionSyntaxException e) {
+            return false;
+        }
+    }
+
+    /**
+     * A default output that is a FEEL expression reading no input, evaluated: its value bound to the output's type, as
+     * plain text, null where it is null.
+     *
+     * @throws InvalidDecisionTableException if it is not FEEL, or reads an input
+     */
+    private static LiteralOutput constantOutput(String text, ColumnType type, FeelExpression.Scope scope, String where) {
+        FeelExpression expression;
+        try {
+            expression = FeelExpression.parse(text, scope);
+        } catch (ExpressionSyntaxException e) {
+            throw new InvalidDecisionTableException("%s: default output '%s' is not FEEL: %s".formatted(where, text, e.getMessage()));
+        }
+        rejectUnsupported(where + ", default output '" + text + "'", expression.unsupported());
+        if (!expression.names().isEmpty()) {
+            throw new InvalidDecisionTableException(("%s: default output '%s' reads '%s'; a default output is a value, which no input "
+                    + "changes (DMN 1.5, Table 46)").formatted(where, text, expression.names().getFirst()));
+        }
+        var value = expression.evaluate(name -> null);
+        if (value == null) {
+            return new LiteralOutput(null);
+        }
+        if (type == ColumnType.STRING) {
+            return new LiteralOutput(value instanceof String string ? string : FeelLiterals.text(value));
+        }
+        var bound = bound(value, type);
+        return new LiteralOutput(bound == null ? null : FeelLiterals.text(bound));
+    }
+
+    /**
+     * A value bound to a simple type (DMN 1.5, 10.3.2.9.4): a list of one as its element, a date as a date and time at UTC
+     * midnight for a date and time, a value of the type as it is, and null for any other.
+     */
+    private static Object bound(Object value, ColumnType type) {
+        var single = value instanceof List<?> list && list.size() == 1 ? list.getFirst() : value;
+        if (single instanceof LocalDate date && type == ColumnType.DATE_TIME) {
+            return date.atStartOfDay(ZoneOffset.UTC);
+        }
+        boolean ofType = switch (type) {
+            case STRING -> single instanceof String;
+            case NUMBER -> single instanceof BigDecimal;
+            case BOOLEAN -> single instanceof Boolean;
+            case DATE -> single instanceof LocalDate;
+            case TIME -> single instanceof LocalTime || single instanceof OffsetTime || single instanceof ZonedTime;
+            case DATE_TIME -> single instanceof LocalDateTime || single instanceof ZonedDateTime;
+            case DAY_TIME_DURATION -> single instanceof Duration;
+            case YEAR_MONTH_DURATION -> single instanceof YearsAndMonths;
+        };
+        return ofType ? single : null;
     }
 
     /** Whether two values of an output, as plain text, are the same: numbers by value ({@code 1.50} is {@code 1.5}). */
@@ -757,7 +1086,7 @@ public final class DmnReader {
      *
      * @param lists the inputs that hold lists
      */
-    private record Columns(List<InputColumn> inputs, List<OutputColumn> outputs, Set<String> lists) {
+    private record Columns(List<InputColumn> inputs, List<OutputColumn> outputs, Set<String> lists, TableScope scope) {
 
         /** Whether an input is one of the table's columns. */
         boolean isInput(String name) {
@@ -774,7 +1103,7 @@ public final class DmnReader {
      */
     private static Praeceptum rule(Element rule, String where, int number, Columns columns, List<NamedInput> names) {
         var inputEntries = children(rule, "inputEntry");
-        var outputEntries = children(rule, "outputEntry");
+        var outputEntries = children(rule, OUTPUT_ENTRY);
         if (inputEntries.size() != columns.inputs().size() || outputEntries.size() != columns.outputs().size()) {
             throw new InvalidDecisionTableException("%s: has %d input and %d output entries; the table has %d inputs and %d outputs"
                     .formatted(where, inputEntries.size(), outputEntries.size(), columns.inputs().size(), columns.outputs().size()));
@@ -783,29 +1112,55 @@ public final class DmnReader {
         return new Praeceptum(number, input, outputEntries(outputEntries, where, columns));
     }
 
-    /** A rule's input entries, kept as written once checked; adds the inputs they compare with that are not columns to {@code names}. */
+    /**
+     * A rule's input entries, kept as written once checked; adds the inputs they compare with that are not columns to
+     * {@code names}. An entry beyond the simple unary tests the bitset index evaluates is checked to be FEEL unary tests.
+     */
     private static PraeceptaInput inputEntries(List<Element> entries, String where, Columns columns, List<NamedInput> names) {
         Map<String, String> cells = new HashMap<>();
         for (int c = 0; c < entries.size(); c++) {
             var column = columns.inputs().get(c);
             var text = textOf(entries.get(c)).strip();
             var cellWhere = where + ", column '" + column.name() + "'";
-            if (columns.lists().contains(column.name())) {
-                parseListCell(text, column.type(), cellWhere); // a list column's cells name no input
-            } else {
-                var cell = parseCell(text, column.type(), cellWhere);
-                if (cell.namesInputs()) {
-                    UnaryTests.names(cell).stream()
-                            .filter(name -> !columns.isInput(name))
-                            .forEach(name -> names.add(new NamedInput(name, column.type())));
-                }
+            var cell = ruleCell(text, column.type(), columns.lists().contains(column.name()), columns.scope(), cellWhere);
+            if (cell != null && cell.namesInputs()) { // a list column's simple cells name no input
+                UnaryTests.names(cell).stream()
+                        .filter(name -> !columns.isInput(name))
+                        .forEach(name -> names.add(new NamedInput(name, column.type())));
             }
             cells.put(column.name(), text);
         }
         return new PraeceptaInput(cells);
     }
 
-    /** A rule's output entries, as plain text: literal values, names of inputs, and expressions computing a value. */
+    /**
+     * A rule's input entry: the simple unary tests {@link CellParser} reads (for a list column, its forms of
+     * {@code list contains}), which the bitset index evaluates; else null, once it is checked to be FEEL unary tests
+     * ({@link FeelUnaryTests}), which the engine applies to the rules the index matches.
+     *
+     * @throws UnsupportedFeatureException  if it invokes a built-in function (0.9, #117)
+     * @throws InvalidDecisionTableException if it is neither
+     */
+    private static UnaryTests ruleCell(String text, ColumnType type, boolean list, TableScope scope, String where) {
+        try {
+            return list ? CellParser.parseFeelList(text, type) : CellParser.parseFeel(text, type);
+        } catch (CellSyntaxException rejected) {
+            FeelUnaryTests tests;
+            try {
+                tests = FeelUnaryTests.parseCell(text, scope.get(), rejected);
+            } catch (CellSyntaxException e) {
+                throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+            }
+            rejectUnsupported(where, tests.unsupported());
+            return null;
+        }
+    }
+
+    /**
+     * A rule's output entries, as plain text: literal values, names of inputs, and FEEL expressions computing a value. A
+     * literal of an output that is not {@linkplain OutputColumn#typed() typed} is an expression, so that it keeps its own
+     * type.
+     */
     private static PraeceptaOutput outputEntries(List<Element> entries, String where, Columns columns) {
         Map<String, String> values = new HashMap<>();
         Map<String, String> references = new HashMap<>();
@@ -819,11 +1174,14 @@ public final class DmnReader {
             if (input != null) {
                 checkReference(input, columns.lists(), outputWhere);
                 references.put(column.name(), input.name());
-            } else if (literal != null) {
+            } else if (literal != null && (column.typed() || literal.text() == null)) {
                 values.put(column.name(), literal.text());
             } else {
-                // checked once the inputs the cells compare with are known (see checkComputedOutputs)
-                parseExpression(text, outputWhere);
+                // an entry that names an input the cells compare with is a reference (see checkComputedOutputs)
+                parseExpression(text, columns.scope().get(), outputWhere);
+                if (column.typed()) {
+                    rejectLiteralOfAnotherType(text, column.type(), columns.scope().get(), outputWhere);
+                }
                 expressions.put(column.name(), text);
             }
         }
@@ -853,14 +1211,11 @@ public final class DmnReader {
     }
 
     /**
-     * Checks the output entries that compute their value, now that the inputs the cells compare with are
-     * known: an expression may read the table's columns and those inputs, as the engine evaluates it,
-     * and an entry that is just the name of such an input names it, as an entry naming a column does.
+     * Once the inputs the cells compare with are known: an output entry that is just the name of such an input names
+     * it, as an entry naming a column does.
      */
-    private static List<Praeceptum> checkComputedOutputs(List<Praeceptum> rules, List<InputColumn> inputs, Map<String, ColumnType> named,
-            Set<String> lists, List<OutputColumn> outputs, String where) {
-        var types = new HashMap<>(named);
-        inputs.forEach(input -> types.put(input.name(), input.type()));
+    private static List<Praeceptum> checkComputedOutputs(List<Praeceptum> rules, Map<String, ColumnType> named, Set<String> lists,
+            List<OutputColumn> outputs, String where) {
         var outputsByName = new HashMap<String, OutputColumn>();
         outputs.forEach(output -> outputsByName.put(output.name(), output));
         var checked = new ArrayList<Praeceptum>();
@@ -877,7 +1232,6 @@ public final class DmnReader {
                     checkReference(input, lists, outputWhere);
                     references.put(column, text);
                 } else {
-                    checkExpression(text, types, lists, outputsByName.get(column), outputWhere);
                     expressions.put(column, text);
                 }
             });
@@ -886,41 +1240,59 @@ public final class DmnReader {
         return checked;
     }
 
-    private static OutputExpression parseExpression(String text, String where) {
-        try {
-            return OutputExpression.parse(text);
-        } catch (ExpressionSyntaxException e) {
-            throw new InvalidDecisionTableException(("%s: '%s' is not supported; output entries must be literals, name an input, "
-                    + "or join literals and inputs with +, -, *, / and ** (%s)").formatted(where, text, e.getMessage()));
+    /**
+     * Rejects an output entry that is a single literal, as written, but not one of its output's type: a date and time
+     * literal that gives no value ({@code time("08:00:00+14:01")}), or, but for a string output, which takes any value as
+     * its text, a literal of another type ({@code "x"} for a number). Such an entry is a mistake in a literal, as a cell's
+     * literal of another type is, not an expression (one that computes a value is checked when the engine is built).
+     *
+     * @throws InvalidDecisionTableException if it is such a literal
+     */
+    private static void rejectLiteralOfAnotherType(String text, ColumnType type, FeelExpression.Scope scope, String where) {
+        var problem = literalProblem(text, type, scope);
+        if (problem != null) {
+            throw new InvalidDecisionTableException("%s: '%s' is not a literal %s%s".formatted(where, text, type.feelName(), problem));
         }
     }
 
     /**
-     * Checks an output entry that computes its value ({@link OutputExpression}): it parses, it names
-     * only inputs of single values (the table's columns, or inputs its cells compare with: those the
-     * engine reads), their types go together, and the value has the output's type, or any type for a
-     * string output (which takes a number as its text, as it takes number literals).
-     *
-     * @param types the type of each input an expression may read
+     * What is wrong with an entry that is a single literal, a name of none, but not one of the type: {@code ""} for a
+     * literal of another type (none for a string), the error FEEL reports for a literal that gives no value; null for an
+     * entry that is no single literal, or is fine.
      */
-    private static void checkExpression(String text, Map<String, ColumnType> types, Set<String> lists, OutputColumn output, String where) {
-        var expression = parseExpression(text, where);
-        for (var name : expression.names()) {
-            if (!types.containsKey(name) || lists.contains(name)) {
-                throw new InvalidDecisionTableException(("%s: '%s' names '%s', which is not one of the table's inputs of single values; "
-                        + "output entries must be literals or read the table's inputs").formatted(where, text, name));
-            }
-        }
-        ColumnType type;
+    private static String literalProblem(String text, ColumnType type, FeelExpression.Scope scope) {
+        FeelUnaryTests tests;
         try {
-            type = expression.type(types::get);
-        } catch (ExpressionTypeException e) {
-            throw new InvalidDecisionTableException("%s: '%s' %s".formatted(where, text, e.getMessage()));
+            tests = FeelUnaryTests.parse(text, scope);
+        } catch (ExpressionSyntaxException e) {
+            return null;
         }
-        if (type != output.type() && output.type() != ColumnType.STRING) {
-            throw new InvalidDecisionTableException("%s: '%s' gives a %s, but the output is a %s"
-                    .formatted(where, text, type.feelName(), output.type().feelName()));
+        if (tests.isAny() || !tests.isSimple() || !tests.names().isEmpty()) {
+            return null;
         }
+        var errors = new ArrayList<String>();
+        FeelExpression.parse(text, scope).evaluate(name -> null, errors::add);
+        if (!errors.isEmpty()) {
+            return ": " + errors.getFirst();
+        }
+        return type == ColumnType.STRING ? null : "";
+    }
+
+    /**
+     * Checks an output entry that computes its value: a FEEL expression (DMN 1.5, chapter 10), which the engine parses,
+     * types and evaluates; one whose value is null whatever its inputs is a WARNING of its validation report.
+     *
+     * @throws UnsupportedFeatureException  if it invokes a built-in function (0.9, #117)
+     * @throws InvalidDecisionTableException if it is not FEEL
+     */
+    private static void parseExpression(String text, FeelExpression.Scope scope, String where) {
+        FeelExpression expression;
+        try {
+            expression = FeelExpression.parse(text, scope);
+        } catch (ExpressionSyntaxException e) {
+            throw new InvalidDecisionTableException("%s: '%s' is not a FEEL expression (%s)".formatted(where, text, e.getMessage()));
+        }
+        rejectUnsupported(where, expression.unsupported());
     }
 
     /**
@@ -947,15 +1319,6 @@ public final class DmnReader {
     private static UnaryTests parseCell(String text, ColumnType type, String where) {
         try {
             return CellParser.parseFeel(text, type);
-        } catch (CellSyntaxException e) {
-            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
-        }
-    }
-
-    /** Parses the cell of a list column ({@code list contains(?, "PT")}), naming {@code where} it is if it is invalid. */
-    private static void parseListCell(String text, ColumnType type, String where) {
-        try {
-            CellParser.parseFeelList(text, type);
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }
@@ -1094,10 +1457,44 @@ public final class DmnReader {
      * collections of collections and function types are rejected.
      */
     private static final class ItemDefinitions {
-        private final Map<String, Element> byName = new HashMap<>();
+        private final Map<String, Element> byName = new LinkedHashMap<>();
+        /** Whether a function item is read as a function type, as {@link #all} reads them, rather than rejected. */
+        private boolean functions;
+        private final Element root;
+        /** The names of the model's input data and decisions, found once for all its tables; null until asked for. */
+        private Set<String> elementNames;
+        private FeelExpression.Scope expressionScope;
+        private ModelTypes modelTypes;
+        /** Every type the item definitions define ({@link #all}), read once. */
+        private Map<String, FeelType> all;
 
         ItemDefinitions(Element root) {
+            this.root = root;
             children(root, "itemDefinition").forEach(definition -> byName.putIfAbsent(definition.getAttribute("name"), definition));
+        }
+
+        /** The names of the model's input data and decisions ({@link DmnReader#elementNames}), found once. */
+        Set<String> elementNames() {
+            if (elementNames == null) {
+                elementNames = DmnReader.elementNames(root);
+            }
+            return elementNames;
+        }
+
+        /** Those names in scope, for an input expression, indexed once. */
+        FeelExpression.Scope expressionScope() {
+            if (expressionScope == null) {
+                expressionScope = FeelExpression.scope(elementNames(), Map.of());
+            }
+            return expressionScope;
+        }
+
+        /** The declared types of the model's input data and decisions ({@link ModelTypes#of}), read once. */
+        ModelTypes modelTypes() {
+            if (modelTypes == null) {
+                modelTypes = ModelTypes.of(root, this);
+            }
+            return modelTypes;
         }
 
         /**
@@ -1189,13 +1586,57 @@ public final class DmnReader {
             return type;
         }
 
+        /**
+         * Every type the model's item definitions define, by name, for FEEL's {@code instance of} and function parameters
+         * (DMN 1.5, 10.3.2.9): function types (a {@code functionItem}) among them; a definition Praecepta cannot read is
+         * left out.
+         */
+        Map<String, FeelType> all() {
+            if (all == null) {
+                all = Collections.unmodifiableMap(allTypes());
+            }
+            return all;
+        }
+
+        private Map<String, FeelType> allTypes() {
+            var read = new LinkedHashMap<String, FeelType>();
+            functions = true;
+            try {
+                for (var name : byName.keySet()) {
+                    try {
+                        read.put(name, typeOf(name, "Item definition '" + name + "'", 0, new HashSet<>()));
+                    } catch (InvalidDecisionTableException e) {
+                        // a type Praecepta cannot read: an expression that names it is reported
+                    }
+                }
+            } finally {
+                functions = false;
+            }
+            return read;
+        }
+
+        /** A function item's type (DMN 1.5, 7.3.4): its parameters' types and its output's, {@code Any} where it names none. */
+        private FeelType functionType(Element function, String where, int depth, Set<String> enclosing) {
+            var parameters = new ArrayList<FeelType>();
+            for (var parameter : children(function, "parameters")) {
+                var typeRef = parameter.getAttribute(TYPE_REF);
+                parameters.add(typeRef.isBlank() ? FeelType.ANY : typeOf(typeRef, where, depth + 1, enclosing));
+            }
+            var output = function.getAttribute("outputTypeRef");
+            return new FeelType.FunctionOf(parameters, output.isBlank() ? FeelType.ANY : typeOf(output, where, depth + 1, enclosing));
+        }
+
         /** The type an item definition, or one of its components, defines. */
         private FeelType definitionType(Element definition, String name, String where, int depth, Set<String> enclosing) {
             if (depth > MAX_TYPE_DEPTH) {
                 throw new InvalidDecisionTableException("%s: type '%s' nests more than %d levels of item definitions and components"
                         .formatted(where, name, MAX_TYPE_DEPTH));
             }
-            if (child(definition, "functionItem") != null) {
+            var function = child(definition, "functionItem");
+            if (function != null && functions) {
+                return functionType(function, where, depth, enclosing);
+            }
+            if (function != null) {
                 throw BOXED.exception(("%s: type '%s' is a function type, which Praecepta does not support yet: "
                         + "business knowledge models and functions are planned for 0.10 (#118)").formatted(where, name));
             }

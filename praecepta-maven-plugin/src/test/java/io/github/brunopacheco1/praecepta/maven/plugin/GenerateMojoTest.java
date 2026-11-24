@@ -120,6 +120,38 @@ class GenerateMojoTest {
         Assertions.assertThat(infos).filteredOn(line -> line.startsWith("Compiled table")).hasSize(2);
     }
 
+    /**
+     * A source the engine rejects, or that uses what a later release plans with no table to compile alone, fails the
+     * build as a MojoFailureException, with the engine's message and exception as its cause.
+     */
+    @Test
+    void a_source_the_engine_rejects_fails_the_build() throws Exception {
+        Files.writeString(basedir.resolve("src/main/rules/bkm.dmn"), """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
+                  <businessKnowledgeModel id="bkm" name="Rate"/>
+                  <decision id="a" name="A"><literalExpression><text>1</text></literalExpression></decision>
+                </definitions>""");
+        var later = new TableConfig(new File("src/main/rules/bkm.dmn"), null, null, null, null, List.of(), List.of());
+        Assertions.assertThatThrownBy(() -> mojo(List.of(later), "ERROR", null).execute())
+                .isInstanceOf(MojoFailureException.class)
+                .hasMessageContaining("business knowledge model 'Rate'")
+                .hasRootCauseInstanceOf(io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException.class);
+
+        Files.writeString(basedir.resolve("src/main/rules/broken.dmn"), """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="t" name="T"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>
+                    <output name="tier" typeRef="string"/>
+                    <rule><inputEntry><text>&gt; (1</text></inputEntry><outputEntry><text>"any"</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var broken = new TableConfig(new File("src/main/rules/broken.dmn"), null, null, null, null, List.of(), List.of());
+        Assertions.assertThatThrownBy(() -> mojo(List.of(broken), "ERROR", null).execute())
+                .isInstanceOf(MojoFailureException.class)
+                .hasMessageContaining("rule 1")
+                .hasRootCauseInstanceOf(io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException.class);
+    }
+
     @Test
     void skip_writes_nothing() throws Exception {
         var mojo = mojo(List.of(fees("Fees")), "ERROR", null);

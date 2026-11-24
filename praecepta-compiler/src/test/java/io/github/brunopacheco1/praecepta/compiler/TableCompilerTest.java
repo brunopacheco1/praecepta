@@ -146,6 +146,28 @@ class TableCompilerTest {
         }
     }
 
+    /**
+     * A table in the full FEEL language (#116), compiled on its own: its column computed from the input it reads is no
+     * component, which that input is, and so is the input its cells and output entries read beside it.
+     */
+    @Test
+    void a_table_in_the_full_feel_language_compiles_its_inputs_as_components() throws Exception {
+        var config = new TableDefinition(table("feel-table.dmn"), "Fees", null, null, null, List.of(), List.of());
+        var result = compile(config, PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("FeesInput"))
+                .contains("public record FeesInput(java.math.BigDecimal limit, java.math.BigDecimal age)");
+
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".FeesInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Fees").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(new BigDecimal(25), new BigDecimal(30))))
+                    .get().hasToString("FeesOutput[fee=50]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(new BigDecimal(25), new BigDecimal(20))))
+                    .get().hasToString("FeesOutput[fee=0]");
+        }
+    }
+
     /** DMN 1.5, 10.3.2.10: when no rule matches, the table gives its default output values (#79). */
     @Test
     void a_dmn_tables_default_output_is_what_the_generated_class_gives_when_no_rule_matches() throws Exception {
@@ -663,6 +685,98 @@ class TableCompilerTest {
                 Assertions.assertThat(output.getClass().getMethod("opens").invoke(output))
                         .isEqualTo(OffsetTime.of(9, 0, 0, 0, ZoneOffset.ofHours(1)));
             }
+        }
+    }
+
+    /**
+     * DMN 1.5, 10.3.2.9.4: a date bound to a date and time output is the date and time at UTC midnight, which the engine
+     * gives with its zone, so the generated component holds a ZonedDateTime, not a LocalDateTime.
+     */
+    @Test
+    void a_date_bound_to_a_date_and_time_output_is_zoned_at_utc() throws Exception {
+        var dmn = out.resolve("due.dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="due" name="due"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="number"><text>days</text></inputExpression></input>
+                    <output name="at" typeRef="dateTime"/>
+                    <rule><inputEntry><text>-</text></inputEntry>
+                      <outputEntry><text>date("2020-01-01") + duration("P1D")</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var result = compile(new TableDefinition(dmn, "Due", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("DueOutput")).contains("public record DueOutput(java.time.ZonedDateTime at)");
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".DueInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Due").getMethod("evaluate", input);
+            var output = ((Optional<?>) evaluate.invoke(null, input.getDeclaredConstructors()[0].newInstance(BigDecimal.ONE))).orElseThrow();
+            Assertions.assertThat(output.getClass().getMethod("at").invoke(output))
+                    .isEqualTo(ZonedDateTime.of(2020, 1, 2, 0, 0, 0, 0, ZoneOffset.UTC));
+        }
+    }
+
+    /**
+     * A FEEL cell links its column's kind of time only with the inputs of its type it reads: a date and time column may
+     * read a time column written without a zone though its own literals have one.
+     */
+    @Test
+    void a_feel_cell_links_its_column_only_with_inputs_of_its_type() throws Exception {
+        var dmn = out.resolve("slots.dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="slot" name="slot"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="dateTime"><text>when</text></inputExpression></input>
+                    <input><inputExpression typeRef="time"><text>at</text></inputExpression></input>
+                    <output name="open" typeRef="boolean"/>
+                    <rule><inputEntry><text>? &gt; @"2020-01-01T00:00:00Z" and at &lt; @"10:00:00"</text></inputEntry>
+                      <inputEntry><text>&gt;= @"08:00:00"</text></inputEntry><outputEntry><text>true</text></outputEntry></rule>
+                    <rule><inputEntry><text>-</text></inputEntry><inputEntry><text>-</text></inputEntry>
+                      <outputEntry><text>false</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var result = compile(new TableDefinition(dmn, "Slot", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("SlotInput"))
+                .contains("public record SlotInput(java.time.ZonedDateTime when, java.time.LocalTime at)");
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".SlotInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Slot").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            var when = ZonedDateTime.of(2021, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(when, LocalTime.of(9, 0))))
+                    .get().hasToString("SlotOutput[open=true]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(when, LocalTime.of(11, 0))))
+                    .get().hasToString("SlotOutput[open=false]");
+        }
+    }
+
+    /**
+     * A column computed from an input ({@code start + @"PT1H"}) has that input's kind of time: the input takes the zone the
+     * computed column's cells are written with.
+     */
+    @Test
+    void an_input_read_by_a_computed_column_takes_its_kind_of_time() throws Exception {
+        var dmn = out.resolve("ends.dmn");
+        Files.writeString(dmn, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
+                  <decision id="late" name="late"><decisionTable hitPolicy="FIRST">
+                    <input><inputExpression typeRef="dateTime"><text>start + @"PT1H"</text></inputExpression></input>
+                    <output name="late" typeRef="boolean"/>
+                    <rule><inputEntry><text>&gt; @"2020-01-01T10:00:00Z"</text></inputEntry><outputEntry><text>true</text></outputEntry></rule>
+                    <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>false</text></outputEntry></rule>
+                  </decisionTable></decision>
+                </definitions>""");
+        var result = compile(new TableDefinition(dmn, "Late", null, null, null, List.of(), List.of()), PACKAGE, Severity.ERROR);
+        Assertions.assertThat(result.sources().get("LateInput")).contains("public record LateInput(java.time.ZonedDateTime start)");
+        try (var loader = compileAndLoad(result)) {
+            var input = loader.loadClass(PACKAGE + ".LateInput");
+            var evaluate = loader.loadClass(PACKAGE + ".Late").getMethod("evaluate", input);
+            var constructor = input.getDeclaredConstructors()[0];
+            // 09:30 in Paris is 08:30Z, an hour later 09:30Z: not later than 10:00Z, though 10:30 local would be
+            var start = ZonedDateTime.of(2020, 1, 1, 9, 30, 0, 0, ZoneOffset.ofHours(1));
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(start)))
+                    .get().hasToString("LateOutput[late=false]");
+            Assertions.assertThat((Optional<?>) evaluate.invoke(null, constructor.newInstance(start.plusHours(1))))
+                    .get().hasToString("LateOutput[late=true]");
         }
     }
 

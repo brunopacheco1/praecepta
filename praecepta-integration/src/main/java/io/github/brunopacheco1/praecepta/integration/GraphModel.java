@@ -209,14 +209,15 @@ public final class GraphModel {
             case FeelType.Context(var components) -> contextValue(name, components, text, depth);
             case FeelType.ListOf(FeelType.Simple(var element)) -> listValue(name, element, text.get(name));
             case FeelType.ListOf(FeelType.Any any) -> listValue(name, ColumnType.STRING, text.get(name));
-            case FeelType.ListOf list -> {
+            case FeelType.Simple(var simple) -> simple == ColumnType.STRING ? text.get(name) : present(text.get(name));
+            case FeelType.Any any -> text.get(name) != null ? present(text.get(name)) : paths(name, text);
+            default -> {
+                // a list of lists or contexts, a range, a function: no text holds one
                 if (text.get(name) != null && !text.get(name).isBlank()) {
                     throw new InvalidInputException(name, text.get(name), "is a %s, which cannot be given as text".formatted(type.feelName()));
                 }
                 yield null;
             }
-            case FeelType.Simple(var simple) -> simple == ColumnType.STRING ? text.get(name) : present(text.get(name));
-            case FeelType.Any any -> text.get(name) != null ? present(text.get(name)) : paths(name, text);
         };
     }
 

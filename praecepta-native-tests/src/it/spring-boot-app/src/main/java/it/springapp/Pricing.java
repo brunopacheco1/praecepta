@@ -51,7 +51,14 @@ public class Pricing {
         // rules/graph/credit.dmn, a decision requirements graph (#14): Monthly Limit = Credit Limit / 12, from the input data
         check("Monthly Limit, through the graph", () -> decisions.evaluate("Monthly Limit", Map.of("Applicant Age", "30", "Income", "1200")),
                 List.of(Map.of("Monthly Limit", "200")));
-        check("Decisions found", decisions::names, Set.of("Carrier", "Credit Limit", "Discount", "Fee", "Monthly Limit", "Risk Category"));
+        // rules/graph/feel.dmn, a decision table in the full FEEL language (0.8, #116): a computed column, FEEL cells and outputs
+        check("Band, through the graph", () -> decisions.evaluate("Band", Map.of("Age", "30", "Limit", "100")), List.of(Map.of("Band", "360")));
+        check("Band, over the limit", () -> decisions.evaluate("Band", Map.of("Age", "30", "Limit", "20")),
+                List.of(Map.of("Band", "over the limit")));
+        check("Summary, through the graph", () -> decisions.evaluate("Summary", Map.of("Age", "30", "Limit", "100")),
+                List.of(Map.of("Summary", "true")));
+        check("Decisions found", decisions::names, Set.of("Band", "Carrier", "Credit Limit", "Discount",
+                "Fee", "Monthly Limit", "Risk Category", "Summary"));
         // COLLECT SUM: 5 + 12.5
         check("Fee, by name", () -> decisions.evaluate("Fee", Map.of("zone", "islands")), List.of(Map.of("fee", "17.5")));
         System.out.printf("%d checks failed%n", failures.size());

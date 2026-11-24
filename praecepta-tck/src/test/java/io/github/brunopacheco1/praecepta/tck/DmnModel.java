@@ -73,6 +73,11 @@ final class DmnModel {
         return tables;
     }
 
+    /** The names of every input data. */
+    Set<String> inputData() {
+        return inputData.keySet();
+    }
+
     /** The names of every decision. */
     Set<String> decisions() {
         return decisions.keySet();

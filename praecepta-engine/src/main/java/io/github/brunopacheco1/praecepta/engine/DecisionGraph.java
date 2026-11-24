@@ -36,6 +36,7 @@ import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
 /**
@@ -84,11 +85,12 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * <p><b>Evaluating.</b> {@link #evaluate(String, Map)} evaluates a decision and the decisions it requires, directly or
  * indirectly, each once, in dependency order, and nothing else; every table, expression and name was parsed and
  * resolved when the graph was built, and only a computed output entry's value is converted from its text when it is
- * evaluated. A graph is immutable and thread-safe.
+ * evaluated. A literal expression is FEEL (DMN 1.5, chapter 10; {@link io.github.brunopacheco1.praecepta.engine.feel.FeelExpression}):
+ * where FEEL defines no value it gives null, and {@link #evaluateWithErrors} gives the errors FEEL reported with the
+ * value. A graph is immutable and thread-safe.
  *
  * <p>Business knowledge models, invocations and boxed expressions are planned for 0.10
- * (<a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>), the full FEEL language for 0.8
- * (<a href="https://github.com/brunopacheco1/praecepta/issues/116">#116</a>) and its built-in functions for 0.9
+ * (<a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>), FEEL's built-in functions for 0.9
  * (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>), decision services and imports for 0.11
  * (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>); a model that uses them is rejected when it
  * is read.
@@ -195,10 +197,9 @@ public final class DecisionGraph {
         var decision = analysis.model.decisions().get(d);
         var reads = analysis.reads.get(d);
         return switch (decision.logic()) {
-            case DecisionLogic.Table(var table, var type) -> new GraphNodes.TableNode(table, analysis.tableReads(d), reads,
-                    analysis.listedNamedInputs.get(d), analysis.bindings[d], type, log);
+            case DecisionLogic.Table(var table, var type) -> new GraphNodes.TableNode(table, analysis, d, type, log);
             case DecisionLogic.LiteralExpression literal -> new GraphNodes.LiteralNode(analysis.expressions[d], reads, analysis.bindings[d],
-                    literal.type(), analysis.dynamic[d]);
+                    literal.type());
         };
     }
 
@@ -276,9 +277,56 @@ public final class DecisionGraph {
         var values = new Object[slotCount];
         assign(plan.inputs(), values, inputData);
         for (int d : plan.decisions()) {
-            values[inputNames.length + d] = nodes[d].evaluate(values);
+            values[inputNames.length + d] = nodes[d].evaluate(values, null);
         }
         return values[inputNames.length + plan.decision()];
+    }
+
+    /**
+     * A decision's value, and the errors FEEL reported while evaluating it and the decisions it requires (DMN 1.5,
+     * 10.3.2.15): where FEEL defines no value, as for operands it does not combine ({@code "a" + 1}), a division by zero,
+     * an index beyond a list or an invalid date literal, the value is null, and an error says why.
+     *
+     * @param value  the decision's value, as {@link #evaluate(String, Map)} gives it
+     * @param errors the errors' messages, by the name of the decision whose logic reported them, in the order the
+     *               decisions were evaluated; a decision that reported none is not there
+     */
+    public record Outcome(Object value, Map<String, List<String>> errors) {
+        public Outcome {
+            var copy = new LinkedHashMap<String, List<String>>();
+            errors.forEach((name, messages) -> copy.put(name, List.copyOf(messages)));
+            errors = Collections.unmodifiableMap(copy);
+        }
+
+        /** The errors a decision's own logic reported; empty if it reported none. */
+        public List<String> errorsOf(String decision) {
+            return errors.getOrDefault(decision, List.of());
+        }
+    }
+
+    /**
+     * Evaluates a decision as {@link #evaluate(String, Map)} does, and gives the errors FEEL reported on the way with its
+     * value. Evaluation is the same, and as fast but for the errors' messages.
+     *
+     * @throws NoSuchElementException        if the graph has no decision of that name
+     * @throws InvalidDecisionTableException if the decision cannot be evaluated (see {@link #evaluate(String, Map)})
+     * @throws InvalidInputException         if an input data's value is not one of its type, or a decision table
+     *                                       rejects a value
+     * @throws HitPolicyViolationException   if a decision table's hit policy is violated
+     */
+    public Outcome evaluateWithErrors(String decision, Map<String, ?> inputData) {
+        var plan = plan(decision);
+        var values = new Object[slotCount];
+        assign(plan.inputs(), values, inputData);
+        var errors = new LinkedHashMap<String, List<String>>();
+        for (int d : plan.decisions()) {
+            var messages = new ArrayList<String>();
+            values[inputNames.length + d] = nodes[d].evaluate(values, messages::add);
+            if (!messages.isEmpty()) {
+                errors.put(model.decisions().get(d).name(), messages);
+            }
+        }
+        return new Outcome(values[inputNames.length + plan.decision()], errors);
     }
 
     /**
@@ -299,7 +347,7 @@ public final class DecisionGraph {
         var values = new Object[slotCount];
         assign(inputs.stream().mapToInt(Integer::intValue).toArray(), values, inputData);
         for (int d : needed) {
-            values[inputNames.length + d] = nodes[d].evaluate(values);
+            values[inputNames.length + d] = nodes[d].evaluate(values, null);
         }
         var results = new LinkedHashMap<String, Object>();
         selected.forEach(plan -> results.put(model.decisions().get(plan.decision()).name(), values[inputNames.length + plan.decision()]));
@@ -412,6 +460,7 @@ public final class DecisionGraph {
         /** The decisions, in order; those whose requirements are to be worked out have none yet. */
         private final List<Decision> decisions = new ArrayList<>();
         private final Set<String> inferred = new LinkedHashSet<>();
+        private final Map<String, FeelType> types = new LinkedHashMap<>();
         private Severity failOn;
         private boolean log = true;
 
@@ -429,6 +478,16 @@ public final class DecisionGraph {
             name(model.name());
             inputData.addAll(model.inputData());
             decisions.addAll(model.decisions());
+            types.putAll(model.types());
+            return this;
+        }
+
+        /**
+         * Adds a type the model defines (an item definition), which a literal expression's {@code instance of} and function
+         * parameters may name.
+         */
+        public Builder type(String name, FeelType type) {
+            types.put(Objects.requireNonNull(name, "name"), Objects.requireNonNull(type, "type"));
             return this;
         }
 
@@ -468,7 +527,7 @@ public final class DecisionGraph {
         /**
          * Adds a decision whose logic is a literal expression, requiring what its names read, of no declared type.
          *
-         * @throws IllegalArgumentException if the expression is not in Praecepta's expression subset
+         * @throws IllegalArgumentException if the expression is not a FEEL expression
          */
         public Builder literalDecision(String name, String expression) {
             return literalDecision(name, FeelType.ANY, expression);
@@ -477,7 +536,7 @@ public final class DecisionGraph {
         /**
          * Adds a decision whose logic is a literal expression, requiring what its names read, of a declared type.
          *
-         * @throws IllegalArgumentException if the expression is not in Praecepta's expression subset
+         * @throws IllegalArgumentException if the expression is not a FEEL expression
          */
         public Builder literalDecision(String name, FeelType type, String expression) {
             return inferred(new Decision(name, List.of(), List.of(), new DecisionLogic.LiteralExpression(expression, type)));
@@ -517,18 +576,27 @@ public final class DecisionGraph {
         public DecisionGraph build() {
             var inputNames = inputData.stream().map(InputData::name).collect(Collectors.toSet());
             var decisionNames = decisions.stream().map(Decision::name).collect(Collectors.toSet());
+            var names = new LinkedHashSet<>(inputNames);
+            names.addAll(decisionNames);
+            var scope = FeelExpression.scope(names, types);
             var resolved = decisions.stream()
-                    .map(decision -> inferred.contains(decision.name()) ? withRequirements(decision, inputNames, decisionNames) : decision)
+                    .map(decision -> inferred.contains(decision.name()) ? withRequirements(decision, names, decisionNames, scope, types) : decision)
                     .toList();
-            return new DecisionGraph(new DecisionModel(name, inputData, resolved), failOn, log);
+            return new DecisionGraph(new DecisionModel(name, inputData, resolved, types), failOn, log);
         }
 
-        /** The decision, requiring what its logic reads. */
-        private static Decision withRequirements(Decision decision, Set<String> inputNames, Set<String> decisionNames) {
+        /**
+         * The decision, requiring what its logic reads.
+         *
+         * @param names the names of the model's input data and decisions
+         * @param types the types the model defines
+         */
+        private static Decision withRequirements(Decision decision, Set<String> names, Set<String> decisionNames,
+                FeelExpression.Scope scope, Map<String, FeelType> types) {
             var requiredDecisions = new LinkedHashSet<String>();
             var requiredInputs = new LinkedHashSet<String>();
-            for (var read : GraphAnalysis.namesRead(decision)) {
-                var element = DecisionModel.elementOf(read, name -> inputNames.contains(name) || decisionNames.contains(name));
+            for (var read : GraphAnalysis.namesRead(decision, names, scope, types)) {
+                var element = DecisionModel.elementOf(read, names::contains);
                 var root = element == null ? read : element;
                 if (decisionNames.contains(root)) {
                     requiredDecisions.add(root);

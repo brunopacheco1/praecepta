@@ -27,13 +27,14 @@ import java.util.Map;
 import javax.tools.ToolProvider;
 
 import org.assertj.core.api.Assertions;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import io.github.brunopacheco1.praecepta.engine.DecisionGraph;
 import io.github.brunopacheco1.praecepta.engine.PraeceptaEngine;
 import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
-import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException;
 import io.github.brunopacheco1.praecepta.integration.Decisions;
 import io.github.brunopacheco1.praecepta.integration.TableSource;
 
@@ -235,6 +236,38 @@ class GraphCompilerTest {
         Assertions.assertThat(risk.reports()).containsOnlyKeys("RiskCategory");
     }
 
+    /**
+     * Decision tables in the full FEEL language (#116): a column computed from the input data it reads, cells beyond the
+     * simple unary tests, and output entries whose values are of several types, which the generated class gives as an
+     * {@code Object}, each entry its own type (DMN 1.5, 10.3.2.10, step 3c).
+     */
+    @Test
+    void tables_in_the_full_feel_language_compile_and_give_what_the_graph_gives() throws Exception {
+        var result = compile(TableDefinition.dmn(table("feel.dmn")), Severity.ERROR);
+        Assertions.assertThat(result.sources().get("BandInput"))
+                .contains("public record BandInput(java.math.BigDecimal age, java.math.BigDecimal limit)");
+        Assertions.assertThat(result.sources().get("Band")).contains("public static Object evaluate(BandInput input)");
+        var graph = graph("feel.dmn");
+        try (var loader = compileAndLoad(result)) {
+            var band = decision(loader, "Band");
+            var summary = decision(loader, "Summary");
+            for (var age : List.of(10, 18, 30, 70)) {
+                for (var limit : List.of(17, 40, 100)) {
+                    var inputData = Map.<String, Object>of("Age", BigDecimal.valueOf(age), "Limit", BigDecimal.valueOf(limit));
+                    Assertions.assertThat(band.evaluate(BigDecimal.valueOf(age), BigDecimal.valueOf(limit)))
+                            .isEqualTo(graph.evaluate("Band", inputData));
+                    Assertions.assertThat(summary.evaluate(BigDecimal.valueOf(age), BigDecimal.valueOf(limit)))
+                            .isEqualTo(graph.evaluate("Summary", inputData));
+                }
+            }
+            Assertions.assertThat(band.evaluate(new BigDecimal(30), new BigDecimal(100))).asInstanceOf(InstanceOfAssertFactories.BIG_DECIMAL)
+                    .isEqualByComparingTo("360");
+            Assertions.assertThat(band.evaluate(new BigDecimal(30), new BigDecimal(20))).isEqualTo("over the limit");
+            Assertions.assertThat(band.evaluate(new BigDecimal(10), new BigDecimal(20)))
+                    .isEqualTo(List.of(new BigDecimal(10), new BigDecimal(20)));
+        }
+    }
+
     @Test
     void a_graphs_issues_fail_at_the_failing_severity_and_its_other_decisions_compile_below_it() throws Exception {
         var cycle = TableDefinition.dmn(table("cycle.dmn"));
@@ -265,9 +298,10 @@ class GraphCompilerTest {
                 </definitions>""", StandardCharsets.UTF_8);
         var definition = TableDefinition.dmn(file);
         Assertions.assertThatThrownBy(() -> compile(definition, Severity.ERROR))
-                .isInstanceOf(InvalidDecisionTableException.class)
+                .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("business knowledge model 'Rate'")
-                .hasMessageContaining("#118");
+                .hasMessageContaining("#118")
+                .hasCauseInstanceOf(UnsupportedFeatureException.class);
     }
 
     /**
@@ -305,6 +339,58 @@ class GraphCompilerTest {
         // the options log nothing unless told where
         Assertions.assertThat(TableCompiler.compile(TableDefinition.dmn(file), CompilerOptions.of(PACKAGE, "praecepta-maven-plugin")).className())
                 .isEqualTo("Tier");
+    }
+
+    /**
+     * A decision whose value is a range or a function gives the engine's FeelRange or FeelFunction, and one that is
+     * always null an Object, as the graph gives them.
+     */
+    @Test
+    void ranges_functions_and_nulls_cross_the_generated_classes_as_the_graph_gives_them() throws Exception {
+        var file = out.resolve("values.dmn");
+        Files.writeString(file, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="Values" namespace="n">
+                  <inputData id="n" name="N"><variable name="N" typeRef="number"/></inputData>
+                  <decision id="r" name="Window">
+                    <informationRequirement><requiredInput href="#n"/></informationRequirement>
+                    <literalExpression><text>[N..N + 10]</text></literalExpression>
+                  </decision>
+                  <decision id="f" name="Doubler">
+                    <informationRequirement><requiredInput href="#n"/></informationRequirement>
+                    <literalExpression><text>function(x) x * N</text></literalExpression>
+                  </decision>
+                  <decision id="z" name="Nothing">
+                    <informationRequirement><requiredInput href="#n"/></informationRequirement>
+                    <literalExpression><text>null</text></literalExpression>
+                  </decision>
+                </definitions>""", StandardCharsets.UTF_8);
+        var result = compile(TableDefinition.dmn(file), Severity.ERROR);
+        Assertions.assertThat(result.sources().get("Window"))
+                .contains("public static io.github.brunopacheco1.praecepta.engine.feel.FeelRange evaluate(WindowInput input)");
+        Assertions.assertThat(result.sources().get("Doubler"))
+                .contains("public static io.github.brunopacheco1.praecepta.engine.feel.FeelFunction evaluate(DoublerInput input)");
+        Assertions.assertThat(result.sources().get("Nothing")).contains("public static Object evaluate(NothingInput input)");
+        try (var loader = compileAndLoad(result)) {
+            var window = decision(loader, "Window").evaluate(new BigDecimal(2));
+            // the generated classes load the engine of their own class loader
+            var range = loader.loadClass("io.github.brunopacheco1.praecepta.engine.feel.FeelRange");
+            Assertions.assertThat(window).isInstanceOf(range).hasToString(String.valueOf(graph(file).evaluate("Window", Map.of("N", 2))));
+            var function = loader.loadClass("io.github.brunopacheco1.praecepta.engine.feel.FeelFunction");
+            var doubler = decision(loader, "Doubler").evaluate(new BigDecimal(3));
+            Assertions.assertThat(doubler).isInstanceOf(function);
+            var invoke = function.getMethod("invoke", List.class, java.util.function.Consumer.class);
+            Assertions.assertThat(invoke.invoke(doubler, List.of(new BigDecimal(2)), null)).asInstanceOf(InstanceOfAssertFactories.BIG_DECIMAL)
+                    .isEqualByComparingTo("6");
+            Assertions.assertThat(decision(loader, "Nothing").evaluate(new BigDecimal(3))).isNull();
+        }
+    }
+
+    private static DecisionGraph graph(Path file) {
+        try (var dmn = Files.newInputStream(file)) {
+            return DecisionGraph.read(dmn);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Test

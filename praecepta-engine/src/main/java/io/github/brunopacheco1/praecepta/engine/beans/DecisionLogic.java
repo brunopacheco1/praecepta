@@ -8,13 +8,13 @@ package io.github.brunopacheco1.praecepta.engine.beans;
 import java.util.Objects;
 
 import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
-import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
 
 /**
  * A decision's logic (DMN 1.5, 6.3.7, {@code decisionLogic}): the expression that gives the decision its value from
  * the values of its information requirements. Praecepta evaluates two kinds of expression, a {@linkplain Table decision
- * table} and a {@linkplain LiteralExpression literal expression} in its expression subset; the other kinds DMN has
+ * table} and a {@linkplain LiteralExpression literal expression} in FEEL; the other kinds DMN has
  * (boxed contexts, invocations, function definitions, relations, lists, conditionals, iterators, filters) are planned
  * for 0.10 (<a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>), and will be further
  * implementations of this interface, so a {@code switch} over a {@code DecisionLogic} should keep a {@code default}
@@ -48,13 +48,12 @@ public sealed interface DecisionLogic {
     }
 
     /**
-     * A literal expression in Praecepta's expression subset, the one decision tables' output entries take
-     * ({@link OutputExpression}): literals (strings, numbers, dates, times, date-times and durations), names of the
-     * decision's information requirements, with a path into a context ({@code Pricing.discount}), joined with
-     * {@code +}, {@code -}, {@code *}, {@code /}, {@code **}, unary minus and parentheses, as in
-     * {@code "Hello " + Full Name} or {@code (Pricing.price - Pricing.discount) * 1.2}. The full FEEL language is planned
-     * for 0.8 (<a href="https://github.com/brunopacheco1/praecepta/issues/116">#116</a>), and its built-in functions for
-     * 0.9 (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>).
+     * A literal expression (DMN 1.5, 10.2): a FEEL expression ({@link FeelExpression}) whose value is the decision's, such
+     * as {@code "Hello " + Full Name}, {@code if Applicant.age >= 18 then "adult" else "minor"} or
+     * {@code Orders[amount > 100].customer}. The names it reads are those of the decision's information requirements, and
+     * the graph parses it with them in scope, as FEEL's names may hold spaces and keywords. FEEL's built-in functions are
+     * planned for 0.9 (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>): a decision that invokes
+     * one is reported as not evaluated yet.
      *
      * @param text the expression, as written
      * @param type the type the model declares for the decision's value (its variable's {@code typeRef}), or
@@ -66,9 +65,9 @@ public sealed interface DecisionLogic {
     record LiteralExpression(String text, FeelType type) implements DecisionLogic {
 
         /**
-         * A literal expression, checked to be in Praecepta's expression subset.
+         * A literal expression, checked to be FEEL.
          *
-         * @throws IllegalArgumentException if it is not, naming what is not supported and the release that plans it
+         * @throws IllegalArgumentException if it is not a FEEL expression, saying why
          */
         public LiteralExpression {
             Objects.requireNonNull(text, "text");
@@ -82,25 +81,29 @@ public sealed interface DecisionLogic {
         }
 
         /**
-         * The parsed expression, parsed again on each call. Its form is that of Praecepta's expression subset, which
-         * the full FEEL language replaces in 0.8 (#116): this method is meant for Praecepta's own modules, and its
-         * return type will change then.
+         * The expression as its syntax alone reads it, parsed again on each call: for checking its syntax and what it uses
+         * ({@link FeelExpression#unsupported()}), not for the names it reads, nor for evaluating it.
+         *
+         * <p>It is parsed with no names in scope but those it binds itself, and no model's types: every other name is
+         * read as words up to a keyword or an operator, and every type name it does not know as any type. A
+         * {@code DecisionGraph} parses it with the names of its decision's requirements in scope, and the model's item
+         * definitions, which this cannot know ({@link FeelExpression#parse(String, java.util.Collection, java.util.Map)}),
+         * so its {@link FeelExpression#names()} may differ from those the graph reads: a requirement named
+         * {@code Income - Tax} is one name to the graph but the subtraction of {@code Tax} from {@code Income} here, and
+         * a type name the model does not define is an error to the graph but not here.
          *
          * @throws IllegalArgumentException never, as the text was checked when the expression was made
          */
-        public OutputExpression expression() {
+        public FeelExpression expression() {
             return parse(text);
         }
 
-        private static OutputExpression parse(String text) {
+        private static FeelExpression parse(String text) {
             try {
-                return OutputExpression.parse(text);
+                return FeelExpression.parse(text);
             } catch (ExpressionSyntaxException e) {
-                var planned = e.getMessage().contains("function call")
-                        ? "built-in functions are planned for 0.9 (#117), and the full FEEL language for 0.8 (#116)"
-                        : "the full FEEL language is planned for 0.8 (#116), and its built-in functions for 0.9 (#117)";
-                throw new IllegalArgumentException(("literal expression '%s' is not in Praecepta's expression subset "
-                        + "(literals and names joined with +, -, *, / and **): %s; %s").formatted(text.strip(), e.getMessage(), planned), e);
+                throw new IllegalArgumentException("literal expression '%s' is not a valid FEEL expression: %s"
+                        .formatted(text.strip(), e.getMessage()), e);
             }
         }
     }

@@ -94,8 +94,8 @@ integrations find their tables at runtime, so their engines take maps instead:
   components, or a literal expression's value under the decision's name; one map per element of a list (RULE
   ORDER, OUTPUT ORDER, COLLECT); none for null. Each decision table is still an engine bean, which evaluates the
   table alone from its columns, the values of the decisions it requires included, as 0.6 did; a literal
-  expression has no engine bean. The graph's report (`DECISION_CYCLE`, `MISSING_REQUIREMENT`, `TYPE_MISMATCH` and
-  `UNSUPPORTED_FEATURE`, ERRORs, and `ALWAYS_NULL`, a WARNING) fails loading at `fail-on` like a table's; below it,
+  expression has no engine bean. The graph's report (`DECISION_CYCLE`, `MISSING_REQUIREMENT`, `TYPE_MISMATCH`,
+  `UNSUPPORTED_FEATURE` and `INVALID_EXPRESSION`, ERRORs, and `ALWAYS_NULL`, a WARNING) fails loading at `fail-on` like a table's; below it,
   a decision an ERROR concerns throws `InvalidDecisionTableException` when evaluated, and the others evaluate. A
   decision table of the graph is checked against its analysis as the graph evaluates it
   (`DecisionGraph.validationReport(decision)`, its `Decision.report()`), the report the build plugins check, so a
@@ -103,7 +103,7 @@ integrations find their tables at runtime, so their engines take maps instead:
   `UnsupportedFeatureException` `DmnReader.readModel` throws, not by its message. A file without such decisions loads
   exactly as before, its decision tables read alone. So does a file that is no graph Praecepta evaluates yet:
   one that uses what later releases bring (business knowledge models, boxed expressions, decision services,
-  imports, FEEL beyond the expression subset), or that is not a well-formed decision model (two elements of one
+  imports, literal expressions or decision table entries that invoke built-in functions), or that is not a well-formed decision model (two elements of one
   name, as `DmnWriter` writes a table with a column of its own name, a decision without logic), which a file of
   tables never had to be. Its decision tables load alone, as in 0.6, and nothing else of it is evaluated; a file
   with no decision table fails, naming the feature and its issue. A file whose tables load alone because it uses
@@ -198,8 +198,8 @@ when there are such graphs, `models` lists each one's `name`, `location`, `decis
 `type`) and `issues`. An issue's `kind` is one of `ValidationReport.Kind`: `OVERLAPPING_RULES`, `CONFLICTING_OUTPUTS`
 and `UNREACHABLE_DEFAULT_OUTPUT` (a default output on a table that every input matches, which DMN 1.5,
 10.3.2.10, forbids) are errors, so they fail the build or the startup at the default `fail-on`;
-`UNREACHABLE_RULE` and `GAP` are warnings; a graph's `DECISION_CYCLE`, `MISSING_REQUIREMENT`, `TYPE_MISMATCH` and
-`UNSUPPORTED_FEATURE` are errors, and its `ALWAYS_NULL` a warning. They only read; nothing is evaluated through them. The descriptions show the rules'
+`UNREACHABLE_RULE` and `GAP` are warnings; a graph's `DECISION_CYCLE`, `MISSING_REQUIREMENT`, `TYPE_MISMATCH`,
+`UNSUPPORTED_FEATURE` and `INVALID_EXPRESSION` are errors, and its `ALWAYS_NULL` a warning. They only read; nothing is evaluated through them. The descriptions show the rules'
 conditions, so expose the endpoints as you would any other that shows configuration.
 
 In Quarkus, the application builds its engines from the DMN the build validated, so it cannot fail

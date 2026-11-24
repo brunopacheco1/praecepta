@@ -61,11 +61,19 @@ class GraphEvaluatorTest {
     }
 
     @Test
-    void a_decision_the_graph_reports_keeps_the_reasons_it_has_on_its_own() {
+    void a_null_feel_reports_an_error_for_is_the_error_the_kit_expects() {
+        // DMN 1.5, Table 53 and 10.3.2.15: false = 0 compares values of two types, which is null, and an error
+        var check = KIT.get("compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #boolean_008 boolean_008");
+
+        assertThat(graphs.evaluate(check)).isInstanceOf(Evaluation.Error.class);
+        assertThat(new TckRunner(graphs).run(check).status()).isEqualTo(Status.PASSED);
+    }
+
+    @Test
+    void the_full_feel_language_is_evaluated_through_the_graph() {
         var check = KIT.get("compliance-level-2/0106-feel-ternary-logic/0106-feel-ternary-logic-test-01.xml #001 DecisionAnd");
 
-        assertThat(graphs.evaluate(check)).isEqualTo(single.evaluate(check));
-        assertThat(((Evaluation.Unsupported) graphs.evaluate(check)).needs()).doesNotContain(GraphEvaluator.REPORTED);
+        assertThat(new TckRunner(graphs).run(check).status()).isEqualTo(Status.PASSED);
     }
 
     @Test

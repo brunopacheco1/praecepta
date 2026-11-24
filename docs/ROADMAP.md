@@ -38,17 +38,26 @@ Released in November 2026 (see the [changelog](../CHANGELOG.md)):
   ([#123](https://github.com/brunopacheco1/praecepta/issues/123)) and a year with a leading `+`
   ([#124](https://github.com/brunopacheco1/praecepta/issues/124)) are rejected.
 
-## Next: 0.8
-- **The FEEL core** ([#116](https://github.com/brunopacheco1/praecepta/issues/116)): the whole
-  expression language of DMN 1.5: three-valued boolean logic, lists, contexts and ranges as values,
-  `if`, comparisons, `between`, `in` and `instance of` as expressions, paths, filters, `for` and
-  `some`/`every`, and function invocations, in literal expressions and in the cells and output
-  entries of decision tables, which keep their analysis and generated code.
+## 0.8
+Released in November 2026 (see the [changelog](../CHANGELOG.md)):
+- **The full FEEL language** ([#116](https://github.com/brunopacheco1/praecepta/issues/116)): the
+  expression language of DMN 1.5, chapter 10, but its built-in functions: three-valued boolean logic,
+  lists, contexts, ranges and functions as values, `if`, comparisons, `between`, `in` and
+  `instance of`, paths, filters, `for` and `some`/`every`, invocations of function values, and FEEL's
+  errors, which give null. Literal expression decisions are any FEEL expression, and so are decision
+  tables' input expressions and output entries; their input entries are any FEEL unary tests. Tables
+  keep their bitset index, analysis and generated code: a cell beyond the simple unary tests is
+  applied to the rules the index matches, and the analysis reports nothing it cannot prove.
+- **The DMN TCK**: 2,275 of its 3,511 result nodes pass (64.8 %, from 454), and 2,275 of the 2,279
+  that Praecepta evaluates; all 1,289 nodes of FEEL's feature area pass. Most of the 1,232
+  nodes not supported yet need FEEL's built-in functions. The decision-table checks still pass 83 of
+  86.
 
-## 0.9
+## Next: 0.9
 - **Built-in functions** ([#117](https://github.com/brunopacheco1/praecepta/issues/117)): DMN 1.5's
   function library: conversion, boolean, string, list, numeric, date and time, range and context
-  functions, such as `substring`, `sum`, `round half up` and `day of week`.
+  functions, such as `substring`, `sum`, `round half up` and `day of week`, in literal expressions
+  and in decision tables alike.
 
 ## 0.10
 - **Boxed expressions and business knowledge models**

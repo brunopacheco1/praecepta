@@ -26,9 +26,11 @@ import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelUnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Compare;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests.Equals;
@@ -67,6 +69,8 @@ public final class DmnWriter {
     private static final String VARIABLE = "    <variable";
     private static final String TYPE_REF = "typeRef";
     private static final String TYPE_REF_END = "</typeRef>\n";
+    private static final String ITEM_DEFINITION = "  <itemDefinition";
+    private static final String ITEM_DEFINITION_END = "  </itemDefinition>\n";
 
     private DmnWriter() {
     }
@@ -102,7 +106,8 @@ public final class DmnWriter {
      * {@code inputData} per input data, typed by its type (an item definition for a list or a context, and no
      * {@code typeRef} for {@link FeelType#ANY any type}), and a {@code decision} per decision, with an
      * {@code informationRequirement} per requirement and its logic: a decision table, written as {@link #write(DecisionTable)}
-     * writes it, or a {@code literalExpression}, as written; the type the decision declares is its variable's. Elements are
+     * writes it, or a {@code literalExpression}, as written; the type the decision declares is its variable's; and an item
+     * definition per type the model names ({@link DecisionModel#types()}), under its name. Elements are
      * identified by their position ({@code input_data_0}, {@code decision_0}), so that any names may be told apart.
      *
      * @throws InvalidDecisionTableException if a decision requires a decision or an input data the model does not have,
@@ -114,13 +119,15 @@ public final class DmnWriter {
         var xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         xml.append("<definitions").append(attribute("xmlns", NAMESPACE)).append(idAndName("definitions_" + id, model.name()))
            .append(attribute("namespace", "https://github.com/brunopacheco1/praecepta/" + id)).append(">\n");
+        model.types().forEach((name, type) -> namedType(xml, name, type));
         var ids = new HashMap<String, String>();
         var inputData = model.inputData();
         var decisions = model.decisions();
         var inputTypes = new String[inputData.size()];
         for (int i = 0; i < inputData.size(); i++) {
             ids.put(inputData.get(i).name(), INPUT_DATA + i);
-            inputTypes[i] = typeRef(xml, inputData.get(i).type(), INPUT_DATA + i + TYPE_SUFFIX, "input data '" + inputData.get(i).name() + "'");
+            inputTypes[i] = elementTypeRef(xml, inputData.get(i).type(), INPUT_DATA + i + TYPE_SUFFIX, model.types(),
+                    "input data '" + inputData.get(i).name() + "'");
         }
         var decisionTypes = new String[decisions.size()];
         for (int d = 0; d < decisions.size(); d++) {
@@ -129,10 +136,10 @@ public final class DmnWriter {
             switch (decision.logic()) {
                 case DecisionLogic.Table(var table, var type) -> {
                     listItemDefinitions(xml, table, DECISION + d + "_");
-                    decisionTypes[d] = typeRef(xml, type, DECISION + d + TYPE_SUFFIX, "decision '" + decision.name() + "'");
+                    decisionTypes[d] = elementTypeRef(xml, type, DECISION + d + TYPE_SUFFIX, model.types(), "decision '" + decision.name() + "'");
                 }
-                case DecisionLogic.LiteralExpression literal -> decisionTypes[d] = typeRef(xml, literal.type(), DECISION + d + TYPE_SUFFIX,
-                        "decision '" + decision.name() + "'");
+                case DecisionLogic.LiteralExpression literal -> decisionTypes[d] = elementTypeRef(xml, literal.type(), DECISION + d + TYPE_SUFFIX,
+                        model.types(), "decision '" + decision.name() + "'");
             }
         }
         for (int i = 0; i < inputData.size(); i++) {
@@ -146,6 +153,39 @@ public final class DmnWriter {
         }
         xml.append("</definitions>\n");
         return xml.toString();
+    }
+
+    /**
+     * An item definition for a type the model names ({@link DecisionModel#types()}): a function type as a
+     * {@code functionItem}, whose parameters and output are of simple types or {@code Any}; any other type as
+     * {@link #itemDefinition} writes it. A range, or the type of null, has no item definition, and is not written.
+     */
+    private static void namedType(StringBuilder xml, String name, FeelType type) {
+        switch (type) {
+            case FeelType.RangeOf range -> {
+                // no item definition holds a range type
+            }
+            case FeelType.Null nothing -> {
+                // nor the type of null
+            }
+            case FeelType.FunctionOf(var parameters, var result) -> {
+                xml.append(ITEM_DEFINITION).append(attribute("name", name)).append(">\n    <functionItem")
+                   .append(attribute("outputTypeRef", simpleTypeRef(result))).append(">\n");
+                for (int i = 0; i < parameters.size(); i++) {
+                    xml.append("      <parameters").append(attribute("name", "p" + i)).append(attribute(TYPE_REF, simpleTypeRef(parameters.get(i))))
+                       .append("/>\n");
+                }
+                xml.append("    </functionItem>\n  </itemDefinition>\n");
+            }
+            case FeelType.Simple(var simple) -> xml.append(ITEM_DEFINITION).append(attribute("name", name)).append(">\n    <typeRef>")
+                    .append(typeName(simple)).append(TYPE_REF_END).append(ITEM_DEFINITION_END);
+            default -> itemDefinition(xml, "itemDefinition", name, type, "  ", "type '" + name + "'");
+        }
+    }
+
+    /** A simple type's name, or {@code Any} for any other type. */
+    private static String simpleTypeRef(FeelType type) {
+        return type instanceof FeelType.Simple(var simple) ? typeName(simple) : "Any";
     }
 
     /** The item definitions of a table's columns of lists. */
@@ -186,6 +226,25 @@ public final class DmnWriter {
     /** The attribute {@code typeRef="..."}, or nothing for a value of any type. */
     private static String optionalType(String typeRef) {
         return typeRef == null ? "" : attribute(TYPE_REF, typeRef);
+    }
+
+    /**
+     * The {@code typeRef} of an element's type, as {@link #typeRef} gives it, where the model's own types are written
+     * already: a type of the model under the name an item definition would be given is that one, not written twice, and
+     * a type the model names otherwise takes the next name that is free ({@code input_data_0_type_1}).
+     */
+    private static String elementTypeRef(StringBuilder xml, FeelType type, String name, Map<String, FeelType> named, String where) {
+        if (type instanceof FeelType.Simple || type instanceof FeelType.Any) {
+            return typeRef(xml, type, name, where);
+        }
+        if (type.equals(named.get(name))) {
+            return name;
+        }
+        var free = name;
+        for (int k = 1; named.containsKey(free); k++) {
+            free = name + "_" + k;
+        }
+        return typeRef(xml, type, free, where);
     }
 
     /**
@@ -276,14 +335,14 @@ public final class DmnWriter {
         if (input.allowedValues() != null) {
             items = prefix + INPUT + v + "_item";
             var values = standardFeel(input.allowedValues(), input.type(), false, false, "input values of column '" + input.name() + "'");
-            xml.append("  <itemDefinition").append(attribute("name", items)).append(">\n")
+            xml.append(ITEM_DEFINITION).append(attribute("name", items)).append(">\n")
                .append("    <typeRef>").append(typeName(input.type())).append(TYPE_REF_END)
                .append("    <allowedValues><text>").append(escapeText(values)).append("</text></allowedValues>\n")
-               .append("  </itemDefinition>\n");
+               .append(ITEM_DEFINITION_END);
         }
-        xml.append("  <itemDefinition").append(attribute("name", listTypeName(v, prefix))).append(attribute("isCollection", "true")).append(">\n")
+        xml.append(ITEM_DEFINITION).append(attribute("name", listTypeName(v, prefix))).append(attribute("isCollection", "true")).append(">\n")
            .append("    <typeRef>").append(escapeText(items)).append(TYPE_REF_END)
-           .append("  </itemDefinition>\n");
+           .append(ITEM_DEFINITION_END);
     }
 
     /** The name of the item definition of the list input at {@code v}. */
@@ -348,7 +407,7 @@ public final class DmnWriter {
 
     /** An output, with its value list and its default value ({@code defaultOutputEntry}), if it has them, in that order. */
     private static void output(StringBuilder xml, int c, OutputColumn output, String prefix) {
-        xml.append("      <output").append(idAndName(prefix + "output_" + c, output.name())).append(typed(output.type()));
+        xml.append("      <output").append(idAndName(prefix + "output_" + c, output.name())).append(output.typed() ? typed(output.type()) : "");
         if (output.values().isEmpty() && !output.hasDefault()) {
             xml.append("/>\n");
             return;
@@ -444,8 +503,22 @@ public final class DmnWriter {
             }
             return render(feel ? CellParser.parseFeel(cell, type) : CellParser.parse(cell, type));
         } catch (CellSyntaxException e) {
+            if (!feel) {
+                throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+            }
+            return beyondSimple(cell, e, where);
+        }
+    }
+
+    /** A strict FEEL cell beyond the simple unary tests ({@link FeelUnaryTests}): as written, once checked. */
+    private static String beyondSimple(String cell, CellSyntaxException rejected, String where) {
+        try {
+            // no names in scope, nor types: its names are read as words and its types as any, which is all checking it needs
+            FeelUnaryTests.parseCell(cell, FeelExpression.namesScope(List.of()), rejected);
+        } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }
+        return cell.strip();
     }
 
     private static String join(List<Test> tests) {

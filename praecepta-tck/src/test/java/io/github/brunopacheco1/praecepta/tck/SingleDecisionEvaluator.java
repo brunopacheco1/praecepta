@@ -62,8 +62,8 @@ final class SingleDecisionEvaluator implements ModelEvaluator {
     /**
      * Every feature a node needs, {@code first} first: those of what it invokes, and of the decisions, knowledge
      * models and decision services that requires, but for decisions whose value the test case gives. Only what
-     * Praecepta cannot read counts: a decision table {@link DecisionTableEvaluator} reads, or a literal expression output
-     * expressions read, needs nothing.
+     * Praecepta cannot read counts: a decision table {@link DecisionTableEvaluator} reads, or a literal expression
+     * Praecepta evaluates, needs nothing.
      */
     List<Feature> needs(Check check, List<Feature> first) {
         return walk(check, first, this::unread, false);
@@ -79,8 +79,8 @@ final class SingleDecisionEvaluator implements ModelEvaluator {
 
     /**
      * Every feature the content of a node uses, whether Praecepta reads it or not: a decision table, or a literal
-     * expression of arithmetic, names and literals, uses none. The latest area among them is the node's feature area,
-     * which does not change as Praecepta grows.
+     * expression of arithmetic, names and literals ({@link LiteralExpressionEvaluator#inTheSubset}), uses none. The
+     * latest area among them is the node's feature area, which does not change as Praecepta grows.
      */
     static List<Feature> content(Check check) {
         return walk(check, List.of(), SingleDecisionEvaluator::used, false);
@@ -199,9 +199,9 @@ final class SingleDecisionEvaluator implements ModelEvaluator {
     }
 
     /**
-     * What Praecepta cannot read in an expression: in a literal expression, what {@link FeelScan} finds unless output
-     * expressions read it; another boxed expression itself, and what the literal expressions inside it need. A decision
-     * table needs what {@link DmnReader} rejects in it.
+     * What Praecepta cannot read in an expression: in a literal expression, what {@link FeelScan} finds that Praecepta
+     * does not evaluate (a built-in function), unless it evaluates the whole of it; another boxed expression itself, and
+     * what the literal expressions inside it need. A decision table needs what {@link DmnReader} rejects in it.
      */
     private List<Feature> unread(DmnModel model, Element decision, Element logic) {
         return switch (logic.getLocalName()) {
@@ -211,7 +211,7 @@ final class SingleDecisionEvaluator implements ModelEvaluator {
             }
             case "literalExpression" -> {
                 var text = LiteralExpressionEvaluator.text(logic);
-                yield LiteralExpressionEvaluator.parses(text) ? List.of() : LiteralExpressionEvaluator.features(text, model);
+                yield LiteralExpressionEvaluator.evaluates(text) ? List.of() : LiteralExpressionEvaluator.unsupported(text, model);
             }
             default -> boxed(model, logic, true);
         };
@@ -224,7 +224,7 @@ final class SingleDecisionEvaluator implements ModelEvaluator {
             case "literalExpression" -> {
                 var text = LiteralExpressionEvaluator.text(logic);
                 var features = new ArrayList<>(FeelScan.features(text, model));
-                if (LiteralExpressionEvaluator.parses(text)) {
+                if (LiteralExpressionEvaluator.inTheSubset(text)) {
                     features.addAll(LiteralExpressionEvaluator.inputs(model, text));
                 } else if (features.isEmpty()) {
                     features.add(LiteralExpressionEvaluator.OTHER_SYNTAX);
@@ -240,8 +240,10 @@ final class SingleDecisionEvaluator implements ModelEvaluator {
         var needs = new LinkedHashSet<Feature>();
         needs.add(BOXED.get(logic.getLocalName()));
         for (var text : texts(logic)) {
-            if (!unreadOnly || !LiteralExpressionEvaluator.parses(text)) {
+            if (!unreadOnly) {
                 needs.addAll(FeelScan.features(text, model));
+            } else if (!LiteralExpressionEvaluator.evaluates(text)) {
+                needs.addAll(LiteralExpressionEvaluator.unsupported(text, model));
             }
         }
         return new ArrayList<>(needs);

@@ -14,7 +14,9 @@ mkdir -p "$classes"
 "$SRC/jdk/bin/javac" --release 21 -nowarn -d "$classes" -cp "$SRC/jazzer-api.jar" \
   $(find "$engine/main/java" -name '*.java' ! -name module-info.java) \
   "$engine/test/java/io/github/brunopacheco1/praecepta/engine/feel/CellParserFuzzer.java" \
-  "$engine/test/java/io/github/brunopacheco1/praecepta/engine/dmn/DmnReaderFuzzer.java"
+  "$engine/test/java/io/github/brunopacheco1/praecepta/engine/dmn/DmnReaderFuzzer.java" \
+  "$engine/test/java/io/github/brunopacheco1/praecepta/engine/feel/FeelExpressionFuzzer.java" \
+  "$engine/test/java/io/github/brunopacheco1/praecepta/engine/feel/FeelUnaryTestsFuzzer.java"
 "$SRC/jdk/bin/jar" --create --file "$OUT/praecepta-fuzz.jar" -C "$classes" .
 cp "$SRC/jazzer.jar" "$SRC/jazzer-api.jar" "$OUT/"
 cp -r "$SRC/jdk" "$OUT/jdk"
@@ -23,6 +25,8 @@ cp -r "$SRC/jdk" "$OUT/jdk"
 targets=(
   "cell_parser_fuzzer io.github.brunopacheco1.praecepta.engine.feel.CellParserFuzzer feel/CellParserFuzzTestInputs"
   "dmn_reader_fuzzer io.github.brunopacheco1.praecepta.engine.dmn.DmnReaderFuzzer dmn/DmnReaderFuzzTestInputs"
+  "feel_expression_fuzzer io.github.brunopacheco1.praecepta.engine.feel.FeelExpressionFuzzer feel/FeelExpressionFuzzTestInputs"
+  "feel_unary_tests_fuzzer io.github.brunopacheco1.praecepta.engine.feel.FeelUnaryTestsFuzzer feel/FeelUnaryTestsFuzzTestInputs"
 )
 for target in "${targets[@]}"; do
   read -r name class inputs <<< "$target"

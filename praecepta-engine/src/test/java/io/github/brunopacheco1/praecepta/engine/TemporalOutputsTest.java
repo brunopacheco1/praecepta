@@ -15,13 +15,13 @@ import java.util.Map;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
-import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 
 /** Output entries that compute dates, times and durations (#85), in DMN tables. */
 class TemporalOutputsTest {
@@ -76,15 +76,23 @@ class TemporalOutputsTest {
     }
 
     @Test
-    void an_entry_of_another_type_than_its_output_is_rejected() {
-        var dmn = stream(RETURNS.replace("<output name=\"took\" typeRef=\"dayTimeDuration\"/>", "<output name=\"took\" typeRef=\"date\"/>"));
-        Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
-                .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessageContaining("'returned - sent' gives a days and time duration, but the output is a date");
-        var mixed = stream(RETURNS.replace("returned - sent", "due + sent"));
-        Assertions.assertThatThrownBy(() -> DmnReader.read(mixed))
-                .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessageContaining("+ combines a date and a date and time, which gives null in FEEL");
+    void an_entry_of_another_type_than_its_output_is_null_and_reported() {
+        // DMN 1.5, 10.3.2.9.4: a value that does not conform to the output's type is null; Tables 57 and 59 give null for
+        // operands they do not combine; the engine's report warns of both (ALWAYS_NULL)
+        var dmn = DmnReader.read(stream(RETURNS.replace("<output name=\"took\" typeRef=\"dayTimeDuration\"/>",
+                "<output name=\"took\" typeRef=\"date\"/>")));
+        Assertions.assertThat(report(dmn)).anySatisfy(detail -> Assertions.assertThat(detail)
+                .contains("'returned - sent' gives a days and time duration, but the output is a date"));
+        var mixed = DmnReader.read(stream(RETURNS.replace("returned - sent", "due + sent")));
+        Assertions.assertThat(report(mixed)).anySatisfy(detail -> Assertions.assertThat(detail)
+                .contains("+ combines a date and a date and time, which gives null in FEEL"));
+    }
+
+    private static List<String> report(DecisionTable table) {
+        return PraeceptaEngine.<Map<String, String>, Map<String, String>>builder().table(table)
+                .inputs(PraeceptaInput::new)
+                .output(PraeceptaOutput::values).logValidationReport(false).build()
+                .validationReport().issues(ValidationReport.Kind.ALWAYS_NULL).stream().map(ValidationReport.Issue::detail).toList();
     }
 
     @Test

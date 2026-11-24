@@ -11,6 +11,261 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+The full FEEL language, the second step of Praecepta's plan to grow from a decision-table engine into a full DMN 1.5
+engine, one layer per release ([#120](https://github.com/brunopacheco1/praecepta/issues/120)): literal expression
+decisions, and decision tables' input entries, input expressions and output entries, are now FEEL as DMN 1.5, chapter
+10, defines it ([#116](https://github.com/brunopacheco1/praecepta/issues/116)), where 0.7 read FEEL's simple unary
+tests in cells and the arithmetic of names and literals in output entries and literal expressions. That brings
+FEEL's three-valued logic; lists, contexts, ranges and functions as values; `if then else`, `between`, `in` and
+`instance of`; paths, filters, `for`, `some` and `every`; names with spaces and keywords; and FEEL's errors, which
+give null and are reported (`DecisionGraph.evaluateWithErrors`). `FeelExpression` and `FeelUnaryTests` are its public
+entry points. Decision tables keep what sets Praecepta apart: a cell of the simple unary tests is indexed and
+analysed as before, and one beyond them is applied to the rules the bitset index matches, so a table of literal cells
+evaluates as fast as before and the analysis reports nothing it cannot prove; the build plugins and the framework
+integrations compile and load such tables, and the graphs of files whose literal expressions use FEEL. FEEL's
+built-in functions come next, in 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)); FEEL that
+invokes one is rejected, naming that release. Of the DMN TCK's 3,511 result nodes, 2,275 now pass (64.8 %, from 454
+in 0.7), 2,275 of the 2,279 Praecepta evaluates, and all 1,289 of FEEL's own feature area; the
+decision-table checks still pass 83 of 86 ([RESULTS.md](praecepta-tck/RESULTS.md)). Build dependencies were updated
+(the versions-maven-plugin 2.25.2, Maven 3.10.1 in the Maven wrapper, and the GitHub Actions the workflows pin); no
+published module's dependencies changed. Read *Changed* before upgrading if your code calls
+`DecisionLogic.LiteralExpression.expression()` or uses `OutputExpression` or `ExpressionTypeException` (both
+removed), deconstructs `DecisionTable.OutputColumn` or `DecisionModel` with a record pattern, switches over `FeelType`
+exhaustively, or walks a table's cells with `DecisionTable.cell(...)`; if you rely on a table being rejected for an
+output entry whose operands FEEL does not combine (it now loads, the entry null with a WARNING) or that holds an
+unquoted word (now the name of an input); if a decision of no declared type has a table with several results and a
+default output (its default is now a single value), or a literal expression reads a path to a component its type
+does not have (now null with a WARNING, where it was an ERROR); or if a framework integration or build plugin loads
+a DMN file whose literal expressions use FEEL beyond 0.7's subset (it now loads, and compiles, as a graph, whose
+report is checked at `fail-on`); if you look for `MISSING_REQUIREMENT` where a literal expression is not FEEL (now
+`INVALID_EXPRESSION`), catch an `InvalidDecisionTableException` from `TableCompiler.compile` (now the cause of its
+`IllegalArgumentException`), or change the map `DecisionTable.namedInputs()` returns (now unmodifiable).
+
+### Added
+- **The full FEEL language in literal expressions** ([#116](https://github.com/brunopacheco1/praecepta/issues/116)):
+  a decision requirement graph's literal expression decisions are now FEEL as DMN 1.5, chapter 10, defines it,
+  where 0.7 took the arithmetic subset of output entries. Values are null, booleans with FEEL's three-valued `and`
+  and `or` (Table 50), numbers (decimals of 34 digits), strings, dates, times, date-times and durations, lists,
+  contexts (`{a: 1, "b c": a + 1}`, each entry seeing those before it), ranges (`[1..10)`, `(< 10)`, `(= 10)`) and
+  functions (`function(a, b) a + b`, closing over their scope). The expressions are `if then else`, comparisons with
+  FEEL's equality and order and their null rules (Tables 53 and 54: `null = null` is true, `1 = "1"` is null),
+  `between`, `in` with positive unary tests (lists, ranges, `?`), `instance of` with FEEL's types (`list<number>`,
+  `context<a: number>`, `range<date>`, `function<number>->number`, `Any`, `Null`, and the model's item definitions),
+  paths (`a.b.c`, projections over lists of contexts, and the properties of dates, times, durations and ranges of
+  Table 65, `Birth.year`), filters (`xs[item > 3]`, `xs[1]`, `xs[-1]`, `xs[a > 1]` on contexts), `for` with
+  `partial` and iteration ranges (`1..3`, dates), `some` and `every`, invocations of function values with positional
+  or named arguments, unary minus, comments, and date and time literals, an at-literal or a date and time function
+  of literal arguments, hour 24 included (`24:00:00` is `00:00:00`, as XML Schema's time reads it, and
+  `2021-01-01T24:00:00` midnight of the next day, as the DMN TCK has it; [DMN conformance](docs/DMN-CONFORMANCE.md),
+  case 19). Number literals are rounded to FEEL's 34 significant digits (10.3.2.3.1). Times and date-times keep their
+  nanoseconds and compare to the millisecond in FEEL (case 18).
+  A backslash in a string that starts no escape sequence is a character of the string (`"\s"`, grammar rule 64).
+  Names may hold spaces, keywords and the additional name symbols `. / - ' + *`: an expression is parsed against the
+  names of its decision's requirements, the longest in scope winning wherever the text holds one, so
+  `Another Date and Time` and `Date-Time` read as the input data they name. Every expression is parsed and typed
+  once, when the graph is built.
+- **Decision tables in the full FEEL language** ([#116](https://github.com/brunopacheco1/praecepta/issues/116)):
+  - **Input entries** are any FEEL unary tests (DMN 1.5, grammar rules 13 to 17, 10.3.2.10 and Table 55): positive
+    unary tests whose values and endpoints are any expression (`> Limit * 2`, `[Low..Low + 10]`, `= Base + 1`), lists
+    and ranges as values (`[1, 2, Limit]`), expressions that name `?`, the value tested (`? > 5 and ? < 10`,
+    `some x in ? satisfies x > Limit` in a list column), and `not(...)` of them, with FEEL's nulls: a test FEEL gives
+    null for holds for no value, and neither does its `not(...)`. The simple unary tests of earlier releases are
+    read, indexed and analysed exactly as before; a rule with a cell beyond them is matched by the bitset index as if
+    that cell were `-`, and the cell is then applied to it, as a cell that compares with another input (`> limit`) is,
+    so a table of literal cells evaluates as fast as before. The analysis treats such rules as it treats those: it
+    never counts them as overlapping, hiding other rules or covering a default output, and looks for no gaps in a
+    table that has them, so it reports nothing it cannot prove.
+  - **Input expressions** are any FEEL expression (`Age * 12`, `Orders[amount > 100].code`), computed from the
+    inputs they read, and typed, where they declare no `typeRef`, as FEEL types them from the types of the file's
+    input data and decisions.
+  - **Output entries** are any FEEL expression (`if score > 700 then "A" else "B"`, `{base: price, total: base *
+    1.2}.total`, `[min, max]`), and default outputs any expression that reads no input (`-1`), whose value is taken
+    when the table is read. They are parsed and typed when the engine or graph is built, and evaluated only for the
+    rules that match; their values are bound to their output's type (10.3.2.9.4), a string output taking any value
+    as its text, and a list or context a rule gives is passed to the output strategy as FEEL's text of it
+    (`["PT", "BR"]`) and to a `DecisionGraph` as the value it is. An entry that is null whatever its inputs is a
+    WARNING of the table's validation report (`ALWAYS_NULL`, naming the rule and the output; see *Changed*).
+  - **Names** a table's FEEL reads that are not columns are inputs of the engine, as an input a cell compares with
+    is: bound by its own getter, or with map-based inputs read with the type `columnType(...)` declares, else that of
+    the column or output whose entry reads it first; in a decision graph, the value of the requirement it names, of
+    that requirement's type ([DMN conformance](docs/DMN-CONFORMANCE.md), case 25). `DecisionTable.namedInputs()`
+    lists them.
+  - **In decision graphs, the framework integrations and the build plugins** such tables work as any other: a file
+    whose tables use the full FEEL language loads and compiles as a file of simple cells does, its decisions served
+    as graphs where their files are graphs (see *Changed* for what 0.7 rejected, and what is still rejected).
+- **FEEL's errors** (DMN 1.5, 10.3.2.16): where FEEL defines no value (operands it does not combine, a null operand of
+  arithmetic, a division by zero, values of two types compared, an entry a context does not have, an invalid date
+  literal, an invocation of what is not a function, `instance of` a type FEEL does not have), the value is null and an
+  error is reported; an index beyond a list is null without one, as the DMN TCK has it
+  ([DMN conformance](docs/DMN-CONFORMANCE.md), case 20). `DecisionGraph.evaluateWithErrors(decision, inputData)` gives
+  a decision's value with the errors each decision reported (`DecisionGraph.Outcome`); `evaluate` is unchanged. The
+  DMN TCK counts such an error where it expects one (`errorResult`).
+- **Limits that keep evaluation bounded** ([DMN conformance](docs/DMN-CONFORMANCE.md), case 23): an expression's tree
+  nests at most 300 levels, and its text at most 250 levels of parentheses, fewer of constructs that take more of the
+  parser's stack (`if`, `for`, filters...); deeper is a syntax error, so every construct, nested as deeply as it may
+  be, is parsed and evaluated on a 448 KiB stack, an eighth less than 512 KiB (checked in an interpreted JVM, so
+  whatever the JIT does). One evaluation takes at most 1,000,000 steps (iterations of its `for`, `some` and `every`
+  and each element of the ranges they iterate, function invocations, and the elements its filters test, its paths
+  project, its `in` looks through and its equalities and `instance of` look at), makes strings of at most 10,000,000
+  characters in all with `+`, and nests function invocations at most 800 levels with the expression itself; beyond
+  the steps or the characters it stops and its value is null, with an error. It reports at most 100 errors, quoting
+  each string by its first 64 characters, then one that counts the others.
+- **`FeelExpression`**, the FEEL language as a public entry point of `io.github.brunopacheco1.praecepta.engine.feel`:
+  `parse(text)` or `parse(text, names)` (or against a `FeelExpression.Scope` of names and types made once for many
+  expressions), then `names()` (the names it reads), `unsupported()` (what it uses that Praecepta does not evaluate
+  yet, each a `FeelExpression.Unsupported` of the feature, the release and the issue that plan it), `literals()`,
+  `type(types)` (its static type, `FeelType.NULL` where it is always null, with the reason) and `evaluate(values)` or
+  `evaluate(values, errors)`, which take an `Integer`, a `Long` or a `Double` as the `BigDecimal` of its value. With
+  it come the value types `FeelRange` (whose `comparison()` is a `FeelRange.Comparison`, checked against its
+  endpoints) and `FeelFunction`, and `FeelType.RangeOf`, `FeelType.FunctionOf`, `FeelType.Null` and
+  `FeelType.conformsTo` (10.3.2.9.2), which decision tables use too. **Upgrade note:** `FeelFunction` is sealed: only
+  Praecepta makes function values, the values of function definitions an evaluation gives (and, from 0.9, the
+  built-in functions); an object of a class of your own cannot implement it, and is no function in FEEL (invoking it
+  is null, with an error, and `instance of function<...>` false). A function value an evaluation gave may be given
+  back as input data, or invoked from Java with `invoke(arguments, errors)`, each invocation an evaluation of its
+  own, with its own limits, from any number of threads at once.
+- **`FeelUnaryTests`**, FEEL's unary tests as a public entry point of the same package: `parse(text, scope)`, then
+  `names()`, `unsupported()`, `literals()`, `isSimple()` (whether `CellParser`'s simple unary tests, which the bitset
+  index evaluates, read it) and `matches(value, values, errors)`; `parseCell(text, scope, rejected)` reads a cell the
+  simple unary tests rejected, as a decision table does. A test whose value is a function is satisfied when it is
+  true applied to the value (DMN 1.5, 7.3.2(c)); `- 1` and `> - 1`, which the simple unary tests do not read, are
+  FEEL, and so is a cell or an input expression of words FEEL reads as an expression (`? instance of tAmount`,
+  `if Flag then Low else High`), which `CellParser.isName` no longer takes for another input's name.
+- **Two Jazzer fuzz targets**, run in every build on their saved inputs and by ClusterFuzzLite and the fuzzing
+  workflow: `FeelExpressionFuzzer` checks that any text parses or is a syntax error, and is typed and evaluated
+  without throwing, and `FeelUnaryTestsFuzzer` does the same for unary tests, read as a decision table reads its
+  cells.
+- **`DecisionModel.types()`**, the item definitions a model's literal expressions may name in `instance of`, which
+  `DmnReader.readModel` reads (a function item as a `FeelType.FunctionOf`), `DmnWriter.write(model)` writes and
+  `DecisionGraph.Builder.type(name, type)` adds in code.
+- **The DMN TCK**: 2,275 of its 3,511 result nodes pass (64.8 %, from 454), 4 fail and 1,232 need a later release.
+  All 1,289 nodes of FEEL's feature area pass, the equalities of times and date-times that differ below the
+  millisecond among them, which FEEL compares to the millisecond ([DMN conformance](docs/DMN-CONFORMANCE.md),
+  case 18). Nodes of other areas pass where they need FEEL alone, such
+  as `0074-feel-properties`, `0082-feel-coercion` and the error cases of `1115-feel-date-function` to
+  `1120-feel-duration-function`. Decision tables in the full FEEL language change none of these numbers: the kit's
+  tables pass 83 of 86 checks as before (the other three need business knowledge models, 0.10), and its nodes not
+  supported yet need FEEL's built-in functions, boxed expressions or imports. The arithmetic of
+  `0099-arithmetic-negation` and `0100-arithmetic`, evaluated as decision tables' output entries
+  (`OutputExpressionsTckTest`), gives the kit's result for 1,100 of its 1,101 checks, 826 of them null, where 0.7
+  read 489 and rejected 212 of those. See [RESULTS.md](praecepta-tck/RESULTS.md).
+
+### Changed
+- **`DecisionLogic.LiteralExpression.expression()` returns a `FeelExpression`**, parsed with no names in scope, where
+  it returned an `OutputExpression`; the constructor accepts any FEEL expression, and rejects one that is not FEEL
+  with an `IllegalArgumentException` saying why. **Upgrade note:** code that called `expression()` and used the
+  `OutputExpression` it returned (`names()`, `type(...)`, `evaluate(...)`) uses `FeelExpression`'s methods of the
+  same names instead, after parsing the text with the names in scope (`FeelExpression.parse(literal.text(), names)`),
+  as a name with spaces or keywords reads as words otherwise.
+- **`OutputExpression` and `ExpressionTypeException` are removed**: the subset of FEEL that output entries computed in
+  0.6 and 0.7 is replaced by the full language, `FeelExpression`, which gives null where that subset threw (operands
+  FEEL does not combine). **Upgrade note:** parse an output entry with `FeelExpression.parse(text, names)`, and read
+  `type(types)` (a `FeelType`, `FeelType.NULL` where it is always null, with the reasons) where you caught an
+  `ExpressionTypeException`; `ExpressionSyntaxException` is unchanged.
+- **An output entry whose operands FEEL does not combine (`"a" + 1`, `due + 1`), or whose value is of another type than
+  its output, is evaluated to null and reported as a WARNING** (`ALWAYS_NULL`) of the table's validation report,
+  where `DmnReader` and the engine rejected the table (DMN 1.5, the text before Tables 56 and 58, and 10.3.2.9.4; the
+  TCK's `0100-arithmetic`). An output entry may read a list input, or any input of the table, as FEEL reads it
+  (`Orders[1]`); one that is just a list input's name is still rejected. **Upgrade note:** a table such an entry
+  stopped now loads; with `failOn(Severity.WARNING)` it fails as before, on the warning.
+- **What 0.7 rejected as FEEL beyond its subset now loads**: `DmnReader` and the engine read a table whose input
+  expression, input entry or output entry was rejected only for that, and `DmnReader.readModel` reads a model whose
+  tables or literal expressions use it. So the framework integrations load such a file as a graph where it is one,
+  and the build plugins compile it as a graph, where 0.7 loaded or compiled its decision tables alone: its literal
+  expressions are decisions now. FEEL that invokes a built-in function (but the date and time functions of literal
+  arguments, and the `list contains(?, ...)` of a list column's cells) is still rejected, now with an
+  `UnsupportedFeatureException` (a subclass of the `InvalidDecisionTableException` 0.7 threw) naming 0.9
+  ([#117](https://github.com/brunopacheco1/praecepta/issues/117)): `DmnReader` and the engine reject a table whose
+  entry or input expression invokes one, and `DmnReader.readModel` a model that holds one, whose other decision
+  tables the framework integrations and build plugins still load or compile alone, logged as before.
+  **Upgrade note:** such a file's graph report is checked at `fail-on`, as any graph's is; and an unquoted word in
+  an output entry (`PT`) is a FEEL name, which the engine reads as an input, where it was rejected: quote a string.
+- **`DecisionTable.OutputColumn` has a sixth component, `typed`**, false for an output of a model whose type nothing
+  gives, whose entries each give a value of their own type (DMN 1.5, 10.3.2.10, step 3c); the five-component
+  constructor remains, typed. `DmnWriter` writes no `typeRef` for such an output. **Upgrade note:** a record pattern
+  over `OutputColumn` needs the sixth component.
+- **`DecisionTable.namedInputs()` also lists the names the table's FEEL reads** that are not columns (case 25), and
+  **`DecisionTable.cell(...)` throws for a cell beyond the simple unary tests**, which `FeelUnaryTests.parseCell`
+  reads. **Upgrade note:** code that walked a table's cells with `cell(...)` handles the `CellSyntaxException` of such
+  a cell.
+- **A decision of no declared type whose table has several results and a default output** is typed `Any`, and its
+  default output is the single value it is, where 0.7 typed it `list<T>` and gave a list of one (DMN 1.5, 10.3.2.10,
+  step 2; [DMN conformance](docs/DMN-CONFORMANCE.md), case 14). **Upgrade note:** a decision typed by a list is
+  unchanged; generated code gives such an untyped decision as `Object`.
+- **`DecisionModel` has a fourth component, `types`**; the three-component constructor remains, with no types.
+  **Upgrade note:** a record pattern over `DecisionModel` needs the fourth component.
+- **`FeelType` has three more records, `RangeOf`, `FunctionOf` and `Null`.** **Upgrade note:** a `switch` over
+  `FeelType` that is exhaustive without a `default` branch must handle them; the types `DmnReader` gives an input
+  data or a decision are still simple types, lists, contexts and `Any`.
+- **A path in a literal expression to a component its type does not have is a WARNING** (`ALWAYS_NULL`, naming the
+  reason), and evaluates to null, as FEEL has it, where it was a `TYPE_MISMATCH` ERROR that stopped the decision; a
+  literal expression whose operands FEEL does not combine is an `ALWAYS_NULL` WARNING as in 0.7. A decision table's
+  column that reads such a path is still a `TYPE_MISMATCH`. **Upgrade note:** a decision whose literal expression
+  reads `Applicant.age` where the item definition of `Applicant` has no `age` is now evaluated, to null, rather than
+  reported as an ERROR.
+- **A path to a property of a date, time or duration** (`Birth.year`) is evaluated (Table 65), in a literal expression
+  and in a decision table's column alike, where 0.7 reported it as `UNSUPPORTED_FEATURE`.
+- **A literal expression that is not FEEL** is reported as the new `ValidationReport.Kind.INVALID_EXPRESSION`, an
+  ERROR, where it was a `MISSING_REQUIREMENT`; the decision still cannot be evaluated, nor can those that require it.
+  A decision table with such an entry is rejected when it is read, as before. One that names a type neither FEEL nor
+  the model defines (`x instance of tUnknown`) is FEEL: that construct is null with an error, as the TCK has it, and
+  the decision is reported as `ALWAYS_NULL`. **Upgrade note:** code that looks for `MISSING_REQUIREMENT`
+  to find such a decision looks for `INVALID_EXPRESSION`; a `switch` over `Kind` with a `default` branch, as the
+  enum's Javadoc asks, needs no change.
+- **`TableCompiler.compile` throws an `IllegalArgumentException` for a source the engine rejects**, its message the
+  engine's and its cause the `InvalidDecisionTableException` (or `UnsupportedFeatureException`, which names the
+  release that plans what the source uses), where that exception escaped; so the Maven plugin fails the build with a
+  `MojoFailureException`, and the Gradle plugin with a `GradleException`, as for any other mistake in a table.
+  **Upgrade note:** code that caught `InvalidDecisionTableException` from `TableCompiler.compile` catches the
+  `IllegalArgumentException` and reads its cause.
+- **`DecisionTable.namedInputs()` is worked out once per table and returns an unmodifiable map**, where it parsed
+  every cell on each call and returned a new, modifiable map; it reads the names an expression reads whatever the
+  types it names. **Upgrade note:** copy the map to change it.
+- **`DecisionLogic.LiteralExpression.expression()` says what it is for**: the expression as its syntax alone reads it,
+  for its syntax and `unsupported()`, not for the names it reads, which differ from those a `DecisionGraph` reads
+  where a requirement's name holds an operator (`Income - Tax`). Unchanged otherwise.
+- **Build dependencies**: the versions-maven-plugin 2.25.2
+  ([#132](https://github.com/brunopacheco1/praecepta/pull/132)), Maven 3.10.1 in the Maven wrapper
+  ([#133](https://github.com/brunopacheco1/praecepta/pull/133)), and the GitHub Actions the workflows pin:
+  `actions/setup-java` 6.3.0, `actions/dependency-review-action` 5.0.1 and `graalvm/setup-graalvm` 1.6.10
+  ([#134](https://github.com/brunopacheco1/praecepta/pull/134)), and the OSV scanner's reusable workflow 2.7.1
+  ([#129](https://github.com/brunopacheco1/praecepta/pull/129)). No published module's dependencies change, and
+  building still needs Maven 3.9 or later.
+
+### Fixed
+- **A decision table's output entry whose value holds a list many times over** (`{a0: [1, 1], a1: [a0, a0], ...,
+  a40: [a39, a39]}.a40`) no longer hangs its evaluation: a computed output is written as text only for an output
+  strategy that takes text (a graph's tables take its value), and at most 65,536 characters of a list or a context,
+  then `...`, where its text was written out whole, for every computed output.
+- **A column computed by its input expression (`Age * 12`) is computed once per evaluation**, however many FEEL cells
+  and output entries read it, where it was computed again for each; a table without one costs nothing more. A graph's
+  tables compute theirs in the engine too, a single value of a column of lists being a list of one (DMN 1.5,
+  10.3.2.9.4), as the graph gave it.
+- **Rules that test a computed column are left out of the validation report's analysis**, as rules with FEEL cells
+  are: the bitset index sees `Age * 12` as a column of its own, unrelated to `Age`, so a UNIQUE table of `< 18` on
+  `Age` and `>= 216` on `Age * 12` was reported as overlapping, an ERROR that stopped the build plugins and the
+  framework integrations (`failOn(ERROR)` by default).
+- **A decision table's FEEL may name the model's item definitions** (`Amount instance of tAmount`), as a literal
+  expression's may, where the model failed to read; the model's types are those its literal expressions or its
+  tables name. A table read alone (`DmnReader.read`) has no model's types: there, such a construct is null.
+- **A name a table's FEEL reads that is neither one of its inputs nor a value a graph gives** is rejected when the
+  engine is built, where it was read as the table's first column.
+- **A graph parses each decision table's FEEL once**, in its analysis, and its engine takes those parses, where it
+  parsed them twice more; `TimeZones` in the compiler reads a table's FEEL once, where it worked out the names in
+  scope once per column and per output entry.
+- **The compiler gives a date-and-time output a date-time with a zone where an entry gives a date**, which DMN 1.5,
+  10.3.2.9.4, binds to the date and time at UTC midnight (`date("2020-01-01") + duration("P1D")` is
+  `2020-01-02T00:00:00Z`), where its generated record took a `LocalDateTime` and failed to read the value.
+- **The compiler links a FEEL cell's column only with the inputs of its type that the cell reads**, where it linked
+  a date-and-time column with a time column a cell read and rejected the table for times with and without a zone;
+  and an input read by a computed column takes that column's kind of time (`start + @"PT1H"` compared with
+  `@"2020-01-01T10:00:00Z"` makes `start` a `ZonedDateTime`), where it was a `LocalDateTime`.
+- **The DMN TCK harness credits a literal expression's name from an imported model to imports** (0.11), not to 0.8's
+  scopes, and fails on a baseline that lists a node twice or tags one with anything but `graph`, where it read the
+  last line and dropped the check.
+- **`time(date)`**, of a date literal, is the time of that date at UTC midnight, `00:00:00Z` (DMN 1.5, 10.3.2.3.5,
+  and the DMN TCK's `1116-feel-time-function`), in cells and expressions alike, where it was rejected.
+
 ## [0.7.0] - 2026-11-14
 
 Decision requirement graphs, the first step of Praecepta's plan to grow from a decision-table engine into a full DMN

@@ -108,14 +108,51 @@ final class FeelNumbers {
     }
 
     /**
-     * A number literal without the negative scale an exponent leaves on a {@code BigDecimal}: {@code 5E65} as 5
-     * followed by 65 zeros, {@code 1.2e3} as {@code 1200}. The value is the same, which is all FEEL compares
-     * (10.3.2.3.1), but {@code BigDecimal.equals} compares the scale too: rescaled, a literal equals what its plain
-     * written form reads as, the form {@code FeelLiterals} writes, so a cell and the FEEL written for it parse to
-     * equal tests. A literal written without an exponent never has a negative scale, so it is left as it is.
+     * A number literal as FEEL reads it: rounded to {@link #PRECISION}, 34 significant digits (10.3.2.3.1: a number
+     * is a decimal128, so {@code 1.00000000000000000000000000000000001} is 1), and without the negative scale an
+     * exponent leaves on a {@code BigDecimal}: {@code 5E65} as 5 followed by 65 zeros, {@code 1.2e3} as {@code 1200}.
+     * The value is the same, which is all FEEL compares, but {@code BigDecimal.equals} compares the scale too:
+     * rescaled, a literal equals what its plain written form reads as, the form {@code FeelLiterals} writes, so a cell
+     * and the FEEL written for it parse to equal tests. A literal of 34 digits or fewer, written without an exponent,
+     * is left as it is.
      */
     static BigDecimal plain(BigDecimal literal) {
-        return literal.scale() < 0 ? literal.setScale(0) : literal;
+        var rounded = literal.precision() > PRECISION.getPrecision() ? literal.round(PRECISION) : literal;
+        return rounded.scale() < 0 ? rounded.setScale(0) : rounded;
+    }
+
+    /**
+     * A value given to an evaluation as FEEL takes it: a {@link Number} that is not a {@code BigDecimal} (an
+     * {@code Integer}, a {@code Long}, a {@code Double}...) as the {@code BigDecimal} of the same value, rounded to
+     * {@link #PRECISION}; a {@code Double} or {@code Float} that is not finite, which is no FEEL number, and any other
+     * value as it is.
+     */
+    static Object normalise(Object value) {
+        if (value instanceof Number number && !(value instanceof BigDecimal)) {
+            var decimal = decimal(number);
+            return decimal != null ? decimal : value;
+        }
+        return value;
+    }
+
+    /** A number as a {@code BigDecimal}, rounded to {@link #PRECISION}; null for a value that is not finite or no number. */
+    static BigDecimal decimal(Number number) {
+        try {
+            var decimal = switch (number) {
+                case BigDecimal d -> d;
+                case Integer i -> BigDecimal.valueOf(i.longValue());
+                case Long l -> BigDecimal.valueOf(l);
+                case Short s -> BigDecimal.valueOf(s.longValue());
+                case Byte b -> BigDecimal.valueOf(b.longValue());
+                case Double d -> BigDecimal.valueOf(d);
+                case Float f -> new BigDecimal(Float.toString(f));
+                case java.math.BigInteger i -> new BigDecimal(i);
+                default -> new BigDecimal(number.toString());
+            };
+            return decimal.precision() > PRECISION.getPrecision() ? decimal.round(PRECISION) : decimal;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /** A result, or null if it is beyond what a decimal128 holds. */

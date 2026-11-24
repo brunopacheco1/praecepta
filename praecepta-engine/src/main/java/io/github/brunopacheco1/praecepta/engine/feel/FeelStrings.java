@@ -9,7 +9,7 @@ import java.util.function.Function;
 
 /**
  * FEEL strings: their order, by character, and their escape sequences, read the same way in cells
- * ({@link CellParser}) and output expressions ({@link OutputExpression}), and written back by
+ * ({@link CellParser}) and FEEL expressions ({@link FeelExpression}), and written back by
  * {@link FeelLiterals#literal}.
  *
  * <p>A FEEL string is a sequence of Unicode characters, that is of code points (DMN 1.5, 10.3.2.3.2), and

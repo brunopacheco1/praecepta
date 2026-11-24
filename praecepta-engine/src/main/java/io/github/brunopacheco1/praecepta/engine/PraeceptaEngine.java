@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.BinaryOperator;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
@@ -47,10 +48,10 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableE
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
-import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
-import io.github.brunopacheco1.praecepta.engine.feel.ExpressionTypeException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
-import io.github.brunopacheco1.praecepta.engine.feel.OutputExpression;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelUnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
@@ -74,6 +75,19 @@ import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
  * {@code < date("2025-01-01")}, {@code < @"2025-01-01"}, {@code null}, and {@code -} or blank for any value.
  * See {@code CellParser}. A column bound with {@link Builder#listInput(String, Function)} holds lists, and its
  * cells hold when some element passes them.
+ *
+ * <p>The cells of a DMN table (strict FEEL) may be any FEEL unary tests (DMN 1.5, grammar rules 13 to 17; see
+ * {@link FeelUnaryTests}): {@code > Limit * 2}, {@code [Low..Low + 10]}, {@code ? > 5 and ? < 10}, {@code [1, 2, 3]}.
+ * The index evaluates the simple ones, which compare with literals; a rule with another one is matched by the index
+ * as if that cell were {@code -}, and the cell is then applied to the input, as a cell that compares with another input
+ * ({@code > limit}) is. The analysis treats such rules as it treats those: it never counts them as overlapping, hiding
+ * other rules or covering a default output, and looks for no gaps in a table that has them. The columns of a DMN
+ * table may be expressions ({@code Age * 12}), computed from the inputs they read, and its output entries any FEEL
+ * expression ({@link PraeceptaOutput#expressions()}), parsed and typed when the engine is built; one whose value is
+ * null whatever its inputs is a WARNING of the validation report ({@link ValidationReport.Kind#ALWAYS_NULL}). The
+ * names such an expression reads that are not columns are inputs of the engine, as those a cell compares with are:
+ * bound with their own getters, or with {@link Builder#inputs(InputStrategy)} read from text as values of the type
+ * {@link Builder#columnType} declares, else of the column or output whose entry reads them first.
  *
  * <p>A whole DMN decision table (hit policy, column types, value lists and rules) can be loaded with
  * {@code DmnReader} and passed to {@link Builder#table}; inputs are then bound as usual:
@@ -111,6 +125,10 @@ public final class PraeceptaEngine<I, O> {
     private final BitsetIndex.ColumnReader<I> extractorReader;
     /** Reads a column from the input strategy's map; null with per-column bindings. */
     private final BitsetIndex.ColumnReader<Map<String, String>> mapReader;
+    /** {@link #extractorReader}, computing each computed column once per evaluation; null if none is computed. */
+    private final BitsetIndex.ColumnReader<Computing<I>> computingExtractorReader;
+    /** {@link #mapReader}, computing each computed column once per evaluation; null if none is computed. */
+    private final BitsetIndex.ColumnReader<Computing<Map<String, String>>> computingMapReader;
 
     private final OutputStrategy<O> outputStrategy;
 
@@ -129,9 +147,25 @@ public final class PraeceptaEngine<I, O> {
     private final Set<String> numericOutputs;
     /** The rule's cells that compare with another input, checked after the index; null if it has none. */
     private final VariableCell[][] variableCellsByBit;
-    /** The rules with such cells. */
+    /** The rule's cells in the full FEEL language beyond the index, checked after it; null if it has none. */
+    private final FeelCell[][] feelCellsByBit;
+    /** The rules with either kind of cell. */
     private final long[] variableRules;
     private final boolean hasVariableCells;
+    /**
+     * Where the FEEL language reads each name its expressions read: the position of a column, in evaluation order, or
+     * {@code -1 - i} for the {@code i}-th of the {@linkplain Builder#expressionInput values a graph gives}.
+     */
+    private final Map<String, Integer> nameReads;
+    /** The values a graph gives, by {@link #nameReads}' index. */
+    private final List<Function<Object, Object>> givenValues;
+    /**
+     * By column (evaluation order): how its value is computed from other inputs, or null for one read from the input;
+     * empty if none is computed.
+     */
+    private final ComputedColumn[] computedColumns;
+    /** The issues found in the rules' output entries (one always null, say), which the validation report lists. */
+    private final List<Issue> outputIssues = new ArrayList<>();
     /** The rule's identifier, for violation messages. */
     private final Integer[] idByBit;
     /** ANY only: the mask of the rules whose outputs equal this rule's. */
@@ -158,14 +192,24 @@ public final class PraeceptaEngine<I, O> {
 
         var types = columnTypes(builder, rules);
         var lists = listInputs(builder);
-        var cells = parseCells(rules, types, builder.feelCells, lists);
+        var expressions = new TableExpressions(scope(builder, types), builder.types, builder.parsed);
+        var computed = computedColumns(builder, types, expressions);
+        var cells = parseCells(rules, types, builder.feelCells, lists, expressions);
+        for (int r = 0; r < rules.size(); r++) {
+            expressions.outputs(rules.get(r), r, builder.tableOutputTypes);
+        }
         // cells that compare with another input are decided when evaluating; the index sees "any value"
         var variableCells = takeVariableCells(rules, types, cells, builder.inputStrategy != null, lists);
+        addExpressionInputs(expressions, types, cells, rules.size(), builder);
         var allowedValues = allowedValues(builder, types.keySet());
         inputs = List.copyOf(types.keySet());
         var evaluationOrder = orderByWildcards(inputs, cells, lists);
+        givenValues = givenValues(builder);
+        nameReads = nameReads(expressions, evaluationOrder, List.copyOf(builder.expressionInputs.keySet()), computed);
+        // a table without FEEL beyond the index types nothing, and loads none of FEEL's types
+        var nameTypes = expressions.isEmpty() ? Map.<String, FeelType>of() : nameTypes(types, lists, builder.expressionInputTypes);
 
-        var numeric = numericOutputs(builder.tableOutputTypes, rules, types);
+        var numeric = numericOutputs(builder.tableOutputTypes, rules, types, expressions, nameTypes);
         int[] bitToRule = bitToRule(rules, builder.outputPriority, numeric);
         int words = BitsetIndex.wordsFor(rules.size());
         var enumValues = enumValuesByColumn(builder.bindings);
@@ -182,9 +226,12 @@ public final class PraeceptaEngine<I, O> {
         index = new BitsetIndex(columnIndexes, bitToRule);
 
         inputStrategy = builder.inputStrategy;
+        computedColumns = computedColumns(computed, evaluationOrder, types, lists);
         // readers return raw values; each column converts them (see ColumnIndex#maskFor)
         extractorReader = inputStrategy == null ? extractorReader(builder.bindings, evaluationOrder) : null;
         mapReader = inputStrategy == null ? null : mapReader(evaluationOrder);
+        computingExtractorReader = computingReader(extractorReader);
+        computingMapReader = computingReader(mapReader);
 
         outputStrategy = builder.outputStrategy;
         int ruleCount = rules.size();
@@ -195,7 +242,8 @@ public final class PraeceptaEngine<I, O> {
         computedByBit = new ComputedOutputs[ruleCount];
         ruleOutputByBit = new PraeceptaOutput[ruleCount];
         idByBit = new Integer[ruleCount];
-        readsInputs = fillOutputsByBit(rules, bitToRule, evaluationOrder, lists, types);
+        var outputs = new OutputContext(evaluationOrder, lists, types, expressions, nameTypes, builder);
+        readsInputs = fillOutputsByBit(rules, bitToRule, outputs);
         numericOutputs = numeric;
         // with outputs that read inputs, ANY compares the outputs of each evaluation instead
         sameOutputsByBit = hitPolicy == HitPolicy.ANY && !readsInputs
@@ -211,10 +259,13 @@ public final class PraeceptaEngine<I, O> {
         // DMN 1.5, 10.3.2.10, step 2: no match gives the default output, else null, before any aggregation
         noMatch = builder.defaultOutput == null ? List.of() : List.of(outputStrategy.transform(builder.defaultOutput));
         variableCellsByBit = variableCellsByBit(variableCells, bitToRule, evaluationOrder);
-        variableRules = variableRules(variableCellsByBit, words);
+        feelCellsByBit = feelCellsByBit(expressions, bitToRule, evaluationOrder);
+        variableRules = variableRules(variableCellsByBit, feelCellsByBit, words);
         hasVariableCells = !BitsetIndex.isEmpty(variableRules);
-        report = enforce(analyse(index, rules, hitPolicy, variableRules, numericOutputs, builder.defaultOutput != null), builder.failOn,
-                builder.logValidationReport);
+        // a rule that tests a computed column tests the columns it is computed from, which the index sees as unrelated
+        var unanalysed = computedColumnRules(builder.feelCells ? cells.keySet() : computed.keySet(), cells, bitToRule, variableRules);
+        var analysed = analyse(index, rules, hitPolicy, unanalysed, numericOutputs, builder.defaultOutput != null, outputIssues);
+        report = enforce(analysed, builder.failOn, builder.logValidationReport);
     }
 
     /**
@@ -223,15 +274,14 @@ public final class PraeceptaEngine<I, O> {
      *
      * @return whether some rule's output reads inputs
      */
-    private boolean fillOutputsByBit(List<Praeceptum> rules, int[] bitToRule, List<String> evaluationOrder, Set<String> lists,
-            Map<String, ColumnType> types) {
+    private boolean fillOutputsByBit(List<Praeceptum> rules, int[] bitToRule, OutputContext context) {
         boolean anyReads = false;
         for (int bit = 0; bit < rules.size(); bit++) {
             var rule = rules.get(bitToRule[bit]);
             idByBit[bit] = rule.priority();
             ruleOutputByBit[bit] = rule.output();
             if (rule.output().readsInputs()) {
-                computedByBit[bit] = computedOutputs(rule, evaluationOrder, lists, types);
+                computedByBit[bit] = computedOutputs(rule, bitToRule[bit], context);
                 anyReads = true;
             } else {
                 var output = outputStrategy.transform(rule.output());
@@ -277,46 +327,67 @@ public final class PraeceptaEngine<I, O> {
      *                                     element is of another type)
      */
     public List<O> evaluate(I input) {
-        return inputStrategy == null
-                ? evaluate(input, extractorReader)
-                : evaluate(inputStrategy.transform(input).values(), mapReader);
+        return evaluate(input, null);
+    }
+
+    /**
+     * Evaluates the decision table, as {@link #evaluate(Object)} does, telling {@code errors} of each error FEEL reports
+     * while computing its outputs (DMN 1.5, 10.3.2.15); for {@link DecisionGraph}.
+     *
+     * @param errors receives each error's message; null to ignore them
+     */
+    List<O> evaluate(I input, Consumer<String> errors) {
+        if (inputStrategy == null) {
+            return computingExtractorReader == null
+                    ? evaluate(input, extractorReader, errors)
+                    : evaluate(new Computing<>(input, computedColumns.length), computingExtractorReader, errors);
+        }
+        var values = inputStrategy.transform(input).values();
+        return computingMapReader == null
+                ? evaluate(values, mapReader, errors)
+                : evaluate(new Computing<>(values, computedColumns.length), computingMapReader, errors);
+    }
+
+    /** Whether a result of {@link #evaluate} is the default output: no rule matched (DMN 1.5, 10.3.2.10, step 2). */
+    boolean isDefault(List<O> results) {
+        return results == noMatch && !results.isEmpty();
     }
 
     /** Evaluates an input read column by column with {@code reader}, which also fills in outputs that name inputs. */
     @SuppressWarnings("unchecked")
-    private <T> List<O> evaluate(T input, BitsetIndex.ColumnReader<T> reader) {
+    private <T> List<O> evaluate(T input, BitsetIndex.ColumnReader<T> reader, Consumer<String> errors) {
         long[] matches = index.match(input, reader);
         if (matches.length == 0 || hasVariableCells && !keepVariableMatches(matches, input, reader)) {
             return noMatch;
         }
         // the lowest set bit is the first matching rule in rule order, or the highest-priority one
         return switch (hitPolicy) {
-            case FIRST, PRIORITY -> single(BitsetIndex.first(matches), input, reader);
+            case FIRST, PRIORITY -> single(BitsetIndex.first(matches), input, reader, errors);
             case UNIQUE -> {
                 int bit = BitsetIndex.first(matches);
                 if (BitsetIndex.next(matches, bit + 1) >= 0) {
                     throw violation(matches);
                 }
-                yield single(bit, input, reader);
+                yield single(bit, input, reader, errors);
             }
             case ANY -> {
                 int bit = BitsetIndex.first(matches);
                 if (readsInputs ? !sameOutputs(matches, input, reader) : !Masks.isSubset(matches, sameOutputsByBit[bit])) {
                     throw violation(matches);
                 }
-                yield single(bit, input, reader);
+                yield single(bit, input, reader, errors);
             }
             case RULE_ORDER, OUTPUT_ORDER, COLLECT -> {
                 if (count != null) {
                     yield List.of(count.apply(BitsetIndex.count(matches)));
                 }
                 if (reduce != null) {
-                    yield aggregate(matches, input, reader);
+                    yield aggregate(matches, input, reader, errors);
                 }
                 var selected = new Object[BitsetIndex.count(matches)];
                 int i = 0;
                 for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
-                    selected[i++] = computedByBit[bit] == null ? outputByBit[bit] : outputStrategy.transform(output(bit, input, reader));
+                    selected[i++] = computedByBit[bit] == null ? outputByBit[bit] : transform(output(bit, input, reader, errors));
                 }
                 yield (List<O>) List.of(selected);
             }
@@ -330,7 +401,7 @@ public final class PraeceptaEngine<I, O> {
      * converted, and the strategy combines nothing.
      */
     @SuppressWarnings("unchecked")
-    private <T> List<O> aggregate(long[] matches, T input, BitsetIndex.ColumnReader<T> reader) {
+    private <T> List<O> aggregate(long[] matches, T input, BitsetIndex.ColumnReader<T> reader, Consumer<String> errors) {
         O total = null;
         for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
             O output;
@@ -340,9 +411,9 @@ public final class PraeceptaEngine<I, O> {
                 }
                 output = (O) outputByBit[bit];
             } else {
-                var computed = output(bit, input, reader);
-                output = outputStrategy.transform(computed);
-                if (aggregatedOutput != null && computed.values().get(aggregatedOutput) == null) {
+                var computed = output(bit, input, reader, errors);
+                output = transform(computed);
+                if (aggregatedOutput != null && computed.isNull(aggregatedOutput)) {
                     return List.of(output);
                 }
             }
@@ -360,7 +431,9 @@ public final class PraeceptaEngine<I, O> {
      * Input column names: the bound columns in the order they were bound or, with an {@link InputStrategy},
      * the table's columns, then the other columns the rules test (in alphabetical order), then any other
      * columns named by input value lists and column types (in the order they were declared), then the
-     * inputs that cells compare with and that are not columns (in the order first named).
+     * inputs that cells compare with and that are not columns (in the order first named), then the other inputs the
+     * table's FEEL (its cells beyond the simple unary tests, input expressions and output entries) reads (in the order
+     * first read). A column whose input expression is an expression is among the table's columns, computed.
      */
     public List<String> inputs() {
         return inputs;
@@ -480,11 +553,11 @@ public final class PraeceptaEngine<I, O> {
         return byBit;
     }
 
-    /** The rules with cells that compare with another input, as a mask. */
-    private static long[] variableRules(VariableCell[][] variableCellsByBit, int words) {
+    /** The rules with cells that compare with another input, or in the full FEEL language, as a mask. */
+    private static long[] variableRules(VariableCell[][] variableCellsByBit, FeelCell[][] feelCellsByBit, int words) {
         var mask = new long[words];
         for (int bit = 0; bit < variableCellsByBit.length; bit++) {
-            if (variableCellsByBit[bit] != null) {
+            if (variableCellsByBit[bit] != null || feelCellsByBit[bit] != null) {
                 BitsetIndex.set(mask, bit);
             }
         }
@@ -492,7 +565,34 @@ public final class PraeceptaEngine<I, O> {
     }
 
     /**
-     * Clears the matches whose cells that compare with other inputs fail for this input.
+     * The rules the analysis leaves out ({@link TableAnalysis#analyse}): those with cells that compare with another input
+     * or are in the full FEEL language ({@code variableRules}), and those that test a column computed from other inputs
+     * ({@code Age * 12}), which the index sees as a column of its own, unrelated to the inputs it is computed from, so
+     * that {@code < 18} on {@code Age} and {@code >= 216} on {@code Age * 12} would seem to overlap.
+     *
+     * @param columns the columns that may be computed: those whose input expressions are expressions, bound to a getter
+     *                or not, in a strict FEEL table, else those the engine computes
+     * @param cells   the cells by column, in rule order, those beyond the index {@code -}
+     */
+    private static long[] computedColumnRules(Set<String> columns, Map<String, List<UnaryTests>> cells, int[] bitToRule,
+            long[] variableRules) {
+        var computed = columns.stream().filter(TableExpressions::isExpression).toList();
+        if (computed.isEmpty()) {
+            return variableRules;
+        }
+        var mask = variableRules.clone();
+        for (int bit = 0; bit < bitToRule.length; bit++) {
+            int rule = bitToRule[bit];
+            if (computed.stream().anyMatch(column -> !(cells.get(column).get(rule) instanceof UnaryTests.Any))) {
+                BitsetIndex.set(mask, bit);
+            }
+        }
+        return mask;
+    }
+
+    /**
+     * Clears the matches whose cells that compare with other inputs, or are in the full FEEL language, fail for this
+     * input.
      *
      * @return whether a match is left
      */
@@ -500,7 +600,8 @@ public final class PraeceptaEngine<I, O> {
         boolean any = false;
         for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
             var cells = variableCellsByBit[bit];
-            if (cells != null && !acceptsAll(cells, input, reader)) {
+            var feel = feelCellsByBit[bit];
+            if (cells != null && !acceptsAll(cells, input, reader) || feel != null && !acceptsAll(feel, input, reader)) {
                 BitsetIndex.clear(matches, bit);
             } else {
                 any = true;
@@ -519,22 +620,243 @@ public final class PraeceptaEngine<I, O> {
         return true;
     }
 
+    private <T> boolean acceptsAll(FeelCell[] cells, T input, BitsetIndex.ColumnReader<T> reader) {
+        for (var cell : cells) {
+            // a cell reports no errors: a test that is null is not satisfied, which is all a table asks of it
+            if (!cell.tests().matches(valueOf(cell.column(), input, reader), name -> read(name, input, reader), null)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private <T> Object valueOf(int column, T input, BitsetIndex.ColumnReader<T> reader) {
         return index.column(column).value(reader.read(input, column));
+    }
+
+    /**
+     * The value of a name the FEEL language reads: a column's, as its index reads it, or a value the graph gives; null
+     * for a name the engine does not read, which is never asked for.
+     */
+    private <T> Object read(String name, T input, BitsetIndex.ColumnReader<T> reader) {
+        var at = nameReads.get(name);
+        if (at == null) {
+            return null;
+        }
+        if (at >= 0) {
+            return valueOf(at, input, reader);
+        }
+        // a graph gives its values from its own input, which an evaluation that computes columns wraps
+        return givenValues.get(-1 - at).apply(input instanceof Computing<?> computing ? computing.input : input);
+    }
+
+    // ---- the full FEEL language: cells beyond the index and computed columns -----------------------
+
+    /** A cell in the full FEEL language ({@link FeelUnaryTests}), applied to the value of its column, by position in evaluation order. */
+    private record FeelCell(int column, FeelUnaryTests tests) {
+    }
+
+    /** The FEEL cells by bit, with columns as positions in the evaluation order; null for rules without any. */
+    private static FeelCell[][] feelCellsByBit(TableExpressions expressions, int[] bitToRule, List<String> evaluationOrder) {
+        var byBit = new FeelCell[bitToRule.length][];
+        for (int bit = 0; bit < bitToRule.length; bit++) {
+            var ruleCells = expressions.cells(bitToRule[bit]);
+            if (!ruleCells.isEmpty()) {
+                byBit[bit] = ruleCells.entrySet().stream()
+                        .map(cell -> new FeelCell(evaluationOrder.indexOf(cell.getKey()), cell.getValue()))
+                        .toArray(FeelCell[]::new);
+            }
+        }
+        return byBit;
+    }
+
+    /**
+     * A column whose input expression computes its value from other inputs ({@code Age * 12}): its value is the
+     * expression's, which must be of the column's type (a value of another type is rejected, as a getter's is); for a
+     * column of lists, a single value is a list of one (DMN 1.5, 10.3.2.9.4, "to singleton list").
+     *
+     * @param type the column's type, or a list of it for a column of lists
+     */
+    private record ComputedColumn(String name, FeelExpression expression, FeelType type) {
+
+        /** The column's value, given the expression's. */
+        Object value(Object computed) {
+            var value = computed == null || computed instanceof Collection<?> || !(type instanceof FeelType.ListOf) ? computed : List.of(computed);
+            return GraphValues.normalise(value, type, name);
+        }
+    }
+
+    /**
+     * The names in scope for the table's FEEL: its columns, the inputs bound to it, and the values a graph gives it.
+     */
+    private static Set<String> scope(Builder<?, ?> builder, Map<String, ColumnType> types) {
+        var names = new LinkedHashSet<String>();
+        // a column that is an expression is no name: its text would read as itself
+        types.keySet().stream().filter(column -> !TableExpressions.isExpression(column)).forEach(names::add);
+        names.addAll(builder.bindings.keySet());
+        names.addAll(builder.expressionInputs.keySet());
+        return names;
+    }
+
+    /**
+     * Parses the columns whose input expressions compute their value, those that are expressions rather than names and
+     * that no getter is bound to.
+     *
+     * @return their expressions, by column
+     */
+    private static Map<String, FeelExpression> computedColumns(Builder<?, ?> builder, Map<String, ColumnType> types,
+            TableExpressions expressions) {
+        for (var entry : types.entrySet()) {
+            var column = entry.getKey();
+            if (TableExpressions.isExpression(column) && !builder.bindings.containsKey(column)) {
+                expressions.column(column, entry.getValue());
+            }
+        }
+        return expressions.columns();
+    }
+
+    /** The computed columns by position in evaluation order, null where a column is read; empty if none is computed. */
+    private static ComputedColumn[] computedColumns(Map<String, FeelExpression> computed, List<String> evaluationOrder,
+            Map<String, ColumnType> types, Set<String> lists) {
+        if (computed.isEmpty()) {
+            return new ComputedColumn[0];
+        }
+        var byColumn = new ComputedColumn[evaluationOrder.size()];
+        computed.forEach((column, expression) -> {
+            var type = lists.contains(column) ? FeelType.listOf(types.get(column)) : FeelType.of(types.get(column));
+            byColumn[evaluationOrder.indexOf(column)] = new ComputedColumn(column, expression, type);
+        });
+        return byColumn;
+    }
+
+    /** Marks a computed column's value as not computed yet in {@link Computing#values}. */
+    private static final Object NOT_COMPUTED = new Object();
+
+    /**
+     * An input being evaluated by a table that computes columns, with the values of those it has computed, so that each
+     * is computed once per evaluation however often it is read: by the index, by FEEL cells and by output entries. A
+     * class, not a record: it holds an array and is never compared.
+     */
+    private static final class Computing<T> {
+        private final T input;
+        /** By column (evaluation order): a computed column's value, or {@link #NOT_COMPUTED}. */
+        private final Object[] values;
+
+        Computing(T input, int columns) {
+            this.input = input;
+            this.values = new Object[columns];
+            Arrays.fill(values, NOT_COMPUTED);
+        }
+    }
+
+    /** A reader that also computes the computed columns, over {@code reader}; null without one or without computed columns. */
+    private <T> BitsetIndex.ColumnReader<Computing<T>> computingReader(BitsetIndex.ColumnReader<T> reader) {
+        return reader == null || computedColumns.length == 0 ? null : new ComputingReader<>(reader);
+    }
+
+    /** Reads the columns {@code reader} reads, and computes the computed ones from them, once per evaluation. */
+    private final class ComputingReader<T> implements BitsetIndex.ColumnReader<Computing<T>> {
+        private final BitsetIndex.ColumnReader<T> reader;
+
+        ComputingReader(BitsetIndex.ColumnReader<T> reader) {
+            this.reader = reader;
+        }
+
+        @Override
+        public Object read(Computing<T> computing, int column) {
+            var computedColumn = computedColumns[column];
+            if (computedColumn == null) {
+                return reader.read(computing.input, column);
+            }
+            var value = computing.values[column];
+            if (value == NOT_COMPUTED) {
+                value = computedColumn.value(computedColumn.expression().evaluate(name -> PraeceptaEngine.this.read(name, computing, this)));
+                computing.values[column] = value;
+            }
+            return value;
+        }
+    }
+
+    /**
+     * Adds the names the table's FEEL reads that are not columns, nor values a graph gives, as inputs of the engine, which
+     * the index sees as columns of {@code -} cells: bound by their own getters, or with map-based inputs read with the
+     * type {@code columnType(...)} declares, else that of the column or output whose entry reads them first.
+     *
+     * @throws InvalidDecisionTableException if one has no input binding, with per-column bindings
+     */
+    private static void addExpressionInputs(TableExpressions expressions, Map<String, ColumnType> types,
+            Map<String, List<UnaryTests>> cells, int ruleCount, Builder<?, ?> builder) {
+        expressions.named().forEach((name, type) -> {
+            if (types.containsKey(name) || builder.expressionInputs.containsKey(name)) {
+                return;
+            }
+            if (builder.inputStrategy == null) {
+                throw new InvalidDecisionTableException("The table's expressions read '%s', which has no input binding".formatted(name));
+            }
+            types.put(name, type);
+            cells.put(name, Collections.nCopies(ruleCount, new UnaryTests.Any()));
+        });
+    }
+
+    /**
+     * Where each name the table's FEEL reads is: a column, by position in evaluation order, or a value a graph gives.
+     *
+     * @throws InvalidDecisionTableException if a computed column reads another computed column, or a name is neither a
+     *                                       column nor a value a graph gives
+     */
+    static Map<String, Integer> nameReads(TableExpressions expressions, List<String> evaluationOrder, List<String> given,
+            Map<String, FeelExpression> computed) {
+        var reads = new HashMap<String, Integer>();
+        for (var name : expressions.names()) {
+            int column = evaluationOrder.indexOf(name);
+            int value = given.indexOf(name);
+            if (column < 0 && value < 0) {
+                throw new InvalidDecisionTableException(
+                        "The table's expressions read '%s', which is neither an input of the table nor a value given to it".formatted(name));
+            }
+            reads.put(name, column >= 0 ? column : -1 - value);
+        }
+        computed.forEach((column, expression) -> {
+            for (var name : expression.names()) {
+                if (computed.containsKey(name)) {
+                    throw new InvalidDecisionTableException("Input expression '%s' reads '%s', which is computed itself".formatted(column, name));
+                }
+            }
+        });
+        return Map.copyOf(reads);
+    }
+
+    /** The type of each name the table's FEEL may read: a column's, a list of it for a column of lists, or a given value's. */
+    private static Map<String, FeelType> nameTypes(Map<String, ColumnType> types, Set<String> lists, Map<String, FeelType> given) {
+        var nameTypes = new HashMap<>(given);
+        types.forEach((name, type) -> nameTypes.put(name, lists.contains(name) ? FeelType.listOf(type) : FeelType.of(type)));
+        return nameTypes;
     }
 
     // ---- outputs that read inputs: outputs that name an input, and expressions ---------------------
 
     /**
-     * One output of a rule that reads inputs: the output column, the expression that computes it (a
-     * {@link OutputExpression.Name} for an output that names an input), and the position, in the
-     * evaluation order, of each input it reads.
-     *
-     * @param reference whether the output names an input, so it takes that input's value as its text
-     *                  ({@link FeelLiterals#text}, a number keeping its scale); else it is an expression,
-     *                  and a computed number is written without trailing zeros
+     * How an output's computed value is given (DMN 1.5, 10.3.2.9.4): as it is, for an output whose type the table does
+     * not declare, each entry giving its own (10.3.2.10, step 3c); as its text, for a string output, which takes any
+     * value as its text, as it takes unquoted literals; else bound to the output's type, as it is where it conforms,
+     * a date as a date and time at UTC midnight, a list of one as its element, and as null where it does not conform.
      */
-    private record Computed(String output, OutputExpression expression, Map<String, Integer> columns, boolean reference) {
+    private enum OutputBinding { AS_IS, TEXT, CONFORM }
+
+    /**
+     * One output of a rule that reads inputs: the output column, the expression that computes it, or, for an output that
+     * names an input, that input's position in the evaluation order, and how its value is given.
+     *
+     * @param expression the expression, null for an output that names an input
+     * @param column     the input it names, by position in the evaluation order; -1 for an expression
+     * @param type       the output's type, for {@link OutputBinding#CONFORM}
+     */
+    private record Computed(String output, FeelExpression expression, int column, OutputBinding binding, FeelType type) {
+
+        /** Whether the output names an input, so it takes that input's value as its text, a number keeping its scale. */
+        boolean reference() {
+            return expression == null;
+        }
     }
 
     /**
@@ -543,43 +865,94 @@ public final class PraeceptaEngine<I, O> {
      */
     private static final class ComputedOutputs {
         private final Map<String, String> values;
+        /** The outputs that read no input, as {@link ValueOutputs} takes them beside the values of the others. */
+        private final PraeceptaOutput literals;
         private final Computed[] computed;
 
         ComputedOutputs(Map<String, String> values, Computed[] computed) {
             this.values = values;
+            this.literals = new PraeceptaOutput(values);
             this.computed = computed;
         }
     }
 
+    /** What computing the outputs of rules needs: where the inputs are, their types, and the table's FEEL. */
+    private record OutputContext(List<String> evaluationOrder, Set<String> lists, Map<String, ColumnType> types,
+            TableExpressions expressions, Map<String, FeelType> nameTypes, Map<String, ColumnType> outputTypes,
+            Set<String> untypedOutputs) {
+
+        OutputContext(List<String> evaluationOrder, Set<String> lists, Map<String, ColumnType> types, TableExpressions expressions,
+                Map<String, FeelType> nameTypes, Builder<?, ?> builder) {
+            this(evaluationOrder, lists, types, expressions, nameTypes, builder.tableOutputTypes, builder.untypedOutputs);
+        }
+
+        /** How an output's computed value is given: as it is if the table does not type it, as text if it is a string. */
+        OutputBinding binding(String output) {
+            if (untypedOutputs.contains(output)) {
+                return OutputBinding.AS_IS;
+            }
+            var type = outputTypes.get(output);
+            return type == null || type == ColumnType.STRING ? OutputBinding.TEXT : OutputBinding.CONFORM;
+        }
+    }
+
     /**
-     * The outputs of {@code rule} that read inputs, checked: each reads inputs of the engine that hold
-     * single values (the table's columns, or inputs its cells compare with), an expression parses and its
-     * inputs' types go together, and none is in an output priority list (see {@link #priorityKey}), where
-     * its place cannot be known before evaluation. {@code DmnReader} accepts the same names.
+     * The outputs of {@code rule} that read inputs, checked: an output that names an input names one of the engine's
+     * inputs that holds single values (the table's columns, or inputs its cells compare with), and none is in an output
+     * priority list (see {@link #priorityKey}), where its place cannot be known before evaluation. An expression may read
+     * any input, a list too ({@code Orders[1]}). An expression whose value is null
+     * whatever its inputs, as one whose operands FEEL does not combine, or one of another type than its output, is
+     * reported ({@link ValidationReport.Kind#ALWAYS_NULL}), and evaluated to null. {@code DmnReader} accepts the same names.
      */
-    private static ComputedOutputs computedOutputs(Praeceptum rule, List<String> evaluationOrder, Set<String> lists,
-            Map<String, ColumnType> types) {
+    private ComputedOutputs computedOutputs(Praeceptum rule, int ruleIndex, OutputContext context) {
         var computed = new ArrayList<Computed>();
-        rule.output().references().forEach((output, input) -> computed.add(new Computed(output, new OutputExpression.Name(input),
-                Map.of(input, inputColumn(rule, output, input, evaluationOrder, lists)), true)));
-        rule.output().expressions().forEach((output, text) -> {
-            var where = "Rule %s, output '%s'".formatted(rule.priority(), output);
-            OutputExpression expression;
-            try {
-                expression = OutputExpression.parse(text);
-            } catch (ExpressionSyntaxException e) {
-                throw new InvalidDecisionTableException(where + ": " + e.getMessage());
-            }
-            var columns = new HashMap<String, Integer>();
-            expression.names().forEach(name -> columns.put(name, inputColumn(rule, output, name, evaluationOrder, lists)));
-            try {
-                expression.type(types::get);
-            } catch (ExpressionTypeException e) {
-                throw new InvalidDecisionTableException(where + ": " + e.getMessage());
-            }
-            computed.add(new Computed(output, expression, Map.copyOf(columns), false));
+        rule.output().references().forEach((output, input) -> computed.add(new Computed(output, null,
+                inputColumn(rule, output, input, context.evaluationOrder(), context.lists()), context.binding(output),
+                outputType(context, output))));
+        context.expressions().outputs(ruleIndex).forEach((output, expression) -> {
+            var binding = context.binding(output);
+            checkOutput(rule, output, expression, binding, context);
+            computed.add(new Computed(output, expression, -1, binding, outputType(context, output)));
         });
         return new ComputedOutputs(rule.output().values(), computed.toArray(Computed[]::new));
+    }
+
+    private static FeelType outputType(OutputContext context, String output) {
+        var type = context.outputTypes().get(output);
+        return type == null ? FeelType.ANY : FeelType.of(type);
+    }
+
+    /**
+     * Reports an output entry whose value is null whatever its inputs ({@link ValidationReport.Kind#ALWAYS_NULL}): its
+     * expression is (operands FEEL does not combine, DMN 1.5, 10.3.2.15), or it gives values of a type that does not
+     * conform to its output's (10.3.2.9.4).
+     */
+    private void checkOutput(Praeceptum rule, String output, FeelExpression expression, OutputBinding binding, OutputContext context) {
+        var reasons = new ArrayList<String>();
+        var type = expression.type(context.nameTypes()::get, reasons::add);
+        var where = "rule %s, output '%s': '%s'".formatted(rule.priority(), output, expression.text().strip());
+        if (type instanceof FeelType.Null) {
+            var reason = reasons.isEmpty() ? "it is null" : reasons.getFirst();
+            outputIssues.add(new Issue(ValidationReport.Kind.ALWAYS_NULL, List.of(rule.priority()),
+                    "%s is null whatever its inputs: %s (DMN 1.5, 10.3.2.15)".formatted(where, reason), Map.of()));
+        } else if (binding == OutputBinding.CONFORM && !mayConform(type, context.outputTypes().get(output))) {
+            outputIssues.add(new Issue(ValidationReport.Kind.ALWAYS_NULL, List.of(rule.priority()),
+                    "%s gives a %s, but the output is a %s, so its value is null (DMN 1.5, 10.3.2.9.4)".formatted(where, type.feelName(),
+                            context.outputTypes().get(output).feelName()), Map.of()));
+        }
+    }
+
+    /**
+     * Whether a value of type {@code type} may be bound to an output of type {@code output} as something other than null
+     * (DMN 1.5, 10.3.2.9.4): a value of that type, a date for a date and time, a list (of one), or one of any type.
+     */
+    private static boolean mayConform(FeelType type, ColumnType output) {
+        return switch (type) {
+            case FeelType.Simple(var simple) -> simple == output || simple == ColumnType.DATE && output == ColumnType.DATE_TIME;
+            case FeelType.ListOf(var element) -> mayConform(element, output);
+            case FeelType.Any any -> true;
+            default -> false;
+        };
     }
 
     /** The position, in the evaluation order, of the input an output reads, which must hold single values. */
@@ -601,16 +974,18 @@ public final class PraeceptaEngine<I, O> {
      * a {@linkplain Builder#table table} declares as numbers and, for outputs the table does not declare,
      * those some rule computes as a number (naming a number input, or a number expression).
      */
-    private static Set<String> numericOutputs(Map<String, ColumnType> declared, List<Praeceptum> rules, Map<String, ColumnType> types) {
+    private static Set<String> numericOutputs(Map<String, ColumnType> declared, List<Praeceptum> rules, Map<String, ColumnType> types,
+            TableExpressions expressions, Map<String, FeelType> nameTypes) {
         var numeric = new HashSet<String>();
-        for (var rule : rules) {
-            rule.output().references().forEach((output, input) -> {
+        var number = FeelType.of(ColumnType.NUMBER);
+        for (int r = 0; r < rules.size(); r++) {
+            rules.get(r).output().references().forEach((output, input) -> {
                 if (types.get(input) == ColumnType.NUMBER) {
                     numeric.add(output);
                 }
             });
-            rule.output().expressions().forEach((output, text) -> {
-                if (isNumber(text, types)) {
+            expressions.outputs(r).forEach((output, expression) -> {
+                if (number.equals(expression.type(nameTypes::get))) {
                     numeric.add(output);
                 }
             });
@@ -623,15 +998,6 @@ public final class PraeceptaEngine<I, O> {
             }
         });
         return Set.copyOf(numeric);
-    }
-
-    /** Whether an expression gives a number; false if it is invalid, which indexing its rule reports. */
-    private static boolean isNumber(String expression, Map<String, ColumnType> types) {
-        try {
-            return OutputExpression.parse(expression).type(types::get) == ColumnType.NUMBER;
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
     }
 
     /** Whether two texts of an output are the same value: for a number output, the same number ({@code 1.50} is {@code 1.5}). */
@@ -667,30 +1033,193 @@ public final class PraeceptaEngine<I, O> {
     }
 
     /** The single-hit result of the rule at {@code bit}: ready-made, unless it reads inputs. */
-    private <T> List<O> single(int bit, T input, BitsetIndex.ColumnReader<T> reader) {
+    private <T> List<O> single(int bit, T input, BitsetIndex.ColumnReader<T> reader, Consumer<String> errors) {
         var ready = singleByBit[bit];
-        return ready != null ? ready : List.of(outputStrategy.transform(output(bit, input, reader)));
+        return ready != null ? ready : List.of(transform(output(bit, input, reader, errors)));
     }
 
     /**
-     * The outputs of a rule that reads inputs, filled in with the text of the input's values and of the
-     * expressions' values; a computed number has no trailing zeros, since FEEL numbers are values. An
-     * output that names an input gives the input's value as {@link FeelLiterals#text} writes it, a number
-     * keeping its scale, as a literal output keeps it.
+     * The outputs of a rule that reads inputs: the values of those it computes, and, written only when asked for, all of
+     * them as text, which an output strategy other than {@link ValueOutputs} takes. A class, not a record: it holds an
+     * array and is never compared.
      */
-    private <T> PraeceptaOutput output(int bit, T input, BitsetIndex.ColumnReader<T> reader) {
-        var computedOutputs = computedByBit[bit];
-        var values = new HashMap<>(computedOutputs.values);
-        for (var computed : computedOutputs.computed) {
-            var columns = computed.columns();
-            var value = computed.expression().evaluate(name -> valueOf(columns.get(name), input, reader));
-            values.put(computed.output(), switch (value) {
-                case null -> null;
-                case BigDecimal number when !computed.reference() -> numberText(number);
-                default -> FeelLiterals.text(value);
-            });
+    private static final class Output {
+        private final ComputedOutputs outputs;
+        /** By computed output: its value, bound to its output. */
+        private final Object[] values;
+        private PraeceptaOutput text;
+
+        Output(ComputedOutputs outputs, Object[] values) {
+            this.outputs = outputs;
+            this.values = values;
         }
-        return new PraeceptaOutput(values);
+
+        /**
+         * The outputs as text, the computed ones filled in with the text of their values; a computed number has no
+         * trailing zeros, since FEEL numbers are values. An output that names an input gives the input's value as
+         * {@link FeelLiterals#text} writes it, a number keeping its scale, as a literal output keeps it.
+         */
+        PraeceptaOutput text() {
+            if (text == null) {
+                var texts = new HashMap<>(outputs.values);
+                for (int i = 0; i < values.length; i++) {
+                    var computed = outputs.computed[i];
+                    texts.put(computed.output(), values[i] == null ? null : PraeceptaEngine.text(values[i], computed));
+                }
+                text = new PraeceptaOutput(texts);
+            }
+            return text;
+        }
+
+        /** The values of the computed outputs, by output; null for one that is null. */
+        Map<String, Object> values() {
+            var byOutput = new HashMap<String, Object>();
+            for (int i = 0; i < values.length; i++) {
+                byOutput.put(outputs.computed[i].output(), values[i]);
+            }
+            return byOutput;
+        }
+
+        /** Whether an output is missing: null as written, or computed to null. */
+        boolean isNull(String output) {
+            for (int i = 0; i < values.length; i++) {
+                if (outputs.computed[i].output().equals(output)) {
+                    return values[i] == null;
+                }
+            }
+            return outputs.values.get(output) == null;
+        }
+    }
+
+    /**
+     * Converts computed outputs with the output strategy: their values, and the other outputs' text, for one that takes
+     * values ({@link ValueOutputs}), which so never has them written as text; else all of them as text.
+     */
+    private O transform(Output output) {
+        return outputStrategy instanceof ValueOutputs<O> values
+                ? values.transform(output.outputs.literals, output.values())
+                : outputStrategy.transform(output.text());
+    }
+
+    /** The outputs of a rule that reads inputs, computed: the value of the input each names, or of its expression. */
+    private <T> Output output(int bit, T input, BitsetIndex.ColumnReader<T> reader, Consumer<String> errors) {
+        var computedOutputs = computedByBit[bit];
+        var values = new Object[computedOutputs.computed.length];
+        for (int i = 0; i < values.length; i++) {
+            var computed = computedOutputs.computed[i];
+            var value = computed.reference()
+                    ? valueOf(computed.column(), input, reader)
+                    : computed.expression().evaluate(name -> read(name, input, reader), errors);
+            values[i] = bound(value, computed, errors);
+        }
+        return new Output(computedOutputs, values);
+    }
+
+    /** A computed output's value as text: a computed number without trailing zeros, the value an output names as it is written. */
+    private static String text(Object value, Computed computed) {
+        return value instanceof BigDecimal number && !computed.reference() ? numberText(number) : outputText(value);
+    }
+
+    /** A computed output's value, given as its output takes it ({@link OutputBinding}). */
+    private static Object bound(Object value, Computed computed, Consumer<String> errors) {
+        if (value == null) {
+            return null;
+        }
+        return switch (computed.binding()) {
+            case AS_IS -> computed.reference() ? value : GraphValues.literalValue(value);
+            case TEXT -> value instanceof String ? value : text(value, computed);
+            case CONFORM -> {
+                var conformed = GraphValues.conform(computed.reference() ? value : GraphValues.literalValue(value), computed.type(), 0);
+                if (conformed == null && errors != null) {
+                    errors.accept("output '%s': %s is not a %s, the output's type (DMN 1.5, 10.3.2.9.4)".formatted(computed.output(),
+                            outputText(value), computed.type().feelName()));
+                }
+                yield conformed;
+            }
+        };
+    }
+
+    /** The deepest lists and contexts an output's text writes out; deeper ones are written {@code [...]} or <code>{...}</code>. */
+    private static final int MAX_TEXT_DEPTH = 64;
+    /**
+     * The most characters an output's text writes of a list or a context; the rest is written {@code ...}. A value may
+     * hold one list many times over ({@code {a: [1, 1], b: [a, a], c: [b, b]}.c}), which its text writes out each time,
+     * so the text of a small value could be exponentially long.
+     */
+    static final int MAX_TEXT_LENGTH = 1 << 16;
+
+    /**
+     * The text of an output's value: a simple value's plain text ({@link FeelLiterals#text}), and a list, a context or a
+     * range as FEEL writes it, its values as literals ({@code ["PT", "BR"]}, {@code {a: 1}}), as list inputs are read
+     * from text; of a list or a context, at most {@value #MAX_TEXT_LENGTH} characters, then {@code ...}.
+     */
+    static String outputText(Object value) {
+        if (!(value instanceof List<?>) && !(value instanceof Map<?, ?>)) {
+            return FeelLiterals.text(value);
+        }
+        var text = new StringBuilder();
+        if (!appendLiteral(text, value, 0)) {
+            text.setLength(Math.min(text.length(), MAX_TEXT_LENGTH));
+            text.append("...");
+        }
+        return text.toString();
+    }
+
+    /**
+     * Writes a value as a literal. Each call writes a character at least before it calls itself, so the calls are no
+     * more than the characters written, which {@link #MAX_TEXT_LENGTH} bounds, whatever the value's size.
+     *
+     * @return false if the text reached {@link #MAX_TEXT_LENGTH} characters before the value was written out
+     */
+    private static boolean appendLiteral(StringBuilder text, Object value, int depth) {
+        if (text.length() >= MAX_TEXT_LENGTH) {
+            return false;
+        }
+        if (value instanceof List<?> list) {
+            if (depth >= MAX_TEXT_DEPTH) {
+                text.append("[...]");
+                return true;
+            }
+            text.append('[');
+            var separator = "";
+            for (var element : list) {
+                text.append(separator);
+                separator = ", ";
+                if (!appendLiteral(text, element, depth + 1)) {
+                    return false;
+                }
+            }
+            text.append(']');
+            return true;
+        }
+        if (value instanceof Map<?, ?> context) {
+            return appendContext(text, context, depth);
+        }
+        text.append(value == null || isSimpleValue(value) ? FeelLiterals.literal(value) : value.toString());
+        return true;
+    }
+
+    private static boolean appendContext(StringBuilder text, Map<?, ?> context, int depth) {
+        if (depth >= MAX_TEXT_DEPTH) {
+            text.append("{...}");
+            return true;
+        }
+        text.append('{');
+        var separator = "";
+        for (var entry : context.entrySet()) {
+            text.append(separator).append(FeelLiterals.literal(String.valueOf(entry.getKey()))).append(": ");
+            separator = ", ";
+            if (!appendLiteral(text, entry.getValue(), depth + 1)) {
+                return false;
+            }
+        }
+        text.append('}');
+        return true;
+    }
+
+    /** Whether a value is one of a simple type, which {@link FeelLiterals#literal} writes. */
+    private static boolean isSimpleValue(Object value) {
+        return Arrays.stream(ColumnType.values()).anyMatch(type -> GraphValues.isValueOf(value, type));
     }
 
     /**
@@ -700,7 +1229,7 @@ public final class PraeceptaEngine<I, O> {
     private <T> boolean sameOutputs(long[] matches, T input, BitsetIndex.ColumnReader<T> reader) {
         Map<String, String> first = null;
         for (int bit = BitsetIndex.first(matches); bit >= 0; bit = BitsetIndex.next(matches, bit + 1)) {
-            var output = computedByBit[bit] == null ? ruleOutputByBit[bit] : output(bit, input, reader);
+            var output = computedByBit[bit] == null ? ruleOutputByBit[bit] : output(bit, input, reader, null).text();
             var values = comparable(output, numericOutputs).values();
             if (first == null) {
                 first = values;
@@ -826,12 +1355,21 @@ public final class PraeceptaEngine<I, O> {
     /**
      * The type of each column. Bound columns carry their own, and rules may test no other column. With
      * an {@link InputStrategy}, the columns are the table's, those the rules test and those with input
-     * values (STRING unless the table says otherwise), then {@code columnType(...)} overrides.
+     * values (STRING unless the table says otherwise), then {@code columnType(...)} overrides. A column of the
+     * {@linkplain Builder#table table} whose input expression is an expression, not a name, is computed, so it needs no
+     * binding.
      */
     private static Map<String, ColumnType> columnTypes(Builder<?, ?> builder, List<Praeceptum> rules) {
         var types = new LinkedHashMap<String, ColumnType>();
         if (builder.inputStrategy == null) {
             builder.bindings.forEach((column, binding) -> types.put(column, binding.type()));
+            if (builder.tableTypes != null) {
+                builder.tableTypes.forEach((column, type) -> {
+                    if (TableExpressions.isExpression(column)) {
+                        types.putIfAbsent(column, type);
+                    }
+                });
+            }
             rejectUndeclaredColumns(rules, types.keySet());
             return types;
         }
@@ -880,9 +1418,13 @@ public final class PraeceptaEngine<I, O> {
         return allowedValues;
     }
 
-    /** Whether a column's inputs have a time zone: as its getter says, or either way when read from text. */
+    /**
+     * Whether a column's inputs have a time zone: as its getter says, or either way when read from text or computed by
+     * its input expression.
+     */
     private static Zoning zoning(Builder<?, ?> builder, String column) {
-        return builder.inputStrategy != null ? Zoning.EITHER : builder.bindings.get(column).zoning();
+        var binding = builder.bindings.get(column);
+        return builder.inputStrategy != null || binding == null ? Zoning.EITHER : binding.zoning();
     }
 
     /** For each enum-bound column, each constant's value by ordinal. */
@@ -929,33 +1471,44 @@ public final class PraeceptaEngine<I, O> {
 
     /**
      * Parsed cells per column, in rule order: strict FEEL for a DMN table (a list column's with
-     * {@code list contains(?, ...)}), else Praecepta's syntax.
+     * {@code list contains(?, ...)}), else Praecepta's syntax. A strict FEEL cell beyond the simple unary tests the index
+     * evaluates is {@code -} here, and kept in {@code expressions}, which apply it once the index has matched its rule.
      */
     private static Map<String, List<UnaryTests>> parseCells(List<Praeceptum> rules, Map<String, ColumnType> types, boolean feel,
-            Set<String> lists) {
+            Set<String> lists, TableExpressions expressions) {
         var cells = new LinkedHashMap<String, List<UnaryTests>>();
-        types.forEach((column, type) -> cells.put(column, rules.stream()
-                .map(rule -> parseCell(rule, column, type, feel, lists.contains(column)))
-                .toList()));
+        types.forEach((column, type) -> {
+            var columnCells = new ArrayList<UnaryTests>(rules.size());
+            for (int r = 0; r < rules.size(); r++) {
+                var rule = rules.get(r);
+                try {
+                    columnCells.add(parseCell(rule, column, type, feel, lists.contains(column)));
+                } catch (CellSyntaxException e) {
+                    if (!feel) {
+                        throw new InvalidDecisionTableException("Rule %s, column '%s': %s".formatted(rule.priority(), column, e.getMessage()));
+                    }
+                    expressions.cell(rule, r, column, type, e);
+                    columnCells.add(new UnaryTests.Any());
+                }
+            }
+            cells.put(column, Collections.unmodifiableList(columnCells));
+        });
         return cells;
     }
 
+    /** A cell as the index reads it. */
     private static UnaryTests parseCell(Praeceptum rule, String column, ColumnType type, boolean feel, boolean list) {
-        try {
-            var cell = rule.input().values().get(column);
-            if (!feel) {
-                var parsed = CellParser.parse(cell, type);
-                if (list && parsed.tests().stream().anyMatch(test -> test instanceof UnaryTests.NotEqual(UnaryTests.NullTest n))) {
-                    throw new InvalidDecisionTableException(("Rule %s, column '%s': '!= null' is not a test of a list column, "
-                            + "where 'null' tests the list and other tests its elements; write not(null) for a list that is there")
-                            .formatted(rule.priority(), column));
-                }
-                return parsed;
+        var cell = rule.input().values().get(column);
+        if (!feel) {
+            var parsed = CellParser.parse(cell, type);
+            if (list && parsed.tests().stream().anyMatch(test -> test instanceof UnaryTests.NotEqual(UnaryTests.NullTest n))) {
+                throw new InvalidDecisionTableException(("Rule %s, column '%s': '!= null' is not a test of a list column, "
+                        + "where 'null' tests the list and other tests its elements; write not(null) for a list that is there")
+                        .formatted(rule.priority(), column));
             }
-            return list ? CellParser.parseFeelList(cell, type) : CellParser.parseFeel(cell, type);
-        } catch (CellSyntaxException e) {
-            throw new InvalidDecisionTableException("Rule %s, column '%s': %s".formatted(rule.priority(), column, e.getMessage()));
+            return parsed;
         }
+        return list ? CellParser.parseFeelList(cell, type) : CellParser.parseFeel(cell, type);
     }
 
     /** A column's cells, from rule order to bit order. */
@@ -1008,14 +1561,26 @@ public final class PraeceptaEngine<I, O> {
 
     // ---- input readers -------------------------------------------------------------------------
 
-    /** Reads a column, by its position in the evaluation order, with its bound getter. */
+    /**
+     * Reads a column, by its position in the evaluation order, with its bound getter; a computed column, which has none,
+     * is never read with it ({@link #computing}).
+     */
     @SuppressWarnings("unchecked") // a generic array cannot be created otherwise
     private static <I> BitsetIndex.ColumnReader<I> extractorReader(Map<String, Builder.Binding<I>> bindings,
                                                                    List<String> evaluationOrder) {
+        Function<? super I, ?> computed = input -> null;
         Function<? super I, ?>[] byColumn = evaluationOrder.stream()
-                .map(column -> bindings.get(column).extractor())
+                .map(column -> bindings.containsKey(column) ? bindings.get(column).extractor() : computed)
                 .toArray(Function[]::new);
         return (input, column) -> byColumn[column].apply(input);
+    }
+
+    /** The getters of the values a graph gives the table's FEEL ({@link Builder#expressionInput}), in the order bound. */
+    @SuppressWarnings("unchecked") // each is applied to the engine's own input
+    private static List<Function<Object, Object>> givenValues(Builder<?, ?> builder) {
+        var getters = new ArrayList<Function<Object, Object>>();
+        builder.expressionInputs.values().forEach(getter -> getters.add((Function<Object, Object>) getter));
+        return List.copyOf(getters);
     }
 
     /** Reads a column, by its position in the evaluation order, from the input's map of values. */
@@ -1026,11 +1591,12 @@ public final class PraeceptaEngine<I, O> {
 
     // ---- validation ----------------------------------------------------------------------------
 
-    /** Runs the static analysis: its findings, most severe first. */
+    /** Runs the static analysis: its findings, and those of the output entries, most severe first. */
     private static ValidationReport analyse(BitsetIndex index, List<Praeceptum> rules, HitPolicy hitPolicy, long[] variableRules,
-            Set<String> numericOutputs, boolean hasDefaultOutput) {
+            Set<String> numericOutputs, boolean hasDefaultOutput, List<Issue> outputIssues) {
         var analysed = new ArrayList<>(
                 TableAnalysis.analyse(index, rules, hitPolicy, variableRules, output -> comparable(output, numericOutputs)));
+        analysed.addAll(outputIssues);
         if (hasDefaultOutput) {
             // DMN 1.5, 10.3.2.10: "A complete decision table SHALL NOT specify a default output value"
             var seen = index.allRules();
@@ -1098,6 +1664,16 @@ public final class PraeceptaEngine<I, O> {
         private final Set<String> listColumns = new LinkedHashSet<>();
         /** Whether the rules' cells are strict FEEL, as a DMN table's are. */
         private boolean feelCells;
+        /** The outputs a {@link #table(DecisionTable)} gives no type, whose computed values keep their own. */
+        private Set<String> untypedOutputs = Set.of();
+        /** For {@link DecisionGraph}: the getters of the values the table's FEEL reads beside its columns, by name. */
+        private final Map<String, Function<? super I, ?>> expressionInputs = new LinkedHashMap<>();
+        /** Their types. */
+        private final Map<String, FeelType> expressionInputTypes = new HashMap<>();
+        /** For {@link DecisionGraph}: the types its model defines (item definitions), which the table's FEEL may name. */
+        private Map<String, FeelType> types = Map.of();
+        /** For {@link DecisionGraph}: the table's FEEL as its analysis parsed it, and the scope it parsed it in. */
+        private TableExpressions.Parsed parsed = TableExpressions.Parsed.NONE;
 
         private OutputStrategy<O> outputStrategy;
         private final Map<String, List<String>> outputPriority = new LinkedHashMap<>();
@@ -1120,20 +1696,22 @@ public final class PraeceptaEngine<I, O> {
                 aggregation(table.aggregation());
             }
             rules(table.rules());
-            var types = new LinkedHashMap<String, ColumnType>();
+            var inputTypes = new LinkedHashMap<String, ColumnType>();
             for (var input : table.inputs()) {
-                types.put(input.name(), input.type());
+                inputTypes.put(input.name(), input.type());
                 if (input.allowedValues() != null) {
                     allowedValues(input.name(), input.allowedValues());
                 }
             }
-            tableTypes = types;
+            tableTypes = inputTypes;
             tableLists = table.listInputs();
             this.table = table;
             tableNamedInputs = null;
             var outputTypes = new LinkedHashMap<String, ColumnType>();
             table.outputs().forEach(output -> outputTypes.put(output.name(), output.type()));
             tableOutputTypes = outputTypes;
+            untypedOutputs = table.outputs().stream().filter(output -> !output.typed()).map(DecisionTable.OutputColumn::name)
+                    .collect(Collectors.toUnmodifiableSet());
             listColumns.addAll(table.listInputs());
             feelCells = table.feelCells();
             table.defaultOutput().ifPresent(this::defaultOutput);
@@ -1447,6 +2025,35 @@ public final class PraeceptaEngine<I, O> {
             return bind(column, type, extractor, null, Zoning.EITHER, list);
         }
 
+        /**
+         * For {@link DecisionGraph}: a value the table's FEEL (its cells beyond the index, input expressions and output
+         * entries) reads beside its columns, such as a requirement a cell reads a path into ({@code > Applicant.limit}):
+         * given as it is, a FEEL value of {@code type}, and in scope when those are parsed.
+         */
+        Builder<I, O> expressionInput(String name, FeelType type, Function<? super I, ?> getter) {
+            expressionInputs.put(Objects.requireNonNull(name, "name"), Objects.requireNonNull(getter, "getter"));
+            expressionInputTypes.put(name, Objects.requireNonNull(type, "type"));
+            return this;
+        }
+
+        /**
+         * For {@link DecisionGraph}: the types its model defines (its item definitions), by name, which the table's FEEL
+         * may name ({@code Amount instance of tAmount}).
+         */
+        Builder<I, O> types(Map<String, FeelType> types) {
+            this.types = Map.copyOf(types);
+            return this;
+        }
+
+        /**
+         * For {@link DecisionGraph}: the table's FEEL as the graph's analysis parsed it, which the engine takes instead of
+         * parsing it again, and the scope it was parsed in, which the engine parses the rest in.
+         */
+        Builder<I, O> parsed(TableExpressions.Parsed parsed) {
+            this.parsed = Objects.requireNonNull(parsed, "parsed");
+            return this;
+        }
+
         /** Test hook: stores the masks in this form instead of choosing by density ({@link Masks.Form#AUTO}). */
         Builder<I, O> maskForm(Masks.Form form) {
             this.maskForm = Objects.requireNonNull(form, "form");
@@ -1484,7 +2091,11 @@ public final class PraeceptaEngine<I, O> {
         }
 
         private void checkInputBindings() {
-            require(bindings.isEmpty() != (inputStrategy == null),
+            // a table without input columns, or only with computed ones, which a graph gives what its expressions read,
+            // needs no binding
+            boolean noColumns = tableTypes != null && tableTypes.keySet().stream().allMatch(TableExpressions::isExpression)
+                    && inputStrategy == null;
+            require(bindings.isEmpty() != (inputStrategy == null) || noColumns,
                     "bind inputs either per column with input(...) or with inputs(...), not both and not neither");
             require(columnTypes.isEmpty() || inputStrategy != null,
                     "columnType(...) and listColumnType(...) only apply with inputs(...); per-column bindings carry their type");
@@ -1498,10 +2109,21 @@ public final class PraeceptaEngine<I, O> {
                 }
                 return;
             }
+            checkBindingsMatchTable();
+        }
+
+        /**
+         * Checks that each of the table's columns, but those its input expressions compute, has a binding of its type,
+         * and that each input the table holds is bound as a list or as single values, as the table holds it.
+         */
+        private void checkBindingsMatchTable() {
             for (var tableColumn : tableTypes.entrySet()) {
                 var column = tableColumn.getKey();
                 var type = tableColumn.getValue();
                 var binding = bindings.get(column);
+                if (binding == null && TableExpressions.isExpression(column)) {
+                    continue; // computed from the inputs its expression reads
+                }
                 require(binding != null, "column '%s' of the table has no input binding".formatted(column));
                 require(binding.type() == type, "column '%s' is a %s column in the table but is bound as %s"
                         .formatted(column, type, binding.type()));

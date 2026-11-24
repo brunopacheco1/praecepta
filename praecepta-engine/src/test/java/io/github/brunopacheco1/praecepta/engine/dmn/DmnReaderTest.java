@@ -173,9 +173,9 @@ class DmnReaderTest {
     @CsvSource(delimiter = '|', value = {
             "untyped duration   | duration        | at      |                      |         | type 'duration' is not supported",
             "times of two zones | time            | at      | [time(\"10:00:00@Europe/Paris\")..time(\"11:00:00@Asia/Dhaka\")] | | rule 1, column 'at': Invalid cell",
-            "computed input     | number          | age * 2 |                      |         | input expression 'age * 2' is not supported",
+            "built-in input     | number          | string length(a) |             |         | input expression 'string length(a)' uses the built-in function 'string length', planned for 0.9 (#117)",
             "unsupported cell   | number          | age     | &gt; abs(x)          |         | rule 1, column 'age'",
-            "function output    | string          | a       |                      | upper case(a) | rule 1, output 'result': 'upper case(a)' is not supported",
+            "function output    | string          | a       |                      | upper case(a) | rule 1, output 'result' uses the built-in function 'upper case', planned for 0.9 (#117)",
     })
     void unsupported_dmn_is_rejected_with_its_location(String description, String typeRef, String inputExpression,
             String inputEntry, String outputEntry, String message) {
@@ -282,12 +282,11 @@ class DmnReaderTest {
     }
 
     @Test
-    void outputs_may_not_read_a_named_list_input() {
-        var dmn = stream(symptomTable("tStrings", "Flu Symptoms + \"!\""));
-        Assertions.assertThatThrownBy(() -> DmnReader.read(dmn))
-                .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessageContaining("Decision 't', rule 1, output 'result': 'Flu Symptoms + \"!\"' names 'Flu Symptoms', "
-                        + "which is not one of the table's inputs of single values");
+    void outputs_may_not_name_a_named_list_input_but_an_expression_may_read_it() {
+        // a FEEL expression reads the list (DMN 1.5, chapter 10): a list and a string do not add up, which is null
+        var table = DmnReader.read(stream(symptomTable("tStrings", "Flu Symptoms + \"!\"")));
+        Assertions.assertThat(table.rules().getFirst().output().expressions()).containsEntry("result", "Flu Symptoms + \"!\"");
+        // an entry that is just its name would make an output hold a list
         var naming = stream(symptomTable("tStrings", "Flu Symptoms"));
         Assertions.assertThatThrownBy(() -> DmnReader.read(naming))
                 .hasMessage("Decision 't', rule 1, output 'result': names input 'Flu Symptoms', a list, which outputs cannot hold");

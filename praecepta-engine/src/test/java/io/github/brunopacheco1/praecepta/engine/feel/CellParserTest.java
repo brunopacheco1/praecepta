@@ -329,7 +329,7 @@ class CellParserTest {
                 .toString();
         Assertions.assertThat(CellParser.parse(cell, ColumnType.STRING)).as("Praecepta's syntax").isEqualTo(positive(new Equals(value)));
         Assertions.assertThat(CellParser.parseFeel(cell, ColumnType.STRING)).as("strict FEEL").isEqualTo(positive(new Equals(value)));
-        Assertions.assertThat(OutputExpression.parse(cell).evaluate(name -> null)).as("an output expression").isEqualTo(value);
+        Assertions.assertThat(FeelExpression.parse(cell).evaluate(name -> null)).as("an output expression").isEqualTo(value);
     }
 
     @Test
@@ -372,7 +372,7 @@ class CellParserTest {
         Assertions.assertThatThrownBy(() -> CellParser.parseFeel(cell, ColumnType.STRING))
                 .isInstanceOf(CellSyntaxException.class)
                 .hasMessageContaining("a string literal may not hold a line break; write \\n or \\r");
-        Assertions.assertThatThrownBy(() -> OutputExpression.parse(cell + " + x"))
+        Assertions.assertThatThrownBy(() -> FeelExpression.parse(cell + " + x"))
                 .isInstanceOf(ExpressionSyntaxException.class)
                 .hasMessageContaining("a string literal may not hold a line break");
         // Praecepta's own syntax, as spreadsheets hold it, keeps it
@@ -622,6 +622,23 @@ class CellParserTest {
             "a.2b                         | false",
             "age * 2                      | false",
             "f(x)                         | false",
+            // words FEEL reads as an expression, with its keywords where the expression has them, are no name
+            "? instance of tAmount        | false",
+            "?                            | false",
+            "a.?b                         | false",
+            "if true then y else y        | false",
+            "for x in xs return x         | false",
+            "some x in xs satisfies x     | false",
+            "every x in xs satisfies x    | false",
+            "x instance of t              | false",
+            // keywords elsewhere are words of a name
+            "days in weekend              | true",
+            "Another Date and Time        | true",
+            "Proof of Income              | true",
+            "if only                      | true",
+            "some value                   | true",
+            "instance                     | true",
+            "Is valid?                    | true",
     })
     void feel_names_allow_single_spaces_between_words(String text, boolean name) {
         Assertions.assertThat(CellParser.isName(text)).as(text).isEqualTo(name);

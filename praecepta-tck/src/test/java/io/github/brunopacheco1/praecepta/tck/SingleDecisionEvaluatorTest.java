@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 
 import io.github.brunopacheco1.praecepta.tck.Feature.Area;
@@ -49,9 +50,11 @@ class SingleDecisionEvaluatorTest {
     }
 
     @Test
-    void the_components_of_a_structured_input_are_not_read_by_literal_expressions() {
+    void the_components_of_a_structured_input_are_read_by_paths() {
         var check = KIT.get("compliance-level-2/0008-LX-arithmetic/0008-LX-arithmetic-test-01.xml #001 payment");
-        assertThat(evaluator.evaluate(check)).isEqualTo(new Evaluation.Unsupported(Feature.STRUCTURED_INPUTS));
+        // FEEL's 34 digits (DMN 1.5, 10.3.2.3.1), where the kit gives 15: a known failure
+        assertThat(evaluator.evaluate(check))
+                .isEqualTo(new Evaluation.Value(new TckValue.Simple("decimal", "2778.693549432766768088520383236299"), true));
         assertThat(TckResults.latest(SingleDecisionEvaluator.content(check))).isEqualTo(Area.BOXED_EXPRESSIONS);
     }
 
@@ -69,25 +72,35 @@ class SingleDecisionEvaluatorTest {
     }
 
     @Test
-    void division_by_zero_gives_null_but_reports_no_error_where_the_kit_expects_one() {
+    void division_by_zero_gives_null_and_reports_the_error_the_kit_expects() {
         var check = KIT.get("compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #divide_lhs_number_by_rhs_number_002 "
                 + "divide_lhs_number_by_rhs_number_002");
-        assertThat(evaluator.evaluate(check)).isEqualTo(new Evaluation.Unsupported(LiteralExpressionEvaluator.EXPRESSION_ERRORS));
+        assertThat(evaluator.evaluate(check)).isInstanceOf(Evaluation.Error.class);
+        assertThat(new TckRunner(evaluator).run(check).status()).isEqualTo(Status.PASSED);
         assertThat(TckResults.latest(SingleDecisionEvaluator.content(check))).isEqualTo(Area.DECISION_TABLES);
     }
 
     @Test
-    void a_value_of_another_type_than_the_decisions_needs_an_implicit_conversion() {
+    void a_value_of_another_type_than_the_decisions_is_converted() {
+        // DMN 1.5, 10.3.2.9.4: a date bound to a date and time is that date at UTC midnight
         var check = KIT.get("compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #003 "
                 + "From Date To Date and Time");
-        assertThat(evaluator.evaluate(check)).isEqualTo(new Evaluation.Unsupported(LiteralExpressionEvaluator.TYPE_CONVERSIONS));
+        assertThat(new TckRunner(evaluator).run(check).status()).isEqualTo(Status.PASSED);
     }
 
     @Test
-    void an_expression_rejected_where_feel_gives_null_is_not_supported() {
+    void operands_feel_does_not_combine_give_null_and_an_error() {
         var check = KIT.get("compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #error_when_add_lhs_number_to_rhs_string "
                 + "error_when_add_lhs_number_to_rhs_string");
-        assertThat(evaluator.evaluate(check))
-                .isEqualTo(new Evaluation.Unsupported(LiteralExpressionEvaluator.REJECTED_WHERE_FEEL_GIVES_NULL));
+        assertThat(new TckRunner(evaluator).run(check).status()).isEqualTo(Status.PASSED);
+    }
+
+    @Test
+    void a_built_in_function_is_not_supported_yet_and_counts_as_its_release() {
+        var check = KIT.get("compliance-level-3/1104-feel-string-length-function/1104-feel-string-length-function-test-01.xml #001_1afe6930d1 "
+                + "feel-string-length-function_001_1afe6930d1");
+        assertThat(evaluator.evaluate(check)).asInstanceOf(InstanceOfAssertFactories.type(Evaluation.Unsupported.class))
+                .extracting(Evaluation.Unsupported::needs, InstanceOfAssertFactories.list(Feature.class))
+                .first().isEqualTo(Feature.builtIn("string length"));
     }
 }

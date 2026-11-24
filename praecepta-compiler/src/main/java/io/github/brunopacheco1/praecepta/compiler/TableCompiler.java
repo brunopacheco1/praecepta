@@ -27,6 +27,8 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
+import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
 import io.github.brunopacheco1.praecepta.loader.csv.CsvLoader;
 import io.github.brunopacheco1.praecepta.loader.excel.ExcelLoader;
 
@@ -65,12 +67,23 @@ public final class TableCompiler {
      * @throws IllegalArgumentException with a readable message, naming settings as
      *                                  {@link CompilerOptions#settingNames()} does, if the definition or the
      *                                  table is invalid, or if validation finds issues at least as severe as
-     *                                  {@link CompilerOptions#failOn()}
+     *                                  {@link CompilerOptions#failOn()}; one whose cause is the
+     *                                  {@code InvalidDecisionTableException} (or {@code UnsupportedFeatureException},
+     *                                  which names the release that plans what the source uses) that the engine
+     *                                  rejected the source with
      */
     public static CompiledTable compile(TableDefinition definition, CompilerOptions options) {
         if (definition.source() == null) {
             throw new IllegalArgumentException("Every %s needs a %s".formatted(options.setting("table"), options.setting("source")));
         }
+        try {
+            return compileSource(definition, options);
+        } catch (InvalidDecisionTableException e) {
+            throw new IllegalArgumentException(e.getMessage(), e);
+        }
+    }
+
+    private static CompiledTable compileSource(TableDefinition definition, CompilerOptions options) {
         var model = graphModel(definition, options);
         if (model != null) {
             return GraphCompiler.compile(definition, model, options);
@@ -226,8 +239,9 @@ public final class TableCompiler {
         try {
             var zoned = TimeZones.of(table);
             var lists = table.listInputs();
-            table.inputs().forEach(column -> bind(builder, column.name(), column.type(), zoned.input(column.name()),
-                    lists.contains(column.name())));
+            // a column whose input expression is an expression is computed from the inputs it reads (named inputs)
+            table.inputs().stream().filter(column -> CellParser.isName(column.name()))
+                    .forEach(column -> bind(builder, column.name(), column.type(), zoned.input(column.name()), lists.contains(column.name())));
             table.namedInputs().forEach((name, type) -> bind(builder, name, type, zoned.input(name), lists.contains(name)));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(e.getMessage().startsWith("Table '") ? e.getMessage()

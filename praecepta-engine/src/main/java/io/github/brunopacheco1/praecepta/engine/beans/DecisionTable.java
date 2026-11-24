@@ -6,15 +6,21 @@
 package io.github.brunopacheco1.praecepta.engine.beans;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.stream.Collectors;
 
 import io.github.brunopacheco1.praecepta.engine.feel.CellParser;
+import io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelUnaryTests;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
 /**
@@ -80,9 +86,11 @@ public record DecisionTable(
 
     /**
      * The rule's cell in a column, parsed as the table holds it: strict FEEL or Praecepta's syntax, and
-     * for a list column (strict FEEL) with {@code CellParser#parseFeelList}.
+     * for a list column (strict FEEL) with {@code CellParser#parseFeelList}, as the simple unary tests the bitset index
+     * evaluates. A strict FEEL cell beyond them is FEEL unary tests, which {@link FeelUnaryTests#parseCell} reads, with
+     * the exception this throws for it.
      *
-     * @throws io.github.brunopacheco1.praecepta.engine.feel.CellSyntaxException if the cell is invalid
+     * @throws CellSyntaxException if the cell is invalid, or beyond the simple unary tests
      */
     public UnaryTests cell(Praeceptum rule, InputColumn column) {
         var text = rule.input().values().get(column.name());
@@ -93,25 +101,86 @@ public record DecisionTable(
     }
 
     /**
-     * The inputs the cells compare with that are not columns of the table, each with the type of the
-     * column that compares with it, in the order first named. Empty unless {@link #feelCells}.
+     * The inputs the table reads that are not columns of the table, in the order first named: those its simple cells
+     * compare with ({@code > limit}), each with the type of the column that compares with it, then, in a strict FEEL
+     * table, those its other cells ({@link FeelUnaryTests}), its input expressions that are expressions
+     * ({@code Age * 12}) and its output entries that compute their value read ({@code > Limit * 2},
+     * {@code Base + Rate}), each with the type of the column or output whose entry reads it first, which is the type an
+     * engine reading its inputs from text reads it with. Empty unless {@link #feelCells}. Worked out once per table, as
+     * it parses every cell: the map is unmodifiable, and a table equal to one asked before gives the same.
+     * A type an expression names ({@code instance of}) is not checked here, as the table holds no model's types.
      *
      * @throws IllegalArgumentException if a cell is invalid, or columns of different types compare with one input
      */
     public Map<String, ColumnType> namedInputs() {
-        var named = new LinkedHashMap<String, ColumnType>();
         if (!feelCells) {
-            return named;
+            return Map.of();
         }
-        var columns = inputs.stream().map(InputColumn::name).collect(Collectors.toSet());
-        for (var rule : rules) {
-            for (var input : inputs) {
-                UnaryTests.names(cell(rule, input)).stream()
-                        .filter(name -> !columns.contains(name))
-                        .forEach(name -> nameInput(named, name, input.type()));
-            }
+        var named = NAMED_INPUTS.get(this);
+        if (named == null) {
+            named = Collections.unmodifiableMap(findNamedInputs());
+            NAMED_INPUTS.put(this, named);
         }
         return named;
+    }
+
+    /**
+     * The {@link #namedInputs} of the tables asked for them, while those tables are in use; computed outside the lock, so
+     * that two threads may both work out the same, equal, inputs.
+     */
+    private static final Map<DecisionTable, Map<String, ColumnType>> NAMED_INPUTS = Collections.synchronizedMap(new WeakHashMap<>());
+
+    private Map<String, ColumnType> findNamedInputs() {
+        var named = new LinkedHashMap<String, ColumnType>();
+        var columns = inputs.stream().map(InputColumn::name).collect(Collectors.toSet());
+        var read = new LinkedHashMap<String, ColumnType>();
+        // a column that is an expression is no name: its text would read as itself
+        var scope = FeelExpression.namesScope(columns.stream().filter(CellParser::isName).toList());
+        var outputTypes = new HashMap<String, ColumnType>();
+        outputs.forEach(output -> outputTypes.put(output.name(), output.type()));
+        for (var rule : rules) {
+            for (var input : inputs) {
+                cellNames(rule, input, columns, scope, named, read);
+            }
+            rule.output().expressions().forEach((output, text) -> namesRead(text, scope)
+                    .forEach(name -> read.putIfAbsent(name, outputTypes.getOrDefault(output, ColumnType.STRING))));
+        }
+        for (var input : inputs) {
+            if (!CellParser.isName(input.name())) {
+                namesRead(input.name(), scope).forEach(name -> read.putIfAbsent(name, input.type()));
+            }
+        }
+        read.forEach((name, type) -> {
+            if (!columns.contains(name)) {
+                named.putIfAbsent(name, type);
+            }
+        });
+        return named;
+    }
+
+    /**
+     * Adds the names a cell reads: to {@code named} those a simple cell compares with, to {@code read} those a cell in
+     * the full FEEL language reads.
+     */
+    private void cellNames(Praeceptum rule, InputColumn input, Set<String> columns, FeelExpression.Scope scope, Map<String, ColumnType> named,
+            Map<String, ColumnType> read) {
+        try {
+            UnaryTests.names(cell(rule, input)).stream()
+                    .filter(name -> !columns.contains(name))
+                    .forEach(name -> nameInput(named, name, input.type()));
+        } catch (CellSyntaxException e) {
+            var tests = FeelUnaryTests.parseCell(rule.input().values().get(input.name()), scope, e);
+            tests.names().forEach(name -> read.putIfAbsent(name, input.type()));
+        }
+    }
+
+    /** The names an expression reads. */
+    private static List<String> namesRead(String text, FeelExpression.Scope scope) {
+        try {
+            return FeelExpression.parse(text, scope).names();
+        } catch (ExpressionSyntaxException e) {
+            throw new IllegalArgumentException(e.getMessage(), e);
+        }
     }
 
     private static void nameInput(Map<String, ColumnType> named, String name, ColumnType type) {
@@ -165,8 +234,15 @@ public record DecisionTable(
      *                     default is {@code null} (see {@link DecisionTable#defaultOutput})
      * @param hasDefault   whether the column declares a default value: true for a default of {@code null}, which
      *                     {@code defaultValue} cannot tell from none
+     * @param typed        whether the column's type is its own: false for an output of a decision model whose type
+     *                     neither the output, nor its decision, nor its entries give (entries of several types, or of
+     *                     lists or contexts), which is a {@code string} column here, its literal values text, but whose
+     *                     entries each give a value of their own type to a {@code DecisionGraph} (DMN 1.5, 10.3.2.10,
+     *                     step 3c); its entries are then all expressions ({@link PraeceptaOutput#expressions}), so that
+     *                     each keeps its type, and {@code DmnWriter} writes no {@code typeRef} for it
      */
-    public record OutputColumn(String name, ColumnType type, List<String> values, String defaultValue, boolean hasDefault) {
+    public record OutputColumn(String name, ColumnType type, List<String> values, String defaultValue, boolean hasDefault,
+                               boolean typed) {
         /**
          * A column of the given name, type, output value list and default.
          *
@@ -179,6 +255,11 @@ public record DecisionTable(
             if (defaultValue != null && !hasDefault) {
                 throw new IllegalArgumentException("Output '%s' has the default value '%s' but hasDefault is false".formatted(name, defaultValue));
             }
+        }
+
+        /** A column of its own type, of the given name, type, output value list and default. */
+        public OutputColumn(String name, ColumnType type, List<String> values, String defaultValue, boolean hasDefault) {
+            this(name, type, values, defaultValue, hasDefault, true);
         }
 
         /** A column with a default value, or none if {@code defaultValue} is null. */

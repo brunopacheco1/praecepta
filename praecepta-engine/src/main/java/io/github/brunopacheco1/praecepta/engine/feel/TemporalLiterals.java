@@ -37,8 +37,15 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
  * </pre>
  *
  * The arguments are themselves literals: strings, numbers, date time literals, and {@code null} for a time's offset.
- * {@link CellParser} reads a cell's literals with it, and {@link ExpressionParser} the literals of output
+ * {@link CellParser} reads a cell's literals with it, and {@link FeelParser} the literals of FEEL
  * expressions, so that both read the same forms.
+ *
+ * <p>A time string is in XML Schema's lexical form for {@code time} (10.3.4.1), which takes {@code 24:00:00} (with any
+ * zero fraction) as midnight, {@code 00:00:00}: {@code time("24:00:00")} and {@code @"24:00:00Z"} are
+ * {@code 00:00:00} and {@code 00:00:00Z}. A date time string is a date string, {@code T} and a time string (10.3.4.1),
+ * and at {@code 24:00:00} it is midnight of the next day, as XML Schema's {@code dateTime} reads it and the DMN TCK's
+ * {@code 0100-arithmetic} has it: {@code @"2021-01-01T24:00:00"} is {@code 2021-01-02T00:00:00}. Any other time past
+ * {@code 23:59:59} is invalid ({@code 24:00:01}, the TCK's {@code 1116-feel-time-function}).
  */
 final class TemporalLiterals {
 
@@ -49,6 +56,10 @@ final class TemporalLiterals {
     private static final Pattern DATE = Pattern.compile("[+-]?\\d{4,}-\\d{2}-\\d{2}");
     private static final Pattern YEARS_AND_MONTHS = Pattern.compile("-?P(\\d+Y)?(\\d+M)?");
     private static final Pattern NUMBER = Pattern.compile("-?(\\d+(\\.\\d+)?|\\.\\d+)([eE][+-]?\\d+)?");
+    /** A time string at hour 24, and what follows it: an offset or a zone id. */
+    private static final Pattern TIME_24 = Pattern.compile("24:00:00(?:\\.0+)?(.*)", Pattern.DOTALL);
+    /** A date time string at hour 24: its date, and what follows the time. */
+    private static final Pattern DATE_TIME_24 = Pattern.compile("([+-]?\\d{4,}-\\d{2}-\\d{2})T24:00:00(?:\\.0+)?(.*)", Pattern.DOTALL);
     /** Deeper nesting than {@code date and time(date(date and time(...)), ...)} is refused, so that reading never runs out of stack. */
     private static final int MAX_DEPTH = 8;
 
@@ -89,6 +100,33 @@ final class TemporalLiterals {
         var reader = new TemporalLiterals(text, from, expected);
         var value = reader.literal();
         return new Read(value, reader.position);
+    }
+
+    /**
+     * The value of an at-literal's string ({@code @"2025-01-31"}), its type told by its syntax (10.3.4.1), as
+     * {@link FeelExpression} reads one.
+     *
+     * @throws IllegalArgumentException if it is not a valid date, time, date and time or duration
+     */
+    static Object atLiteral(String value) {
+        return new TemporalLiterals(value, 0, null).atLiteralValue(value);
+    }
+
+    /**
+     * The value of an invocation of {@code date}, {@code time}, {@code date and time} or {@code duration} whose
+     * arguments are literals (Table 72), as {@link FeelExpression} folds one.
+     *
+     * @param function  the function's name
+     * @param arguments the arguments' values
+     * @throws IllegalArgumentException if the arguments do not make a valid value of the function's type
+     */
+    static Object invoke(String function, List<Object> arguments) {
+        return new TemporalLiterals(function, 0, null).invocation(function, arguments);
+    }
+
+    /** Whether a name is one of the functions a date time literal invokes: {@code date}, {@code time}, {@code date and time}, {@code duration}. */
+    static boolean isLiteralFunction(String name) {
+        return FUNCTIONS.contains(name);
     }
 
     /** The column type of a value: of a date time literal, or a string, number or boolean. */
@@ -165,7 +203,7 @@ final class TemporalLiterals {
             if (!text.startsWith("\"", position)) {
                 throw new IllegalArgumentException("@ must be followed by a string, as in @\"2025-01-31\"");
             }
-            value = atLiteral(string());
+            value = atLiteralValue(string());
         } else {
             var name = function(text, position);
             if (name == null) {
@@ -257,7 +295,7 @@ final class TemporalLiterals {
     // ---- values ----------------------------------------------------------------------------------
 
     /** An at-literal's value: its string's syntax says which type it has (10.3.4.1). */
-    private Object atLiteral(String value) {
+    private Object atLiteralValue(String value) {
         var iso = value.strip();
         if (DATE.matcher(iso).matches()) {
             return date(iso);
@@ -311,6 +349,8 @@ final class TemporalLiterals {
                 case OffsetTime time -> time;
                 case ZonedTime time -> FeelTemporals.withFixedOffset(time);
                 case LocalDateTime dateTime -> dateTime.toLocalTime();
+                // a date as the date and time it converts to, UTC midnight (10.3.2.3.5), whose time is 00:00:00Z
+                case LocalDate date -> OffsetTime.of(LocalTime.MIDNIGHT, ZoneOffset.UTC);
                 // at an offset, or in a zone with one fixed offset (Etc/UTC), the time at that offset (Table 72)
                 case ZonedDateTime dateTime -> FeelTemporals.timeIn(dateTime.toLocalTime(), dateTime.getZone());
                 case null, default -> throw takes("time", "a time string, a time or a date and time");
@@ -387,8 +427,9 @@ final class TemporalLiterals {
     }
 
     private Object time(String iso) {
+        var midnight = TIME_24.matcher(iso);
         try {
-            return FeelTemporals.parseTime(iso);
+            return FeelTemporals.parseTime(midnight.matches() ? "00:00:00" + midnight.group(1) : iso);
         } catch (DateTimeParseException e) {
             throw invalid(ColumnType.TIME, iso);
         }
@@ -407,9 +448,22 @@ final class TemporalLiterals {
             throw new IllegalArgumentException("invalid date and time '" + iso + "'; write a zone id as @Europe/Paris");
         }
         try {
-            return FeelTemporals.parseDateTime(iso);
+            return FeelTemporals.parseDateTime(hour24(iso));
         } catch (DateTimeParseException e) {
             throw invalid(ColumnType.DATE_TIME, iso);
+        }
+    }
+
+    /** A date time string at hour 24 as midnight of the next day; any other text as it is. */
+    private static String hour24(String iso) {
+        var matcher = DATE_TIME_24.matcher(iso);
+        if (!matcher.matches()) {
+            return iso;
+        }
+        try {
+            return FeelLiterals.text(FeelTemporals.parseDate(matcher.group(1)).plusDays(1)) + "T00:00:00" + matcher.group(2);
+        } catch (DateTimeException e) {
+            return iso;
         }
     }
 

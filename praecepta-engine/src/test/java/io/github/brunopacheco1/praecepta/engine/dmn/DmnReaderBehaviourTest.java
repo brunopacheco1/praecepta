@@ -77,16 +77,18 @@ class DmnReaderBehaviourTest {
 
     @Test
     void output_entries_that_are_neither_literals_nor_an_input_name_nor_an_expression_are_rejected() {
-        var word = stream(model("", table("string", "PT")));
-        Assertions.assertThatThrownBy(() -> DmnReader.read(word))
-                .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessage("Decision 'd', rule 1, output 'o': 'PT' names 'PT', which is not one of the table's inputs of single values; "
-                        + "output entries must be literals or read the table's inputs");
+        // an unquoted word is a FEEL name (DMN 1.5, 10.3.1.2), which the engine reads as an input of the table
+        var word = DmnReader.read(stream(model("", table("string", "PT"))));
+        Assertions.assertThat(word.rules().getFirst().output().expressions()).containsEntry("o", "PT");
+        Assertions.assertThat(word.namedInputs()).containsEntry("PT", ColumnType.STRING);
         var list = stream(model("", table("number", "1, 2")));
         Assertions.assertThatThrownBy(() -> DmnReader.read(list))
                 .isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessage("Decision 'd', rule 1, output 'o': '1, 2' is not supported; output entries must be literals, name an input, "
-                        + "or join literals and inputs with +, -, *, / and ** ('1, 2' is not a supported output expression: unexpected ', 2')");
+                .hasMessageStartingWith("Decision 'd', rule 1, output 'o': '1, 2' is not a FEEL expression");
+        var literal = stream(model("", table("number", "\"one\"")));
+        Assertions.assertThatThrownBy(() -> DmnReader.read(literal))
+                .isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Decision 'd', rule 1, output 'o': '\"one\"' is not a literal number");
     }
 
     @Test
