@@ -26,7 +26,9 @@ import java.util.Map;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelFunction;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelRange;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
@@ -62,6 +64,9 @@ final class GraphValues {
             case FeelType.ListOf(var element) -> list(raw, element, name);
             case FeelType.Context(var components) -> context(raw, components, name);
             case FeelType.Any any -> anyValue(raw, name, 0);
+            case FeelType.RangeOf range when raw instanceof FeelRange -> raw;
+            case FeelType.FunctionOf function when raw instanceof FeelFunction -> raw;
+            default -> throw new InvalidInputException(name, raw, "is not a " + type.feelName());
         };
     }
 
@@ -329,28 +334,6 @@ final class GraphValues {
                     && components.entrySet().stream().allMatch(component -> context.containsKey(component.getKey())
                             && conformsOrNull(context.get(component.getKey()), component.getValue(), depth + 1));
             default -> true;
-        };
-    }
-
-    /**
-     * The simple type of a value, as FEEL's arithmetic takes it: a string, a number, a date, a time, a date and time or
-     * a duration; null for a missing value, a boolean, a list, a context, or anything else, with which FEEL's arithmetic
-     * gives null.
-     */
-    static ColumnType arithmeticType(Object value) {
-        return switch (value) {
-            case null -> null;
-            case String text -> ColumnType.STRING;
-            case Number number -> ColumnType.NUMBER;
-            case LocalDate date -> ColumnType.DATE;
-            case LocalTime time -> ColumnType.TIME;
-            case OffsetTime time -> ColumnType.TIME;
-            case ZonedTime time -> ColumnType.TIME;
-            case LocalDateTime dateTime -> ColumnType.DATE_TIME;
-            case ZonedDateTime dateTime -> ColumnType.DATE_TIME;
-            case Duration duration -> ColumnType.DAY_TIME_DURATION;
-            case YearsAndMonths duration -> ColumnType.YEAR_MONTH_DURATION;
-            default -> null;
         };
     }
 

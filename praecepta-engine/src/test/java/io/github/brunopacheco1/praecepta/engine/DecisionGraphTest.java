@@ -340,11 +340,10 @@ class DecisionGraphTest {
 
         assertThat(graph.validationReport().issues(Kind.TYPE_MISMATCH)).extracting(ValidationReport.Issue::detail).containsExactlyInAnyOrder(
                 "decision 'Size' reads 'Name', a string, into its input 'Name', a number",
-                "decision 'First' reads 'Name.first', but 'Name' is a string, which has no component 'first'",
                 "decision 'Single' reads 'Names', a list<string>, into its input 'Names', a string",
                 "decision 'Path' reads 'Name.first', but 'Name' is a string, which has no component 'first'",
                 "decision 'Compare' reads 'Name', a string, into its cells' comparisons with 'Name', a number");
-        assertThat(List.of("Size", "First", "Single", "Path", "Compare", "Downstream")).map(graph::canEvaluate).containsOnly(false);
+        assertThat(List.of("Size", "Single", "Path", "Compare", "Downstream")).map(graph::canEvaluate).containsOnly(false);
         var name = Map.of("Name", "x");
         assertThatThrownBy(() -> graph.evaluate("Downstream", name)).isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("it requires decision 'Size'");
@@ -354,17 +353,13 @@ class DecisionGraphTest {
     }
 
     @Test
-    void a_path_to_a_property_of_a_date_is_not_supported_yet_and_names_the_release_that_plans_it() {
-        // DMN 1.5, Table 65 defines Birth.year; it is the full FEEL language's, planned for 0.8, not a mistake of the model
+    void a_path_to_a_property_of_a_date_reads_it() {
+        // DMN 1.5, Table 65: a date's year, month, day and weekday
         var graph = graph("type-mismatch.dmn");
 
-        assertThat(graph.validationReport().issues(Kind.UNSUPPORTED_FEATURE)).extracting(ValidationReport.Issue::toString).containsExactly(
-                "ERROR decision 'Year' reads 'Birth.year', but 'Birth' is a date, whose property 'year' Praecepta does not read yet: "
-                        + "the full FEEL language is planned for 0.8 (#116)");
-        assertThat(List.of("Year", "After Year")).map(graph::canEvaluate).containsOnly(false);
-        var birth = Map.of("Birth", LocalDate.of(2000, 1, 1));
-        assertThatThrownBy(() -> graph.evaluate("After Year", birth))
-                .isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("it requires decision 'Year'");
+        assertThat(graph.validationReport().issues(Kind.UNSUPPORTED_FEATURE)).isEmpty();
+        assertThat(graph.type("Year")).isEqualTo(FeelType.of(ColumnType.NUMBER));
+        assertThat(graph.evaluate("After Year", Map.of("Birth", LocalDate.of(2000, 1, 1)))).isEqualTo(new BigDecimal("2001"));
     }
 
     @Test
@@ -376,12 +371,14 @@ class DecisionGraphTest {
 
         assertThat(graph.validationReport().issues(Kind.ALWAYS_NULL)).extracting(ValidationReport.Issue::toString).containsExactlyInAnyOrder(
                 "WARNING decision 'Twice': in literal expression 'Name * 2', * combines a string and a number, which gives null in FEEL; "
-                        + "its value is null (DMN 1.5, 10.3.2.15, Tables 56 to 59)",
+                        + "its value is null (DMN 1.5, 10.3.2.15)",
+                "WARNING decision 'First': in literal expression 'Name.first', a string has no property 'first'; its value is null "
+                        + "(DMN 1.5, 10.3.2.15)",
                 "WARNING decision 'Declared' declares a number, but its literal expression 'Name + \"!\"' gives a string, so its value is "
                         + "null (DMN 1.5, 10.3.2.9.4)",
-                "WARNING decision 'Listed': in literal expression 'Names + 1', 'Names' is a list<string>, which FEEL's arithmetic does "
-                        + "not combine; its value is null (DMN 1.5, 10.3.2.15, Tables 56 to 59)");
-        assertThat(List.of("Twice", "Declared", "Listed")).map(graph::canEvaluate).containsOnly(true);
+                "WARNING decision 'Listed': in literal expression 'Names + 1', + combines a list<string> and a number, which gives null "
+                        + "in FEEL; its value is null (DMN 1.5, 10.3.2.15)");
+        assertThat(List.of("Twice", "First", "Declared", "Listed")).map(graph::canEvaluate).containsOnly(true);
         assertThat(graph.type("Declared")).isEqualTo(FeelType.of(ColumnType.NUMBER));
         assertThat(graph.evaluate(List.of("Twice", "Declared", "Listed"), Map.of("Name", "x", "Names", List.of("a"))))
                 .containsOnlyKeys("Twice", "Declared", "Listed").containsEntry("Twice", null).containsEntry("Declared", null)
@@ -732,28 +729,41 @@ class DecisionGraphTest {
     }
 
     @Test
-    void a_literal_expression_beyond_the_subset_names_the_release_that_plans_it() {
-        var builder = DecisionGraph.builder();
-        assertThatThrownBy(() -> builder.literalDecision("Upper", "upper case(Name)"))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("built-in functions are planned for 0.9 (#117)");
-        assertThatThrownBy(() -> builder.literalDecision("If", "if Age > 18 then 1 else 2"))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("the full FEEL language is planned for 0.8 (#116)");
+    void a_literal_expression_that_invokes_a_built_in_function_is_reported_and_names_the_release_that_plans_it() {
+        var graph = DecisionGraph.builder().logValidationReport(false).inputData("Name", ColumnType.STRING)
+                .literalDecision("Upper", "upper case(Name)").literalDecision("Greeting", "\"Hello \" + Upper")
+                .literalDecision("If", "if Name = \"a\" then 1 else 2").build();
+
+        assertThat(graph.validationReport().issues()).extracting(ValidationReport.Issue::toString).containsExactly(
+                "ERROR decision 'Upper' uses the built-in function 'upper case', planned for 0.9 (#117), which Praecepta does not "
+                        + "evaluate yet");
+        assertThat(List.of("Upper", "Greeting", "If")).map(graph::canEvaluate).containsExactly(false, false, true);
+        assertThat(graph.evaluate("If", Map.of("Name", "a"))).isEqualTo(BigDecimal.ONE);
     }
 
     @Test
-    void a_name_holding_a_feel_operator_that_no_requirement_provides_points_at_full_feel() {
-        // the DMN TCK's 0106-feel-ternary-logic: in the subset, "A and B" is one name, as names may hold "and"
+    void a_literal_expression_that_is_not_feel_is_rejected() {
+        var builder = DecisionGraph.builder();
+        assertThatThrownBy(() -> builder.literalDecision("Odd", "1 +"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("is not a valid FEEL expression");
+    }
+
+    @Test
+    void a_name_with_a_feel_operator_in_it_is_read_as_the_name_where_it_is_in_scope_and_as_the_operator_elsewhere() {
+        // DMN 1.5, 10.3.1.2: names may hold keywords, and the longest name in scope wins (the DMN TCK's
+        // 0106-feel-ternary-logic and 0021-singleton-list)
         var graph = DecisionGraph.builder()
                 .logValidationReport(false)
                 .inputData("A", ColumnType.BOOLEAN)
                 .inputData("B", ColumnType.BOOLEAN)
-                .decision(new DecisionModel.Decision("Both", List.of(), List.of("A", "B"),
-                        new DecisionLogic.LiteralExpression("A and B")))
+                .inputData("A and B", ColumnType.STRING)
+                .decision(new DecisionModel.Decision("Both", List.of(), List.of("A", "B"), new DecisionLogic.LiteralExpression("A and B")))
+                .decision(new DecisionModel.Decision("Named", List.of(), List.of("A and B"), new DecisionLogic.LiteralExpression("A and B")))
                 .build();
 
-        assertThat(graph.validationReport().issues()).extracting(ValidationReport.Issue::detail).containsExactly(
-                "decision 'Both' reads 'A and B', which none of its information requirements provides (DMN 1.5, 7.3.4); "
-                        + "if 'and' is meant as FEEL's operator, the full FEEL language is planned for 0.8 (#116)");
+        assertThat(graph.validationReport().issues()).isEmpty();
+        assertThat(graph.evaluate("Both", Map.of("A", true, "B", false))).isEqualTo(false);
+        assertThat(graph.evaluate("Named", Map.of("A and B", "x"))).isEqualTo("x");
     }
 
     @Test

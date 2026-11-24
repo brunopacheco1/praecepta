@@ -390,7 +390,12 @@ final class GraphSourceGenerator {
                 yield new TypeCode("java.util.List<" + code.javaType() + ">", TypeCode.Kind.LIST, code, code.records(), modelClass);
             }
             case FeelType.Context(var components) -> context(components, name, depth);
+            case FeelType.RangeOf range -> new TypeCode("io.github.brunopacheco1.praecepta.engine.feel.FeelRange", TypeCode.Kind.CAST, null, "",
+                    modelClass);
+            case FeelType.FunctionOf function -> new TypeCode("io.github.brunopacheco1.praecepta.engine.feel.FeelFunction", TypeCode.Kind.CAST,
+                    null, "", modelClass);
             case FeelType.Any any -> new TypeCode("Object", TypeCode.Kind.AS_IS, null, "", modelClass);
+            case FeelType.Null nothing -> new TypeCode("Object", TypeCode.Kind.AS_IS, null, "", modelClass);
         };
     }
 

@@ -6,8 +6,11 @@
 package io.github.brunopacheco1.praecepta.engine.beans;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
@@ -24,11 +27,23 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * @param name      the model's name (the {@code definitions} element's)
  * @param inputData the input data, in the model's order
  * @param decisions the decisions, in the model's order
+ * @param types     the types the model defines (its item definitions, DMN 1.5, 7.3.2), by name, which a literal
+ *                  expression's {@code instance of} and function parameters may name (10.3.2.9); empty if it defines
+ *                  none
  */
-public record DecisionModel(String name, List<InputData> inputData, List<Decision> decisions) {
+public record DecisionModel(String name, List<InputData> inputData, List<Decision> decisions, Map<String, FeelType> types) {
 
     /**
-     * A model with the given input data and decisions.
+     * A model with the given input data and decisions, and no types of its own.
+     *
+     * @throws IllegalArgumentException if two of them have the same name (see the canonical constructor)
+     */
+    public DecisionModel(String name, List<InputData> inputData, List<Decision> decisions) {
+        this(name, inputData, decisions, Map.of());
+    }
+
+    /**
+     * A model with the given input data, decisions and types.
      *
      * @throws IllegalArgumentException if two of them have the same name: DMN 1.5, 6.3.7 and 6.3.11, "the name of a
      *                                  Decision must be different from the name of any other invocable, input data,
@@ -38,6 +53,7 @@ public record DecisionModel(String name, List<InputData> inputData, List<Decisio
         Objects.requireNonNull(name, "name");
         inputData = List.copyOf(inputData);
         decisions = List.copyOf(decisions);
+        types = Collections.unmodifiableMap(new LinkedHashMap<>(types));
         var names = new HashSet<String>();
         var all = new ArrayList<String>();
         inputData.forEach(input -> all.add(input.name()));

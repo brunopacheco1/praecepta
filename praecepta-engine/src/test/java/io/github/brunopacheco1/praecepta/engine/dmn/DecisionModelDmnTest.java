@@ -159,10 +159,6 @@ class DecisionModelDmnTest {
         "<decision id=\"d\" name=\"D\"><relation/></decision>|its logic is a relation|(#118)",
         "<decision id=\"d\" name=\"D\"><conditional/></decision>|its logic is a boxed conditional|(#118)",
         "<decision id=\"d\" name=\"D\"><functionDefinition/></decision>|its logic is a function definition|(#118)",
-        "<decision id=\"d\" name=\"D\"><literalExpression><text>upper case(\"a\")</text></literalExpression></decision>"
-                + "|function calls such as upper case(...)|built-in functions are planned for 0.9 (#117)",
-        "<decision id=\"d\" name=\"D\"><literalExpression><text>if true then 1 else 2</text></literalExpression></decision>"
-                + "|is not in Praecepta's expression subset|the full FEEL language is planned for 0.8 (#116)",
         "<decision id=\"d\" name=\"D\"><informationRequirement><requiredDecision href=\"other.dmn#x\"/></informationRequirement>"
                 + "<literalExpression><text>1</text></literalExpression></decision>|an element of another model|(#119)",
     })
