@@ -491,15 +491,13 @@ public final class DmnWriter {
     /** A strict FEEL cell beyond the simple unary tests ({@link FeelUnaryTests}): as written, once checked. */
     private static String beyondSimple(String cell, CellSyntaxException rejected, String where) {
         try {
-            FeelUnaryTests.parseCell(cell, NO_NAMES, rejected);
+            // no names in scope: a cell's names are read as words, which is all checking it needs
+            FeelUnaryTests.parseCell(cell, FeelExpression.scope(List.of(), Map.of()), rejected);
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }
         return cell.strip();
     }
-
-    /** No names in scope: a cell's names are read as words, which is all checking it needs. */
-    private static final FeelExpression.Scope NO_NAMES = FeelExpression.scope(List.of(), Map.of());
 
     private static String join(List<Test> tests) {
         return tests.stream().map(DmnWriter::test).collect(Collectors.joining(", "));
