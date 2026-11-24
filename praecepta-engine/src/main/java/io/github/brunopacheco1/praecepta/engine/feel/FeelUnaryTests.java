@@ -69,7 +69,7 @@ public final class FeelUnaryTests {
      */
     public static FeelUnaryTests parse(String text, FeelExpression.Scope scope) {
         Objects.requireNonNull(text, "text");
-        return new FeelUnaryTests(text, FeelParser.parseUnaryTests(text, scope.names, scope.types));
+        return new FeelUnaryTests(text, FeelParser.parseUnaryTests(text, scope.names(), scope.types));
     }
 
     /**

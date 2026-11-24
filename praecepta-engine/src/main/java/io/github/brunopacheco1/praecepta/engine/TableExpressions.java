@@ -33,7 +33,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelUnaryTests;
  */
 final class TableExpressions {
 
-    private final FeelExpression.Scope scope;
+    private final Collection<String> names;
+    /** The names in scope, indexed when the first expression is parsed: a table of simple cells parses none. */
+    private FeelExpression.Scope scope;
     /** By rule (index in rule order), by column: its input entry in the full FEEL language. */
     private final Map<Integer, Map<String, FeelUnaryTests>> cells = new HashMap<>();
     /** By column: the input expression a column's value is computed with. */
@@ -48,7 +50,14 @@ final class TableExpressions {
 
     /** @param names the names in scope: those the engine reads */
     TableExpressions(Collection<String> names) {
-        scope = FeelExpression.scope(new LinkedHashSet<>(names), Map.of());
+        this.names = names;
+    }
+
+    private FeelExpression.Scope scope() {
+        if (scope == null) {
+            scope = FeelExpression.scope(new LinkedHashSet<>(names), Map.of());
+        }
+        return scope;
     }
 
     /** Whether a column's name is no FEEL name but an expression, whose value the engine computes from other inputs. */
@@ -70,7 +79,7 @@ final class TableExpressions {
         var where = "Rule %s, column '%s'".formatted(rule.priority(), column);
         FeelUnaryTests tests;
         try {
-            tests = FeelUnaryTests.parseCell(rule.input().values().get(column), scope, rejected);
+            tests = FeelUnaryTests.parseCell(rule.input().values().get(column), scope(), rejected);
         } catch (CellSyntaxException e) {
             throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }
@@ -108,7 +117,7 @@ final class TableExpressions {
     private FeelExpression parse(String text, String where) {
         FeelExpression expression;
         try {
-            expression = FeelExpression.parse(text, scope);
+            expression = FeelExpression.parse(text, scope());
         } catch (ExpressionSyntaxException e) {
             throw new InvalidDecisionTableException(where + ": " + e.getMessage());
         }

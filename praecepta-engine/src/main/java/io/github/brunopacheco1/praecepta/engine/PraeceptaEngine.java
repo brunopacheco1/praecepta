@@ -199,7 +199,8 @@ public final class PraeceptaEngine<I, O> {
         var evaluationOrder = orderByWildcards(inputs, cells, lists);
         givenValues = givenValues(builder);
         nameReads = nameReads(expressions, evaluationOrder, List.copyOf(builder.expressionInputs.keySet()), computed);
-        var nameTypes = nameTypes(types, lists, builder.expressionInputTypes);
+        // a table without FEEL beyond the index types nothing, and loads none of FEEL's types
+        var nameTypes = expressions.isEmpty() ? Map.<String, FeelType>of() : nameTypes(types, lists, builder.expressionInputTypes);
 
         var numeric = numericOutputs(builder.tableOutputTypes, rules, types, expressions, nameTypes);
         int[] bitToRule = bitToRule(rules, builder.outputPriority, numeric);
