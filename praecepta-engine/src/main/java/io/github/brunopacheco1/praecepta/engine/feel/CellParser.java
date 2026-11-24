@@ -94,6 +94,7 @@ public final class CellParser {
     private static final Pattern BARE_DURATION = Pattern.compile("-?P[0-9YMWDTHS.]+");
     /** Names FEEL reserves for literals, which never name an input. */
     private static final Set<String> KEYWORDS = Set.of("true", "false", "null");
+    private static final String SATISFIES = "satisfies";
 
     private CellParser() {
     }
@@ -119,8 +120,8 @@ public final class CellParser {
     private static final Map<String, List<String>> TEXTUAL_EXPRESSIONS = Map.of(
             "if", List.of("then", "else"),
             "for", List.of("in", "return"),
-            "some", List.of("in", "satisfies"),
-            "every", List.of("in", "satisfies"));
+            "some", List.of("in", SATISFIES),
+            "every", List.of("in", SATISFIES));
 
     /** Whether words that make a name are rather an expression FEEL reads: see {@link #isName}. */
     private static boolean readsAsExpression(String text) {
@@ -326,7 +327,7 @@ public final class CellParser {
             if (!isName(element) || KEYWORDS.contains(element)) {
                 return null;
             }
-            var test = after(after(after(after(after(some, element), "in"), "?"), "satisfies"), element);
+            var test = after(after(after(after(after(some, element), "in"), "?"), SATISFIES), element);
             if (test == null) {
                 return null;
             }

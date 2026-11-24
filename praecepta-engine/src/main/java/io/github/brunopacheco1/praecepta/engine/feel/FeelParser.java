@@ -84,12 +84,16 @@ final class FeelParser {
     private static final String NESTS_MORE_THAN = "it nests more than ";
     private static final String LEVELS = " levels";
     private static final String FUNCTION = "function";
+    private static final String BETWEEN = "between";
+    private static final String INSTANCE_WORD = "instance";
+    private static final String EVERY = "every";
+    private static final String FALSE = "false";
 
     /** Words that end a name read word by word: FEEL's keywords and the words of its operators. */
-    private static final Set<String> STOP_WORDS = Set.of("and", "or", "in", "between", "instance", "then", "else", "return",
-            "satisfies", "if", "for", "some", "every", FUNCTION, "true", "false", "null");
+    private static final Set<String> STOP_WORDS = Set.of("and", "or", "in", BETWEEN, INSTANCE_WORD, "then", "else", "return",
+            "satisfies", "if", "for", "some", EVERY, FUNCTION, "true", FALSE, "null");
     /** The keywords that start an expression. */
-    private static final Set<String> KEYWORDS = Set.of("if", "for", "some", "every", FUNCTION, "true", "false", "null");
+    private static final Set<String> KEYWORDS = Set.of("if", "for", "some", EVERY, FUNCTION, "true", FALSE, "null");
     /** FEEL's names of its built-in types (10.3.2.9.1). */
     private static final Map<String, FeelType> TYPE_NAMES = Map.of(
             "number", FeelType.of(ColumnType.NUMBER), "string", FeelType.of(ColumnType.STRING),
@@ -380,8 +384,8 @@ final class FeelParser {
         return switch (token.text()) {
             case "or" -> OR;
             case "and" -> AND;
-            case "between", "in" -> COMPARISON;
-            case "instance" -> peek(1).isWord("of") ? INSTANCE : 0;
+            case BETWEEN, "in" -> COMPARISON;
+            case INSTANCE_WORD -> peek(1).isWord("of") ? INSTANCE : 0;
             default -> 0;
         };
     }
@@ -397,9 +401,9 @@ final class FeelParser {
             var operator = next().text();
             left = switch (operator) {
                 case "or", "and" -> new Node.Logical(operator.equals("and"), left, operand(precedence + 1));
-                case "between" -> between(left);
+                case BETWEEN -> between(left);
                 case "in" -> new Node.In(left, tests());
-                case "instance" -> {
+                case INSTANCE_WORD -> {
                     expectWord("of");
                     yield instanceOf(left);
                 }
@@ -902,12 +906,12 @@ final class FeelParser {
         next();
         return switch (keyword) {
             case "true" -> new Node.Constant(Boolean.TRUE);
-            case "false" -> new Node.Constant(Boolean.FALSE);
+            case FALSE -> new Node.Constant(Boolean.FALSE);
             case "null" -> new Node.Constant(null);
             case "if" -> ifExpression();
             case "for" -> forExpression();
             case FUNCTION -> functionDefinition();
-            default -> quantified(keyword.equals("every"));
+            default -> quantified(keyword.equals(EVERY));
         };
     }
 
@@ -1146,7 +1150,10 @@ final class FeelParser {
         }
         for (int count = words.size(); count > 0; count--) {
             var name = String.join(" ", words.subList(0, count));
-            var type = TYPE_NAMES.containsKey(name) ? TYPE_NAMES.get(name) : types == null ? null : types.get(name);
+            var type = TYPE_NAMES.get(name);
+            if (type == null && types != null) {
+                type = types.get(name);
+            }
             if (type != null) {
                 at += count;
                 return type;

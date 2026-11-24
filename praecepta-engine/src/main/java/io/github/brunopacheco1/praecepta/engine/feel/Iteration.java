@@ -116,7 +116,8 @@ final class Iteration {
                 return tooMany(env);
             }
             int size = (int) Math.abs(days) + 1;
-            return env.step(size) ? new Dates(a, days < 0 ? -1 : 1, size) : null;
+            int step = days < 0 ? -1 : 1;
+            return env.step(size) ? new Dates(a, step, size) : null;
         }
         return env.error(() -> "%s..%s: an iteration context's range is of whole numbers or dates".formatted(FeelValues.text(from),
                 FeelValues.text(to)));
@@ -128,7 +129,8 @@ final class Iteration {
             return tooMany(env);
         }
         int size = span.intValueExact() + 1;
-        return env.step(size) ? new Numbers(new BigDecimal(from), from.compareTo(to) <= 0 ? 1 : -1, size) : null;
+        int step = from.compareTo(to) <= 0 ? 1 : -1;
+        return env.step(size) ? new Numbers(new BigDecimal(from), step, size) : null;
     }
 
     private static Object tooMany(Env env) {
@@ -140,7 +142,7 @@ final class Iteration {
     }
 
     /** The whole numbers from {@code first}, a {@code step} of 1 or -1 apart: an immutable list that holds none of them. */
-    private static final class Numbers extends AbstractList<Object> implements RandomAccess {
+    private static class Numbers extends AbstractList<Object> implements RandomAccess {
         private final BigDecimal first;
         private final int step;
         private final int size;
@@ -160,10 +162,22 @@ final class Iteration {
         public int size() {
             return size;
         }
+
+        /** Equal, as {@link AbstractList} has it, to any list of equal elements in the same order: its fields only make them. */
+        @Override
+        public final boolean equals(Object other) {
+            return super.equals(other);
+        }
+
+        /** The hash code {@link java.util.List#hashCode} defines, from its elements. */
+        @Override
+        public final int hashCode() {
+            return super.hashCode();
+        }
     }
 
     /** The dates from {@code first}, a {@code step} of a day or minus a day apart: an immutable list that holds none of them. */
-    private static final class Dates extends AbstractList<Object> implements RandomAccess {
+    private static class Dates extends AbstractList<Object> implements RandomAccess {
         private final LocalDate first;
         private final int step;
         private final int size;
@@ -182,6 +196,18 @@ final class Iteration {
         @Override
         public int size() {
             return size;
+        }
+
+        /** Equal, as {@link AbstractList} has it, to any list of equal elements in the same order: its fields only make them. */
+        @Override
+        public final boolean equals(Object other) {
+            return super.equals(other);
+        }
+
+        /** The hash code {@link java.util.List#hashCode} defines, from its elements. */
+        @Override
+        public final int hashCode() {
+            return super.hashCode();
         }
     }
 }

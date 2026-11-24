@@ -69,6 +69,8 @@ public final class DmnWriter {
     private static final String VARIABLE = "    <variable";
     private static final String TYPE_REF = "typeRef";
     private static final String TYPE_REF_END = "</typeRef>\n";
+    private static final String ITEM_DEFINITION = "  <itemDefinition";
+    private static final String ITEM_DEFINITION_END = "  </itemDefinition>\n";
 
     private DmnWriter() {
     }
@@ -124,7 +126,8 @@ public final class DmnWriter {
         var inputTypes = new String[inputData.size()];
         for (int i = 0; i < inputData.size(); i++) {
             ids.put(inputData.get(i).name(), INPUT_DATA + i);
-            inputTypes[i] = elementTypeRef(xml, inputData.get(i).type(), INPUT_DATA + i + TYPE_SUFFIX, model.types(), "input data '" + inputData.get(i).name() + "'");
+            inputTypes[i] = elementTypeRef(xml, inputData.get(i).type(), INPUT_DATA + i + TYPE_SUFFIX, model.types(),
+                    "input data '" + inputData.get(i).name() + "'");
         }
         var decisionTypes = new String[decisions.size()];
         for (int d = 0; d < decisions.size(); d++) {
@@ -135,8 +138,8 @@ public final class DmnWriter {
                     listItemDefinitions(xml, table, DECISION + d + "_");
                     decisionTypes[d] = elementTypeRef(xml, type, DECISION + d + TYPE_SUFFIX, model.types(), "decision '" + decision.name() + "'");
                 }
-                case DecisionLogic.LiteralExpression literal -> decisionTypes[d] = elementTypeRef(xml, literal.type(), DECISION + d + TYPE_SUFFIX, model.types(),
-                        "decision '" + decision.name() + "'");
+                case DecisionLogic.LiteralExpression literal -> decisionTypes[d] = elementTypeRef(xml, literal.type(), DECISION + d + TYPE_SUFFIX,
+                        model.types(), "decision '" + decision.name() + "'");
             }
         }
         for (int i = 0; i < inputData.size(); i++) {
@@ -166,7 +169,7 @@ public final class DmnWriter {
                 // nor the type of null
             }
             case FeelType.FunctionOf(var parameters, var result) -> {
-                xml.append("  <itemDefinition").append(attribute("name", name)).append(">\n    <functionItem")
+                xml.append(ITEM_DEFINITION).append(attribute("name", name)).append(">\n    <functionItem")
                    .append(attribute("outputTypeRef", simpleTypeRef(result))).append(">\n");
                 for (int i = 0; i < parameters.size(); i++) {
                     xml.append("      <parameters").append(attribute("name", "p" + i)).append(attribute(TYPE_REF, simpleTypeRef(parameters.get(i))))
@@ -174,8 +177,8 @@ public final class DmnWriter {
                 }
                 xml.append("    </functionItem>\n  </itemDefinition>\n");
             }
-            case FeelType.Simple(var simple) -> xml.append("  <itemDefinition").append(attribute("name", name)).append(">\n    <typeRef>")
-                    .append(typeName(simple)).append(TYPE_REF_END).append("  </itemDefinition>\n");
+            case FeelType.Simple(var simple) -> xml.append(ITEM_DEFINITION).append(attribute("name", name)).append(">\n    <typeRef>")
+                    .append(typeName(simple)).append(TYPE_REF_END).append(ITEM_DEFINITION_END);
             default -> itemDefinition(xml, "itemDefinition", name, type, "  ", "type '" + name + "'");
         }
     }
@@ -332,14 +335,14 @@ public final class DmnWriter {
         if (input.allowedValues() != null) {
             items = prefix + INPUT + v + "_item";
             var values = standardFeel(input.allowedValues(), input.type(), false, false, "input values of column '" + input.name() + "'");
-            xml.append("  <itemDefinition").append(attribute("name", items)).append(">\n")
+            xml.append(ITEM_DEFINITION).append(attribute("name", items)).append(">\n")
                .append("    <typeRef>").append(typeName(input.type())).append(TYPE_REF_END)
                .append("    <allowedValues><text>").append(escapeText(values)).append("</text></allowedValues>\n")
-               .append("  </itemDefinition>\n");
+               .append(ITEM_DEFINITION_END);
         }
-        xml.append("  <itemDefinition").append(attribute("name", listTypeName(v, prefix))).append(attribute("isCollection", "true")).append(">\n")
+        xml.append(ITEM_DEFINITION).append(attribute("name", listTypeName(v, prefix))).append(attribute("isCollection", "true")).append(">\n")
            .append("    <typeRef>").append(escapeText(items)).append(TYPE_REF_END)
-           .append("  </itemDefinition>\n");
+           .append(ITEM_DEFINITION_END);
     }
 
     /** The name of the item definition of the list input at {@code v}. */

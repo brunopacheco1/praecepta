@@ -708,8 +708,8 @@ sealed interface Node {
                 }
                 default -> {
                     var property = FeelValues.property(value, name);
-                    yield property != FeelValues.NO_PROPERTY ? property
-                            : env.error(() -> "a %s has no property '%s'".formatted(FeelValues.typeName(value), name));
+                    yield property == FeelValues.NO_PROPERTY
+                            ? env.error(() -> "a %s has no property '%s'".formatted(FeelValues.typeName(value), name)) : property;
                 }
             };
         }
@@ -758,6 +758,14 @@ sealed interface Node {
                 var test = condition.evaluate(env.quiet().with(Collections.singletonMap("item", null)));
                 return env.stopped() || test instanceof Number ? null : List.of();
             }
+            return select(list, env);
+        }
+
+        /**
+         * The element at the position the condition gives for the first element, when it gives a number; else the
+         * elements of a non-empty list for which the condition is true.
+         */
+        private Object select(List<?> list, Env env) {
             var selected = new ArrayList<>();
             for (int i = 0; i < list.size(); i++) {
                 if (!env.step()) {
@@ -978,7 +986,7 @@ sealed interface Node {
          * The first {@code size} values of a list that is only ever appended to: an immutable list, made without
          * copying them.
          */
-        private static final class Prefix extends AbstractList<Object> implements java.util.RandomAccess {
+        private static class Prefix extends AbstractList<Object> implements java.util.RandomAccess {
             private final List<Object> values;
             private final int size;
 
@@ -995,6 +1003,18 @@ sealed interface Node {
             @Override
             public int size() {
                 return size;
+            }
+
+            /** Equal, as {@link AbstractList} has it, to any list of equal elements in the same order: its fields only make them. */
+            @Override
+            public final boolean equals(Object other) {
+                return super.equals(other);
+            }
+
+            /** The hash code {@link java.util.List#hashCode} defines, from its elements. */
+            @Override
+            public final int hashCode() {
+                return super.hashCode();
             }
         }
 

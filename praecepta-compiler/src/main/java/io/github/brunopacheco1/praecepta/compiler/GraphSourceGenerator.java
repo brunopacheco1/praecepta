@@ -52,6 +52,8 @@ final class GraphSourceGenerator {
     private static final String EXCEPTIONS = "io.github.brunopacheco1.praecepta.engine.exceptions.";
     /** The suffix of the name of a decision's input record, and the template slot of that name. */
     private static final String INPUT = "Input";
+    /** The Java type of a value no closer type holds: one of any type, the null type or FEEL time, with or without a zone. */
+    private static final String OBJECT = "Object";
 
     // ---- templates ------------------------------------------------------------------------------
 
@@ -381,7 +383,7 @@ final class GraphSourceGenerator {
                 case BOOLEAN -> new TypeCode("Boolean", TypeCode.Kind.CAST, null, "", modelClass);
                 case DATE -> new TypeCode("java.time.LocalDate", TypeCode.Kind.CAST, null, "", modelClass);
                 case DATE_TIME -> new TypeCode("java.time.temporal.TemporalAccessor", TypeCode.Kind.CAST, null, "", modelClass);
-                case TIME -> new TypeCode("Object", TypeCode.Kind.AS_IS, null, "", modelClass);
+                case TIME -> new TypeCode(OBJECT, TypeCode.Kind.AS_IS, null, "", modelClass);
                 case DAY_TIME_DURATION -> new TypeCode("java.time.Duration", TypeCode.Kind.CAST, null, "", modelClass);
                 case YEAR_MONTH_DURATION -> new TypeCode("java.time.Period", TypeCode.Kind.PERIOD, null, "", modelClass);
             };
@@ -394,8 +396,8 @@ final class GraphSourceGenerator {
                     modelClass);
             case FeelType.FunctionOf function -> new TypeCode("io.github.brunopacheco1.praecepta.engine.feel.FeelFunction", TypeCode.Kind.CAST,
                     null, "", modelClass);
-            case FeelType.Any any -> new TypeCode("Object", TypeCode.Kind.AS_IS, null, "", modelClass);
-            case FeelType.Null nothing -> new TypeCode("Object", TypeCode.Kind.AS_IS, null, "", modelClass);
+            case FeelType.Any any -> new TypeCode(OBJECT, TypeCode.Kind.AS_IS, null, "", modelClass);
+            case FeelType.Null nothing -> new TypeCode(OBJECT, TypeCode.Kind.AS_IS, null, "", modelClass);
         };
     }
 

@@ -230,8 +230,8 @@ public final class PraeceptaEngine<I, O> {
         // readers return raw values; each column converts them (see ColumnIndex#maskFor)
         extractorReader = inputStrategy == null ? extractorReader(builder.bindings, evaluationOrder) : null;
         mapReader = inputStrategy == null ? null : mapReader(evaluationOrder);
-        computingExtractorReader = extractorReader == null || computedColumns.length == 0 ? null : new ComputingReader<>(extractorReader);
-        computingMapReader = mapReader == null || computedColumns.length == 0 ? null : new ComputingReader<>(mapReader);
+        computingExtractorReader = computingReader(extractorReader);
+        computingMapReader = computingReader(mapReader);
 
         outputStrategy = builder.outputStrategy;
         int ruleCount = rules.size();
@@ -706,9 +706,10 @@ public final class PraeceptaEngine<I, O> {
      */
     private static Map<String, FeelExpression> computedColumns(Builder<?, ?> builder, Map<String, ColumnType> types,
             TableExpressions expressions) {
-        for (var column : types.keySet()) {
+        for (var entry : types.entrySet()) {
+            var column = entry.getKey();
             if (TableExpressions.isExpression(column) && !builder.bindings.containsKey(column)) {
-                expressions.column(column, types.get(column));
+                expressions.column(column, entry.getValue());
             }
         }
         return expressions.columns();
@@ -746,6 +747,11 @@ public final class PraeceptaEngine<I, O> {
             this.values = new Object[columns];
             Arrays.fill(values, NOT_COMPUTED);
         }
+    }
+
+    /** A reader that also computes the computed columns, over {@code reader}; null without one or without computed columns. */
+    private <T> BitsetIndex.ColumnReader<Computing<T>> computingReader(BitsetIndex.ColumnReader<T> reader) {
+        return reader == null || computedColumns.length == 0 ? null : new ComputingReader<>(reader);
     }
 
     /** Reads the columns {@code reader} reads, and computes the computed ones from them, once per evaluation. */
@@ -1690,14 +1696,14 @@ public final class PraeceptaEngine<I, O> {
                 aggregation(table.aggregation());
             }
             rules(table.rules());
-            var types = new LinkedHashMap<String, ColumnType>();
+            var inputTypes = new LinkedHashMap<String, ColumnType>();
             for (var input : table.inputs()) {
-                types.put(input.name(), input.type());
+                inputTypes.put(input.name(), input.type());
                 if (input.allowedValues() != null) {
                     allowedValues(input.name(), input.allowedValues());
                 }
             }
-            tableTypes = types;
+            tableTypes = inputTypes;
             tableLists = table.listInputs();
             this.table = table;
             tableNamedInputs = null;
@@ -2103,6 +2109,14 @@ public final class PraeceptaEngine<I, O> {
                 }
                 return;
             }
+            checkBindingsMatchTable();
+        }
+
+        /**
+         * Checks that each of the table's columns, but those its input expressions compute, has a binding of its type,
+         * and that each input the table holds is bound as a list or as single values, as the table holds it.
+         */
+        private void checkBindingsMatchTable() {
             for (var tableColumn : tableTypes.entrySet()) {
                 var column = tableColumn.getKey();
                 var type = tableColumn.getValue();

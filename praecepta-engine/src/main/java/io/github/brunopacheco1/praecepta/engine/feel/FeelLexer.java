@@ -157,28 +157,34 @@ final class FeelLexer {
     /** Digits with an optional fraction, or a fraction alone, and an optional exponent; {@code 1..2} is 1, {@code ..}, 2. */
     private String number() {
         int start = position;
+        skipDigits();
+        if (position < text.length() && text.charAt(position) == '.' && isDigitAt(position + 1)) {
+            position++;
+            skipDigits();
+        }
+        if (position < text.length() && (text.charAt(position) == 'e' || text.charAt(position) == 'E')) {
+            skipExponent();
+        }
+        return text.substring(start, position);
+    }
+
+    /** Moves past the digits that follow, if any. */
+    private void skipDigits() {
         while (isDigitAt(position)) {
             position++;
         }
-        if (position < text.length() && text.charAt(position) == '.' && isDigitAt(position + 1)) {
-            position++;
-            while (isDigitAt(position)) {
-                position++;
-            }
+    }
+
+    /** Moves past an exponent, from its {@code e} through an optional sign and its digits; without digits, stays at the {@code e}. */
+    private void skipExponent() {
+        int digit = position + 1;
+        if (digit < text.length() && (text.charAt(digit) == '+' || text.charAt(digit) == '-')) {
+            digit++;
         }
-        if (position < text.length() && (text.charAt(position) == 'e' || text.charAt(position) == 'E')) {
-            int digit = position + 1;
-            if (digit < text.length() && (text.charAt(digit) == '+' || text.charAt(digit) == '-')) {
-                digit++;
-            }
-            if (isDigitAt(digit)) {
-                position = digit;
-                while (isDigitAt(position)) {
-                    position++;
-                }
-            }
+        if (isDigitAt(digit)) {
+            position = digit;
+            skipDigits();
         }
-        return text.substring(start, position);
     }
 
     private String word() {

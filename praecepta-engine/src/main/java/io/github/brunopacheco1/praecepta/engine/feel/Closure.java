@@ -10,6 +10,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
@@ -34,7 +35,7 @@ final class Closure implements FeelFunction {
 
     private final Node.FunctionDefinition definition;
     private final Env.Scope scope;
-    private volatile FeelType type;
+    private final AtomicReference<FeelType> type = new AtomicReference<>();
 
     Closure(Node.FunctionDefinition definition, Env.Scope scope) {
         this.definition = definition;
@@ -48,10 +49,10 @@ final class Closure implements FeelFunction {
 
     @Override
     public FeelType type() {
-        var known = type;
+        var known = type.get();
         if (known == null) {
             known = definition.type(TypeEnv.root(name -> FeelValues.typeOf(scope.lookup(name)), null));
-            type = known;
+            type.set(known);
         }
         return known;
     }

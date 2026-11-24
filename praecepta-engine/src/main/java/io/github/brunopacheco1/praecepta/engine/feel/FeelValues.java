@@ -304,18 +304,18 @@ final class FeelValues {
 
     /** {@code a and b} (DMN 1.5, Table 50): false if either is false, true if both are true, else null. */
     static Object and(Object a, Object b) {
-        if (Boolean.FALSE.equals(a) || Boolean.FALSE.equals(b)) {
-            return false;
+        if (a instanceof Boolean left && b instanceof Boolean right) {
+            return left && right;
         }
-        return Boolean.TRUE.equals(a) && Boolean.TRUE.equals(b) ? Boolean.TRUE : null;
+        return Boolean.FALSE.equals(a) || Boolean.FALSE.equals(b) ? Boolean.FALSE : null;
     }
 
     /** {@code a or b} (DMN 1.5, Table 50): true if either is true, false if both are false, else null. */
     static Object or(Object a, Object b) {
-        if (Boolean.TRUE.equals(a) || Boolean.TRUE.equals(b)) {
-            return true;
+        if (a instanceof Boolean left && b instanceof Boolean right) {
+            return left || right;
         }
-        return Boolean.FALSE.equals(a) && Boolean.FALSE.equals(b) ? Boolean.FALSE : null;
+        return Boolean.TRUE.equals(a) || Boolean.TRUE.equals(b) ? Boolean.TRUE : null;
     }
 
     /** The negation of a test's value: true for false, false for true, null otherwise. */
@@ -342,7 +342,7 @@ final class FeelValues {
             case ZonedDateTime dateTime -> dateTimeProperty(dateTime.toLocalDateTime(), dateTime, name);
             case LocalTime time -> timeProperty(time, null, null, name);
             case OffsetTime time -> timeProperty(time.toLocalTime(), time.getOffset(), null, name);
-            case ZonedTime time -> timeProperty(time.time(), null, time.zone().getId(), name);
+            case ZonedTime(var time, var zone) -> timeProperty(time, null, zone.getId(), name);
             case Duration duration -> durationProperty(duration, name);
             case YearsAndMonths(var months) -> switch (name) {
                 case "years" -> BigDecimal.valueOf(months / 12);
@@ -457,7 +457,8 @@ final class FeelValues {
             case Map<?, ?> context -> "a context";
             case FeelFunction function -> "a function";
             case FeelRange range -> range.toString();
-            default -> simpleType(value) != null ? FeelLiterals.text(value instanceof Boolean ? value.toString() : value) : value.toString();
+            case Boolean bool -> FeelLiterals.text(bool.toString());
+            default -> simpleType(value) != null ? FeelLiterals.text(value) : value.toString();
         };
     }
 

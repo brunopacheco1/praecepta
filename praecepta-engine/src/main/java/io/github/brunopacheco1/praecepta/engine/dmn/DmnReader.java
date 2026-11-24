@@ -841,7 +841,7 @@ public final class DmnReader {
         var typeRef = expression == null ? "" : expression.getAttribute(TYPE_REF);
         var name = column;
         var type = typeRef.isBlank()
-                ? untypedColumnType(input, column, computed, model, types).orElseGet(() -> types.resolve("", inputWhere(where, name)))
+                ? untypedColumnType(column, computed, model, types).orElseGet(() -> types.resolve("", inputWhere(where, name)))
                 : types.resolve(typeRef, inputWhere(where, column));
         var values = nonBlankText(input, "inputValues");
         if (type.list()) {
@@ -866,7 +866,7 @@ public final class DmnReader {
      *
      * @param computed its input expression, if it is an expression rather than a name; else null
      */
-    private static Optional<Type> untypedColumnType(Element input, String column, FeelExpression computed, ModelTypes model,
+    private static Optional<Type> untypedColumnType(String column, FeelExpression computed, ModelTypes model,
             ItemDefinitions types) {
         if (model != null) {
             return computed == null ? model.columnType(column) : model.expressionType(computed);
@@ -1599,12 +1599,12 @@ public final class DmnReader {
         }
 
         private Map<String, FeelType> allTypes() {
-            var all = new LinkedHashMap<String, FeelType>();
+            var read = new LinkedHashMap<String, FeelType>();
             functions = true;
             try {
                 for (var name : byName.keySet()) {
                     try {
-                        all.put(name, typeOf(name, "Item definition '" + name + "'", 0, new HashSet<>()));
+                        read.put(name, typeOf(name, "Item definition '" + name + "'", 0, new HashSet<>()));
                     } catch (InvalidDecisionTableException e) {
                         // a type Praecepta cannot read: an expression that names it is reported
                     }
@@ -1612,7 +1612,7 @@ public final class DmnReader {
             } finally {
                 functions = false;
             }
-            return all;
+            return read;
         }
 
         /** A function item's type (DMN 1.5, 7.3.4): its parameters' types and its output's, {@code Any} where it names none. */
