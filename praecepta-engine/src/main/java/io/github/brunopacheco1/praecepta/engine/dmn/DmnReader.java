@@ -16,6 +16,7 @@ import java.time.OffsetTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,6 +28,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import javax.xml.XMLConstants;
@@ -102,6 +105,7 @@ public final class DmnReader {
     private static final String TYPE_REF = "typeRef";
     private static final String INPUT_DATA = "inputData";
     private static final String DECISION = "decision";
+    private static final String KNOWLEDGE_MODEL = "businessKnowledgeModel";
     private static final String DECISION_TABLE = "decisionTable";
     private static final String VARIABLE = "variable";
     private static final String LABEL = "label";
@@ -184,7 +188,7 @@ public final class DmnReader {
         rejectUnsupported(root);
         var types = new ItemDefinitions(root);
         var elements = new HashMap<String, Element>();
-        for (var kind : List.of(INPUT_DATA, DECISION)) {
+        for (var kind : List.of(INPUT_DATA, DECISION, KNOWLEDGE_MODEL)) {
             children(root, kind).forEach(element -> elements.putIfAbsent(element.getAttribute("id"), element));
         }
         var inputData = new ArrayList<DecisionModel.InputData>();
@@ -205,8 +209,23 @@ public final class DmnReader {
         for (var decision : children(root, DECISION)) {
             decisions.add(decision(decision, types, model, elements));
         }
+        var knowledgeModels = new ArrayList<DecisionModel.BusinessKnowledgeModel>();
+        for (var knowledgeModel : children(root, KNOWLEDGE_MODEL)) {
+            knowledgeModels.add(knowledgeModel(knowledgeModel, types, elements));
+        }
+        var logic = new ArrayList<DecisionLogic>();
+        for (var decision : decisions) {
+            checkExpressions(decision.logic(), decision.requirements(), decisionWhere(decision.name()));
+            logic.add(decision.logic());
+        }
+        for (var knowledgeModel : knowledgeModels) {
+            var names = new ArrayList<>(knowledgeModel.requiredKnowledge());
+            names.add(knowledgeModel.name());
+            checkExpressions(knowledgeModel.logic(), names, "Business knowledge model '" + knowledgeModel.name() + "'");
+            logic.add(knowledgeModel.logic());
+        }
         try {
-            return new DecisionModel(root.getAttribute("name"), inputData, decisions, namedTypes(types, decisions));
+            return new DecisionModel(root.getAttribute("name"), inputData, decisions, knowledgeModels, namedTypes(types, logic));
         } catch (IllegalArgumentException e) {
             throw new InvalidDecisionTableException("DMN model: " + e.getMessage());
         }
@@ -217,8 +236,8 @@ public final class DmnReader {
      * name one of its texts holds as a name, not within a longer one ({@code tFlags} in {@code x instance of tFlags}, not
      * in {@code tFlagsCount}), a literal expression or a decision table's entry or input expression.
      */
-    private static Map<String, FeelType> namedTypes(ItemDefinitions types, List<DecisionModel.Decision> decisions) {
-        var texts = decisions.stream().flatMap(decision -> texts(decision.logic())).toList();
+    private static Map<String, FeelType> namedTypes(ItemDefinitions types, List<DecisionLogic> logic) {
+        var texts = logic.stream().flatMap(DmnReader::texts).toList();
         var named = new LinkedHashMap<String, FeelType>();
         if (!texts.isEmpty()) {
             types.all().forEach((name, type) -> {
@@ -275,8 +294,6 @@ public final class DmnReader {
     private static void rejectUnsupported(Element root) {
         rejectAny(root, "import", "namespace", "DMN model imports '%s', which Praecepta does not support yet: imports are planned for 0.11 (#119)",
                 IMPORTS);
-        rejectAny(root, "businessKnowledgeModel", "id", "DMN model has the business knowledge model '%s', which Praecepta does not support "
-                + "yet: business knowledge models and their invocations are planned for 0.10 (#118)", BOXED);
         rejectAny(root, "decisionService", "id", "DMN model has the decision service '%s', which Praecepta does not support yet: "
                 + "decision services are planned for 0.11 (#119)", IMPORTS);
     }
@@ -313,10 +330,7 @@ public final class DmnReader {
     private static DecisionModel.Decision decision(Element decision, ItemDefinitions types, ModelTypes model, Map<String, Element> elements) {
         var name = elementName(decision, "a decision");
         var where = decisionWhere(name);
-        if (child(decision, "knowledgeRequirement") != null) {
-            throw BOXED.exception(("%s requires business knowledge, which Praecepta does not support yet: business "
-                    + "knowledge models and their invocations are planned for 0.10 (#118)").formatted(where));
-        }
+        var requiredKnowledge = knowledgeRequirements(decision, elements, where);
         var requiredDecisions = new ArrayList<String>();
         var requiredInputs = new ArrayList<String>();
         for (var requirement : children(decision, "informationRequirement")) {
@@ -332,7 +346,42 @@ public final class DmnReader {
                 requiredInputs.add(required(requiredInput, elements, where));
             }
         }
-        return new DecisionModel.Decision(name, requiredDecisions, requiredInputs, logic(decision, types, model, where));
+        return new DecisionModel.Decision(name, requiredDecisions, requiredInputs, requiredKnowledge, logic(decision, types, model, where));
+    }
+
+    /** The business knowledge models an element requires through its knowledge requirements (DMN 1.5, 6.3.14). */
+    private static List<String> knowledgeRequirements(Element element, Map<String, Element> elements, String where) {
+        var required = new ArrayList<String>();
+        for (var requirement : children(element, "knowledgeRequirement")) {
+            var knowledge = child(requirement, "requiredKnowledge");
+            if (knowledge == null) {
+                throw new InvalidDecisionTableException(where + ": a knowledge requirement must name the required knowledge (DMN 1.5, 6.3.14)");
+            }
+            required.add(required(knowledge, elements, where));
+        }
+        return required;
+    }
+
+    /**
+     * A business knowledge model: its knowledge requirements, and its logic, a function definition in FEEL
+     * ({@code encapsulatedLogic}) of the function type its variable declares.
+     */
+    private static DecisionModel.BusinessKnowledgeModel knowledgeModel(Element knowledgeModel, ItemDefinitions types,
+            Map<String, Element> elements) {
+        var name = elementName(knowledgeModel, "a business knowledge model");
+        var where = "Business knowledge model '" + name + "'";
+        var required = knowledgeRequirements(knowledgeModel, elements, where);
+        if (child(knowledgeModel, "informationRequirement") != null) {
+            throw new InvalidDecisionTableException(where + ": a business knowledge model has no information requirements; it reads its "
+                    + "parameters only (DMN 1.5, 6.3.10)");
+        }
+        var logic = child(knowledgeModel, "encapsulatedLogic");
+        if (logic == null) {
+            throw new InvalidDecisionTableException(where + " has no encapsulated logic");
+        }
+        var function = (DecisionLogic.FunctionDefinition) functionDefinition(logic, types, typeOf(variableTypeRef(knowledgeModel), logic,
+                types, where), where);
+        return new DecisionModel.BusinessKnowledgeModel(name, required, function);
     }
 
     /**
@@ -431,11 +480,7 @@ public final class DmnReader {
         if (kind.equals("literalExpression")) {
             checkLiteral(element, where);
             var text = child(element, "text") == null ? "" : textOf(element).strip();
-            try {
-                return new DecisionLogic.LiteralExpression(text.isEmpty() ? "null" : text, type);
-            } catch (IllegalArgumentException e) {
-                throw new InvalidDecisionTableException(where + ": " + e.getMessage());
-            }
+            return new DecisionLogic.LiteralExpression(text.isEmpty() ? "null" : text, type);
         }
         if (kind.equals(DECISION_TABLE)) {
             throw BOXED.exception(("%s: a decision table within a boxed expression, which Praecepta does not support yet: "
@@ -617,21 +662,56 @@ public final class DmnReader {
         if (typeRef.isBlank()) {
             typeRef = literal.getAttribute(TYPE_REF);
         }
-        var type = types.feelType(typeRef, where);
-        DecisionLogic.LiteralExpression literalExpression;
-        try {
-            literalExpression = new DecisionLogic.LiteralExpression(text, type);
-        } catch (IllegalArgumentException e) {
-            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+        return new DecisionLogic.LiteralExpression(text, types.feelType(typeRef, where));
+    }
+
+    /**
+     * Checks that a decision's or a business knowledge model's logic, but a decision table, which is checked as it is
+     * read, is FEEL, with the names it may read in scope ({@link FeelExpression#compose}): its requirements, or a business
+     * knowledge model's knowledge requirements and its own name, and those its constructs bind. A name such as
+     * {@code decision A 2.1} reads as one only where it is in scope (the DMN TCK's {@code 0034-drg-scopes}). Type names
+     * the model does not define are left to the graph, which reports them.
+     *
+     * @throws InvalidDecisionTableException if it is not FEEL, or uses what Praecepta does not support yet (an external
+     *                                       function, 0.11)
+     */
+    private static void checkExpressions(DecisionLogic logic, Collection<String> names, String where) {
+        if (logic instanceof DecisionLogic.Table) {
+            return;
         }
-        var unsupported = literalExpression.expression().unsupported();
+        FeelExpression expression;
+        try {
+            expression = FeelExpression.compose(logic, FeelExpression.namesScope(names), site -> NO_TABLE);
+        } catch (ExpressionSyntaxException e) {
+            throw new InvalidDecisionTableException(where + (logic instanceof DecisionLogic.LiteralExpression ? ": literal expression " : ": ")
+                    + e.getMessage());
+        }
+        var unsupported = expression.unsupported();
         if (!unsupported.isEmpty()) {
             var planned = new Planned(unsupported.getFirst().release(), unsupported.getFirst().issue());
-            throw planned.exception("%s: its literal expression uses %s, which Praecepta does not support yet".formatted(where,
+            throw planned.exception("%s: its %s uses %s, which Praecepta does not support yet".formatted(where,
+                    logic instanceof DecisionLogic.LiteralExpression ? "literal expression" : "logic",
                     String.join(" and ", unsupported.stream().map(Object::toString).toList())));
         }
-        return literalExpression;
     }
+
+    /** A decision table within a boxed expression, as {@link #checkExpressions} sees it: checked as it was read. */
+    private static final FeelExpression.Embedded NO_TABLE = new FeelExpression.Embedded() {
+        @Override
+        public List<String> names() {
+            return List.of();
+        }
+
+        @Override
+        public FeelType type() {
+            return FeelType.ANY;
+        }
+
+        @Override
+        public Object evaluate(Function<String, Object> values, Consumer<String> errors) {
+            return null;
+        }
+    };
 
     /** The {@code typeRef} of a decision's variable, blank if it has none. */
     private static String variableTypeRef(Element decision) {
@@ -1697,8 +1777,6 @@ public final class DmnReader {
      */
     private static final class ItemDefinitions {
         private final Map<String, Element> byName = new LinkedHashMap<>();
-        /** Whether a function item is read as a function type, as {@link #all} reads them, rather than rejected. */
-        private boolean functions;
         private final Element root;
         /** The names of the model's input data and decisions, found once for all its tables; null until asked for. */
         private Set<String> elementNames;
@@ -1839,17 +1917,12 @@ public final class DmnReader {
 
         private Map<String, FeelType> allTypes() {
             var read = new LinkedHashMap<String, FeelType>();
-            functions = true;
-            try {
-                for (var name : byName.keySet()) {
-                    try {
-                        read.put(name, typeOf(name, "Item definition '" + name + "'", 0, new HashSet<>()));
-                    } catch (InvalidDecisionTableException e) {
-                        // a type Praecepta cannot read: an expression that names it is reported
-                    }
+            for (var name : byName.keySet()) {
+                try {
+                    read.put(name, typeOf(name, "Item definition '" + name + "'", 0, new HashSet<>()));
+                } catch (InvalidDecisionTableException e) {
+                    // a type Praecepta cannot read: an expression that names it is reported
                 }
-            } finally {
-                functions = false;
             }
             return read;
         }
@@ -1872,12 +1945,8 @@ public final class DmnReader {
                         .formatted(where, name, MAX_TYPE_DEPTH));
             }
             var function = child(definition, "functionItem");
-            if (function != null && functions) {
-                return functionType(function, where, depth, enclosing);
-            }
             if (function != null) {
-                throw BOXED.exception(("%s: type '%s' is a function type, which Praecepta does not support yet: "
-                        + "business knowledge models and functions are planned for 0.10 (#118)").formatted(where, name));
+                return functionType(function, where, depth, enclosing);
             }
             var components = children(definition, "itemComponent");
             FeelType type;
@@ -1890,11 +1959,9 @@ public final class DmnReader {
                 type = new FeelType.Context(types);
             } else {
                 var base = child(definition, TYPE_REF);
-                if (base == null || base.getTextContent().isBlank()) {
-                    throw new InvalidDecisionTableException(
-                            "%s: type '%s' is not supported; its item definition has no base type".formatted(where, name));
-                }
-                type = typeOf(base.getTextContent(), where, depth, enclosing);
+                // an item definition, or a component, with neither a base type nor components may hold any value (the DMN
+                // TCK's 0031-user-defined-functions and 1120-feel-duration-function)
+                type = base == null || base.getTextContent().isBlank() ? FeelType.ANY : typeOf(base.getTextContent(), where, depth, enclosing);
             }
             // a collection of a collection is a list of lists (the DMN TCK's 0009-append-flatten)
             if (Boolean.parseBoolean(definition.getAttribute("isCollection").strip())) {

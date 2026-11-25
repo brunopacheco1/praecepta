@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Business knowledge models: one invoking another, one invoking itself, and decisions invoking them by name and through a boxed invocation. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="knowledge" name="Payments" namespace="https://example.com/knowledge">
+  <itemDefinition name="tPayment">
+    <functionItem outputTypeRef="number">
+      <parameters name="principal" typeRef="number"/>
+      <parameters name="rate" typeRef="number"/>
+      <parameters name="months" typeRef="number"/>
+    </functionItem>
+  </itemDefinition>
+  <inputData id="principal" name="Principal"><variable name="Principal" typeRef="number"/></inputData>
+  <inputData id="rate" name="Rate"><variable name="Rate" typeRef="number"/></inputData>
+  <inputData id="months" name="Months"><variable name="Months" typeRef="number"/></inputData>
+  <decision id="payment" name="Monthly Payment">
+    <variable name="Monthly Payment" typeRef="number"/>
+    <informationRequirement><requiredInput href="#principal"/></informationRequirement>
+    <informationRequirement><requiredInput href="#rate"/></informationRequirement>
+    <informationRequirement><requiredInput href="#months"/></informationRequirement>
+    <knowledgeRequirement><requiredKnowledge href="#pmt"/></knowledgeRequirement>
+    <invocation>
+      <literalExpression><text>PMT</text></literalExpression>
+      <binding><parameter name="principal"/><literalExpression><text>Principal</text></literalExpression></binding>
+      <binding><parameter name="rate"/><literalExpression><text>Rate</text></literalExpression></binding>
+      <binding><parameter name="months"/><literalExpression><text>Months</text></literalExpression></binding>
+    </invocation>
+  </decision>
+  <decision id="rounded" name="Rounded Payment">
+    <variable name="Rounded Payment" typeRef="number"/>
+    <informationRequirement><requiredInput href="#principal"/></informationRequirement>
+    <informationRequirement><requiredInput href="#rate"/></informationRequirement>
+    <informationRequirement><requiredInput href="#months"/></informationRequirement>
+    <knowledgeRequirement><requiredKnowledge href="#rounded_pmt"/></knowledgeRequirement>
+    <literalExpression><text>Rounded PMT(Principal, Rate, Months)</text></literalExpression>
+  </decision>
+  <decision id="factorial" name="Months Factorial">
+    <variable name="Months Factorial" typeRef="number"/>
+    <informationRequirement><requiredInput href="#months"/></informationRequirement>
+    <knowledgeRequirement><requiredKnowledge href="#fact"/></knowledgeRequirement>
+    <literalExpression><text>factorial(Months)</text></literalExpression>
+  </decision>
+  <businessKnowledgeModel id="pmt" name="PMT">
+    <variable name="PMT" typeRef="tPayment"/>
+    <encapsulatedLogic>
+      <formalParameter name="principal" typeRef="number"/>
+      <formalParameter name="rate" typeRef="number"/>
+      <formalParameter name="months" typeRef="number"/>
+      <literalExpression typeRef="number"><text>(principal * rate / 12) / (1 - (1 + rate / 12) ** -months)</text></literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+  <businessKnowledgeModel id="rounded_pmt" name="Rounded PMT">
+    <variable name="Rounded PMT"/>
+    <encapsulatedLogic>
+      <formalParameter name="p" typeRef="number"/>
+      <formalParameter name="r" typeRef="number"/>
+      <formalParameter name="n" typeRef="number"/>
+      <literalExpression><text>decimal(PMT(p, r, n), 2)</text></literalExpression>
+    </encapsulatedLogic>
+    <knowledgeRequirement><requiredKnowledge href="#pmt"/></knowledgeRequirement>
+  </businessKnowledgeModel>
+  <businessKnowledgeModel id="fact" name="factorial">
+    <variable name="factorial"/>
+    <encapsulatedLogic>
+      <formalParameter name="n" typeRef="number"/>
+      <literalExpression><text>if n &lt;= 1 then 1 else n * factorial(n - 1)</text></literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+</definitions>

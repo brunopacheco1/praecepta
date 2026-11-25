@@ -211,14 +211,14 @@ class PraeceptaPluginTest {
         var later = projectDir.resolve("src/main/rules/bkm.dmn");
         Files.writeString(later, """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
-                  <businessKnowledgeModel id="bkm" name="Rate"/>
+                  <decisionService id="bkm" name="Rate"/>
                   <decision id="a" name="A"><literalExpression><text>1</text></literalExpression></decision>
                 </definitions>""");
         extension.getTables().register("later", table -> table.getSource().set(later.toFile()));
 
         Assertions.assertThatThrownBy(task()::generate)
                 .isInstanceOf(GradleException.class)
-                .hasMessageContaining("business knowledge model 'Rate'")
+                .hasMessageContaining("decision service 'Rate'")
                 .hasRootCauseInstanceOf(io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException.class);
     }
 

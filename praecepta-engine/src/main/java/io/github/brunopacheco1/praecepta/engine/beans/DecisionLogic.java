@@ -84,9 +84,15 @@ public sealed interface DecisionLogic {
      * A literal expression (DMN 1.5, 10.2): a FEEL expression ({@link FeelExpression}) whose value is the decision's, such
      * as {@code "Hello " + Full Name}, {@code if Applicant.age >= 18 then "adult" else "minor"} or
      * {@code Orders[amount > 100].customer}. The names it reads are those of the decision's information requirements, and
-     * the graph parses it with them in scope, as FEEL's names may hold spaces and keywords. FEEL's built-in functions are
-     * evaluated (since 0.9, <a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>); a decision that
-     * defines an external function, planned for 0.11, is reported as not evaluated yet.
+     * the business knowledge models it requires, and the graph parses it with them in scope, as FEEL's names may hold
+     * spaces, keywords and numbers ({@code decision A 2.1}). FEEL's built-in functions are evaluated (since 0.9,
+     * <a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>); a decision that defines an external
+     * function, planned for 0.11, is reported as not evaluated yet.
+     *
+     * <p>Whether it is FEEL depends on the names in scope where it is, so it is checked there: {@code DmnReader} rejects a
+     * model whose expressions are not FEEL with the names their elements may read, and {@code DecisionGraph} reports one
+     * built in code ({@link io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind#INVALID_EXPRESSION}). Since
+     * 0.10, it is not checked when it is made.
      *
      * @param text the expression, as written
      * @param type the type the model declares for the decision's value (its variable's {@code typeRef}), or
@@ -97,15 +103,10 @@ public sealed interface DecisionLogic {
      */
     record LiteralExpression(String text, FeelType type) implements DecisionLogic {
 
-        /**
-         * A literal expression, checked to be FEEL.
-         *
-         * @throws IllegalArgumentException if it is not a FEEL expression, saying why
-         */
+        /** A literal expression. */
         public LiteralExpression {
             Objects.requireNonNull(text, "text");
             Objects.requireNonNull(type, "type");
-            parse(text);
         }
 
         /** A literal expression whose type the model does not declare. */
@@ -114,7 +115,7 @@ public sealed interface DecisionLogic {
         }
 
         /**
-         * The expression as its syntax alone reads it, parsed again on each call: for checking its syntax and what it uses
+         * The expression as its syntax alone reads it, parsed again on each call: for checking what it uses
          * ({@link FeelExpression#unsupported()}), not for the names it reads, nor for evaluating it.
          *
          * <p>It is parsed with no names in scope but those it binds itself, and no model's types: every other name is
@@ -125,13 +126,9 @@ public sealed interface DecisionLogic {
          * {@code Income - Tax} is one name to the graph but the subtraction of {@code Tax} from {@code Income} here, and
          * a type name the model does not define is an error to the graph but not here.
          *
-         * @throws IllegalArgumentException never, as the text was checked when the expression was made
+         * @throws IllegalArgumentException if it is not a FEEL expression without those names in scope, saying why
          */
         public FeelExpression expression() {
-            return parse(text);
-        }
-
-        private static FeelExpression parse(String text) {
             try {
                 return FeelExpression.parse(text);
             } catch (ExpressionSyntaxException e) {

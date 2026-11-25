@@ -334,7 +334,7 @@ class PraeceptaPluginFunctionalTest {
                 """);
         write(project.resolve("src/main/rules/later.dmn"), """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
-                  <businessKnowledgeModel id="bkm" name="Rate"/>
+                  <decisionService id="bkm" name="Rate"/>
                   <decision id="tier" name="Tier"><decisionTable hitPolicy="FIRST">
                     <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>
                     <output name="tier" typeRef="string"/>
@@ -347,8 +347,8 @@ class PraeceptaPluginFunctionalTest {
         Assertions.assertThat(project.resolve("build/generated/sources/praecepta/java/main/com/acme/rules/OtherTier.java")).exists();
         Assertions.assertThat(result.getOutput().lines().filter(line -> line.contains("compiled alone"))).singleElement().asString()
                 .endsWith("later.dmn: its decision table is compiled alone, without its decision requirements graph, which needs "
-                        + "Praecepta 0.10 (#118): DMN model has the business knowledge model 'Rate', which Praecepta does not "
-                        + "support yet: business knowledge models and their invocations are planned for 0.10 (#118)");
+                        + "Praecepta 0.11 (#119): DMN model has the decision service 'Rate', which Praecepta does not "
+                        + "support yet: decision services are planned for 0.11 (#119)");
     }
 
     @Test

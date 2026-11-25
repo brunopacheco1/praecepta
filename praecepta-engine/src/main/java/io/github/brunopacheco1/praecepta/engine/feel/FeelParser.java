@@ -549,11 +549,12 @@ final class FeelParser {
 
     /**
      * Whether the token {@code ahead} of the current one ends an expression, so a {@code [} before it is not a filter
-     * but the end of a range ({@code [1..10[}).
+     * but the end of a range ({@code [1..10[}); a path after the range ({@code [1..10[.start included}, the DMN TCK's
+     * {@code 0074-feel-properties}) starts with a {@code .}, which no filter's condition does.
      */
     private boolean endsAfter(int ahead) {
         var token = peek(ahead);
-        return token.kind() == Kind.END || token.is(CLOSE_PARENTHESIS) || token.is(CLOSE_BRACKET) || token.is(COMMA)
+        return token.kind() == Kind.END || token.is(CLOSE_PARENTHESIS) || token.is(CLOSE_BRACKET) || token.is(COMMA) || token.is(".")
                 || token.is("}") || token.is(COLON) || token.kind() == Kind.WORD && STOP_WORDS.contains(token.text())
                 && !KEYWORDS.contains(token.text());
     }

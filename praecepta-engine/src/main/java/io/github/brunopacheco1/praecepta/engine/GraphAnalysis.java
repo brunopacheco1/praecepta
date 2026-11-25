@@ -102,9 +102,19 @@ final class GraphAnalysis {
     }
 
     final DecisionModel model;
-    /** Each element's slot, by name: the input data, then the decisions. */
+    /** Each element's slot, by name: the input data, then the decisions, then the business knowledge models. */
     final Map<String, Integer> slots = new HashMap<>();
     final int inputCount;
+    final int decisionCount;
+    /**
+     * By business knowledge model (index in the model): its function definition, composed with the names of the business
+     * knowledge models it requires in scope; null where it is not FEEL.
+     */
+    final FeelExpression[] knowledgeExpressions;
+    /** By business knowledge model: the slot of each business knowledge model its logic reads, by name. */
+    final List<Map<String, Integer>> knowledgeReads = new ArrayList<>();
+    /** By business knowledge model: why it cannot be evaluated, or null if it can. */
+    final String[] knowledgeBlocked;
     /** Each slot's type: an input data's, declared or worked out from the tables that read it, or a decision's value's. */
     final FeelType[] types;
     /** By decision (index in the model): the names its logic reads, resolved; a name none of its requirements provides is left out. */
@@ -136,7 +146,11 @@ final class GraphAnalysis {
         this.model = model;
         var decisions = model.decisions();
         inputCount = model.inputData().size();
-        types = new FeelType[inputCount + decisions.size()];
+        decisionCount = decisions.size();
+        var knowledgeModels = model.knowledgeModels();
+        types = new FeelType[inputCount + decisions.size() + knowledgeModels.size()];
+        knowledgeExpressions = new FeelExpression[knowledgeModels.size()];
+        knowledgeBlocked = new String[knowledgeModels.size()];
         blocked = new String[decisions.size()];
         bindings = new GraphValues.Binding[decisions.size()];
         Arrays.fill(bindings, GraphValues.Binding.AS_IS);
@@ -149,6 +163,13 @@ final class GraphAnalysis {
         for (int d = 0; d < decisions.size(); d++) {
             slots.put(decisions.get(d).name(), inputCount + d);
         }
+        for (int k = 0; k < knowledgeModels.size(); k++) {
+            slots.put(knowledgeModels.get(k).name(), inputCount + decisionCount + k);
+        }
+        for (int k = 0; k < knowledgeModels.size(); k++) {
+            resolveKnowledge(k);
+        }
+        blockKnowledge();
         for (int d = 0; d < decisions.size(); d++) {
             checkRequirements(d);
             resolveReads(d);
@@ -156,6 +177,7 @@ final class GraphAnalysis {
         var cyclic = findCycles();
         order = topologicalOrder(cyclic);
         inferInputTypes();
+        typeKnowledge();
         typeDecisions();
         checkTableReads();
         block(cyclic);
@@ -186,9 +208,9 @@ final class GraphAnalysis {
             if (slot == null) {
                 report(d, Kind.MISSING_REQUIREMENT,
                         "decision '%s' requires decision '%s', which is not in the model".formatted(decision.name(), name));
-            } else if (slot < inputCount) {
-                report(d, Kind.MISSING_REQUIREMENT, "decision '%s' requires decision '%s', which is input data, not a decision"
-                        .formatted(decision.name(), name));
+            } else if (!isDecision(slot)) {
+                report(d, Kind.MISSING_REQUIREMENT, "decision '%s' requires decision '%s', which is %s, not a decision"
+                        .formatted(decision.name(), name, kindOf(slot)));
             } else {
                 required.add(slot - inputCount);
             }
@@ -198,12 +220,149 @@ final class GraphAnalysis {
             if (slot == null) {
                 report(d, Kind.MISSING_REQUIREMENT,
                         "decision '%s' requires input data '%s', which is not in the model".formatted(decision.name(), name));
-            } else if (slot >= inputCount) {
-                report(d, Kind.MISSING_REQUIREMENT, "decision '%s' requires input data '%s', which is a decision, not input data"
+            } else if (!isInputData(slot)) {
+                report(d, Kind.MISSING_REQUIREMENT, "decision '%s' requires input data '%s', which is %s, not input data"
+                        .formatted(decision.name(), name, kindOf(slot)));
+            }
+        }
+        for (var name : decision.requiredKnowledge()) {
+            var slot = slots.get(name);
+            if (slot == null) {
+                report(d, Kind.MISSING_REQUIREMENT, "decision '%s' requires business knowledge model '%s', which is not in the model"
                         .formatted(decision.name(), name));
+            } else if (!isKnowledge(slot)) {
+                report(d, Kind.MISSING_REQUIREMENT, ("decision '%s' requires business knowledge model '%s', which is %s, not a business "
+                        + "knowledge model").formatted(decision.name(), name, kindOf(slot)));
+            } else if (knowledgeBlocked[slot - inputCount - decisionCount] != null) {
+                report(d, Kind.MISSING_REQUIREMENT, "decision '%s' requires business knowledge model '%s', which cannot be evaluated: %s"
+                        .formatted(decision.name(), name, knowledgeBlocked[slot - inputCount - decisionCount]), false);
             }
         }
         requiredDecisions.add(required.stream().mapToInt(Integer::intValue).toArray());
+    }
+
+    /** What kind of element is at a slot, as messages name it. */
+    private String kindOf(int slot) {
+        if (isInputData(slot)) {
+            return "input data";
+        }
+        return isDecision(slot) ? "a decision" : "a business knowledge model";
+    }
+
+    // ---- business knowledge models -----------------------------------------------------------------
+
+    /**
+     * Checks a business knowledge model's knowledge requirements, composes its logic with their names in scope (its
+     * parameters are its own), and resolves each name it reads among them: a name none of them provides is a missing
+     * requirement, as a decision's is (DMN 1.5, 6.3.10: it reads its parameters and the knowledge it requires only).
+     */
+    private void resolveKnowledge(int k) {
+        var knowledgeModel = model.knowledgeModels().get(k);
+        var name = knowledgeModel.name();
+        var reads = new LinkedHashMap<String, Integer>();
+        knowledgeReads.add(reads);
+        var valid = new HashSet<String>();
+        for (var required : knowledgeModel.requiredKnowledge()) {
+            var slot = slots.get(required);
+            if (slot == null) {
+                reportKnowledge(k, Kind.MISSING_REQUIREMENT, ("business knowledge model '%s' requires business knowledge model '%s', which is "
+                        + "not in the model").formatted(name, required));
+            } else if (!isKnowledge(slot)) {
+                reportKnowledge(k, Kind.MISSING_REQUIREMENT, ("business knowledge model '%s' requires business knowledge model '%s', which is "
+                        + "%s, not a business knowledge model").formatted(name, required, kindOf(slot)));
+            } else {
+                valid.add(required);
+            }
+        }
+        // a business knowledge model may invoke itself, as a function a context defines may
+        var scope = new LinkedHashSet<>(knowledgeModel.requiredKnowledge());
+        scope.add(name);
+        valid.add(name);
+        try {
+            knowledgeExpressions[k] = FeelExpression.compose(knowledgeModel.logic(), FeelExpression.scope(scope, model.types()));
+        } catch (ExpressionSyntaxException e) {
+            reportKnowledge(k, Kind.INVALID_EXPRESSION, "business knowledge model '%s': %s".formatted(name, e.getMessage()));
+            return;
+        }
+        for (var what : knowledgeExpressions[k].unsupported()) {
+            reportKnowledge(k, Kind.UNSUPPORTED_FEATURE, "business knowledge model '%s' uses %s, which Praecepta does not evaluate yet"
+                    .formatted(name, what));
+        }
+        for (var read : knowledgeExpressions[k].names()) {
+            var required = DecisionModel.elementOf(read, scope::contains);
+            if (required == null) {
+                reportKnowledge(k, Kind.MISSING_REQUIREMENT, ("business knowledge model '%s' reads '%s', which is neither one of its parameters "
+                        + "nor a business knowledge model it requires (DMN 1.5, 6.3.10)").formatted(name, read));
+            } else if (valid.contains(required)) {
+                reads.put(read, slots.get(required));
+            }
+        }
+    }
+
+    /** Reports an issue of a business knowledge model, which then cannot be evaluated, nor what requires it. */
+    private void reportKnowledge(int k, Kind kind, String detail) {
+        issues.add(new Issue(kind, List.of(), detail, Map.of()));
+        if (knowledgeBlocked[k] == null) {
+            knowledgeBlocked[k] = detail;
+        }
+    }
+
+    /** Blocks every business knowledge model that requires one that cannot be evaluated, directly or indirectly. */
+    private void blockKnowledge() {
+        var knowledgeModels = model.knowledgeModels();
+        for (boolean changed = true; changed;) {
+            changed = false;
+            for (int k = 0; k < knowledgeModels.size(); k++) {
+                if (knowledgeBlocked[k] != null) {
+                    continue;
+                }
+                for (var required : knowledgeModels.get(k).requiredKnowledge()) {
+                    var slot = slots.get(required);
+                    if (slot != null && isKnowledge(slot) && knowledgeBlocked[slot - inputCount - decisionCount] != null) {
+                        knowledgeBlocked[k] = "it requires business knowledge model '%s', which cannot be evaluated".formatted(required);
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Types every business knowledge model as the function its logic defines, each from the types of those it invokes,
+     * in the order they require one another; one that invokes itself, directly or not, reads its own type as any type.
+     */
+    private void typeKnowledge() {
+        int count = model.knowledgeModels().size();
+        var state = new int[count]; // 0: not typed, 1: being typed, 2: typed
+        for (int k = 0; k < count; k++) {
+            typeKnowledge(k, state);
+        }
+    }
+
+    private FeelType typeKnowledge(int k, int[] state) {
+        int slot = inputCount + decisionCount + k;
+        if (state[k] == 2) {
+            return types[slot];
+        }
+        if (state[k] == 1) {
+            return FeelType.ANY;
+        }
+        state[k] = 1;
+        var expression = knowledgeExpressions[k];
+        var declared = model.knowledgeModels().get(k).logic().type();
+        FeelType type = declared;
+        if (expression != null && knowledgeBlocked[k] == null) {
+            var reads = knowledgeReads.get(k);
+            var computed = expression.type(name -> {
+                var read = reads.get(name);
+                return read == null ? null : typeKnowledge(read - inputCount - decisionCount, state);
+            });
+            type = declared instanceof FeelType.Any ? computed : declared;
+        }
+        types[slot] = type;
+        state[k] = 2;
+        return type;
     }
 
     /**
@@ -218,6 +377,7 @@ final class GraphAnalysis {
         var valid = new HashSet<String>();
         decision.requiredDecisions().stream().filter(name -> isDecision(slots.get(name))).forEach(valid::add);
         decision.requiredInputs().stream().filter(name -> isInputData(slots.get(name))).forEach(valid::add);
+        decision.requiredKnowledge().stream().filter(name -> isKnowledge(slots.get(name))).forEach(valid::add);
         var resolved = new LinkedHashMap<String, Resolution>();
         var names = new LinkedHashSet<String>();
         switch (decision.logic()) {
@@ -270,7 +430,11 @@ final class GraphAnalysis {
     }
 
     private boolean isDecision(Integer slot) {
-        return slot != null && slot >= inputCount;
+        return slot != null && slot >= inputCount && slot < inputCount + decisionCount;
+    }
+
+    private boolean isKnowledge(Integer slot) {
+        return slot != null && slot >= inputCount + decisionCount;
     }
 
     private boolean isInputData(Integer slot) {
@@ -936,7 +1100,14 @@ final class GraphAnalysis {
     // ---- what cannot be evaluated ------------------------------------------------------------------
 
     private void report(int d, Kind kind, String detail) {
-        issues.add(new Issue(kind, List.of(), detail, Map.of()));
+        report(d, kind, detail, true);
+    }
+
+    /** Blocks a decision for an issue, which is reported unless it is reported already, as a business knowledge model's. */
+    private void report(int d, Kind kind, String detail, boolean issue) {
+        if (issue) {
+            issues.add(new Issue(kind, List.of(), detail, Map.of()));
+        }
         if (blocked[d] == null) {
             blocked[d] = detail;
         }

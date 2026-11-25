@@ -321,7 +321,7 @@ class GraphModelTest {
     void what_later_releases_bring_is_not_evaluated_and_a_file_without_tables_fails_naming_it() {
         var file = """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
-                  <businessKnowledgeModel id="bkm" name="Rate"/>
+                  <decisionService id="bkm" name="Rate"/>
                   <decision id="tier" name="Tier"><decisionTable hitPolicy="FIRST">
                     <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>
                     <output name="tier" typeRef="string"/>
@@ -356,20 +356,20 @@ class GraphModelTest {
         Assertions.assertThat(infos).hasSize(2).first().asString().startsWith("Loaded 4 decision(s) from 2 DMN file(s): ");
         Assertions.assertThat(infos.get(1))
                 .startsWith("rules/bkm.dmn: its decision tables are loaded alone, without its decision requirements graph, "
-                        + "which needs Praecepta 0.10 (#118): ")
-                .contains("business knowledge model 'Rate'");
+                        + "which needs Praecepta 0.11 (#119): ")
+                .contains("decision service 'Rate'");
         Assertions.assertThat(warnings).isEmpty();
 
         var withoutTables = """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
-                  <businessKnowledgeModel id="bkm" name="Rate"/>
+                  <decisionService id="bkm" name="Rate"/>
                   <decision id="a" name="A"><literalExpression><text>1</text></literalExpression></decision>
                 </definitions>""";
         var sources = List.of(TableSource.of("bkm.dmn", withoutTables.getBytes(StandardCharsets.UTF_8)));
         Assertions.assertThatThrownBy(() -> Decisions.load(sources, Severity.ERROR))
                 .isInstanceOfSatisfying(DecisionsException.class, e -> Assertions.assertThat(e.problems()).singleElement().asString()
                         .startsWith("bkm.dmn: ")
-                        .contains("business knowledge model 'Rate'", "#118"));
+                        .contains("decision service 'Rate'", "#119"));
     }
 
     @Test

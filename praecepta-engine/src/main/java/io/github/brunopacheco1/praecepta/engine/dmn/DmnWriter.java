@@ -67,6 +67,8 @@ public final class DmnWriter {
     private static final String INPUT_DATA = "input_data_";
     /** The prefix of the ids of a model's decisions, followed by their position. */
     private static final String DECISION = "decision_";
+    /** The prefix of a business knowledge model's id. */
+    private static final String KNOWLEDGE_MODEL = "knowledge_model_";
     /** The suffix of the name of the item definition of an input data's or a decision's type. */
     private static final String TYPE_SUFFIX = "_type";
     private static final String VARIABLE = "    <variable";
@@ -120,7 +122,8 @@ public final class DmnWriter {
     public static String write(DecisionModel model) {
         var id = identifier(model.name());
         var xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        var namespace = model.decisions().stream().anyMatch(decision -> needsDmn15(decision.logic())) ? NAMESPACE_15 : NAMESPACE;
+        var namespace = model.decisions().stream().anyMatch(decision -> needsDmn15(decision.logic()))
+                || model.knowledgeModels().stream().anyMatch(knowledgeModel -> needsDmn15(knowledgeModel.logic())) ? NAMESPACE_15 : NAMESPACE;
         xml.append("<definitions").append(attribute("xmlns", namespace)).append(idAndName("definitions_" + id, model.name()))
            .append(attribute("namespace", "https://github.com/brunopacheco1/praecepta/" + id)).append(">\n");
         model.types().forEach((name, type) -> namedType(xml, name, type));
@@ -152,6 +155,12 @@ public final class DmnWriter {
                 }
             }
         }
+        var knowledgeModels = model.knowledgeModels();
+        for (int k = 0; k < knowledgeModels.size(); k++) {
+            var knowledgeModel = knowledgeModels.get(k);
+            ids.put(knowledgeModel.name(), KNOWLEDGE_MODEL + k);
+            boxedTypes.declare(knowledgeModel.logic(), false, "business knowledge model '" + knowledgeModel.name() + "'");
+        }
         for (int i = 0; i < inputData.size(); i++) {
             var name = inputData.get(i).name();
             xml.append("  <inputData").append(idAndName(INPUT_DATA + i, name)).append(">\n")
@@ -160,6 +169,9 @@ public final class DmnWriter {
         }
         for (int d = 0; d < decisions.size(); d++) {
             decision(xml, d, decisions.get(d), decisionTypes[d], prefixes[d], ids, boxedTypes);
+        }
+        for (int k = 0; k < knowledgeModels.size(); k++) {
+            knowledgeModel(xml, k, knowledgeModels.get(k), ids, boxedTypes);
         }
         xml.append("</definitions>\n");
         return xml.toString();
@@ -233,12 +245,18 @@ public final class DmnWriter {
         xml.append("  <decision").append(idAndName(DECISION + d, decision.name())).append(">\n")
            .append(VARIABLE).append(idAndName(DECISION + d + "_variable", decision.name())).append(optionalType(type)).append("/>\n");
         var requirements = decision.requirements();
+        int information = decision.requiredDecisions().size() + decision.requiredInputs().size();
         for (int r = 0; r < requirements.size(); r++) {
             var required = requirements.get(r);
             var href = ids.get(required);
             if (href == null) {
                 throw new InvalidDecisionTableException("%s requires '%s', which is not in the model, so DMN cannot refer to it"
                         .formatted(where, required));
+            }
+            if (r >= information) {
+                xml.append("    <knowledgeRequirement").append(id(DECISION + d + "_requirement_" + r)).append("><requiredKnowledge")
+                   .append(attribute("href", "#" + href)).append("/></knowledgeRequirement>\n");
+                continue;
             }
             var kind = r < decision.requiredDecisions().size() ? "requiredDecision" : "requiredInput";
             xml.append("    <informationRequirement").append(id(DECISION + d + "_requirement_" + r)).append("><").append(kind)
@@ -388,15 +406,7 @@ public final class DmnWriter {
                 }
                 xml.append(indent).append("</invocation>\n");
             }
-            case DecisionLogic.FunctionDefinition(var parameters, var body, var functionType) -> {
-                xml.append(indent).append("<functionDefinition").append(type).append(">\n");
-                for (var parameter : parameters) {
-                    xml.append(inner).append("<formalParameter").append(attribute("name", parameter.name()))
-                       .append(types.attributeOf(parameter.type())).append("/>\n");
-                }
-                boxed(xml, body, types.attributeOf(body.type()), inner, types);
-                xml.append(indent).append("</functionDefinition>\n");
-            }
+            case DecisionLogic.FunctionDefinition function -> functionDefinition(xml, "functionDefinition", function, type, indent, types);
             case DecisionLogic.Relation(var columns, var rows, var relationType) -> {
                 xml.append(indent).append("<relation").append(type).append(">\n");
                 for (var column : columns) {
@@ -436,6 +446,43 @@ public final class DmnWriter {
                 xml.append(indent).append("</filter>\n");
             }
         }
+    }
+
+    /** A function definition, as {@code tag}: its formal parameters and its body. */
+    private static void functionDefinition(StringBuilder xml, String tag, DecisionLogic.FunctionDefinition function, String type,
+            String indent, BoxedTypes types) {
+        var inner = indent + "  ";
+        xml.append(indent).append('<').append(tag).append(type).append(">\n");
+        for (var parameter : function.parameters()) {
+            xml.append(inner).append("<formalParameter").append(attribute("name", parameter.name())).append(types.attributeOf(parameter.type()))
+               .append("/>\n");
+        }
+        boxed(xml, function.body(), types.attributeOf(function.body().type()), inner, types);
+        xml.append(indent).append("</").append(tag).append(">\n");
+    }
+
+    /**
+     * A business knowledge model at position {@code k}: its variable, of its logic's type, its logic as
+     * {@code encapsulatedLogic}, and its knowledge requirements.
+     */
+    private static void knowledgeModel(StringBuilder xml, int k, DecisionModel.BusinessKnowledgeModel knowledgeModel, Map<String, String> ids,
+            BoxedTypes types) {
+        var where = "Business knowledge model '" + knowledgeModel.name() + "'";
+        xml.append("  <businessKnowledgeModel").append(idAndName(KNOWLEDGE_MODEL + k, knowledgeModel.name())).append(">\n")
+           .append(VARIABLE).append(idAndName(KNOWLEDGE_MODEL + k + "_variable", knowledgeModel.name()))
+           .append(types.attributeOf(knowledgeModel.logic().type())).append("/>\n");
+        functionDefinition(xml, "encapsulatedLogic", knowledgeModel.logic(), "", "    ", types);
+        var required = knowledgeModel.requiredKnowledge();
+        for (int r = 0; r < required.size(); r++) {
+            var href = ids.get(required.get(r));
+            if (href == null) {
+                throw new InvalidDecisionTableException("%s requires '%s', which is not in the model, so DMN cannot refer to it"
+                        .formatted(where, required.get(r)));
+            }
+            xml.append("    <knowledgeRequirement").append(id(KNOWLEDGE_MODEL + k + "_requirement_" + r)).append("><requiredKnowledge")
+               .append(attribute("href", "#" + href)).append("/></knowledgeRequirement>\n");
+        }
+        xml.append("  </businessKnowledgeModel>\n");
     }
 
     /** A child element of a boxed expression holding one expression: {@code <if>}, {@code <in>}, {@code <return>}... */

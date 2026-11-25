@@ -113,7 +113,7 @@ class ValidationLoggingTest {
      */
     @Test
     void loading_on_its_own_logs_each_file_whose_tables_load_alone() {
-        var later = TableSource.of("later.dmn", UNREACHABLE.replace("<decision ", "<businessKnowledgeModel id=\"bkm\" name=\"Rate\"/><decision ")
+        var later = TableSource.of("later.dmn", UNREACHABLE.replace("<decision ", "<decisionService id=\"bkm\" name=\"Rate\"/><decision ")
                 .replace("name=\"Grade\"", "name=\"Later Grade\"").getBytes(StandardCharsets.UTF_8));
         var logger = Logger.getLogger(Decisions.class.getName());
         var records = new ArrayList<LogRecord>();
@@ -141,7 +141,7 @@ class ValidationLoggingTest {
             Assertions.assertThat(records).singleElement().satisfies(logged -> {
                 Assertions.assertThat(logged.getLevel()).isEqualTo(Level.INFO);
                 Assertions.assertThat(logged.getMessage()).startsWith("later.dmn: its decision tables are loaded alone, ")
-                        .contains("0.10 (#118)", "business knowledge model 'Rate'");
+                        .contains("0.11 (#119)", "decision service 'Rate'");
             });
             records.clear();
             Decisions.load(List.of(later), Severity.ERROR, false);

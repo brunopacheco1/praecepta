@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- A decision table beside a business knowledge model, which DmnReader.readModel rejects (0.10, #118): the table loads alone -->
+<!-- A decision table beside a decision service, which DmnReader.readModel rejects (0.11, #119): the table loads alone -->
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="rated" name="rated" namespace="https://example.com/rated">
-  <businessKnowledgeModel id="bkm" name="Rate"/>
+  <decisionService id="bkm" name="Rate"/>
   <decision id="tier" name="Rated">
     <decisionTable hitPolicy="FIRST">
       <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>

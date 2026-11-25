@@ -102,6 +102,11 @@ public final class DecisionGraph {
     private final DecisionModel model;
     /** The number of slots: one per input data, then one per decision. */
     private final int slotCount;
+    /**
+     * The value of each business knowledge model, a function made once when the graph is built, which the last slots of
+     * every evaluation hold; null for one that cannot be evaluated.
+     */
+    private final Object[] knowledge;
     /** Each input data's name and type (declared, or worked out from the tables that read it), by slot. */
     private final String[] inputNames;
     private final FeelType[] inputTypes;
@@ -155,7 +160,8 @@ public final class DecisionGraph {
         var analysis = new GraphAnalysis(model);
         int inputCount = analysis.inputCount;
         int decisionCount = model.decisions().size();
-        slotCount = inputCount + decisionCount;
+        slotCount = inputCount + decisionCount + model.knowledgeModels().size();
+        knowledge = knowledgeFunctions(analysis);
         inputNames = new String[inputCount];
         inputTypes = new FeelType[inputCount];
         var allTypes = new LinkedHashMap<String, FeelType>();
@@ -191,6 +197,34 @@ public final class DecisionGraph {
             LOG.log(Level.WARNING, "Decision model ''{0}'' has {1} validation issue(s):\n{2}", model.name(), report.issues().size(), report);
         }
         enforce(failOn);
+    }
+
+    /**
+     * The functions of the business knowledge models (DMN 1.5, 6.3.10), each its function definition evaluated once,
+     * whose body reads the others it invokes, and itself, when it is invoked: a closure over them all.
+     */
+    private static Object[] knowledgeFunctions(GraphAnalysis analysis) {
+        int base = analysis.inputCount + analysis.decisionCount;
+        var functions = new Object[analysis.knowledgeExpressions.length];
+        for (int k = 0; k < functions.length; k++) {
+            var expression = analysis.knowledgeExpressions[k];
+            if (expression == null || analysis.knowledgeBlocked[k] != null) {
+                continue;
+            }
+            var reads = analysis.knowledgeReads.get(k);
+            functions[k] = expression.evaluate(name -> {
+                var slot = reads.get(name);
+                return slot == null ? null : functions[slot - base];
+            });
+        }
+        return functions;
+    }
+
+    /** The slots of an evaluation: empty, but for the business knowledge models' functions. */
+    private Object[] slots() {
+        var values = new Object[slotCount];
+        System.arraycopy(knowledge, 0, values, slotCount - knowledge.length, knowledge.length);
+        return values;
     }
 
     private static GraphNodes.Node node(GraphAnalysis analysis, int d, boolean log) {
@@ -273,7 +307,7 @@ public final class DecisionGraph {
      */
     public Object evaluate(String decision, Map<String, ?> inputData) {
         var plan = plan(decision);
-        var values = new Object[slotCount];
+        var values = slots();
         assign(plan.inputs(), values, inputData);
         for (int d : plan.decisions()) {
             values[inputNames.length + d] = nodes[d].evaluate(values, null);
@@ -315,7 +349,7 @@ public final class DecisionGraph {
      */
     public Outcome evaluateWithErrors(String decision, Map<String, ?> inputData) {
         var plan = plan(decision);
-        var values = new Object[slotCount];
+        var values = slots();
         assign(plan.inputs(), values, inputData);
         var errors = new LinkedHashMap<String, List<String>>();
         for (int d : plan.decisions()) {
@@ -343,7 +377,7 @@ public final class DecisionGraph {
             IntStream.of(plan.inputs()).forEach(inputs::add);
             IntStream.of(plan.decisions()).forEach(needed::add);
         }
-        var values = new Object[slotCount];
+        var values = slots();
         assign(inputs.stream().mapToInt(Integer::intValue).toArray(), values, inputData);
         for (int d : needed) {
             values[inputNames.length + d] = nodes[d].evaluate(values, null);
@@ -459,6 +493,7 @@ public final class DecisionGraph {
         /** The decisions, in order; those whose requirements are to be worked out have none yet. */
         private final List<Decision> decisions = new ArrayList<>();
         private final Set<String> inferred = new LinkedHashSet<>();
+        private final List<DecisionModel.BusinessKnowledgeModel> knowledgeModels = new ArrayList<>();
         private final Map<String, FeelType> types = new LinkedHashMap<>();
         private Severity failOn;
         private boolean log = true;
@@ -477,7 +512,17 @@ public final class DecisionGraph {
             name(model.name());
             inputData.addAll(model.inputData());
             decisions.addAll(model.decisions());
+            knowledgeModels.addAll(model.knowledgeModels());
             types.putAll(model.types());
+            return this;
+        }
+
+        /**
+         * Adds a business knowledge model (DMN 1.5, 6.3.10), a function that decisions requiring it, and other business
+         * knowledge models, invoke by its name.
+         */
+        public Builder knowledgeModel(DecisionModel.BusinessKnowledgeModel knowledgeModel) {
+            knowledgeModels.add(Objects.requireNonNull(knowledgeModel, "knowledgeModel"));
             return this;
         }
 
@@ -538,7 +583,9 @@ public final class DecisionGraph {
          * @throws IllegalArgumentException if the expression is not a FEEL expression
          */
         public Builder literalDecision(String name, FeelType type, String expression) {
-            return inferred(new Decision(name, List.of(), List.of(), new DecisionLogic.LiteralExpression(expression, type)));
+            var literal = new DecisionLogic.LiteralExpression(expression, type);
+            literal.expression(); // checked here, where the names it may read are not all known yet, as before 0.10
+            return inferred(new Decision(name, List.of(), List.of(), literal));
         }
 
         private Builder inferred(Decision decision) {
@@ -581,7 +628,7 @@ public final class DecisionGraph {
             var resolved = decisions.stream()
                     .map(decision -> inferred.contains(decision.name()) ? withRequirements(decision, names, decisionNames, scope, types) : decision)
                     .toList();
-            return new DecisionGraph(new DecisionModel(name, inputData, resolved, types), failOn, log);
+            return new DecisionGraph(new DecisionModel(name, inputData, resolved, knowledgeModels, types), failOn, log);
         }
 
         /**
