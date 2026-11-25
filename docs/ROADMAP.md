@@ -53,13 +53,19 @@ Released in November 2026 (see the [changelog](../CHANGELOG.md)):
   nodes not supported yet need FEEL's built-in functions. The decision-table checks still pass 83 of
   86.
 
-## Next: 0.9
+## 0.9
+Released in November 2026 (see the [changelog](../CHANGELOG.md)):
 - **Built-in functions** ([#117](https://github.com/brunopacheco1/praecepta/issues/117)): DMN 1.5's
-  function library: conversion, boolean, string, list, numeric, date and time, range and context
-  functions, such as `substring`, `sum`, `round half up` and `day of week`, in literal expressions
-  and in decision tables alike.
+  whole function library, conversion, boolean, string, list, sort, numeric, date and time, range and
+  context functions, such as `substring`, `sum`, `round half up` and `day of week`, in literal
+  expressions and in decision tables alike, with named arguments, and each function's work counted
+  against the evaluation's limits, regular expressions included.
+- **The DMN TCK**: 3,276 of its 3,511 result nodes pass (93.3 %, from 2,275), and 3,276 of the 3,280
+  that Praecepta evaluates; 1,066 of the built-in functions' 1,071. Most of the 231 nodes not
+  supported yet need boxed expressions and business knowledge models. The decision-table checks still
+  pass 83 of 86.
 
-## 0.10
+## Next: 0.10
 - **Boxed expressions and business knowledge models**
   ([#118](https://github.com/brunopacheco1/praecepta/issues/118)): invocations, function
   definitions, boxed contexts, relations, lists, conditionals, iterators and filters, and

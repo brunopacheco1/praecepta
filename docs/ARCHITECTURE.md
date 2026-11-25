@@ -169,7 +169,7 @@ An engine is **immutable** once built: any number of threads may share it withou
   from none: with several outputs, defaults that are all `null` still make a default output, of nulls.
   It uses the JDK's own XML parser (`DocumentBuilderFactory.newDefaultInstance()`, never one JAXP finds
   on the class path) with DTDs and external entities disabled. Anything it does not
-  support (FEEL's built-in functions, 0.9) is rejected
+  support (an external function, 0.11) is rejected
   with an error naming the decision, rule and column. Output entries may be any FEEL expression
   (`FeelExpression`): they are kept as written, parsed and typed when the engine is built, and evaluated only
   for matching rules, like outputs that name an input; `DmnWriter` writes them back unchanged, and so a cell
@@ -216,7 +216,7 @@ outputs), else by the one type its output entries give, as FEEL types them, and 
 entry gives its own type). What later releases bring is rejected
 whole with an `UnsupportedFeatureException`, whose `release()` and `issue()` name the release that plans it, so that
 callers fall back by its type, never by its message: business knowledge models, knowledge requirements and boxed
-expressions as logic (#118), literal expressions that invoke a built-in function (#117), decision services,
+expressions as logic (#118), decision services,
 imports, external functions and references into other models (#119). Knowledge sources, authority requirements,
 annotations and diagrams take no part in evaluation and are ignored. `DmnWriter.write(DecisionModel)` writes DMN 1.3
 with ids by position (`input_data_0`, `decision_0`, and `decision_0_` before the ids of a decision's table, so the
@@ -232,8 +232,8 @@ input data and decision gets a *slot*: input data first, then decisions, in the 
    logic reads (a table's columns and the inputs its cells compare with, a literal expression's free names) among
    that decision's requirements: the requirement so named, else the one named by its longest part before a dot, the
    rest being a path into its value (`Pricing.discount` in a table column), as `DecisionModel.elementOf` resolves
-   names for every part of Praecepta; a name no requirement provides is a `MISSING_REQUIREMENT` (7.3.4), and a
-   built-in function a literal expression invokes an `UNSUPPORTED_FEATURE` (0.9, #117), and a literal expression that
+   names for every part of Praecepta; a name no requirement provides is a `MISSING_REQUIREMENT` (7.3.4), an
+   external function a literal expression defines an `UNSUPPORTED_FEATURE` (0.11, #119), and a literal expression that
    is not FEEL an `INVALID_EXPRESSION`;
 3. finds cycles among required decisions (Tarjan's algorithm with an explicit stack), reported with the cycle's
    path (`DECISION_CYCLE`), and orders the other decisions so each comes after those it requires (Kahn's algorithm);
@@ -292,7 +292,8 @@ its Javadoc, immutable.
 literal expressions a FEEL interpreter over the same slots, and `FeelType` FEEL's full type system; decision tables'
 cells, input expressions and output entries adopted the same interpreter in 0.8 too ([Decision tables in
 FEEL](#decision-tables-in-feel-116)); built-in functions (0.9, #117) are registered in
-`BuiltInFunctions`, where the parser resolves their names; boxed expressions and business knowledge models (0.10, #118) are further
+`BuiltInFunctions`, where the parser resolves their names, each a `BuiltInFunction` of its signatures and a body given
+the evaluation that invokes it, one class per family (`StringFunctions`, `ListFunctions`...); boxed expressions and business knowledge models (0.10, #118) are further
 `DecisionLogic` kinds with nodes of their own, and invocables become elements with slots that hold functions,
 required through knowledge requirements, with the same cycle and type checks; decision services and imports (0.11,
 #119) add elements and qualified names to the resolution of step 2. The reader rejects each of them by name until
@@ -322,8 +323,8 @@ once, against a `Scope` of names (and a model's types), then `names()`, `unsuppo
   in scope and a subtraction where only `Date` and `Time` are. A name in no scope is read as words up to a keyword,
   and is a free name the caller resolves, but inside a filter, where it may name an element's entry. Date and time
   functions of literal arguments are folded into literals while parsing (`TemporalLiterals`, as cells read them),
-  an invalid one into a node that is null with an error; a built-in function Praecepta does not evaluate yet into
-  an `Unsupported` node, which `unsupported()` lists.
+  an invalid one into a node that is null with an error; a built-in function into an invocation of it; an external
+  function, which Praecepta does not evaluate yet, into an `Unsupported` node, which `unsupported()` lists.
 - **Evaluation** (`Node.evaluate(Env)`): each node evaluates its children in a scope (`Env`: frames of bound names,
   innermost first, then the values given), giving FEEL's values (`FeelValues` holds equality, order, `instance of`
   and the properties of Table 65; `FeelArithmetic` the arithmetic tables cells already used). Where FEEL defines no

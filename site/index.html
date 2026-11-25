@@ -285,12 +285,9 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
       <h2 id="not-title">What it is not</h2>
       <p>Praecepta is on its way to a full DMN 1.5 engine, one layer per release
         (<a href="https://github.com/brunopacheco1/praecepta/issues/120">#120</a>), but it is not one yet. Today it evaluates decision tables and the
-        graphs of tables and literal expressions around them, in the full FEEL language but its built-in
+        graphs of tables and literal expressions around them, in the full FEEL language with its built-in
         functions. It does not have these yet; when you need one before its release, use Camunda or Drools:</p>
       <ul class="plain">
-        <li><strong>Built-in functions</strong> (0.9, <a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>), such as <code>sum(...)</code>
-          or <code>string length(...)</code>: none is called but <code>date(...)</code>, <code>time(...)</code>,
-          <code>date and time(...)</code> and <code>duration(...)</code> of literal arguments.</li>
         <li><strong>Business knowledge models and boxed expressions</strong> (0.10,
           <a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>), and <strong>decision services and imports</strong> (0.11,
           <a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>).</li>
@@ -488,13 +485,16 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
           </ul>
         </li>
         <li>
-          <h3>Next: 0.9</h3>
+          <h3>0.9 · released</h3>
           <ul class="plain">
-            <li>FEEL's built-in functions (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>)</li>
+            <li>FEEL's built-in functions, all of DMN 1.5's, in literal expressions and decision tables alike
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>)</li>
+            <li>The DMN conformance kit: 3,276 of 3,511 result nodes pass, 3,276 of the 3,280 Praecepta evaluates;
+              decision tables still pass 83 of 86 (<a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
           </ul>
         </li>
         <li>
-          <h3>0.10</h3>
+          <h3>Next: 0.10</h3>
           <ul class="plain">
             <li>Boxed expressions and business knowledge models; decision tables reach 86 of 86 in the
               conformance kit (<a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>)</li>
