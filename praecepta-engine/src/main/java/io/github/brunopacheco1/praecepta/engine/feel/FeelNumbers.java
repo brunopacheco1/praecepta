@@ -78,7 +78,29 @@ final class FeelNumbers {
         if (base.signum() < 0) {
             return null;
         }
-        return inRange(exp(exponent.multiply(ln(base), WORKING)).round(PRECISION));
+        return inRange(expo(exponent.multiply(ln(base), WORKING)).round(PRECISION));
+    }
+
+    /** The natural logarithm of a number ({@code log}, DMN 1.5, 10.3.4.5); null for zero or a negative one. */
+    static BigDecimal log(BigDecimal number) {
+        return number.signum() <= 0 ? null : inRange(ln(number).round(PRECISION));
+    }
+
+    /**
+     * Euler's number to a power ({@code exp}, DMN 1.5, 10.3.4.5); null where that is beyond what a decimal128 holds,
+     * either way, as {@code exp(-20000)} is.
+     */
+    static BigDecimal exp(BigDecimal exponent) {
+        // e ** 14,200 is about 10 ** 6,167, beyond the largest decimal128; e ** -14,200 below the smallest
+        if (exponent.abs().compareTo(BigDecimal.valueOf(14_200)) > 0) {
+            return null;
+        }
+        return inRange(expo(exponent).round(PRECISION));
+    }
+
+    /** The square root of a number ({@code sqrt}, DMN 1.5, 10.3.4.5); null for a negative one. */
+    static BigDecimal sqrt(BigDecimal number) {
+        return number.signum() < 0 ? null : inRange(number.sqrt(PRECISION));
     }
 
     /** {@code 0 ** exponent}: 1 for a zero exponent, 0 for a positive one, null for a negative one. */
@@ -179,7 +201,7 @@ final class FeelNumbers {
     private static BigDecimal lnNearOne(BigDecimal x, double estimate) {
         var y = BigDecimal.valueOf(estimate);
         for (int step = 0; step < 2; step++) {
-            var e = exp(y);
+            var e = expo(y);
             y = y.add(TWO.multiply(x.subtract(e), WORKING).divide(x.add(e), WORKING), WORKING);
         }
         return y;
@@ -190,7 +212,7 @@ final class FeelNumbers {
      * series, and the result squared back. Each squaring doubles the error, so the series carries as many
      * extra digits as there are squarings.
      */
-    private static BigDecimal exp(BigDecimal z) {
+    private static BigDecimal expo(BigDecimal z) {
         int halvings = 0;
         var small = z;
         while (small.abs().compareTo(BigDecimal.valueOf(0.25)) > 0) {

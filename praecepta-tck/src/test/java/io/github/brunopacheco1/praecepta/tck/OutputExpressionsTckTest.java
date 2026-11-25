@@ -34,18 +34,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
  * own (DMN 1.5, 10.3.2.10, step 3c). Their literals are at-literals ({@code @"2021-01-01" + @"P1D"}), so the cases check
  * the arithmetic of dates, times, date-times and durations (DMN 1.5, Tables 57, 59 and 62), and operands FEEL does not
  * combine ({@code @"P1D" + 10}), which give null, with an error, where 0.7 rejected the table. An expression wrapped in
- * {@code string(...)}, which the kit uses for values it cannot write otherwise (a time with a zone id), is evaluated
- * without it and compared as FEEL's text of the value. An expression that invokes another built-in function (0.9, #117)
- * is not supported.
+ * {@code string(...)}, which the kit uses for values it cannot write otherwise (a time with a zone id), and any other
+ * that invokes a built-in function, is evaluated as it is (since 0.9, #117).
  */
 class OutputExpressionsTckTest {
-
-    /**
-     * Checks Praecepta answers otherwise, by decision: the kit gives a power that is not whole to 13 significant digits,
-     * where FEEL's numbers have 34 (DMN 1.5, 10.3.2.3.1 and Table 60), which output entries keep (#71).
-     */
-    private static final Map<String, String> KNOWN = Map.of(
-            "exponent_lhs_number_exp_rhs_number_005", "a power to 13 digits, not 34");
 
     /**
      * @param expectedPassed the checks whose expression gives the kit's result
@@ -54,7 +46,7 @@ class OutputExpressionsTckTest {
     @ParameterizedTest
     @CsvSource({
             "compliance-level-3/0099-arithmetic-negation, 14,   7",
-            "compliance-level-3/0100-arithmetic,          1086, 819",
+            "compliance-level-3/0100-arithmetic,          1087, 819",
     })
     void every_expression_gives_the_kits_result_as_an_output_entry(String testCase, int expectedPassed, int expectedNull) {
         var directory = TckSuite.root().resolve(Path.of(testCase));
@@ -68,8 +60,7 @@ class OutputExpressionsTckTest {
         for (var node : TckXml.descendants(root, "resultNode")) {
             var expected = TckValue.read(TckXml.children(node, "expected").getFirst());
             var text = expressions.get(node.getAttribute("name"));
-            var outcome = KNOWN.containsKey(node.getAttribute("name")) ? "not supported: " + KNOWN.get(node.getAttribute("name"))
-                    : outcome(text, expected);
+            var outcome = outcome(text, expected);
             if (outcome == null) {
                 passed++;
                 nulls += expected instanceof TckValue.Nil ? 1 : 0;
@@ -86,30 +77,22 @@ class OutputExpressionsTckTest {
 
     /** Null if the expression, as an output entry, gives the expected value; else why not. */
     private static String outcome(String text, TckValue expected) {
-        var asString = text.startsWith("string(") && text.endsWith(")");
-        var expressionText = asString ? text.substring("string(".length(), text.length() - 1) : text;
         var output = new DecisionTable.OutputColumn("value", ColumnType.STRING, List.of(), null, false, false);
-        var rule = new Praeceptum(1, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of(), Map.of(), Map.of("value", expressionText)));
+        var rule = new Praeceptum(1, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of(), Map.of(), Map.of("value", text)));
         DecisionGraph graph;
         try {
             graph = DecisionGraph.builder().logValidationReport(false)
                     .decision(new DecisionTable("Value", HitPolicy.FIRST, null, List.of(), List.of(output), List.of(rule), true)).build();
         } catch (InvalidDecisionTableException e) {
-            return "not supported: " + reason(e.getMessage());
+            return "not supported: " + e.getMessage();
         }
         var value = graph.evaluate("Value", Map.of());
         if (value == null) {
             return expected.matches(TckValue.NIL, true) ? null : "null";
         }
         var valueText = value instanceof BigDecimal number ? number.toPlainString() : FeelLiterals.text(value);
-        var actual = new TckValue.Simple(asString ? "string" : "", valueText);
+        var actual = new TckValue.Simple(value instanceof String ? "string" : "", valueText);
         return expected.matches(actual, true) ? null : String.valueOf(actual);
-    }
-
-    /** What makes an expression unsupported, in a few words: the built-in function it invokes. */
-    private static String reason(String message) {
-        var matcher = java.util.regex.Pattern.compile("the built-in function '([^']+)'").matcher(message);
-        return matcher.find() ? matcher.group(1) + "()" : message;
     }
 
     /** The text of each decision's literal expression, by decision name. */

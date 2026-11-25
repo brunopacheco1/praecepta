@@ -78,19 +78,26 @@ class GraphEvaluatorTest {
 
     @Test
     void a_node_needs_what_its_decisions_need_but_no_longer_graphs() {
+        // 0004-lending has business knowledge models, so readModel rejects it; its decisions are evaluated alone
+        var check = KIT.get("compliance-level-3/0004-lending/0004-lending-test-01.xml #001 BureauCallType");
+
+        var needs = ((Evaluation.Unsupported) ModelEvaluator.praecepta().evaluate(check)).needs();
+        assertThat(needs).contains(Feature.KNOWLEDGE_MODELS).doesNotContain(Feature.REQUIRED_DECISIONS);
+    }
+
+    @Test
+    void a_node_on_decisions_that_invoke_built_in_functions_is_evaluated_through_the_graph() {
         var check = KIT.get("compliance-level-3/0020-vacation-days/0020-vacation-days-test-01.xml #001 Total Vacation Days");
 
-        assertThat(ModelEvaluator.praecepta().evaluate(check)).isEqualTo(new Evaluation.Unsupported(Feature.builtIn("max")));
+        assertThat(new TckRunner(graphs).run(check).status()).isEqualTo(Status.PASSED);
     }
 
     @Test
     void a_model_read_only_in_part_is_left_to_single_decisions() {
-        // 0100-arithmetic has decisions that call functions, so readModel rejects it, and each decision is evaluated alone
-        var check = KIT.get("compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #multiply_lhs_number_by_rhs_number_001 "
-                + "multiply_lhs_number_by_rhs_number_001");
+        // 0004-lending has business knowledge models, so readModel rejects it, and each decision is evaluated alone
+        var check = KIT.get("compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Adjudication");
 
-        assertThat(graphs.evaluate(check))
-                .isEqualTo(new Evaluation.Unsupported(new Feature(Feature.Area.BUILT_IN_FUNCTIONS, "function calls elsewhere in the model")));
+        assertThat(graphs.evaluate(check)).isEqualTo(new Evaluation.Unsupported(Feature.KNOWLEDGE_MODELS));
         assertThat(new TckRunner(ModelEvaluator.praecepta()).run(check).status()).isEqualTo(Status.PASSED);
     }
 

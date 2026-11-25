@@ -110,7 +110,7 @@ class FeelExpressionPropertiesTest {
 
     @Property(tries = TRIES)
     void de_morgan_holds_for_three_values(@ForAll("tests") String p, @ForAll("tests") String q) {
-        // not(p and q) = not(p) or not(q), with not written as an if, as not() is a built-in function (0.9)
+        // not(p and q) = not(p) or not(q), with not written as an if, so that the law is FEEL's logic, not not()'s
         var left = FeelExpression.parse(negation("(" + p + " and " + q + ")")).evaluate(name -> null);
         var right = FeelExpression.parse(negation(p) + " or " + negation(q)).evaluate(name -> null);
         assertThat(left).isEqualTo(right);

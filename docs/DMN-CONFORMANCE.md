@@ -52,6 +52,11 @@ release meant to remove it.
 | 26 | [A literal entry of another type than its column or output](#26-a-literal-entry-of-another-type-than-its-column-or-output) | decided by DMN 1.5 for output entries (8.3.3); open for input entries |
 | 27 | [A default output that reads an input](#27-a-default-output-that-reads-an-input) | open |
 | 28 | [A value of another type than its output](#28-a-value-of-another-type-than-its-output) | decided by DMN 1.5 for an entry whose type shows it (8.3.3); open for a value known only when evaluated |
+| 29 | [A position, length or scale that is not a whole number](#29-a-position-length-or-scale-that-is-not-a-whole-number) | decided by the TCK |
+| 30 | [The regular expressions of `matches`, `replace` and `split`](#30-the-regular-expressions-of-matches-replace-and-split) | decided by DMN 1.5 and the TCK where they say; open beyond |
+| 31 | [`string()` of a list, a context, a range or a function](#31-string-of-a-list-a-context-a-range-or-a-function) | open |
+| 32 | [The zone of `now()` and the day of `today()`](#32-the-zone-of-now-and-the-day-of-today) | open |
+| 33 | [Real numbers the TCK states to some digits](#33-real-numbers-the-tck-states-to-some-digits) | open |
 
 How Praecepta returns DMN's null result, which is a choice of representation rather than of semantics,
 is [at the end](#how-a-null-result-is-returned).
@@ -392,9 +397,11 @@ integrations alike.
   - **Steps**: one evaluation takes at most 1,000,000: an iteration of a `for`, `some` or `every` is one, and so is
     each element of a range it iterates (`1..1000`, which holds none of them, is a thousand when it is made), a
     function invocation, an element a filter tests, a path projects (`xs.a`) or `in` looks through, and an element or
-    entry equality and `instance of` look at. A function body nests at most 800 levels with the expression's own depth.
-  - **Memory**: the strings `+` makes in one evaluation hold at most 10,000,000 characters in all; other values are
-    bounded by the steps that make them. An error's message quotes a string by its first 64 characters, and is built
+    entry equality and `instance of` look at. A built-in function (since 0.9.0) counts a step for each element or entry
+    it looks at, each comparison of a sort, and each hundred characters a regular expression reads (case 30). A
+    function body nests at most 800 levels with the expression's own depth.
+  - **Memory**: the strings `+` and the built-in functions make in one evaluation hold at most 10,000,000 characters in
+    all; other values are bounded by the steps that make them. An error's message quotes a string by its first 64 characters, and is built
     only where errors are reported; one evaluation reports at most 100 errors, then one that counts the others.
   - Beyond the steps or the characters, the evaluation stops, and its value is null, with an error; beyond the nesting
     of function bodies, the invocation that goes beyond it is null, with an error.
@@ -468,6 +475,67 @@ integrations alike.
   clause's `typeRef`, which Table 34 says it does not have, is read where one is given. A string output takes any
   value as its text, as Praecepta has typed outputs since 0.6 (it takes unquoted numbers and dates as their text).
 
+## 29. A position, length or scale that is not a whole number
+- **DMN 1.5.** `substring`, `sublist`, `insert before`, `remove` and `list replace` take positions and lengths, and
+  `decimal`, `floor`, `ceiling` and the `round` functions a scale, each a number (10.3.4); what one that is not whole
+  means is not said.
+- **TCK.** `substring("foobar",3,3.8)` is `"oba"` (`1103-feel-substring-function`), `decimal(1/3, 2.5)` is `0.33`
+  (`1100-feel-decimal-function`), and `list replace([1,2,3], 2.5, 4)` and `list replace([1,2,3], -1.5, 4)` are
+  `[1, 4, 3]` and `[1, 2, 4]` (`1155-list-replace-function`): the number's whole part.
+- **Praecepta (since 0.9.0, [#117](https://github.com/brunopacheco1/praecepta/issues/117)).** Every position, length
+  and scale is its number's whole part, toward zero, as the TCK has them.
+
+## 30. The regular expressions of `matches`, `replace` and `split`
+- **DMN 1.5.** `matches` and `replace` are XQuery 1.0 and XPath 2.0 Functions and Operators' `fn:matches` and
+  `fn:replace` (7.6), and `split` splits by a pattern of the same kind (10.3.4.3), whose regular expressions are XML
+  Schema's with XPath's additions, and its flags `s`, `m`, `i`, `x` and `q`.
+- **TCK.** `1109-feel-replace-function`, `1111-feel-matches-function` and `0067-feel-split-function` test flags,
+  back-references, block escapes (`\p{IsBasicLatin}`), whitespace with `x`, and the patterns that are errors: an
+  unknown flag, a back-reference to a group the pattern does not have, a pattern that matches the empty string in
+  `replace`.
+- **Praecepta (since 0.9.0, [#117](https://github.com/brunopacheco1/praecepta/issues/117)).** Java's regular
+  expressions read the pattern, after XML Schema's character class subtraction (`[a-z-[aeiou]]`) is written as Java's
+  intersection and its block escapes (`\p{IsBasicLatin}`) as Java's (`\p{InBasicLatin}`), and with `x` the whitespace
+  outside character classes is removed first, as XPath has it. Every case the TCK has is followed. A pattern that XML
+  Schema does not allow but Java does, such as a possessive quantifier (`a*+`) or an inline flag (`(?i)`), is read as
+  Java reads it rather than rejected. Matching counts against the evaluation's limits (case 23), a step every hundred
+  characters it reads, so that a pattern that backtracks without end, such as `(.*a){12}!x`, gives null with an error;
+  so does a match that Java's regular expressions would make by recursing deeper than the thread's stack, as they do
+  for an alternation repeated over a long text (`(a|b)*` over a hundred thousand characters).
+
+## 31. `string()` of a list, a context, a range or a function
+- **DMN 1.5.** `string(from)` converts "from" to a string (Table 72), and its examples are a number and a string;
+  FEEL's other values are written by their literals elsewhere, but what `string()` gives for a list, a context, a range
+  or a function is not said.
+- **TCK.** Its cases convert simple values: numbers, strings, dates, times, date-times and durations.
+- **Praecepta (since 0.9.0, [#117](https://github.com/brunopacheco1/praecepta/issues/117)).** A simple value is written
+  as its text (`1.5`, `2025-01-31T08:30:00@Europe/Paris`, `P1DT2H`), a string as it is; a list as `[1, "a", null]` and
+  a context as `{a: 1}`, the strings in them quoted, each element written as it would be on its own; a range as FEEL
+  writes it (`[1..10)`); a built-in function by its name. `string(null)` is null.
+
+## 32. The zone of `now()` and the day of `today()`
+- **DMN 1.5.** `now()` is "the current date and time" and `today()` "the current date" (10.3.4.11), whose zone is not
+  said.
+- **TCK.** `1148-feel-now-function` and `1149-feel-today-function` check their types alone.
+- **Praecepta (since 0.9.0, [#117](https://github.com/brunopacheco1/praecepta/issues/117)).** `now()` is the date and
+  time in the JVM's default zone, with its zone id, to the millisecond; `today()` the date there. Each invocation reads
+  the clock, so two in one expression may differ.
+
+## 33. Real numbers the TCK states to some digits
+- **DMN 1.5.** A number is a decimal128 (10.3.2.3.1): 34 significant digits. `exp`, `log`, `sqrt` and `stddev` give
+  real numbers that no decimal holds exactly, so FEEL's value is the real number rounded to 34 digits.
+- **TCK.** It writes such results to fewer digits, cut or rounded from a double's 15 or so: `exp(4)` is `54.59815003`
+  (`0052-feel-exp-function`), the sample standard deviation of `[2, 4, 7, 5]` is `2.0816659994661`
+  (`0063-feel-stddev-function`), `5 ** 2.55` is `60.58617166606` (`0100-arithmetic`). Two values of
+  `0008-LX-arithmetic`, the monthly payment of a loan, are off in their last digits: for a principal of 30,000 at 4.75 %
+  over 60 months it states `562.707359373292`, where the payment is `562.7073593732659271562143285576...` (and a double
+  gives `562.7073593732719`).
+- **Praecepta (since 0.9.0, [#117](https://github.com/brunopacheco1/praecepta/issues/117)).** FEEL's values have their
+  34 digits. `praecepta-tck` takes a number the kit writes to at least 8 significant digits as the real number it
+  states: a result of more decimals that is less than one unit of its last digit away from it passes. A number of fewer
+  digits, such as `0.33`, is compared exactly. The two payments of `0008-LX-arithmetic` that the kit states wrongly
+  fail.
+
 ## Known deviations
 Where DMN 1.5 or the TCK decides and Praecepta does otherwise. Each is reported or documented where it shows,
 and is meant to go with the release named. Three were closed in 0.8.0
@@ -476,6 +544,12 @@ the default output of a table with several results bound to a decision of no dec
 value (case 14); output entries whose operands FEEL does not combine, now null, where they were rejected (case 13);
 and untyped outputs whose entries are not literals of one type, which now give each entry its own type (case 13).
 
+- **A time in a zone with one fixed offset keeps no zone id.** `time("00:01:00@Etc/UTC")` is the time at that zone's
+  offset, `00:01:00Z`, as Table 72's example of `time(from)` has it equal (case 9); but the TCK also has
+  `string(time("00:01:00@Etc/UTC"))` be `"00:01:00@Etc/UTC"` (`1116-feel-time-function`) and
+  `is(@"23:00:50@Etc/GMT", @"23:00:50Z")` be false (`0103-feel-is-function`), which keep the zone id apart from the
+  offset. Praecepta gives `"00:01:00Z"` and true. Keeping the zone id is a change to how every time is read, in decision
+  tables' cells, their bitset index and generated code too, so it is left to a release of its own.
 - **A literal expression's own `typeRef`.** A literal expression's value is bound to the type its decision's variable
   declares (10.3.2.9.4); the literal expression's own `typeRef` is read only where the variable has none, and one that
   differs from the variable's is not reported, though 7.3.1 says that "the referenced type SHALL be the same as the type

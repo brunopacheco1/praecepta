@@ -269,11 +269,12 @@ class GraphModelTest {
     }
 
     /**
-     * Decision tables in the full FEEL language (#116) load as graphs, their cells and output entries read as FEEL; a
-     * table entry that invokes a built-in function (0.9, #117) is rejected as a literal expression is, naming the release.
+     * Decision tables in the full FEEL language (#116) load as graphs, their cells and output entries read as FEEL, built-in
+     * functions (#117) included; a table entry that defines an external function (0.11, #119) is rejected as a literal
+     * expression is, naming the release.
      */
     @Test
-    void tables_in_the_full_feel_language_load_as_graphs_and_built_in_functions_name_their_release() {
+    void tables_in_the_full_feel_language_load_as_graphs_and_external_functions_name_their_release() {
         var file = """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
                   <inputData id="age" name="Age"><variable name="Age" typeRef="number"/></inputData>
@@ -301,11 +302,15 @@ class GraphModelTest {
         Assertions.assertThat(decisions.evaluate("Band", Map.of("Age", "10", "Limit", "40"))).containsExactly(Map.of("Band", "minor"));
 
         var builtIn = file.replace("&gt; Limit * 12", "&gt; abs(Limit) * 12");
-        var sources = List.of(TableSource.of("built-in.dmn", builtIn.getBytes(StandardCharsets.UTF_8)));
+        var withBuiltIn = Decisions.load(List.of(TableSource.of("built-in.dmn", builtIn.getBytes(StandardCharsets.UTF_8))), Severity.ERROR);
+        Assertions.assertThat(withBuiltIn.evaluate("Band", Map.of("Age", "30", "Limit", "-20"))).containsExactly(Map.of("Band", "over"));
+
+        var external = file.replace("&gt; Limit * 12", "&gt; (function(a) external {java: {class: \"C\"}})(Limit)");
+        var sources = List.of(TableSource.of("external.dmn", external.getBytes(StandardCharsets.UTF_8)));
         Assertions.assertThatThrownBy(() -> Decisions.load(sources, Severity.ERROR))
                 .isInstanceOfSatisfying(DecisionsException.class, e -> Assertions.assertThat(e.problems()).singleElement().asString()
-                        .startsWith("built-in.dmn: ")
-                        .contains("the built-in function 'abs', planned for 0.9 (#117)"));
+                        .startsWith("external.dmn: ")
+                        .contains("an external function (Java or PMML), planned for 0.11 (#119)"));
     }
 
     /**

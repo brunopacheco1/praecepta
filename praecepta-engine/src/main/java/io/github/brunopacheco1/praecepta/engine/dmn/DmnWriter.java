@@ -130,12 +130,14 @@ public final class DmnWriter {
                     "input data '" + inputData.get(i).name() + "'");
         }
         var decisionTypes = new String[decisions.size()];
+        var prefixes = new String[decisions.size()];
         for (int d = 0; d < decisions.size(); d++) {
+            prefixes[d] = tablePrefix(d, model.types());
             var decision = decisions.get(d);
             ids.put(decision.name(), DECISION + d);
             switch (decision.logic()) {
                 case DecisionLogic.Table(var table, var type) -> {
-                    listItemDefinitions(xml, table, DECISION + d + "_");
+                    listItemDefinitions(xml, table, prefixes[d]);
                     decisionTypes[d] = elementTypeRef(xml, type, DECISION + d + TYPE_SUFFIX, model.types(), "decision '" + decision.name() + "'");
                 }
                 case DecisionLogic.LiteralExpression literal -> decisionTypes[d] = elementTypeRef(xml, literal.type(), DECISION + d + TYPE_SUFFIX,
@@ -149,7 +151,7 @@ public final class DmnWriter {
                .append("  </inputData>\n");
         }
         for (int d = 0; d < decisions.size(); d++) {
-            decision(xml, d, decisions.get(d), decisionTypes[d], ids);
+            decision(xml, d, decisions.get(d), decisionTypes[d], prefixes[d], ids);
         }
         xml.append("</definitions>\n");
         return xml.toString();
@@ -198,8 +200,27 @@ public final class DmnWriter {
         }
     }
 
+    /**
+     * The prefix of the ids of the table of the decision at {@code d}, and of the item definitions of its list columns:
+     * {@code decision_3_}; or, where the model names a type it would start ({@code decision_3_input_0_list}), the first
+     * of {@code decision_3_1_}, {@code decision_3_2_}... that no type's name starts, so that no item definition is
+     * written twice.
+     */
+    private static String tablePrefix(int d, Map<String, FeelType> named) {
+        var prefix = DECISION + d + "_";
+        for (int k = 1; startsAName(named, prefix + INPUT); k++) {
+            prefix = DECISION + d + "_" + k + "_";
+        }
+        return prefix;
+    }
+
+    private static boolean startsAName(Map<String, FeelType> named, String start) {
+        return named.keySet().stream().anyMatch(name -> name.startsWith(start));
+    }
+
     /** A decision of a model, at position {@code d}: its variable, its information requirements and its logic. */
-    private static void decision(StringBuilder xml, int d, DecisionModel.Decision decision, String type, Map<String, String> ids) {
+    private static void decision(StringBuilder xml, int d, DecisionModel.Decision decision, String type, String prefix,
+            Map<String, String> ids) {
         var where = "Decision '" + decision.name() + "'";
         xml.append("  <decision").append(idAndName(DECISION + d, decision.name())).append(">\n")
            .append(VARIABLE).append(idAndName(DECISION + d + "_variable", decision.name())).append(optionalType(type)).append("/>\n");
@@ -216,7 +237,7 @@ public final class DmnWriter {
                .append(attribute("href", "#" + href)).append("/></informationRequirement>\n");
         }
         switch (decision.logic()) {
-            case DecisionLogic.Table(var table, var tableType) -> decisionTable(xml, table, DECISION + d + "_");
+            case DecisionLogic.Table(var table, var tableType) -> decisionTable(xml, table, prefix);
             case DecisionLogic.LiteralExpression literal -> xml.append("    <literalExpression").append(id(DECISION + d + "_literal"))
                     .append("><text>").append(escapeText(literal.text())).append("</text></literalExpression>\n");
         }
