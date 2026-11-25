@@ -114,15 +114,11 @@ rebuilds it independently to check it is bit-for-bit identical to Maven Central.
 
 # What Praecepta is not
 Praecepta evaluates DMN decision tables, fast, and the decision requirement graphs whose decisions are
-tables or literal expressions, in the full FEEL language but its built-in functions
+tables or literal expressions, in the full FEEL language with its built-in functions
 ([decision requirement graphs](#decision-requirement-graphs)). It is on its way to a full DMN 1.5 engine, one
 layer per release ([#120](https://github.com/brunopacheco1/praecepta/issues/120), see the
 [roadmap](docs/ROADMAP.md)), but it is not one yet. It does not have these yet; when you need one of them
 before its release, use an engine that has it, such as Camunda or Drools:
-- **FEEL's built-in functions** (0.9, [#117](https://github.com/brunopacheco1/praecepta/issues/117)), such as
-  `string length(...)`, `sum(...)` or `max(...)`: an expression may define and invoke its own functions
-  (`function(x) x * 2`), but of the built-in functions only `date(...)`, `time(...)`, `date and time(...)` and
-  `duration(...)` of literal arguments are evaluated, as date and time literals.
 - **Business knowledge models and boxed expressions** (0.10,
   [#118](https://github.com/brunopacheco1/praecepta/issues/118)): invocations, function definitions, contexts,
   relations, lists, conditionals and the other boxed expressions.
@@ -449,9 +445,9 @@ Supported:
   FEEL's `sum`, `min` and `max` are null for a list that holds null (10.3.4.4): the engine gives that rule's
   output (`[{fee=null}]`), and COUNT counts the rule.
 
-Anything else is rejected with a message naming the decision, rule and column; FEEL's built-in functions
-(`upper case(a)`, `string length(name) > 3`) with an `UnsupportedFeatureException` naming 0.9
-([#117](https://github.com/brunopacheco1/praecepta/issues/117)). A column may read another decision's value (its
+Entries and input expressions may invoke FEEL's built-in functions (`upper case(a)`, `string length(name) > 3`).
+Anything else is rejected with a message naming the decision, rule and column; an external function (Java or PMML)
+with an `UnsupportedFeatureException` naming 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)). A column may read another decision's value (its
 input expression names it), which a table read alone takes as an input of the engine, and a
 [decision graph](#decision-requirement-graphs) gives it from that decision. `DmnReader.readAll(dmn)`
 reads every decision table of a file. `DmnWriter.write(table)` produces DMN 1.3 that Camunda and Drools
@@ -485,10 +481,15 @@ graph.validationReport("Credit Limit");                    // that table's own a
   spaces and keywords (`Another Date and Time`), and are read against the names the decision's requirements
   provide, the longest first. Where FEEL defines no value, such as for operands it does not combine (a string and
   a number), a division by zero or an index beyond a list, the value is null, and
-  `graph.evaluateWithErrors(decision, inputData)` gives FEEL's errors with it. FEEL's built-in functions are 0.9's
-  ([#117](https://github.com/brunopacheco1/praecepta/issues/117)): `date(...)`, `time(...)`,
-  `date and time(...)` and `duration(...)` of literal arguments are date and time literals, and nothing else is
-  called. `FeelExpression` parses and evaluates FEEL on its own.
+  `graph.evaluateWithErrors(decision, inputData)` gives FEEL's errors with it. FEEL's built-in functions (since 0.9,
+  [#117](https://github.com/brunopacheco1/praecepta/issues/117)) are all there: conversions (`date(...)`,
+  `number("1 000,5", " ", ",")`, `string(...)`, `range("[18..21)")`), strings (`substring`, `upper case`,
+  `matches` and `replace` with XPath's regular expressions), lists (`sum`, `max`, `distinct values`,
+  `sort(Orders, function(a, b) a.amount > b.amount)`), numbers (`decimal`, `round half up`, `modulo`, `sqrt`),
+  dates (`day of week`), ranges (`before`, `overlaps`, `includes`) and contexts (`get value`, `context put`), with
+  positional or named arguments; a function given arguments it does not take is null, with an error. A function's
+  work counts against the evaluation's limits, so a regular expression that backtracks without end, or a sort of a
+  million items, stops with an error. `FeelExpression` parses and evaluates FEEL on its own.
 - **Values.** A table with one output gives its value, with several a context (a `Map` of its outputs), whose
   components a decision reads by path (`Pricing.discount`), and under RULE ORDER, OUTPUT ORDER or COLLECT
   without an aggregation a list of those, which a list column downstream takes (`Checks.code` is the list of
@@ -523,9 +524,8 @@ graph.validationReport("Credit Limit");                    // that table's own a
   ([Spring Boot](#decision-requirement-graphs-in-the-framework-integrations)).
 
 Business knowledge models, invocations and boxed expressions (0.10,
-[#118](https://github.com/brunopacheco1/praecepta/issues/118)), FEEL's built-in functions (0.9,
-[#117](https://github.com/brunopacheco1/praecepta/issues/117)), decision services and imports (0.11,
-[#119](https://github.com/brunopacheco1/praecepta/issues/119)) come later: a model that uses them is rejected
+[#118](https://github.com/brunopacheco1/praecepta/issues/118)), decision services, imports and FEEL's external
+functions (0.11, [#119](https://github.com/brunopacheco1/praecepta/issues/119)) come later: a model that uses them is rejected
 when it is read with an `UnsupportedFeatureException`, whose message, `release()` and `issue()` name the feature's
 release and issue. What DMN 1.5 decides and Praecepta does not do yet is listed in
 [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md#known-deviations).
@@ -1084,16 +1084,16 @@ build, and gives two numbers:
 - **Decision tables: 83 of 86 checks pass (96.5 %).** These are the decision-table checks counted since the
   first release; the other three read inputs computed by other decisions in models that also invoke
   business knowledge models, which come in 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)).
-- **The whole kit: 2,275 of 3,511 result nodes pass (64.8 %).** Every model of compliance levels 2 and 3
+- **The whole kit: 3,276 of 3,511 result nodes pass (93.3 %).** Every model of compliance levels 2 and 3
   (148 models at the pinned commit), each result node scored as passed, failed or not supported, each
   decision evaluated through its model's decision requirement graph where Praecepta reads the model. This
-  measures how much of DMN 1.5 Praecepta covers: of the 2,279 nodes it evaluates, 2,275 pass (the four others
-  are [known failures](praecepta-tck/README.md#known-failures)), and the other 1,232 need features it does
-  not have yet, mostly FEEL's built-in functions (0.9).
+  measures how much of DMN 1.5 Praecepta covers: of the 3,280 nodes it evaluates, 3,276 pass (the four others
+  are [known failures](praecepta-tck/README.md#known-failures)), and the other 231 need features it does
+  not have yet, mostly boxed expressions and business knowledge models (0.10).
 
 Praecepta is a decision-table engine growing into a full DMN 1.5 engine one layer per release
-([#120](https://github.com/brunopacheco1/praecepta/issues/120)), so a third of the kit (built-in functions,
-boxed expressions, business knowledge models, decision services) is still ahead; [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md) has the results per model and feature area,
+([#120](https://github.com/brunopacheco1/praecepta/issues/120)), so part of the kit (boxed expressions,
+business knowledge models, decision services) is still ahead; [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md) has the results per model and feature area,
 every feature the unsupported nodes need with the release that brings it, and how many nodes each release
 would complete. The build fails only on a regression: a node the committed baseline has passing that no
 longer does. The literal expressions of the TCK's arithmetic test cases also run as decision tables' output
@@ -1169,9 +1169,9 @@ Quarkus' tools can check it matches the application's Quarkus version. Its deplo
 Quarkus' build uses, brings `praecepta-compiler` and Apache POI; neither reaches the application.
 
 # Roadmap
-[docs/ROADMAP.md](docs/ROADMAP.md) has the plans for the next year. 0.8 brought the full FEEL language; next come
-its built-in functions in 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)), boxed expressions
-and business knowledge models in 0.10, then decision services, imports and a DMN 1.5 conformance claim for 1.0
+[docs/ROADMAP.md](docs/ROADMAP.md) has the plans for the next year. 0.8 brought the full FEEL language and 0.9 its
+built-in functions ([#117](https://github.com/brunopacheco1/praecepta/issues/117)); next come boxed expressions
+and business knowledge models in 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)), then decision services, imports and a DMN 1.5 conformance claim for 1.0
 ([#120](https://github.com/brunopacheco1/praecepta/issues/120)); past
 decisions and their reasons are in
 [docs/MODERNISATION.md](docs/MODERNISATION.md).

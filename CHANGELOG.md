@@ -11,6 +11,76 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+FEEL's built-in functions, the third step of Praecepta's plan to grow from a decision-table engine into a full DMN 1.5
+engine, one layer per release ([#120](https://github.com/brunopacheco1/praecepta/issues/120)): every function of DMN
+1.5, 10.3.4, is now evaluated ([#117](https://github.com/brunopacheco1/praecepta/issues/117)), in literal expressions
+and in decision tables' input entries, input expressions and output entries alike, where 0.8 rejected an expression
+that invoked one. Of the DMN TCK's 3,511 result nodes, 3,276 now pass (93.3 %, from 2,275 in 0.8), 3,276 of the 3,280
+Praecepta evaluates; of the built-in functions' feature area, 1,066 of 1,071, where 3 others need business knowledge
+models and 2 are a known deviation; the decision-table checks still pass 83 of 86 ([RESULTS.md](praecepta-tck/RESULTS.md)). Read *Changed* before
+upgrading if you rely on a model being rejected for invoking a built-in function, or look for one in
+`FeelExpression.unsupported()`.
+
+### Added
+- **FEEL's built-in functions** ([#117](https://github.com/brunopacheco1/praecepta/issues/117)), all of DMN 1.5,
+  10.3.4, by the names and parameters it gives them:
+  - **conversion** (10.3.4.1): `date`, `date and time`, `time` and `duration` of any arguments, as their date time
+    literals were in 0.8; `years and months duration`, counting whole months between two dates (a date and time by its
+    date, as the TCK has it); `number` with a grouping and a decimal separator; `string`; and `range`, of a range
+    literal whose endpoints are literals of one type, in order (`range("[18..21)")`);
+  - **boolean** (10.3.4.2) and **miscellaneous** (10.3.4.11): `not`, `is` (the same element of FEEL's domain: a time at
+    an offset is not the time at another, though they are equal), `now` and `today`;
+  - **string** (10.3.4.3): `substring`, `string length`, `upper case`, `lower case`, `substring before`,
+    `substring after`, `replace`, `contains`, `starts with`, `ends with`, `matches`, `split` and `string join`. Strings
+    are sequences of Unicode code points (`string length("\U01F40E")` is 1), and `matches`, `replace` and `split` take
+    XPath's regular expressions and flags (`s`, `m`, `i`, `x`, `q`; [DMN conformance](docs/DMN-CONFORMANCE.md), case
+    30);
+  - **list** (10.3.4.4) and **sort** (10.3.4.9): `list contains`, `count`, `min`, `max`, `sum`, `mean`, `all`, `any`,
+    `sublist`, `append`, `concatenate`, `insert before`, `remove`, `reverse`, `index of`, `union`, `distinct values`,
+    `flatten`, `product`, `median`, `stddev`, `mode`, `list replace` (at a position, or where a function matches) and
+    `sort` (by a `precedes` function, stable, or in ascending order without one). Items are found by FEEL's equality
+    and ordered by its order;
+  - **numeric** (10.3.4.5): `decimal`, `floor` and `ceiling` (with an optional scale), `round up`, `round down`,
+    `round half up`, `round half down`, `abs` (of numbers and durations), `modulo`, `sqrt`, `log`, `exp`, `odd` and
+    `even`, to FEEL's 34 significant digits;
+  - **date and time** (10.3.4.6): `day of year`, `day of week`, `month of year` and `week of year` (ISO 8601's);
+  - **range** (10.3.4.7): `before`, `after`, `meets`, `met by`, `overlaps`, `overlaps before`, `overlaps after`,
+    `finishes`, `finished by`, `includes`, `during`, `starts`, `started by` and `coincides`, of points and ranges, by
+    DMN 1.5's formulas; a range's missing endpoint (`< 10`) is unbounded;
+  - **context** (10.3.4.10): `get value`, `get entries`, `context`, `context put` (of a key, or of a path of keys into
+    nested contexts) and `context merge`, which keep a context's entries in order.
+
+  Arguments may be positional or named, and a function of several signatures (`date(from)` and
+  `date(year, month, day)`) binds named ones by the signature that names them. A parameter of a simple type takes a
+  list of one value, and one of a list type a single value (10.3.2.9.4). Positions, lengths and scales are their
+  numbers' whole parts, as the TCK has them (case 29). Arguments a function does not take make it null, with an error
+  naming the function, the parameter and what it was given (`substring(...) takes a number as its 'start position',
+  not "x"`). A function's work counts against the evaluation's limits: a step for each element it looks at, each
+  comparison of a sort, and each hundred characters a regular expression reads, so that one that backtracks without
+  end gives null with an error; and the strings it makes count with those `+` makes (case 23).
+- **Input data typed by a collection of collections** in a decision requirement graph: an item definition that is a
+  collection of another collection is a list of lists (`list<list<string>>`), where `DmnReader.readModel` rejected it.
+  A decision table's column of such a type is still rejected.
+
+### Changed
+- **A model that invokes a built-in function now loads**: `DmnReader.read` and `readModel`, `DecisionGraph`, the
+  engine's output expressions, the build plugins and the framework integrations read and evaluate decision tables and
+  literal expressions that invoke one, where they rejected them with an `UnsupportedFeatureException` naming 0.9.
+  **Upgrade note:** a file that was left out, or loaded only in part, for that reason now loads whole.
+- **`FeelExpression.unsupported()` and `FeelUnaryTests.unsupported()` name external functions alone** (`function(a)
+  external {...}`, planned for 0.11, [#119](https://github.com/brunopacheco1/praecepta/issues/119)), and an
+  `UnsupportedFeatureException` for one names 0.11 and #119.
+- **An invocation of a built-in function nests as any invocation does**, two levels of the expression's tree, so they
+  nest 149 deep where 0.8 parsed 250 levels of the ones it did not evaluate ([DMN conformance](docs/DMN-CONFORMANCE.md),
+  case 23).
+- **`praecepta-tck` reads a number the kit states to some digits as the real number it states**: one written to at
+  least 8 significant digits, as `exp(4)` is `54.59815003`, matches a result less than one unit of its last digit away
+  (case 33). Two of 0.8's known failures, a power that is not whole and the first payment of `0008-LX-arithmetic`,
+  now pass; the other two payments, which the kit states wrongly, still fail. Two new known failures are a known
+  deviation: `string(time("00:01:00@Etc/UTC"))` is `"00:01:00Z"`, and `is(@"23:00:50@Etc/GMT", @"23:00:50Z")` true,
+  where the TCK keeps a fixed-offset zone id apart from its offset ([DMN conformance](docs/DMN-CONFORMANCE.md), known
+  deviations).
+
 ## [0.8.0] - 2026-11-24
 
 The full FEEL language, the second step of Praecepta's plan to grow from a decision-table engine into a full DMN 1.5

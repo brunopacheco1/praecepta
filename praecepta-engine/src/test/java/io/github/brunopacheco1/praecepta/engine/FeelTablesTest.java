@@ -283,18 +283,19 @@ class FeelTablesTest {
         Assertions.assertThat(graph.evaluate("Price", Map.of("Base", 10, "Rate", 2))).isNull();
     }
 
-    /** FEEL's built-in functions are planned for 0.9 (#117): a table entry that invokes one is rejected as a literal expression is. */
+    /** FEEL's built-in functions (since 0.9, #117) in a cell and in an output entry; an external function is not supported yet. */
     @Test
-    void an_entry_that_invokes_a_built_in_function_is_not_supported_yet() {
-        var cell = stream(AMOUNTS.formatted("&gt; abs(Limit)"));
-        Assertions.assertThatThrownBy(() -> DmnReader.readModel(cell))
+    void an_entry_may_invoke_a_built_in_function() {
+        var cell = DecisionGraph.read(stream(AMOUNTS.formatted("&gt; abs(Limit)")));
+        Assertions.assertThat(cell.evaluate("Check", Map.of("Amount", 6, "Limit", -5, "Low", 0))).isEqualTo("yes");
+        Assertions.assertThat(cell.evaluate("Check", Map.of("Amount", 4, "Limit", -5, "Low", 0))).isEqualTo("no");
+        var output = DecisionGraph.read(stream(PRICES.formatted("", "string(Base) + \"!\"", "\"\"")));
+        Assertions.assertThat(output.evaluate("Price", Map.of("Base", 10, "Rate", 2))).isEqualTo("10!");
+        var external = stream(AMOUNTS.formatted("&gt; (function(a) external {java: {class: \"C\"}})(Limit)"));
+        Assertions.assertThatThrownBy(() -> DmnReader.readModel(external))
                 .isInstanceOf(UnsupportedFeatureException.class)
-                .hasMessageContaining("the built-in function 'abs', planned for 0.9 (#117)")
-                .extracting(e -> ((UnsupportedFeatureException) e).release()).isEqualTo("0.9");
-        var output = stream(PRICES.formatted("", "string(Base)", "\"\""));
-        Assertions.assertThatThrownBy(() -> DmnReader.readModel(output)).isInstanceOf(UnsupportedFeatureException.class);
-        var all = stream(AMOUNTS.formatted("&gt; abs(Limit)"));
-        Assertions.assertThatThrownBy(() -> DmnReader.readAll(all)).isInstanceOf(UnsupportedFeatureException.class);
+                .hasMessageContaining("an external function (Java or PMML), planned for 0.11 (#119)")
+                .extracting(e -> ((UnsupportedFeatureException) e).release()).isEqualTo("0.11");
     }
 
     /** A cell that is neither simple unary tests nor FEEL is rejected, naming where it is, as before. */

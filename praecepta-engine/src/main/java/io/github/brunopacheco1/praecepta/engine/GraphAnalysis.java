@@ -252,8 +252,8 @@ final class GraphAnalysis {
 
     /**
      * Parses a decision's literal expression with the names of its requirements in scope (DMN 1.5, 7.3.4 and 10.3.2.11),
-     * and the types the model defines; reports what it uses that Praecepta does not evaluate yet (a built-in function,
-     * planned for 0.9), and an expression that is not FEEL, or names a type that neither FEEL nor the model defines
+     * and the types the model defines; reports what it uses that Praecepta does not evaluate yet (an external function,
+     * planned for 0.11), and an expression that is not FEEL, or names a type that neither FEEL nor the model defines
      * ({@link Kind#INVALID_EXPRESSION}).
      */
     private void parseLiteral(int d, DecisionLogic.LiteralExpression literal, Set<String> scope) {

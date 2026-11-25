@@ -299,7 +299,6 @@ final class GraphEvaluator implements ModelEvaluator {
             case 119 -> message.startsWith("DMN model has the decision service") ? Feature.DECISION_SERVICES : Feature.IMPORTS;
             case 118 -> message.startsWith("DMN model has the business knowledge model") || message.contains("requires business knowledge")
                     ? Feature.KNOWLEDGE_MODELS : Feature.boxed("boxed expressions elsewhere in the model");
-            case 117 -> new Feature(Feature.Area.BUILT_IN_FUNCTIONS, "function calls elsewhere in the model");
             default -> Feature.feel("FEEL Praecepta does not read elsewhere in the model");
         };
     }

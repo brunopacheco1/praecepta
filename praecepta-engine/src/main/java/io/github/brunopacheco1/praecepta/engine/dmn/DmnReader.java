@@ -89,8 +89,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
  * any input for a string output; an input is a column or an input the cells compare with, and holds single
  * values), or any other FEEL expression (DMN 1.5, chapter 10), kept as written in
  * {@link PraeceptaOutput#expressions()}, which the engine parses, types and evaluates; every hit policy; SUM, MIN, MAX
- * and COUNT aggregation. An entry or input expression that invokes one of FEEL's built-in functions is rejected with an
- * {@link UnsupportedFeatureException}, as they are planned for 0.9 (#117); anything else Praecepta does not read with an
+ * and COUNT aggregation. An entry or input expression that defines an external function is rejected with an
+ * {@link UnsupportedFeatureException}, as they are planned for 0.11 (#119); anything else Praecepta does not read with an
  * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered
  * from 1 in table order.
  *
@@ -173,9 +173,7 @@ public final class DmnReader {
      * <p>What Praecepta does not evaluate yet is rejected, naming the element and the release that plans it: business
      * knowledge models, knowledge requirements and invocations, and decision logic that is a boxed expression (a context,
      * an invocation, a function definition, a relation, a list, a conditional, an iteration, a quantified expression, a
-     * filter), planned for 0.10 (#118); literal expressions, and decision tables' entries and input expressions, that
-     * invoke a built-in function, for 0.9 (#117); decision
-     * services, imports and external functions, for 0.11 (#119).
+     * filter), planned for 0.10 (#118); decision services, imports and external functions, for 0.11 (#119).
      *
      * @throws InvalidDecisionTableException if the model cannot be read (a literal expression that is not FEEL among
      *                                       other things), uses what Praecepta does not support yet, or names two of its
@@ -260,7 +258,6 @@ public final class DmnReader {
         }
     }
 
-    private static final Planned FUNCTIONS = new Planned("0.9", 117);
     private static final Planned BOXED = new Planned("0.10", 118);
     private static final Planned IMPORTS = new Planned("0.11", 119);
 
@@ -387,7 +384,7 @@ public final class DmnReader {
         }
         var unsupported = literalExpression.expression().unsupported();
         if (!unsupported.isEmpty()) {
-            var planned = unsupported.getFirst().issue() == 119 ? IMPORTS : FUNCTIONS;
+            var planned = new Planned(unsupported.getFirst().release(), unsupported.getFirst().issue());
             throw planned.exception("%s: its literal expression uses %s, which Praecepta does not support yet".formatted(where,
                     String.join(" and ", unsupported.stream().map(Object::toString).toList())));
         }
@@ -878,7 +875,7 @@ public final class DmnReader {
     /**
      * An input expression that is not a name: a FEEL expression, checked.
      *
-     * @throws UnsupportedFeatureException  if it invokes a built-in function (0.9, #117)
+     * @throws UnsupportedFeatureException  if it defines an external function (0.11, #119)
      * @throws InvalidDecisionTableException if it is not FEEL
      */
     private static FeelExpression inputExpression(String text, FeelExpression.Scope scope, String where) {
@@ -896,7 +893,7 @@ public final class DmnReader {
     /** Rejects an expression that uses what Praecepta does not evaluate yet, naming the release that plans it. */
     private static void rejectUnsupported(String where, List<FeelExpression.Unsupported> unsupported) {
         if (!unsupported.isEmpty()) {
-            var planned = unsupported.getFirst().issue() == 119 ? IMPORTS : FUNCTIONS;
+            var planned = new Planned(unsupported.getFirst().release(), unsupported.getFirst().issue());
             throw planned.exception("%s uses %s, which Praecepta does not support yet".formatted(where,
                     String.join(" and ", unsupported.stream().map(Object::toString).toList())));
         }
@@ -1138,7 +1135,7 @@ public final class DmnReader {
      * {@code list contains}), which the bitset index evaluates; else null, once it is checked to be FEEL unary tests
      * ({@link FeelUnaryTests}), which the engine applies to the rules the index matches.
      *
-     * @throws UnsupportedFeatureException  if it invokes a built-in function (0.9, #117)
+     * @throws UnsupportedFeatureException  if it defines an external function (0.11, #119)
      * @throws InvalidDecisionTableException if it is neither
      */
     private static UnaryTests ruleCell(String text, ColumnType type, boolean list, TableScope scope, String where) {
@@ -1282,7 +1279,7 @@ public final class DmnReader {
      * Checks an output entry that computes its value: a FEEL expression (DMN 1.5, chapter 10), which the engine parses,
      * types and evaluates; one whose value is null whatever its inputs is a WARNING of its validation report.
      *
-     * @throws UnsupportedFeatureException  if it invokes a built-in function (0.9, #117)
+     * @throws UnsupportedFeatureException  if it defines an external function (0.11, #119)
      * @throws InvalidDecisionTableException if it is not FEEL
      */
     private static void parseExpression(String text, FeelExpression.Scope scope, String where) {
@@ -1657,11 +1654,8 @@ public final class DmnReader {
                 }
                 type = typeOf(base.getTextContent(), where, depth, enclosing);
             }
+            // a collection of a collection is a list of lists (the DMN TCK's 0009-append-flatten)
             if (Boolean.parseBoolean(definition.getAttribute("isCollection").strip())) {
-                if (type instanceof FeelType.ListOf) {
-                    throw new InvalidDecisionTableException("%s: type '%s' is a collection of collections, which is not supported"
-                            .formatted(where, name));
-                }
                 type = new FeelType.ListOf(type);
             }
             return type;

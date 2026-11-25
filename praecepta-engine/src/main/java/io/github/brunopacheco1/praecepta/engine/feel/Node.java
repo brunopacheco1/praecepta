@@ -163,7 +163,7 @@ sealed interface Node {
     }
 
     /**
-     * What DMN 1.5 defines but Praecepta does not evaluate yet, such as a built-in function (0.9, #117): its value is
+     * What DMN 1.5 defines but Praecepta does not evaluate yet, such as an external function (0.11, #119): its value is
      * null, with an error; {@link FeelExpression#unsupported()} names it, so a decision that uses it is reported.
      *
      * @param what what it is, and the release that plans it
@@ -884,7 +884,8 @@ sealed interface Node {
                 }
                 return call(f, values, env);
             }
-            var parameters = f.parameters();
+            int signature = f instanceof BuiltInFunction builtIn ? builtIn.signatureNaming(names) : BuiltInFunction.POSITIONAL;
+            var parameters = f instanceof BuiltInFunction builtIn ? builtIn.signature(signature) : f.parameters();
             var positions = new int[names.size()];
             int highest = -1;
             for (int i = 0; i < names.size(); i++) {
@@ -903,7 +904,7 @@ sealed interface Node {
             for (int i = 0; i < names.size(); i++) {
                 values.set(positions[i], arguments.get(i).evaluate(env));
             }
-            return call(f, values, env);
+            return f instanceof BuiltInFunction builtIn ? builtIn.call(values, signature, env) : call(f, values, env);
         }
 
         /** Invokes a function from an evaluation, which it counts against and reports its errors to. */
