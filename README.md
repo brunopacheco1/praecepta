@@ -80,14 +80,14 @@ Java 21 or later (tested on 21, 25 and 27). Pick the modules you need:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-engine</artifactId>
-  <version>0.8.0</version>
+  <version>0.9.0</version>
 </dependency>
 
 <!-- optional: load rules from Excel or CSV at runtime (brings Apache POI) -->
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-loader</artifactId>
-  <version>0.8.0</version>
+  <version>0.9.0</version>
 </dependency>
 ```
 
@@ -579,7 +579,7 @@ needs only `praecepta-engine`; Apache POI stays a build-time dependency.
 <plugin>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-maven-plugin</artifactId>
-  <version>0.8.0</version>
+  <version>0.9.0</version>
   <executions><execution><goals><goal>generate</goal></goals></execution></executions>
   <configuration>
     <packageName>com.acme.pricing</packageName>
@@ -675,11 +675,11 @@ too, with its plugin marker). Version 0.5.0 is on Maven Central only: for it, ad
 // build.gradle.kts
 plugins {
     java
-    id("io.github.brunopacheco1.praecepta") version "0.8.0"
+    id("io.github.brunopacheco1.praecepta") version "0.9.0"
 }
 
 dependencies {
-    implementation("io.github.brunopacheco1:praecepta-engine:0.8.0")
+    implementation("io.github.brunopacheco1:praecepta-engine:0.9.0")
 }
 
 praecepta {
@@ -725,7 +725,7 @@ registers them as beans:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-spring-boot-starter</artifactId>
-  <version>0.8.0</version>
+  <version>0.9.0</version>
 </dependency>
 ```
 
@@ -822,7 +822,7 @@ For Micronaut 4 applications on Java 21+. At startup, the module:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-micronaut</artifactId>
-  <version>0.8.0</version>
+  <version>0.9.0</version>
 </dependency>
 ```
 
@@ -885,7 +885,7 @@ Runs on Quarkus 3.40 and later with Java 21+. Add the extension to a Quarkus app
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-quarkus</artifactId>
-  <version>0.8.0</version>
+  <version>0.9.0</version>
 </dependency>
 ```
 
@@ -962,7 +962,7 @@ DMN files, builds one engine per decision table, and evaluates them by name. It 
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-integration</artifactId>
-  <version>0.8.0</version>
+  <version>0.9.0</version>
 </dependency>
 ```
 
