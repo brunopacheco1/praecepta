@@ -402,6 +402,17 @@ class BuiltInFunctionsTest {
     }
 
     @Test
+    void a_regular_expression_that_nests_beyond_the_stack_is_null_with_an_error() {
+        // Java's regular expressions recurse for each repetition of an alternation: (a|b)* over 100,000 characters
+        var text = "{s: string join(for i in 1..50000 return \"ab\")}.s";
+        for (var expression : List.of("matches(" + text + ", \"^(a|b)*$\")", "replace(" + text + ", \"(a|b)+\", \"x\")",
+                "split(" + text + ", \"(a|b)+c\")")) {
+            assertThat(value(expression)).as(expression).isNull();
+            assertThat(errors(expression)).as(expression).anyMatch(error -> error.contains("deeper than the thread's stack"));
+        }
+    }
+
+    @Test
     void a_function_s_work_counts_against_the_evaluation_s_steps() {
         assertThat(value("count(sort(for i in 1..20000 return -i))")).isEqualTo(BigDecimal.valueOf(20_000));
         // each comparison of a sort invokes its function, a step each

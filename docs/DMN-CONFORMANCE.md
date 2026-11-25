@@ -499,7 +499,9 @@ integrations alike.
   outside character classes is removed first, as XPath has it. Every case the TCK has is followed. A pattern that XML
   Schema does not allow but Java does, such as a possessive quantifier (`a*+`) or an inline flag (`(?i)`), is read as
   Java reads it rather than rejected. Matching counts against the evaluation's limits (case 23), a step every hundred
-  characters it reads, so that a pattern that backtracks without end, such as `(.*a){12}!x`, gives null with an error.
+  characters it reads, so that a pattern that backtracks without end, such as `(.*a){12}!x`, gives null with an error;
+  so does a match that Java's regular expressions would make by recursing deeper than the thread's stack, as they do
+  for an alternation repeated over a long text (`(a|b)*` over a hundred thousand characters).
 
 ## 31. `string()` of a list, a context, a range or a function
 - **DMN 1.5.** `string(from)` converts "from" to a string (Table 72), and its examples are a number and a string;

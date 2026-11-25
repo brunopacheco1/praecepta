@@ -38,8 +38,8 @@ final class Arguments {
         return single(value) instanceof BigDecimal number ? number : reject("a number", value, parameter);
     }
 
-    static Boolean bool(Object value, String parameter) {
-        return single(value) instanceof Boolean bool ? bool : reject("a boolean", value, parameter);
+    static boolean bool(Object value, String parameter) {
+        return single(value) instanceof Boolean bool ? bool : Arguments.<Boolean>reject("a boolean", value, parameter);
     }
 
     /**
@@ -56,16 +56,18 @@ final class Arguments {
     }
 
     /** A list; a single value, but null, as the list of it ("to singleton list"). */
-    static List<?> list(Object value, String parameter) {
+    @SuppressWarnings("unchecked") // FEEL's lists are read, never written to
+    static List<Object> list(Object value, String parameter) {
         if (value instanceof List<?> list) {
-            return list;
+            return (List<Object>) list;
         }
         return value == null ? reject("a list", null, parameter) : Collections.singletonList(value);
     }
 
     /** A context. */
-    static Map<?, ?> context(Object value, String parameter) {
-        return single(value) instanceof Map<?, ?> context ? context : reject("a context", value, parameter);
+    @SuppressWarnings("unchecked") // FEEL's contexts are read, never written to
+    static Map<Object, Object> context(Object value, String parameter) {
+        return single(value) instanceof Map<?, ?> context ? (Map<Object, Object>) context : reject("a context", value, parameter);
     }
 
     /** A function. */
@@ -77,7 +79,7 @@ final class Arguments {
      * The values of a function of a list or of its values ({@code min(list)}, {@code min(c1, c2, ...)}): the list,
      * if it is given one argument (a single value as the list of it), else the arguments.
      */
-    static List<?> items(List<Object> arguments, String parameter) {
+    static List<Object> items(List<Object> arguments, String parameter) {
         return arguments.size() == 1 ? list(arguments.getFirst(), parameter) : arguments;
     }
 

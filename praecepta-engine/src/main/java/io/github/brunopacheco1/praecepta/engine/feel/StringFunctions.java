@@ -30,9 +30,11 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
  */
 final class StringFunctions {
 
-    private static final FeelType STRING = FeelType.of(ColumnType.STRING);
+    private static final FeelType STRING_TYPE = FeelType.of(ColumnType.STRING);
     private static final FeelType NUMBER = FeelType.of(ColumnType.NUMBER);
     private static final FeelType BOOLEAN = FeelType.of(ColumnType.BOOLEAN);
+    private static final String STRING = "string";
+    private static final String DELIMITER = "delimiter";
     private static final String INPUT = "input";
     private static final String PATTERN = "pattern";
     private static final String FLAGS = "flags";
@@ -48,42 +50,44 @@ final class StringFunctions {
     }
 
     static void register(Consumer<BuiltInFunction> add) {
-        add.accept(BuiltInFunction.of("substring", STRING, optional(2, 1), StringFunctions::substring,
-                "string", "start position", "length"));
+        add.accept(BuiltInFunction.of("substring", STRING_TYPE, optional(2, 1), StringFunctions::substring,
+                STRING, "start position", "length"));
         add.accept(BuiltInFunction.of("string length", NUMBER, fixed(1),
-                (arguments, env) -> FeelNumbers.decimal(string(arguments.getFirst(), "string").codePointCount(0,
-                        string(arguments.getFirst(), "string").length())), "string"));
-        add.accept(BuiltInFunction.of("upper case", STRING, fixed(1),
-                (arguments, env) -> string(arguments.getFirst(), "string").toUpperCase(Locale.ROOT), "string"));
-        add.accept(BuiltInFunction.of("lower case", STRING, fixed(1),
-                (arguments, env) -> string(arguments.getFirst(), "string").toLowerCase(Locale.ROOT), "string"));
-        add.accept(BuiltInFunction.of("substring before", STRING, fixed(2), (arguments, env) -> {
-            var text = string(arguments.get(0), "string");
+                (arguments, env) -> FeelNumbers.decimal(string(arguments.getFirst(), STRING).codePointCount(0,
+                        string(arguments.getFirst(), STRING).length())), STRING));
+        add.accept(BuiltInFunction.of("upper case", STRING_TYPE, fixed(1),
+                (arguments, env) -> string(arguments.getFirst(), STRING).toUpperCase(Locale.ROOT), STRING));
+        add.accept(BuiltInFunction.of("lower case", STRING_TYPE, fixed(1),
+                (arguments, env) -> string(arguments.getFirst(), STRING).toLowerCase(Locale.ROOT), STRING));
+        add.accept(BuiltInFunction.of("substring before", STRING_TYPE, fixed(2), (arguments, env) -> {
+            var text = string(arguments.get(0), STRING);
             int at = text.indexOf(string(arguments.get(1), MATCH));
             return at < 0 ? "" : text.substring(0, at);
-        }, "string", MATCH));
-        add.accept(BuiltInFunction.of("substring after", STRING, fixed(2), (arguments, env) -> {
-            var text = string(arguments.get(0), "string");
+        }, STRING, MATCH));
+        add.accept(BuiltInFunction.of("substring after", STRING_TYPE, fixed(2), (arguments, env) -> {
+            var text = string(arguments.get(0), STRING);
             var match = string(arguments.get(1), MATCH);
             int at = text.indexOf(match);
             return at < 0 ? "" : text.substring(at + match.length());
-        }, "string", MATCH));
-        add.accept(BuiltInFunction.of("replace", STRING, optional(3, 1), StringFunctions::replace,
+        }, STRING, MATCH));
+        add.accept(BuiltInFunction.of("replace", STRING_TYPE, optional(3, 1),
+                (arguments, env) -> matching(() -> replace(arguments, env)),
                 INPUT, PATTERN, "replacement", FLAGS));
         add.accept(BuiltInFunction.of("contains", BOOLEAN, fixed(2),
-                (arguments, env) -> string(arguments.get(0), "string").contains(string(arguments.get(1), MATCH)), "string", MATCH));
+                (arguments, env) -> string(arguments.get(0), STRING).contains(string(arguments.get(1), MATCH)), STRING, MATCH));
         add.accept(BuiltInFunction.of("starts with", BOOLEAN, fixed(2),
-                (arguments, env) -> string(arguments.get(0), "string").startsWith(string(arguments.get(1), MATCH)), "string", MATCH));
+                (arguments, env) -> string(arguments.get(0), STRING).startsWith(string(arguments.get(1), MATCH)), STRING, MATCH));
         add.accept(BuiltInFunction.of("ends with", BOOLEAN, fixed(2),
-                (arguments, env) -> string(arguments.get(0), "string").endsWith(string(arguments.get(1), MATCH)), "string", MATCH));
+                (arguments, env) -> string(arguments.get(0), STRING).endsWith(string(arguments.get(1), MATCH)), STRING, MATCH));
         add.accept(BuiltInFunction.of("matches", BOOLEAN, optional(2, 1), (arguments, env) -> {
             var input = string(arguments.get(0), INPUT);
             var pattern = pattern(string(arguments.get(1), PATTERN), flags(arguments, 2));
-            return matcher(pattern, input, env).find();
+            return matching(() -> matcher(pattern, input, env).find());
         }, INPUT, PATTERN, FLAGS));
-        add.accept(BuiltInFunction.of("split", FeelType.listOf(ColumnType.STRING), fixed(2), StringFunctions::split,
-                "string", "delimiter"));
-        add.accept(BuiltInFunction.of("string join", STRING, optional(1, 1), StringFunctions::join, "list", "delimiter"));
+        add.accept(BuiltInFunction.of("split", FeelType.listOf(ColumnType.STRING), fixed(2),
+                (arguments, env) -> matching(() -> split(arguments, env)),
+                STRING, DELIMITER));
+        add.accept(BuiltInFunction.of("string join", STRING_TYPE, optional(1, 1), StringFunctions::join, "list", DELIMITER));
     }
 
     /**
@@ -92,7 +96,7 @@ final class StringFunctions {
      * the string, either way, is null, with an error.
      */
     private static Object substring(List<Object> arguments, Env env) {
-        var text = string(arguments.get(0), "string");
+        var text = string(arguments.get(0), STRING);
         int start = Arguments.whole(arguments.get(1), "start position");
         var points = text.codePoints().toArray();
         int from = start > 0 ? start - 1 : points.length + start;
@@ -138,24 +142,25 @@ final class StringFunctions {
 
     /** Whether a replacement is one XPath takes: {@code \} only before {@code \} or {@code $}, {@code $} only before a digit. */
     private static boolean isReplacement(String replacement) {
-        for (int i = 0; i < replacement.length(); i++) {
+        int i = 0;
+        while (i < replacement.length()) {
             char c = replacement.charAt(i);
             if (c == '\\' || c == '$') {
-                if (i + 1 == replacement.length()) {
-                    return false;
-                }
-                char next = replacement.charAt(++i);
+                char next = i + 1 < replacement.length() ? replacement.charAt(i + 1) : 0;
                 if (c == '\\' && next != '\\' && next != '$' || c == '$' && !Character.isDigit(next)) {
                     return false;
                 }
+                i += 2;
+            } else {
+                i++;
             }
         }
         return true;
     }
 
     private static Object split(List<Object> arguments, Env env) {
-        var text = string(arguments.get(0), "string");
-        var pattern = pattern(string(arguments.get(1), "delimiter"), "");
+        var text = string(arguments.get(0), STRING);
+        var pattern = pattern(string(arguments.get(1), DELIMITER), "");
         if (matcher(pattern, "", env).matches()) {
             throw invalid("takes a delimiter that does not match the empty string, not \"%s\"".formatted(pattern.pattern()));
         }
@@ -174,24 +179,20 @@ final class StringFunctions {
     /** {@code string join(list, delimiter?)}: the strings of a list, its nulls left out, between delimiters. */
     private static Object join(List<Object> arguments, Env env) {
         var list = Arguments.list(arguments.getFirst(), "list");
-        var delimiter = arguments.size() > 1 && arguments.get(1) != null ? string(arguments.get(1), "delimiter") : "";
+        var delimiter = arguments.size() > 1 && arguments.get(1) != null ? string(arguments.get(1), DELIMITER) : "";
         Arguments.steps(env, list.size());
         var joined = new StringBuilder();
         boolean first = true;
         for (var item : list) {
-            if (item == null) {
-                continue;
-            }
-            if (!(item instanceof String text)) {
+            if (item != null && !(item instanceof String)) {
                 throw invalid("takes a list of strings, not one holding " + FeelValues.text(item));
             }
-            if (!first) {
-                joined.append(delimiter);
-            }
-            joined.append(text);
-            first = false;
-            if (joined.length() > Env.MAX_CHARACTERS) {
-                break;
+            if (item != null && joined.length() <= Env.MAX_CHARACTERS) {
+                if (!first) {
+                    joined.append(delimiter);
+                }
+                joined.append((String) item);
+                first = false;
             }
         }
         return Arguments.characters(env, joined.toString());
@@ -302,16 +303,33 @@ final class StringFunctions {
         return pattern.matcher(new Budgeted(text, env));
     }
 
+    /**
+     * Runs a match, which Java's regular expressions make by recursion: an alternation repeated over a long text,
+     * {@code (a|b)*} over a hundred thousand characters, overflows the thread's stack, and gives null, with an error.
+     */
+    static <T> T matching(java.util.function.Supplier<T> match) {
+        try {
+            return match.get();
+        } catch (StackOverflowError e) {
+            throw invalid("takes a regular expression that matches the text without nesting deeper than the thread's stack");
+        }
+    }
+
     /** A text that counts a step of the evaluation each {@link #READS_PER_STEP} characters a match reads. */
-    private record Budgeted(String text, Env env, int[] reads) implements CharSequence {
+    private static final class Budgeted implements CharSequence {
+        private final String text;
+        private final Env env;
+        private int reads;
+
         Budgeted(String text, Env env) {
-            this(text, env, new int[1]);
+            this.text = text;
+            this.env = env;
         }
 
         @Override
         public char charAt(int index) {
-            if (++reads[0] == READS_PER_STEP) {
-                reads[0] = 0;
+            if (++reads == READS_PER_STEP) {
+                reads = 0;
                 Arguments.steps(env, 1);
             }
             return text.charAt(index);

@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetTime;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
@@ -45,6 +46,7 @@ final class ConversionFunctions {
     private static final String DATE = "date";
     private static final String DATE_AND_TIME = "date and time";
     /** A number, once its grouping separators are gone and its decimal separator is a period. */
+    private static final String NOT_A_NUMBER = "takes a string that writes a number, not \"%s\"";
     private static final Pattern NUMBER_TEXT = Pattern.compile("[+-]?(\\d+(\\.\\d*)?|\\.\\d+)([eE][+-]?\\d+)?");
 
     private ConversionFunctions() {
@@ -69,12 +71,12 @@ final class ConversionFunctions {
         add.accept(BuiltInFunction.of("range", new FeelType.RangeOf(FeelType.ANY), fixed(1),
                 (arguments, env) -> range(string(arguments.getFirst(), FROM)), FROM));
         add.accept(BuiltInFunction.of("not", BOOLEAN, fixed(1),
-                (arguments, env) -> Arguments.bool(arguments.getFirst(), "negand") ? Boolean.FALSE : Boolean.TRUE, "negand"));
+                (arguments, env) -> !Arguments.bool(arguments.getFirst(), "negand"), "negand"));
         add.accept(BuiltInFunction.of("is", BOOLEAN, fixed(2), (arguments, env) -> same(arguments.get(0), arguments.get(1), env),
                 "value1", "value2"));
         add.accept(BuiltInFunction.of("now", FeelType.of(ColumnType.DATE_TIME), fixed(0),
-                (arguments, env) -> ZonedDateTime.now().truncatedTo(ChronoUnit.MILLIS)));
-        add.accept(BuiltInFunction.of("today", FeelType.of(ColumnType.DATE), fixed(0), (arguments, env) -> LocalDate.now()));
+                (arguments, env) -> ZonedDateTime.now(ZoneId.systemDefault()).truncatedTo(ChronoUnit.MILLIS)));
+        add.accept(BuiltInFunction.of("today", FeelType.of(ColumnType.DATE), fixed(0), (arguments, env) -> LocalDate.now(ZoneId.systemDefault())));
         add.accept(BuiltInFunction.of("day of year", NUMBER, fixed(1),
                 (arguments, env) -> BigDecimal.valueOf(date(arguments.getFirst()).getDayOfYear()), DATE));
         add.accept(BuiltInFunction.of("day of week", STRING, fixed(1),
@@ -139,12 +141,12 @@ final class ConversionFunctions {
         var text = grouping != null ? from.replace(grouping, "") : from;
         if (decimal != null && !decimal.equals(".")) {
             if (text.contains(".")) {
-                throw invalid("takes a string that writes a number, not \"%s\"".formatted(from));
+                throw invalid(NOT_A_NUMBER.formatted(from));
             }
             text = text.replace(decimal, ".");
         }
         if (!NUMBER_TEXT.matcher(text).matches()) {
-            throw invalid("takes a string that writes a number, not \"%s\"".formatted(from));
+            throw invalid(NOT_A_NUMBER.formatted(from));
         }
         try {
             var number = new BigDecimal(text);
@@ -153,7 +155,7 @@ final class ConversionFunctions {
             }
             return FeelNumbers.plain(number);
         } catch (NumberFormatException e) {
-            throw invalid("takes a string that writes a number, not \"%s\"".formatted(from));
+            throw invalid(NOT_A_NUMBER.formatted(from));
         }
     }
 

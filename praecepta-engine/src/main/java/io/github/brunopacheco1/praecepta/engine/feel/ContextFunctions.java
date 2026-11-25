@@ -52,34 +52,9 @@ final class ContextFunctions {
             });
             return Arguments.result(entries);
         }, "m"));
-        add.accept(BuiltInFunction.of(CONTEXT, FeelType.ANY, fixed(1), (arguments, env) -> {
-            var entries = list(arguments.getFirst(), "entries");
-            steps(env, entries.size());
-            var context = new LinkedHashMap<String, Object>();
-            for (var entry : entries) {
-                if (!(entry instanceof Map<?, ?> pair) || !(pair.get(KEY) instanceof String key) || !pair.containsKey(VALUE)) {
-                    throw invalid("takes a list of contexts of a string 'key' and a 'value', not one holding " + FeelValues.text(entry));
-                }
-                if (context.containsKey(key)) {
-                    throw invalid("takes entries of different keys, not two of \"%s\"".formatted(key));
-                }
-                context.put(key, pair.get(VALUE));
-            }
-            return Collections.unmodifiableMap(context);
-        }, "entries"));
-        add.accept(BuiltInFunction.of("context put", FeelType.ANY, fixed(3), (BuiltInFunction.Overloaded) (arguments, signature, env) -> {
-            var context = context(arguments.get(0), CONTEXT);
-            List<?> keys;
-            if (signature == KEY_SIGNATURE || signature == BuiltInFunction.POSITIONAL && !(arguments.get(1) instanceof List<?>)) {
-                keys = List.of(Arguments.string(arguments.get(1), KEY));
-            } else {
-                keys = Arguments.list(arguments.get(1), KEYS);
-                if (keys.isEmpty() || keys.stream().anyMatch(k -> !(k instanceof String))) {
-                    throw Arguments.invalid("a non-empty list of strings", arguments.get(1), KEYS);
-                }
-            }
-            return put(context, keys, arguments.get(2), env);
-        }, List.of(List.of(CONTEXT, KEY, VALUE), List.of(CONTEXT, KEYS, VALUE))));
+        add.accept(BuiltInFunction.of(CONTEXT, FeelType.ANY, fixed(1), ContextFunctions::fromEntries, "entries"));
+        add.accept(BuiltInFunction.of("context put", FeelType.ANY, fixed(3), (BuiltInFunction.Overloaded) ContextFunctions::contextPut,
+                List.of(List.of(CONTEXT, KEY, VALUE), List.of(CONTEXT, KEYS, VALUE))));
         add.accept(BuiltInFunction.of("context merge", FeelType.ANY, fixed(1), (arguments, env) -> {
             var merged = new LinkedHashMap<String, Object>();
             for (var context : list(arguments.getFirst(), "contexts")) {
@@ -91,6 +66,38 @@ final class ContextFunctions {
             }
             return Collections.unmodifiableMap(merged);
         }, "contexts"));
+    }
+
+    /** {@code context(entries)}: the context of a list of {@code {key, value}} contexts, of different keys. */
+    private static Object fromEntries(List<Object> arguments, Env env) {
+        var entries = list(arguments.getFirst(), "entries");
+        steps(env, entries.size());
+        var context = new LinkedHashMap<String, Object>();
+        for (var entry : entries) {
+            if (!(entry instanceof Map<?, ?> pair) || !(pair.get(KEY) instanceof String key) || !pair.containsKey(VALUE)) {
+                throw invalid("takes a list of contexts of a string 'key' and a 'value', not one holding " + FeelValues.text(entry));
+            }
+            if (context.containsKey(key)) {
+                throw invalid("takes entries of different keys, not two of \"%s\"".formatted(key));
+            }
+            context.put(key, pair.get(VALUE));
+        }
+        return Collections.unmodifiableMap(context);
+    }
+
+    /** {@code context put(context, key, value)} or {@code context put(context, keys, value)}. */
+    private static Object contextPut(List<Object> arguments, int signature, Env env) {
+        var context = context(arguments.get(0), CONTEXT);
+        List<?> keys;
+        if (signature == KEY_SIGNATURE || signature == BuiltInFunction.POSITIONAL && !(arguments.get(1) instanceof List<?>)) {
+            keys = List.of(Arguments.string(arguments.get(1), KEY));
+        } else {
+            keys = Arguments.list(arguments.get(1), KEYS);
+            if (keys.isEmpty() || keys.stream().anyMatch(k -> !(k instanceof String))) {
+                throw Arguments.invalid("a non-empty list of strings", arguments.get(1), KEYS);
+            }
+        }
+        return put(context, keys, arguments.get(2), env);
     }
 
     /** A context with a value put at a path of keys: each key but the last names a context, or none, in the one before. */

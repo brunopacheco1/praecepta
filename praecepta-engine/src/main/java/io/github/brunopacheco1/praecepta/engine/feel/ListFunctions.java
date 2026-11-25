@@ -44,7 +44,7 @@ final class ListFunctions {
     static void register(Consumer<BuiltInFunction> add) {
         add.accept(BuiltInFunction.of("list contains", BOOLEAN, fixed(2), (arguments, env) -> {
             var list = list(arguments.get(0), LIST_PARAMETER);
-            return indexes(list, arguments.get(1), env, true).size() > 0;
+            return !indexes(list, arguments.get(1), env, true).isEmpty();
         }, LIST_PARAMETER, "element"));
         add.accept(BuiltInFunction.of("count", NUMBER, fixed(1),
                 (arguments, env) -> BigDecimal.valueOf(list(arguments.getFirst(), LIST_PARAMETER).size()), LIST_PARAMETER));
@@ -54,13 +54,7 @@ final class ListFunctions {
             var numbers = numbers(arguments, env);
             return numbers.isEmpty() ? null : sum(numbers);
         }, LIST_PARAMETER));
-        add.accept(BuiltInFunction.of("mean", NUMBER, variadic(1), (arguments, env) -> {
-            var numbers = numbers(arguments, env);
-            if (numbers.isEmpty()) {
-                throw invalid("takes a list of one number or more, not an empty one");
-            }
-            return defined(FeelNumbers.divide(sum(numbers), BigDecimal.valueOf(numbers.size())));
-        }, LIST_PARAMETER));
+        add.accept(BuiltInFunction.of("mean", NUMBER, variadic(1), ListFunctions::mean, LIST_PARAMETER));
         add.accept(BuiltInFunction.of("all", BOOLEAN, variadic(1), (arguments, env) -> logic(arguments, env, false), LIST_PARAMETER));
         add.accept(BuiltInFunction.of("any", BOOLEAN, variadic(1), (arguments, env) -> logic(arguments, env, true), LIST_PARAMETER));
         add.accept(BuiltInFunction.of("sublist", LIST, optional(2, 1), ListFunctions::sublist, LIST_PARAMETER, "start position", "length"));
@@ -70,15 +64,7 @@ final class ListFunctions {
             steps(env, list.size());
             return result(list);
         }, LIST_PARAMETER, "item"));
-        add.accept(BuiltInFunction.of("concatenate", LIST, variadic(0), (arguments, env) -> {
-            var all = new ArrayList<Object>();
-            for (var argument : arguments) {
-                var list = list(argument, LIST_PARAMETER);
-                steps(env, list.size());
-                all.addAll(list);
-            }
-            return result(all);
-        }, LIST_PARAMETER));
+        add.accept(BuiltInFunction.of("concatenate", LIST, variadic(0), ListFunctions::concatenate, LIST_PARAMETER));
         add.accept(BuiltInFunction.of("insert before", LIST, fixed(3), (arguments, env) -> {
             var list = new ArrayList<Object>(list(arguments.get(0), LIST_PARAMETER));
             steps(env, list.size());
@@ -118,34 +104,57 @@ final class ListFunctions {
             flatten(list(arguments.getFirst(), LIST_PARAMETER), flat, env, 0);
             return result(flat);
         }, LIST_PARAMETER));
-        add.accept(BuiltInFunction.of("product", NUMBER, variadic(1), (arguments, env) -> {
-            var numbers = numbers(arguments, env);
-            if (numbers.isEmpty()) {
-                throw invalid("takes a list of one number or more, not an empty one");
-            }
-            var product = BigDecimal.ONE;
-            for (var number : numbers) {
-                product = defined(FeelNumbers.multiply(product, number));
-            }
-            return product;
-        }, LIST_PARAMETER));
-        add.accept(BuiltInFunction.of("median", NUMBER, variadic(1), (arguments, env) -> {
-            var numbers = sorted(numbers(arguments, env), env);
-            if (numbers.isEmpty()) {
-                return null;
-            }
-            int middle = numbers.size() / 2;
-            if (numbers.size() % 2 == 1) {
-                return numbers.get(middle);
-            }
-            return defined(FeelNumbers.divide(FeelNumbers.add((BigDecimal) numbers.get(middle - 1), (BigDecimal) numbers.get(middle)),
-                    BigDecimal.valueOf(2)));
-        }, LIST_PARAMETER));
+        add.accept(BuiltInFunction.of("product", NUMBER, variadic(1), ListFunctions::product, LIST_PARAMETER));
+        add.accept(BuiltInFunction.of("median", NUMBER, variadic(1), ListFunctions::median, LIST_PARAMETER));
         add.accept(BuiltInFunction.of("stddev", NUMBER, variadic(1), ListFunctions::stddev, LIST_PARAMETER));
         add.accept(BuiltInFunction.of("mode", LIST, variadic(1), ListFunctions::mode, LIST_PARAMETER));
         add.accept(BuiltInFunction.of("list replace", LIST, fixed(3), ListFunctions::listReplace,
                 List.of(List.of(LIST_PARAMETER, POSITION, NEW_ITEM), List.of(LIST_PARAMETER, "match", NEW_ITEM))));
         add.accept(BuiltInFunction.of("sort", LIST, optional(1, 1), ListFunctions::sort, LIST_PARAMETER, "precedes"));
+    }
+
+    private static Object mean(List<Object> arguments, Env env) {
+        var numbers = numbers(arguments, env);
+        if (numbers.isEmpty()) {
+            throw invalid("takes a list of one number or more, not an empty one");
+        }
+        return defined(FeelNumbers.divide(sum(numbers), BigDecimal.valueOf(numbers.size())));
+    }
+
+    private static Object concatenate(List<Object> arguments, Env env) {
+        var all = new ArrayList<Object>();
+        for (var argument : arguments) {
+            var list = list(argument, LIST_PARAMETER);
+            steps(env, list.size());
+            all.addAll(list);
+        }
+        return result(all);
+    }
+
+    private static Object product(List<Object> arguments, Env env) {
+        var numbers = numbers(arguments, env);
+        if (numbers.isEmpty()) {
+            throw invalid("takes a list of one number or more, not an empty one");
+        }
+        var product = BigDecimal.ONE;
+        for (var number : numbers) {
+            product = defined(FeelNumbers.multiply(product, number));
+        }
+        return product;
+    }
+
+    /** The middle value, or the mean of the two in the middle; null for no values. */
+    private static Object median(List<Object> arguments, Env env) {
+        var numbers = sorted(numbers(arguments, env), env);
+        if (numbers.isEmpty()) {
+            return null;
+        }
+        int middle = numbers.size() / 2;
+        if (numbers.size() % 2 == 1) {
+            return numbers.get(middle);
+        }
+        return defined(FeelNumbers.divide(FeelNumbers.add((BigDecimal) numbers.get(middle - 1), (BigDecimal) numbers.get(middle)),
+                BigDecimal.valueOf(2)));
     }
 
     /** The positions, from 0, of the items of a list equal to a value; only the first, if {@code first}. */
@@ -230,11 +239,10 @@ final class ListFunctions {
         steps(env, values.size());
         boolean unknown = false;
         for (var value : values) {
-            if (value instanceof Boolean bool) {
-                if (bool == any) {
-                    return any;
-                }
-            } else {
+            if (Boolean.valueOf(any).equals(value)) {
+                return any;
+            }
+            if (!(value instanceof Boolean)) {
                 unknown = true;
             }
         }
@@ -259,7 +267,7 @@ final class ListFunctions {
             }
             to = from + length;
         }
-        steps(env, to - from);
+        steps(env, (long) to - from);
         return result(list.subList(from, to));
     }
 
@@ -319,19 +327,20 @@ final class ListFunctions {
         var values = sorted(items(arguments, LIST_PARAMETER), env);
         var modes = new ArrayList<Object>();
         int most = 0;
-        for (int i = 0; i < values.size();) {
-            int j = i + 1;
-            while (j < values.size() && Boolean.TRUE.equals(FeelValues.equality(values.get(i), values.get(j), env))) {
-                j++;
+        int start = 0;
+        while (start < values.size()) {
+            int end = start + 1;
+            while (end < values.size() && Boolean.TRUE.equals(FeelValues.equality(values.get(start), values.get(end), env))) {
+                end++;
             }
-            if (j - i > most) {
+            if (end - start > most) {
                 modes.clear();
-                most = j - i;
+                most = end - start;
             }
-            if (j - i == most) {
-                modes.add(values.get(i));
+            if (end - start == most) {
+                modes.add(values.get(start));
             }
-            i = j;
+            start = end;
         }
         return result(modes);
     }
@@ -347,10 +356,10 @@ final class ListFunctions {
         if (Arguments.single(arguments.get(1)) instanceof FeelFunction match) {
             for (int i = 0; i < list.size(); i++) {
                 var matches = Node.Invocation.call(match, Arrays.asList(list.get(i), newItem), env);
-                if (!(matches instanceof Boolean)) {
+                if (!(matches instanceof Boolean replace)) {
                     throw invalid("takes a match function that gives a boolean, not " + FeelValues.text(matches));
                 }
-                if ((Boolean) matches) {
+                if (replace.booleanValue()) {
                     list.set(i, newItem);
                 }
             }
