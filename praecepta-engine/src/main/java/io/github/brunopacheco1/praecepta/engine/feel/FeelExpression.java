@@ -38,9 +38,10 @@ import java.util.function.Function;
  * {@code for} (with {@code partial} and iteration ranges {@code 1..3}), {@code some} and {@code every}, paths
  * ({@code a.b.c}, over lists as projections, and the properties of dates, times, durations and ranges), filters
  * ({@code xs[item > 3]}, {@code xs[1]}, {@code xs[-1]}), function definitions ({@code function(a, b) a + b}, which close
- * over their scope) and their invocation with positional or named arguments, and comments. FEEL's built-in functions
- * (10.3.4) are planned for 0.9 (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>): an
- * expression that invokes one parses, and {@link #unsupported()} names it.
+ * over their scope) and their invocation with positional or named arguments, FEEL's built-in functions (10.3.4, since
+ * 0.9, <a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>), and comments. External functions
+ * (Java or PMML) are planned for 0.11 (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>): an
+ * expression that defines one parses, and {@link #unsupported()} names it.
  *
  * <p><b>Values given.</b> A name's value is a FEEL value, null for a name with none; a {@link Number} that is not a
  * {@code BigDecimal} ({@code Integer}, {@code Long}, {@code Double}...) is taken as the {@code BigDecimal} of its
@@ -74,9 +75,9 @@ public final class FeelExpression {
     /**
      * What DMN 1.5 defines but Praecepta does not evaluate yet ({@link #unsupported()}), and the release that plans it.
      *
-     * @param feature what it is: {@code the built-in function 'string length'}, {@code an external function (Java or PMML)}
-     * @param release the release that plans it: {@code 0.9}
-     * @param issue   the GitHub issue that plans it: 117
+     * @param feature what it is: {@code an external function (Java or PMML)}
+     * @param release the release that plans it: {@code 0.11}
+     * @param issue   the GitHub issue that plans it: 119
      */
     public record Unsupported(String feature, String release, int issue) {
         public Unsupported {
@@ -84,7 +85,7 @@ public final class FeelExpression {
             java.util.Objects.requireNonNull(release, "release");
         }
 
-        /** As messages name it: {@code the built-in function 'string length', planned for 0.9 (#117)}. */
+        /** As messages name it: {@code an external function (Java or PMML), planned for 0.11 (#119)}. */
         @Override
         public String toString() {
             return "%s, planned for %s (#%d)".formatted(feature, release, issue);
@@ -217,8 +218,8 @@ public final class FeelExpression {
 
     /**
      * What the expression uses that DMN 1.5 defines but Praecepta does not evaluate yet, each with the release that
-     * plans it: a built-in function ({@code the built-in function 'string', planned for 0.9 (#117)}) or an external
-     * function (0.11, #119). Empty if it uses none; where it uses one, its value there is null, with an error.
+     * plans it: an external function ({@code an external function (Java or PMML), planned for 0.11 (#119)}). Empty if it
+     * uses none; where it uses one, its value there is null, with an error.
      */
     public List<Unsupported> unsupported() {
         return unsupported;

@@ -42,9 +42,10 @@ import java.util.function.Function;
  *
  * <p>The limits of {@link FeelExpression} apply to each application of the tests, which is an evaluation of its own:
  * the tests nest as deeply as an expression may, and one application takes at most a million steps; beyond them, the
- * tests are not satisfied. FEEL's built-in functions are planned for 0.9
- * (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>): {@link #unsupported()} names those a test
- * invokes. Immutable and thread-safe.
+ * tests are not satisfied. The tests may invoke FEEL's built-in functions (since 0.9,
+ * <a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>); external functions are planned for 0.11
+ * (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>): {@link #unsupported()} names one a test
+ * defines. Immutable and thread-safe.
  */
 public final class FeelUnaryTests {
 

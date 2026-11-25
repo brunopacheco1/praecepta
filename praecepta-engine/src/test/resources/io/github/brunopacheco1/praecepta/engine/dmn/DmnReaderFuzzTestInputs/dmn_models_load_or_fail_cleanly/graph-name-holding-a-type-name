@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_Screening" name="Screening" namespace="https://github.com/brunopacheco1/praecepta/Screening">
+  <itemDefinition name="tFlags" isCollection="true">
+    <typeRef>string</typeRef>
+  </itemDefinition>
+  <itemDefinition name="decision_0_type" isCollection="true">
+    <typeRef>string</typeRef>
+  </itemDefinition>
+  <itemDefinition name="decision_2_input_0_list" isCollection="true">
+    <typeRef>string</typeRef>
+  </itemDefinition>
+  <itemDefinition name="decision_3_input_0_list" isCollection="true">
+    <typeRef>string</typeRef>
+  </itemDefinition>
+  <inputData id="input_data_0" name="Amount">
+    <variable id="input_data_0_variable" name="Amount" typeRef="number"/>
+  </inputData>
+  <inputData id="input_data_1" name="Country">
+    <variable id="input_data_1_variable" name="Country" typeRef="string"/>
+  </inputData>
+  <decision id="decision_0" name="Flags">
+    <variable id="decision_0_variable" name="Flags" typeRef="decision_0_type"/>
+    <informationRequirement id="decision_0_requirement_0"><requiredInput href="#input_data_0"/></informationRequirement>
+    <informationRequirement id="decision_0_requirement_1"><requiredInput href="#input_data_1"/></informationRequirement>
+    <decisionTable id="decision_0_table" hitPolicy="COLLECT">
+      <input id="decision_0_input_0" label="Amount">
+        <inputExpression id="decision_0_input_expression_0" typeRef="number"><text>Amount</text></inputExpression>
+      </input>
+      <input id="decision_0_input_1" label="Country">
+        <inputExpression id="decision_0_input_expression_1" typeRef="string"><text>Country</text></inputExpression>
+      </input>
+      <output id="decision_0_output_0" name="Flags" typeRef="string"/>
+      <rule id="decision_0_rule_0">
+        <inputEntry id="decision_0_input_entry_0_0"><text>&gt; 10000</text></inputEntry>
+        <inputEntry id="decision_0_input_entry_0_1"><text>-</text></inputEntry>
+        <outputEntry id="decision_0_output_entry_0_0"><text>"large"</text></outputEntry>
+      </rule>
+      <rule id="decision_0_rule_1">
+        <inputEntry id="decision_0_input_entry_1_0"><text>-</text></inputEntry>
+        <inputEntry id="decision_0_input_entry_1_1"><text>"XX"</text></inputEntry>
+        <outputEntry id="decision_0_output_entry_1_0"><text>"sanctioned"</text></outputEntry>
+      </rule>
+      <rule id="decision_0_rule_2">
+        <inputEntry id="decision_0_input_entry_2_0"><text>&lt; 5</text></inputEntry>
+        <inputEntry id="decision_0_input_entry_2_1"><text>-</text></inputEntry>
+        <outputEntry id="decision_0_output_entry_2_0"><text>"negative"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_1" name="Checks">
+    <variable id="decision_1_variable" name="Checks"/>
+    <informationRequirement id="decision_1_requirement_0"><requiredInput href="#input_data_0"/></informationRequirement>
+    <decisionTable id="decision_1_table" hitPolicy="RULE ORDER">
+      <input id="decision_1_input_0" label="Amount">
+        <inputExpression id="decision_1_input_expression_0" typeRef="number"><text>Amount</text></inputExpression>
+      </input>
+      <output id="decision_1_output_0" name="code" typeRef="string"/>
+      <output id="decision_1_output_1" name="weight" typeRef="number"/>
+      <rule id="decision_1_rule_0">
+        <inputEntry id="decision_1_input_entry_0_0"><text>&gt; 10000</text></inputEntry>
+        <outputEntry id="decision_1_output_entry_0_0"><text>"AML"</text></outputEntry>
+        <outputEntry id="decision_1_output_entry_0_1"><text>3</text></outputEntry>
+      </rule>
+      <rule id="decision_1_rule_1">
+        <inputEntry id="decision_1_input_entry_1_0"><text>-</text></inputEntry>
+        <outputEntry id="decision_1_output_entry_1_0"><text>"BASIC"</text></outputEntry>
+        <outputEntry id="decision_1_output_entry_1_1"><text>1</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_2" name="Review">
+    <variable id="decision_2_variable" name="Review"/>
+    <informationRequirement id="decision_2_requirement_0"><requiredDecision href="#decision_0"/></informationRequirement>
+    <decisionTable id="decision_2_table" hitPolicy="FIRST">
+      <input id="decision_2_input_0" label="decision_3_input_0_listFlags">
+        <inputExpression id="decision_2_input_expression_0" typeRef="decision_2_input_0_list"><text>decision_3_input_0_listFlags</text></inputExpression>
+      </input>
+      <output id="decision_2_output_0" name="Review" typeRef="string"/>
+      <rule id="decision_2_rule_0">
+        <inputEntry id="decision_2_input_entry_0_0"><text>list contains(?, "sanctioned")</text></inputEntry>
+        <outputEntry id="decision_2_output_entry_0_0"><text>"Block"</text></outputEntry>
+      </rule>
+      <rule id="decision_2_rule_1">
+        <inputEntry id="decision_2_input_entry_1_0"><text>list contains(?, "large")</text></inputEntry>
+        <outputEntry id="decision_2_output_entry_1_0"><text>"Manual"</text></outputEntry>
+      </rule>
+      <rule id="decision_2_rule_2">
+        <inputEntry id="decision_2_input_entry_2_0"><text>-</text></inputEntry>
+        <outputEntry id="decision_2_output_entry_2_0"><text>"Auto"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_3" name="Due Diligence">
+    <variable id="decision_3_variable" name="Due Diligence"/>
+    <informationRequirement id="decision_3_requirement_0"><requiredDecision href="#decision_1"/></informationRequirement>
+    <decisionTable id="decision_3_table" hitPolicy="FIRST">
+      <input id="decision_3_input_0" label="Checks.code">
+        <inputExpression id="decision_3_input_expression_0" typeRef="decision_3_input_0_list"><text>Checks.code</text></inputExpression>
+      </input>
+      <output id="decision_3_output_0" name="Due Diligence" typeRef="string"/>
+      <rule id="decision_3_rule_0">
+        <inputEntry id="decision_3_input_entry_0_0"><text>list contains(?, "AML")</text></inputEntry>
+        <outputEntry id="decision_3_output_entry_0_0"><text>"Enhanced"</text></outputEntry>
+      </rule>
+      <rule id="decision_3_rule_1">
+        <inputEntry id="decision_3_input_entry_1_0"><text>-</text></inputEntry>
+        <outputEntry id="decision_3_output_entry_1_0"><text>"Standard"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="decision_4" name="Flag Count">
+    <variable id="decision_4_variable" name="Flag Count"/>
+    <informationRequirement id="decision_4_requirement_0"><requiredInput href="#input_data_0"/></informationRequirement>
+    <informationRequirement id="decision_4_requirement_1"><requiredInput href="#input_data_1"/></informationRequirement>
+    <decisionTable id="decision_4_table" hitPolicy="COLLECT" aggregation="COUNT">
+      <input id="decision_4_input_0" label="Amount">
+        <inputExpression id="decision_4_input_expression_0" typeRef="number"><text>Amount</text></inputExpression>
+      </input>
+      <input id="decision_4_input_1" label="Country">
+        <inputExpression id="decision_4_input_expression_1" typeRef="string"><text>Country</text></inputExpression>
+      </input>
+      <output id="decision_4_output_0" name="Flag Count" typeRef="string"/>
+      <rule id="decision_4_rule_0">
+        <inputEntry id="decision_4_input_entry_0_0"><text>&gt; 10000</text></inputEntry>
+        <inputEntry id="decision_4_input_entry_0_1"><text>-</text></inputEntry>
+        <outputEntry id="decision_4_output_entry_0_0"><text>"large"</text></outputEntry>
+      </rule>
+      <rule id="decision_4_rule_1">
+        <inputEntry id="decision_4_input_entry_1_0"><text>-</text></inputEntry>
+        <inputEntry id="decision_4_input_entry_1_1"><text>"XX"</text></inputEntry>
+        <outputEntry id="decision_4_output_entry_1_0"><text>"sanctioned"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>

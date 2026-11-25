@@ -1040,8 +1040,7 @@ final class FeelParser {
 
     /**
      * An invocation of a built-in function: a date time literal when it is {@code date}, {@code time},
-     * {@code date and time} or {@code duration} of literal arguments; else the function, if Praecepta evaluates it;
-     * else what it does not evaluate yet.
+     * {@code date and time} or {@code duration} of literal arguments; else an invocation of the function.
      */
     private Node builtInInvocation(String name, List<Node> arguments, List<String> names) {
         if (names.isEmpty() && TemporalLiterals.isLiteralFunction(name) && arguments.stream().allMatch(Node.Constant.class::isInstance)) {
@@ -1057,13 +1056,7 @@ final class FeelParser {
         if (twice != null) {
             return new Node.Invalid("the invocation names the argument '%s' twice".formatted(twice));
         }
-        var function = BuiltInFunctions.lookup(name);
-        if (function != null) {
-            return new Node.Invocation(new Node.Constant(function), arguments, names);
-        }
-        var what = new FeelExpression.Unsupported("the built-in function '%s'".formatted(name), "0.9", 117);
-        unsupported.add(what);
-        return new Node.Unsupported(what, arguments);
+        return new Node.Invocation(new Node.Constant(BuiltInFunctions.lookup(name)), arguments, names);
     }
 
     // ---- types -------------------------------------------------------------------------------------

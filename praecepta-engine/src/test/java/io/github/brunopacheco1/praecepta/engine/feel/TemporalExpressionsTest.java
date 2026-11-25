@@ -156,11 +156,11 @@ class TemporalExpressionsTest {
         var errors = new java.util.ArrayList<String>();
         Assertions.assertThat(parse("date(\"2025-02-30\") + @\"P1D\"").evaluate(any -> null, errors::add)).isNull();
         Assertions.assertThat(errors).isNotEmpty();
-        // the date and time functions of other arguments, and the other built-in functions, are planned for 0.9 (#117)
-        Assertions.assertThat(parse("date(x)").unsupported())
-                .containsExactly(new FeelExpression.Unsupported("the built-in function 'date'", "0.9", 117));
-        Assertions.assertThat(parse("years and months duration(due, due)").unsupported()).singleElement()
-                .hasToString("the built-in function 'years and months duration', planned for 0.9 (#117)");
+        // the date and time functions of other arguments, and the other built-in functions, since 0.9 (#117)
+        Assertions.assertThat(FeelExpression.parse("date(x)", java.util.List.of("x")).evaluate(name -> "2025-01-31"))
+                .isEqualTo(LocalDate.of(2025, 1, 31));
+        Assertions.assertThat(FeelExpression.parse("years and months duration(due, due + @\"P14M\")", java.util.List.of("due"))
+                .evaluate(name -> LocalDate.of(2025, 1, 31))).isEqualTo(new YearsAndMonths(14));
     }
 
     private static FeelExpression parse(String text) {

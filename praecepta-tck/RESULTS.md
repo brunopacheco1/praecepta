@@ -24,7 +24,7 @@ only on a regression: a node the baseline lists that no longer passes. Semantics
 and the TCK alone; where both leave a case open, what Praecepta does is recorded in
 [DMN conformance](../docs/DMN-CONFORMANCE.md).
 
-**The whole kit: 2,275 of 3,511 result nodes pass (64.8 %).** Of the 2,279 that Praecepta evaluates, 2,275 pass (99.8 %).
+**The whole kit: 3,276 of 3,511 result nodes pass (93.3 %).** Of the 3,280 that Praecepta evaluates, 3,276 pass (99.9 %).
 
 **Decision tables: 83 of 86 checks pass (96.5 %).**
 
@@ -40,9 +40,9 @@ result nodes that are commented out are not counted.
 
 | Compliance level | Models | Result nodes | Passed | Failed | Not supported |
 |---|---:|---:|---:|---:|---:|
-| 2 | 28 | 126 | 117 | 3 | 6 |
-| 3 | 120 | 3,385 | 2,158 | 1 | 1,226 |
-| **Total** | **148** | **3,511** | **2,275** | **4** | **1,232** |
+| 2 | 28 | 126 | 121 | 2 | 3 |
+| 3 | 120 | 3,385 | 3,155 | 2 | 228 |
+| **Total** | **148** | **3,511** | **3,276** | **4** | **231** |
 
 ### By feature area
 
@@ -52,11 +52,11 @@ It does not change as Praecepta grows, so each row shows how far that layer is d
 
 | Feature area | Release | Result nodes | Passed | Failed | Not supported |
 |---|---|---:|---:|---:|---:|
-| Single decision tables and arithmetic | 0.6 | 643 | 640 | 1 | 2 |
+| Single decision tables and arithmetic | 0.6 | 643 | 641 | 0 | 2 |
 | Decision requirement graphs | 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | 0 | 0 | 0 | 0 |
 | FEEL language | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1,289 | 1,289 | 0 | 0 |
-| Built-in functions | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1,071 | 87 | 0 | 984 |
-| Boxed expressions, business knowledge models and structured values | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 456 | 259 | 3 | 194 |
+| Built-in functions | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1,071 | 1,066 | 2 | 3 |
+| Boxed expressions, business knowledge models and structured values | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 456 | 280 | 2 | 174 |
 | Decision services, imports and the rest | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 52 | 0 | 0 | 52 |
 
 ### What each release unlocks
@@ -66,10 +66,10 @@ features, these nodes have all they need once it ships.
 
 | Release | Feature area | Not-supported nodes | Evaluated by then, of all nodes |
 |---|---|---:|---:|
-| 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | Decision requirement graphs | 0 | 2,279 (64.9 %) |
-| 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | FEEL language | 0 | 2,279 (64.9 %) |
-| 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | Built-in functions | 1,002 | 3,281 (93.4 %) |
-| 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | Boxed expressions, business knowledge models and structured values | 176 | 3,457 (98.5 %) |
+| 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | Decision requirement graphs | 0 | 3,280 (93.4 %) |
+| 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | FEEL language | 0 | 3,280 (93.4 %) |
+| 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | Built-in functions | 0 | 3,280 (93.4 %) |
+| 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | Boxed expressions, business knowledge models and structured values | 177 | 3,457 (98.5 %) |
 | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | Decision services, imports and the rest | 54 | 3,511 (100.0 %) |
 
 ### Not supported, by feature
@@ -82,108 +82,24 @@ not-supported nodes); *alone* counts those that need nothing else.
 |---|---|---:|---:|---:|
 | other FEEL syntax | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 6 | 0 | 0 |
 | contexts | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 3 | 0 | 0 |
-| lists | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 2 | 0 | 0 |
+| lists | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 3 | 0 | 0 |
 | boolean literals | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
 | comparisons | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
 | filters | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
 | if then else | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
 | null | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
 | ranges | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
-| string() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 97 | 92 | 83 |
-| range() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 56 | 56 | 53 |
-| is() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 50 | 50 | 50 |
-| matches() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 41 | 41 | 41 |
-| years and months duration() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 36 | 36 | 34 |
-| context put() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 30 | 25 | 23 |
-| replace() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 29 | 28 | 28 |
-| modulo() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 28 | 28 | 28 |
-| date and time() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 24 | 11 | 5 |
-| list replace() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 22 | 22 | 22 |
-| string join() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 22 | 22 | 22 |
-| context() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 21 | 21 | 21 |
-| number() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 21 | 21 | 21 |
-| time() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 21 | 8 | 7 |
-| floor() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 20 | 17 | 17 |
-| all() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 19 | 19 | 19 |
-| day of year() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 19 | 19 | 19 |
-| even() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 19 | 19 | 19 |
-| week of year() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 19 | 18 | 18 |
-| date() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 18 | 4 | 4 |
-| abs() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 17 | 17 | 17 |
-| any() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 17 | 17 | 17 |
-| ceiling() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 17 | 17 | 17 |
-| odd() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 17 | 17 | 17 |
-| round down() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 16 | 16 | 16 |
-| round half down() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 16 | 16 | 16 |
-| round half up() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 16 | 16 | 16 |
-| round up() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 16 | 16 | 16 |
-| exp() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 15 | 15 | 15 |
-| log() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 15 | 15 | 15 |
-| sqrt() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 15 | 15 | 15 |
-| context merge() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 14 | 14 | 14 |
-| decimal() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 14 | 10 | 10 |
-| get value() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 14 | 14 | 14 |
-| max() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 14 | 7 | 7 |
-| median() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 14 | 14 | 14 |
-| string length() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 14 | 13 | 13 |
-| substring after() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 14 | 10 | 10 |
-| contains() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 13 | 12 | 12 |
-| mode() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 13 | 13 | 13 |
-| product() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 13 | 13 | 13 |
-| substring before() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 13 | 12 | 9 |
-| substring() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 13 | 12 | 12 |
-| day of week() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 12 | 10 | 10 |
-| flatten() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 12 | 10 | 5 |
-| month of year() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 12 | 10 | 10 |
-| stddev() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 12 | 12 | 12 |
-| append() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 11 | 6 | 6 |
-| get entries() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 10 | 10 | 9 |
-| lower case() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 10 | 9 | 9 |
-| upper case() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 10 | 9 | 9 |
-| not() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 9 | 9 | 9 |
-| split() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 9 | 9 | 9 |
-| concatenate() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 7 | 5 | 3 |
-| duration() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 7 | 7 | 6 |
-| insert before() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 6 | 4 | 4 |
-| sort() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 6 | 4 | 3 |
-| sublist() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 4 | 4 | 4 |
-| remove() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 3 | 3 | 3 |
-| ends with() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 2 | 1 | 1 |
-| list contains() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 2 | 2 | 2 |
-| mean() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 2 | 2 | 2 |
-| now() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 2 | 2 | 2 |
-| today() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 2 | 2 | 2 |
-| after() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| before() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| coincides() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| count() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 1 | 1 |
-| distinct values() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 1 | 0 |
-| during() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| finished by() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| finishes() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| includes() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| index of() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 1 | 1 |
-| meets() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| met by() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| min() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 1 | 1 |
-| overlaps after() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| overlaps before() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| overlaps() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| reverse() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 1 | 0 |
-| started by() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| starts with() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| starts() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 0 | 0 |
-| sum() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 1 | 1 |
-| union() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 1 | 0 |
-| boxed contexts | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 117 | 89 | 29 |
-| business knowledge models | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 74 | 33 | 22 |
+| sort() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 1 | 0 |
+| boxed contexts | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 117 | 101 | 69 |
+| business knowledge models | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 76 | 35 | 25 |
 | invocations | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 33 | 32 | 0 |
 | boxed iterators (for, some, every) | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 12 | 12 | 12 |
-| function definitions and lambdas | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 9 | 4 | 4 |
+| function definitions and lambdas | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 7 | 2 | 2 |
 | relations | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 6 | 5 | 4 |
 | boxed filters | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 4 | 4 | 4 |
 | boxed conditionals | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 3 | 3 | 3 |
-| boxed lists | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 3 | 3 | 0 |
+| boxed lists | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 3 | 3 | 3 |
+| boxed expressions elsewhere in the model | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 1 | 1 | 1 |
 | decision services | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 29 | 26 | 24 |
 | external functions (Java, PMML) | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 17 | 0 | 0 |
 | imports | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 8 | 6 | 6 |
@@ -200,7 +116,7 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-2/0005-simpletable-A](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0005-simpletable-A) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-2/0006-simpletable-P1](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0006-simpletable-P1) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-2/0007-simpletable-P2](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0007-simpletable-P2) | 3 | 3 | 0 | 0 |  |
-| [compliance-level-2/0008-LX-arithmetic](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0008-LX-arithmetic) | 3 | 0 | 3 | 0 |  |
+| [compliance-level-2/0008-LX-arithmetic](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0008-LX-arithmetic) | 3 | 1 | 2 | 0 |  |
 | [compliance-level-2/0009-invocation-arithmetic](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0009-invocation-arithmetic) | 3 | 0 | 0 | 3 | business knowledge models (0.10) |
 | [compliance-level-2/0010-multi-output-U](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0010-multi-output-U) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-2/0100-feel-constants](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0100-feel-constants) | 2 | 2 | 0 | 0 |  |
@@ -208,7 +124,7 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-2/0102-feel-constants](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0102-feel-constants) | 4 | 4 | 0 | 0 |  |
 | [compliance-level-2/0105-feel-math](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0105-feel-math) | 33 | 33 | 0 | 0 |  |
 | [compliance-level-2/0106-feel-ternary-logic](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0106-feel-ternary-logic) | 18 | 18 | 0 | 0 |  |
-| [compliance-level-2/0107-feel-ternary-logic-not](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0107-feel-ternary-logic-not) | 3 | 0 | 0 | 3 | not() (0.9) |
+| [compliance-level-2/0107-feel-ternary-logic-not](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0107-feel-ternary-logic-not) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-2/0108-first-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0108-first-hitpolicy) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-2/0109-ruleOrder-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0109-ruleOrder-hitpolicy) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-2/0110-outputOrder-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0110-outputOrder-hitpolicy) | 3 | 3 | 0 | 0 |  |
@@ -222,53 +138,53 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-2/0118-multi-priority-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0118-multi-priority-hitpolicy) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-2/0119-multi-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0119-multi-collect-hitpolicy) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-3/0001-filter](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0001-filter) | 1 | 1 | 0 | 0 |  |
-| [compliance-level-3/0002-string-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0002-string-functions) | 4 | 0 | 0 | 4 | boxed contexts (0.10); contains() (0.9); ends with() (0.9); … |
+| [compliance-level-3/0002-string-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0002-string-functions) | 4 | 2 | 0 | 2 | boxed contexts (0.10) |
 | [compliance-level-3/0003-iteration](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0003-iteration) | 1 | 0 | 0 | 1 | business knowledge models (0.10) |
 | [compliance-level-3/0004-lending](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0004-lending) | 11 | 1 | 0 | 10 | business knowledge models (0.10); invocations (0.10); boxed contexts (0.10) |
 | [compliance-level-3/0005-literal-invocation](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0005-literal-invocation) | 3 | 0 | 0 | 3 | business knowledge models (0.10) |
 | [compliance-level-3/0006-join](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0006-join) | 1 | 1 | 0 | 0 |  |
-| [compliance-level-3/0007-date-time](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0007-date-time) | 19 | 0 | 0 | 19 | date and time() (0.9); boxed contexts (0.10); date() (0.9); … |
-| [compliance-level-3/0008-listGen](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0008-listGen) | 10 | 5 | 0 | 5 | flatten() (0.9) |
-| [compliance-level-3/0009-append-flatten](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0009-append-flatten) | 10 | 2 | 0 | 8 | append() (0.9); flatten() (0.9) |
-| [compliance-level-3/0010-concatenate](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0010-concatenate) | 6 | 2 | 0 | 4 | concatenate() (0.9); flatten() (0.9) |
-| [compliance-level-3/0011-insert-remove](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0011-insert-remove) | 6 | 1 | 0 | 5 | insert before() (0.9); remove() (0.9) |
-| [compliance-level-3/0012-list-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0012-list-functions) | 19 | 0 | 0 | 19 | append() (0.9); concatenate() (0.9); insert before() (0.9); … |
-| [compliance-level-3/0013-sort](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0013-sort) | 3 | 0 | 0 | 3 | sort() (0.9) |
-| [compliance-level-3/0014-loan-comparison](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0014-loan-comparison) | 2 | 0 | 0 | 2 | relations (0.10); boxed contexts (0.10); business knowledge models (0.10); … |
-| [compliance-level-3/0016-some-every](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0016-some-every) | 8 | 2 | 0 | 6 | relations (0.10); even() (0.9); business knowledge models (0.10) |
+| [compliance-level-3/0007-date-time](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0007-date-time) | 19 | 4 | 0 | 15 | boxed contexts (0.10); boxed expressions elsewhere in the model (0.10) |
+| [compliance-level-3/0008-listGen](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0008-listGen) | 10 | 10 | 0 | 0 |  |
+| [compliance-level-3/0009-append-flatten](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0009-append-flatten) | 10 | 10 | 0 | 0 |  |
+| [compliance-level-3/0010-concatenate](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0010-concatenate) | 6 | 6 | 0 | 0 |  |
+| [compliance-level-3/0011-insert-remove](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0011-insert-remove) | 6 | 6 | 0 | 0 |  |
+| [compliance-level-3/0012-list-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0012-list-functions) | 19 | 19 | 0 | 0 |  |
+| [compliance-level-3/0013-sort](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0013-sort) | 3 | 3 | 0 | 0 |  |
+| [compliance-level-3/0014-loan-comparison](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0014-loan-comparison) | 2 | 0 | 0 | 2 | relations (0.10); boxed contexts (0.10); business knowledge models (0.10) |
+| [compliance-level-3/0016-some-every](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0016-some-every) | 8 | 2 | 0 | 6 | relations (0.10); business knowledge models (0.10) |
 | [compliance-level-3/0017-tableTests](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0017-tableTests) | 4 | 4 | 0 | 0 |  |
-| [compliance-level-3/0020-vacation-days](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0020-vacation-days) | 7 | 0 | 0 | 7 | max() (0.9) |
-| [compliance-level-3/0021-singleton-list](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0021-singleton-list) | 5 | 2 | 0 | 3 | sublist() (0.9); upper case() (0.9) |
+| [compliance-level-3/0020-vacation-days](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0020-vacation-days) | 7 | 7 | 0 | 0 |  |
+| [compliance-level-3/0021-singleton-list](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0021-singleton-list) | 5 | 5 | 0 | 0 |  |
 | [compliance-level-3/0030-user-defined-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0030-user-defined-functions) | 2 | 0 | 0 | 2 | boxed contexts (0.10) |
 | [compliance-level-3/0031-user-defined-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0031-user-defined-functions) | 3 | 0 | 0 | 3 | boxed contexts (0.10); business knowledge models (0.10) |
-| [compliance-level-3/0032-conditionals](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0032-conditionals) | 6 | 3 | 0 | 3 | substring after() (0.9); substring before() (0.9) |
-| [compliance-level-3/0033-for-loops](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0033-for-loops) | 4 | 3 | 0 | 1 | business knowledge models (0.10); decimal() (0.9) |
+| [compliance-level-3/0032-conditionals](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0032-conditionals) | 6 | 6 | 0 | 0 |  |
+| [compliance-level-3/0033-for-loops](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0033-for-loops) | 4 | 3 | 0 | 1 | business knowledge models (0.10) |
 | [compliance-level-3/0034-drg-scopes](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0034-drg-scopes) | 12 | 0 | 0 | 12 | boxed contexts (0.10); other FEEL syntax (0.8); business knowledge models (0.10); … |
-| [compliance-level-3/0035-test-structure-output](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0035-test-structure-output) | 3 | 0 | 0 | 3 | boxed contexts (0.10); business knowledge models (0.10); decimal() (0.9); … |
+| [compliance-level-3/0035-test-structure-output](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0035-test-structure-output) | 3 | 0 | 0 | 3 | boxed contexts (0.10); business knowledge models (0.10) |
 | [compliance-level-3/0036-dt-variable-input](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0036-dt-variable-input) | 24 | 24 | 0 | 0 |  |
 | [compliance-level-3/0037-dt-on-bkm-implicit-params](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0037-dt-on-bkm-implicit-params) | 2 | 0 | 0 | 2 | business knowledge models (0.10); invocations (0.10) |
 | [compliance-level-3/0038-dt-on-bkm-explicit-params](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0038-dt-on-bkm-explicit-params) | 2 | 0 | 0 | 2 | boxed contexts (0.10); business knowledge models (0.10); invocations (0.10) |
 | [compliance-level-3/0039-dt-list-semantics](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0039-dt-list-semantics) | 2 | 2 | 0 | 0 |  |
 | [compliance-level-3/0040-singlenestedcontext](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0040-singlenestedcontext) | 3 | 0 | 0 | 3 | boxed contexts (0.10) |
 | [compliance-level-3/0041-multiple-nestedcontext](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0041-multiple-nestedcontext) | 3 | 0 | 0 | 3 | boxed contexts (0.10) |
-| [compliance-level-3/0050-feel-abs-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0050-feel-abs-function) | 17 | 0 | 0 | 17 | abs() (0.9) |
-| [compliance-level-3/0051-feel-sqrt-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0051-feel-sqrt-function) | 15 | 0 | 0 | 15 | sqrt() (0.9) |
-| [compliance-level-3/0052-feel-exp-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0052-feel-exp-function) | 15 | 0 | 0 | 15 | exp() (0.9) |
-| [compliance-level-3/0053-feel-log-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0053-feel-log-function) | 15 | 0 | 0 | 15 | log() (0.9) |
-| [compliance-level-3/0054-feel-even-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0054-feel-even-function) | 17 | 0 | 0 | 17 | even() (0.9) |
-| [compliance-level-3/0055-feel-odd-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0055-feel-odd-function) | 17 | 0 | 0 | 17 | odd() (0.9) |
-| [compliance-level-3/0056-feel-modulo-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0056-feel-modulo-function) | 28 | 0 | 0 | 28 | modulo() (0.9) |
+| [compliance-level-3/0050-feel-abs-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0050-feel-abs-function) | 17 | 17 | 0 | 0 |  |
+| [compliance-level-3/0051-feel-sqrt-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0051-feel-sqrt-function) | 15 | 15 | 0 | 0 |  |
+| [compliance-level-3/0052-feel-exp-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0052-feel-exp-function) | 15 | 15 | 0 | 0 |  |
+| [compliance-level-3/0053-feel-log-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0053-feel-log-function) | 15 | 15 | 0 | 0 |  |
+| [compliance-level-3/0054-feel-even-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0054-feel-even-function) | 17 | 17 | 0 | 0 |  |
+| [compliance-level-3/0055-feel-odd-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0055-feel-odd-function) | 17 | 17 | 0 | 0 |  |
+| [compliance-level-3/0056-feel-modulo-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0056-feel-modulo-function) | 28 | 28 | 0 | 0 |  |
 | [compliance-level-3/0057-feel-context](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0057-feel-context) | 11 | 11 | 0 | 0 |  |
-| [compliance-level-3/0058-feel-number-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0058-feel-number-function) | 21 | 0 | 0 | 21 | number() (0.9) |
-| [compliance-level-3/0059-feel-all-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0059-feel-all-function) | 19 | 0 | 0 | 19 | all() (0.9) |
-| [compliance-level-3/0060-feel-any-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0060-feel-any-function) | 17 | 0 | 0 | 17 | any() (0.9) |
-| [compliance-level-3/0061-feel-median-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0061-feel-median-function) | 14 | 0 | 0 | 14 | median() (0.9) |
-| [compliance-level-3/0062-feel-mode-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0062-feel-mode-function) | 13 | 0 | 0 | 13 | mode() (0.9) |
-| [compliance-level-3/0063-feel-stddev-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0063-feel-stddev-function) | 12 | 0 | 0 | 12 | stddev() (0.9) |
+| [compliance-level-3/0058-feel-number-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0058-feel-number-function) | 21 | 21 | 0 | 0 |  |
+| [compliance-level-3/0059-feel-all-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0059-feel-all-function) | 19 | 19 | 0 | 0 |  |
+| [compliance-level-3/0060-feel-any-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0060-feel-any-function) | 17 | 17 | 0 | 0 |  |
+| [compliance-level-3/0061-feel-median-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0061-feel-median-function) | 14 | 14 | 0 | 0 |  |
+| [compliance-level-3/0062-feel-mode-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0062-feel-mode-function) | 13 | 13 | 0 | 0 |  |
+| [compliance-level-3/0063-feel-stddev-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0063-feel-stddev-function) | 12 | 12 | 0 | 0 |  |
 | [compliance-level-3/0064-feel-conjunction](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0064-feel-conjunction) | 19 | 19 | 0 | 0 |  |
 | [compliance-level-3/0065-feel-disjunction](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0065-feel-disjunction) | 19 | 19 | 0 | 0 |  |
-| [compliance-level-3/0066-feel-negation](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0066-feel-negation) | 6 | 0 | 0 | 6 | not() (0.9) |
-| [compliance-level-3/0067-feel-split-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0067-feel-split-function) | 9 | 0 | 0 | 9 | split() (0.9) |
+| [compliance-level-3/0066-feel-negation](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0066-feel-negation) | 6 | 6 | 0 | 0 |  |
+| [compliance-level-3/0067-feel-split-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0067-feel-split-function) | 9 | 9 | 0 | 0 |  |
 | [compliance-level-3/0068-feel-equality](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0068-feel-equality) | 114 | 114 | 0 | 0 |  |
 | [compliance-level-3/0069-feel-list](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0069-feel-list) | 35 | 35 | 0 | 0 |  |
 | [compliance-level-3/0070-feel-instance-of](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0070-feel-instance-of) | 142 | 142 | 0 | 0 |  |
@@ -277,13 +193,13 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-3/0073-feel-comments](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0073-feel-comments) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-3/0074-feel-properties](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0074-feel-properties) | 53 | 43 | 0 | 10 | boxed contexts (0.10); filters (0.8); lists (0.8); … |
 | [compliance-level-3/0075-feel-exponent](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0075-feel-exponent) | 12 | 12 | 0 | 0 |  |
-| [compliance-level-3/0076-feel-external-java](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0076-feel-external-java) | 18 | 0 | 0 | 18 | boxed contexts (0.10); external functions (Java, PMML) (0.11); max() (0.9) |
+| [compliance-level-3/0076-feel-external-java](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0076-feel-external-java) | 18 | 0 | 0 | 18 | boxed contexts (0.10); external functions (Java, PMML) (0.11) |
 | [compliance-level-3/0077-feel-nan](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0077-feel-nan) | 1 | 1 | 0 | 0 |  |
 | [compliance-level-3/0078-feel-infinity](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0078-feel-infinity) | 2 | 2 | 0 | 0 |  |
-| [compliance-level-3/0080-feel-getvalue-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0080-feel-getvalue-function) | 14 | 0 | 0 | 14 | get value() (0.9) |
-| [compliance-level-3/0081-feel-getentries-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0081-feel-getentries-function) | 9 | 0 | 0 | 9 | get entries() (0.9) |
-| [compliance-level-3/0082-feel-coercion](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0082-feel-coercion) | 36 | 13 | 0 | 23 | business knowledge models (0.10); invocations (0.10); decision services (0.11); … |
-| [compliance-level-3/0083-feel-unicode](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0083-feel-unicode) | 14 | 3 | 0 | 11 | string length() (0.9); contains() (0.9); ends with() (0.9); … |
+| [compliance-level-3/0080-feel-getvalue-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0080-feel-getvalue-function) | 14 | 14 | 0 | 0 |  |
+| [compliance-level-3/0081-feel-getentries-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0081-feel-getentries-function) | 9 | 9 | 0 | 0 |  |
+| [compliance-level-3/0082-feel-coercion](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0082-feel-coercion) | 36 | 16 | 0 | 20 | business knowledge models (0.10); invocations (0.10); decision services (0.11); … |
+| [compliance-level-3/0083-feel-unicode](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0083-feel-unicode) | 14 | 14 | 0 | 0 |  |
 | [compliance-level-3/0084-feel-for-loops](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0084-feel-for-loops) | 24 | 24 | 0 | 0 |  |
 | [compliance-level-3/0085-decision-services](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0085-decision-services) | 19 | 0 | 0 | 19 | decision services (0.11); boxed contexts (0.10) |
 | [compliance-level-3/0086-import](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0086-import) | 2 | 0 | 0 | 2 | boxed contexts (0.10); imports (0.11) |
@@ -292,62 +208,62 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-3/0089-nested-inputdata-imports](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0089-nested-inputdata-imports) | 1 | 0 | 0 | 1 | imports (0.11) |
 | [compliance-level-3/0090-feel-paths](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0090-feel-paths) | 4 | 4 | 0 | 0 |  |
 | [compliance-level-3/0091-local-hrefs](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0091-local-hrefs) | 1 | 0 | 0 | 1 | imports (0.11) |
-| [compliance-level-3/0092-feel-lambda](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0092-feel-lambda) | 18 | 0 | 0 | 18 | business knowledge models (0.10); function definitions and lambdas (0.10); sort() (0.9); … |
-| [compliance-level-3/0093-feel-at-literals](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0093-feel-at-literals) | 19 | 17 | 0 | 2 | string() (0.9) |
-| [compliance-level-3/0094-feel-product-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0094-feel-product-function) | 13 | 0 | 0 | 13 | product() (0.9) |
-| [compliance-level-3/0095-feel-day-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0095-feel-day-of-year-function) | 19 | 0 | 0 | 19 | day of year() (0.9) |
-| [compliance-level-3/0096-feel-day-of-week-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0096-feel-day-of-week-function) | 12 | 0 | 0 | 12 | day of week() (0.9); boxed contexts (0.10) |
-| [compliance-level-3/0097-feel-month-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0097-feel-month-of-year-function) | 12 | 0 | 0 | 12 | month of year() (0.9); boxed contexts (0.10) |
-| [compliance-level-3/0098-feel-week-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0098-feel-week-of-year-function) | 19 | 0 | 0 | 19 | week of year() (0.9); boxed lists (0.10) |
+| [compliance-level-3/0092-feel-lambda](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0092-feel-lambda) | 18 | 0 | 0 | 18 | business knowledge models (0.10); function definitions and lambdas (0.10); boolean literals (0.8); … |
+| [compliance-level-3/0093-feel-at-literals](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0093-feel-at-literals) | 19 | 19 | 0 | 0 |  |
+| [compliance-level-3/0094-feel-product-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0094-feel-product-function) | 13 | 13 | 0 | 0 |  |
+| [compliance-level-3/0095-feel-day-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0095-feel-day-of-year-function) | 19 | 19 | 0 | 0 |  |
+| [compliance-level-3/0096-feel-day-of-week-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0096-feel-day-of-week-function) | 12 | 10 | 0 | 2 | boxed contexts (0.10) |
+| [compliance-level-3/0097-feel-month-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0097-feel-month-of-year-function) | 12 | 10 | 0 | 2 | boxed contexts (0.10) |
+| [compliance-level-3/0098-feel-week-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0098-feel-week-of-year-function) | 19 | 18 | 0 | 1 | boxed lists (0.10) |
 | [compliance-level-3/0099-arithmetic-negation](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0099-arithmetic-negation) | 14 | 14 | 0 | 0 |  |
-| [compliance-level-3/0100-arithmetic](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0100-arithmetic) | 1,087 | 1,020 | 1 | 66 | string() (0.9) |
-| [compliance-level-3/0103-feel-is-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0103-feel-is-function) | 50 | 0 | 0 | 50 | is() (0.9) |
-| [compliance-level-3/1100-feel-decimal-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1100-feel-decimal-function) | 10 | 0 | 0 | 10 | decimal() (0.9) |
-| [compliance-level-3/1101-feel-floor-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1101-feel-floor-function) | 17 | 0 | 0 | 17 | floor() (0.9) |
-| [compliance-level-3/1102-feel-ceiling-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1102-feel-ceiling-function) | 17 | 0 | 0 | 17 | ceiling() (0.9) |
-| [compliance-level-3/1103-feel-substring-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1103-feel-substring-function) | 11 | 0 | 0 | 11 | substring() (0.9) |
-| [compliance-level-3/1104-feel-string-length-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1104-feel-string-length-function) | 6 | 0 | 0 | 6 | string length() (0.9) |
-| [compliance-level-3/1105-feel-upper-case-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1105-feel-upper-case-function) | 8 | 0 | 0 | 8 | upper case() (0.9) |
-| [compliance-level-3/1106-feel-lower-case-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1106-feel-lower-case-function) | 9 | 0 | 0 | 9 | lower case() (0.9) |
-| [compliance-level-3/1107-feel-substring-before-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1107-feel-substring-before-function) | 9 | 0 | 0 | 9 | substring before() (0.9) |
-| [compliance-level-3/1108-feel-substring-after-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1108-feel-substring-after-function) | 10 | 0 | 0 | 10 | substring after() (0.9) |
-| [compliance-level-3/1109-feel-replace-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1109-feel-replace-function) | 28 | 0 | 0 | 28 | replace() (0.9) |
-| [compliance-level-3/1110-feel-contains-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1110-feel-contains-function) | 10 | 0 | 0 | 10 | contains() (0.9) |
-| [compliance-level-3/1111-feel-matches-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1111-feel-matches-function) | 40 | 0 | 0 | 40 | matches() (0.9) |
-| [compliance-level-3/1115-feel-date-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1115-feel-date-function) | 52 | 44 | 0 | 8 | date() (0.9); string() (0.9) |
-| [compliance-level-3/1116-feel-time-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1116-feel-time-function) | 83 | 72 | 0 | 11 | time() (0.9); string() (0.9) |
-| [compliance-level-3/1117-feel-date-and-time-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1117-feel-date-and-time-function) | 88 | 71 | 0 | 17 | string() (0.9); date and time() (0.9) |
-| [compliance-level-3/1120-feel-duration-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1120-feel-duration-function) | 50 | 46 | 0 | 4 | duration() (0.9) |
-| [compliance-level-3/1121-feel-years-and-months-duration-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1121-feel-years-and-months-duration-function) | 36 | 0 | 0 | 36 | years and months duration() (0.9); function definitions and lambdas (0.10) |
-| [compliance-level-3/1130-feel-interval](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1130-feel-interval) | 14 | 0 | 0 | 14 | boxed contexts (0.10); after() (0.9); before() (0.9); … |
+| [compliance-level-3/0100-arithmetic](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0100-arithmetic) | 1,087 | 1,087 | 0 | 0 |  |
+| [compliance-level-3/0103-feel-is-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0103-feel-is-function) | 50 | 49 | 1 | 0 |  |
+| [compliance-level-3/1100-feel-decimal-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1100-feel-decimal-function) | 10 | 10 | 0 | 0 |  |
+| [compliance-level-3/1101-feel-floor-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1101-feel-floor-function) | 17 | 17 | 0 | 0 |  |
+| [compliance-level-3/1102-feel-ceiling-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1102-feel-ceiling-function) | 17 | 17 | 0 | 0 |  |
+| [compliance-level-3/1103-feel-substring-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1103-feel-substring-function) | 11 | 11 | 0 | 0 |  |
+| [compliance-level-3/1104-feel-string-length-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1104-feel-string-length-function) | 6 | 6 | 0 | 0 |  |
+| [compliance-level-3/1105-feel-upper-case-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1105-feel-upper-case-function) | 8 | 8 | 0 | 0 |  |
+| [compliance-level-3/1106-feel-lower-case-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1106-feel-lower-case-function) | 9 | 9 | 0 | 0 |  |
+| [compliance-level-3/1107-feel-substring-before-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1107-feel-substring-before-function) | 9 | 9 | 0 | 0 |  |
+| [compliance-level-3/1108-feel-substring-after-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1108-feel-substring-after-function) | 10 | 10 | 0 | 0 |  |
+| [compliance-level-3/1109-feel-replace-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1109-feel-replace-function) | 28 | 28 | 0 | 0 |  |
+| [compliance-level-3/1110-feel-contains-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1110-feel-contains-function) | 10 | 10 | 0 | 0 |  |
+| [compliance-level-3/1111-feel-matches-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1111-feel-matches-function) | 40 | 40 | 0 | 0 |  |
+| [compliance-level-3/1115-feel-date-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1115-feel-date-function) | 52 | 52 | 0 | 0 |  |
+| [compliance-level-3/1116-feel-time-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1116-feel-time-function) | 83 | 82 | 1 | 0 |  |
+| [compliance-level-3/1117-feel-date-and-time-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1117-feel-date-and-time-function) | 88 | 88 | 0 | 0 |  |
+| [compliance-level-3/1120-feel-duration-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1120-feel-duration-function) | 50 | 50 | 0 | 0 |  |
+| [compliance-level-3/1121-feel-years-and-months-duration-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1121-feel-years-and-months-duration-function) | 36 | 36 | 0 | 0 |  |
+| [compliance-level-3/1130-feel-interval](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1130-feel-interval) | 14 | 0 | 0 | 14 | boxed contexts (0.10) |
 | [compliance-level-3/1131-feel-function-invocation](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1131-feel-function-invocation) | 8 | 7 | 0 | 1 | function definitions and lambdas (0.10) |
-| [compliance-level-3/1140-feel-string-join-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1140-feel-string-join-function) | 22 | 0 | 0 | 22 | string join() (0.9) |
-| [compliance-level-3/1141-feel-round-up-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1141-feel-round-up-function) | 16 | 0 | 0 | 16 | round up() (0.9) |
-| [compliance-level-3/1142-feel-round-down-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1142-feel-round-down-function) | 16 | 0 | 0 | 16 | round down() (0.9) |
-| [compliance-level-3/1143-feel-round-half-up-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1143-feel-round-half-up-function) | 16 | 0 | 0 | 16 | round half up() (0.9) |
-| [compliance-level-3/1144-feel-round-half-down-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1144-feel-round-half-down-function) | 16 | 0 | 0 | 16 | round half down() (0.9) |
-| [compliance-level-3/1145-feel-context-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1145-feel-context-function) | 18 | 0 | 0 | 18 | context() (0.9) |
-| [compliance-level-3/1146-feel-context-put-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1146-feel-context-put-function) | 30 | 0 | 0 | 30 | context put() (0.9); boxed contexts (0.10); get entries() (0.9) |
-| [compliance-level-3/1147-feel-context-merge-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1147-feel-context-merge-function) | 14 | 0 | 0 | 14 | context merge() (0.9) |
-| [compliance-level-3/1148-feel-now-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1148-feel-now-function) | 2 | 0 | 0 | 2 | now() (0.9) |
-| [compliance-level-3/1149-feel-today-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1149-feel-today-function) | 2 | 0 | 0 | 2 | today() (0.9) |
+| [compliance-level-3/1140-feel-string-join-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1140-feel-string-join-function) | 22 | 22 | 0 | 0 |  |
+| [compliance-level-3/1141-feel-round-up-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1141-feel-round-up-function) | 16 | 16 | 0 | 0 |  |
+| [compliance-level-3/1142-feel-round-down-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1142-feel-round-down-function) | 16 | 16 | 0 | 0 |  |
+| [compliance-level-3/1143-feel-round-half-up-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1143-feel-round-half-up-function) | 16 | 16 | 0 | 0 |  |
+| [compliance-level-3/1144-feel-round-half-down-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1144-feel-round-half-down-function) | 16 | 16 | 0 | 0 |  |
+| [compliance-level-3/1145-feel-context-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1145-feel-context-function) | 18 | 18 | 0 | 0 |  |
+| [compliance-level-3/1146-feel-context-put-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1146-feel-context-put-function) | 30 | 24 | 0 | 6 | boxed contexts (0.10) |
+| [compliance-level-3/1147-feel-context-merge-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1147-feel-context-merge-function) | 14 | 14 | 0 | 0 |  |
+| [compliance-level-3/1148-feel-now-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1148-feel-now-function) | 2 | 2 | 0 | 0 |  |
+| [compliance-level-3/1149-feel-today-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1149-feel-today-function) | 2 | 2 | 0 | 0 |  |
 | [compliance-level-3/1150-boxed-conditional](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1150-boxed-conditional) | 3 | 0 | 0 | 3 | boxed conditionals (0.10) |
 | [compliance-level-3/1151-boxed-filter](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1151-boxed-filter) | 4 | 0 | 0 | 4 | boxed filters (0.10) |
 | [compliance-level-3/1152-boxed-for](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1152-boxed-for) | 2 | 0 | 0 | 2 | boxed iterators (for, some, every) (0.10) |
 | [compliance-level-3/1153-boxed-some](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1153-boxed-some) | 5 | 0 | 0 | 5 | boxed iterators (for, some, every) (0.10) |
 | [compliance-level-3/1154-boxed-every](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1154-boxed-every) | 5 | 0 | 0 | 5 | boxed iterators (for, some, every) (0.10) |
-| [compliance-level-3/1155-list-replace-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1155-list-replace-function) | 22 | 0 | 0 | 22 | list replace() (0.9) |
-| [compliance-level-3/1156-range-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1156-range-function) | 56 | 0 | 0 | 56 | range() (0.9); string() (0.9) |
+| [compliance-level-3/1155-list-replace-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1155-list-replace-function) | 22 | 22 | 0 | 0 |  |
+| [compliance-level-3/1156-range-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1156-range-function) | 56 | 56 | 0 | 0 |  |
 | [compliance-level-3/1157-implicit-conversions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1157-implicit-conversions) | 12 | 4 | 0 | 8 | business knowledge models (0.10); decision services (0.11); boxed contexts (0.10); … |
 | [compliance-level-3/1160-multiple-imports](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1160-multiple-imports) | 4 | 0 | 0 | 4 | imports (0.11) |
-| [compliance-level-3/1161-boxed-list-expression](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1161-boxed-list-expression) | 2 | 0 | 0 | 2 | boxed lists (0.10); string() (0.9) |
+| [compliance-level-3/1161-boxed-list-expression](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1161-boxed-list-expression) | 2 | 0 | 0 | 2 | boxed lists (0.10) |
 
 ### Failures
 
-- `compliance-level-2/0008-LX-arithmetic/0008-LX-arithmetic-test-01.xml #001 payment`: expected 2778.69354943277, got 2778.693549432766768088520383236299
 - `compliance-level-2/0008-LX-arithmetic/0008-LX-arithmetic-test-01.xml #002 payment`: expected 562.707359373292, got 562.7073593732659271562143285576524
 - `compliance-level-2/0008-LX-arithmetic/0008-LX-arithmetic-test-01.xml #003 payment`: expected 2861.03377700389, got 2861.033777003901636716262779605767
-- `compliance-level-3/0100-arithmetic/0100-arithmetic-test-01.xml #exponent_lhs_number_exp_rhs_number_005 exponent_lhs_number_exp_rhs_number_005`: expected 60.58617166606, got 60.58617166606633673745724928244262
+- `compliance-level-3/0103-feel-is-function/0103-feel-is-function-test-01.xml #time_007 time_007`: expected false, got true
+- `compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #028_eaea7a943c feel-time-function_028_eaea7a943c`: expected "00:01:00@Etc/UTC", got "00:01:00Z"
 
 ## Decision tables
 

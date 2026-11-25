@@ -154,12 +154,34 @@ class FeelDecisionsTest {
     }
 
     @Test
-    void a_literal_expression_that_invokes_a_built_in_function_is_rejected_when_the_model_is_read() {
-        // FEEL's built-in functions are planned for 0.9 (#117): the model is one Praecepta does not evaluate yet
-        assertThatThrownBy(() -> read("""
+    void a_literal_expression_that_invokes_a_built_in_function_is_evaluated() {
+        // FEEL's built-in functions since 0.9 (#117)
+        var model = read("""
                 <decision id="d" name="D"><literalExpression><text>upper case("a") + "!"</text></literalExpression></decision>
+                """);
+        assertThat(graph(model).evaluate("D", Map.of())).isEqualTo("A!");
+    }
+
+    @Test
+    void an_input_of_a_collection_of_collections_is_a_list_of_lists() {
+        // the DMN TCK's 0009-append-flatten: an item definition that is a collection of another collection
+        var model = read("""
+                <itemDefinition name="tStrings" isCollection="true"><typeRef>string</typeRef></itemDefinition>
+                <itemDefinition name="tNested" isCollection="true"><typeRef>tStrings</typeRef></itemDefinition>
+                <inputData id="n" name="Nested"><variable name="Nested" typeRef="tNested"/></inputData>
+                <decision id="d" name="D"><informationRequirement><requiredInput href="#n"/></informationRequirement>
+                  <literalExpression><text>flatten(append(Nested, ["c"]))</text></literalExpression></decision>
+                """);
+        assertThat(graph(model).evaluate("D", Map.of("Nested", List.of(List.of("a"), List.of("b"))))).isEqualTo(List.of("a", "b", "c"));
+    }
+
+    @Test
+    void a_literal_expression_that_defines_an_external_function_is_rejected_when_the_model_is_read() {
+        // external functions are planned for 0.11 (#119): the model is one Praecepta does not evaluate yet
+        assertThatThrownBy(() -> read("""
+                <decision id="d" name="D"><literalExpression><text>function(a) external {java: {class: "C"}}</text></literalExpression></decision>
                 """)).isInstanceOf(UnsupportedFeatureException.class)
-                .hasMessageContaining("uses the built-in function 'upper case', planned for 0.9 (#117)")
-                .satisfies(e -> assertThat(((UnsupportedFeatureException) e).issue()).isEqualTo(117));
+                .hasMessageContaining("uses an external function (Java or PMML), planned for 0.11 (#119)")
+                .satisfies(e -> assertThat(((UnsupportedFeatureException) e).issue()).isEqualTo(119));
     }
 }
