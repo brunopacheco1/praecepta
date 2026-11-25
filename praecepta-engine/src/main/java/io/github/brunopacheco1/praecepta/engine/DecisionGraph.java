@@ -198,8 +198,7 @@ public final class DecisionGraph {
         var reads = analysis.reads.get(d);
         return switch (decision.logic()) {
             case DecisionLogic.Table(var table, var type) -> new GraphNodes.TableNode(table, analysis, d, type, log);
-            case DecisionLogic.LiteralExpression literal -> new GraphNodes.LiteralNode(analysis.expressions[d], reads, analysis.bindings[d],
-                    literal.type());
+            default -> new GraphNodes.LiteralNode(analysis.expressions[d], reads, analysis.bindings[d], decision.logic().type());
         };
     }
 

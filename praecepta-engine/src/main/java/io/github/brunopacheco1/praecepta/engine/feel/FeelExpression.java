@@ -5,6 +5,7 @@
  */
 package io.github.brunopacheco1.praecepta.engine.feel;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +13,8 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
+
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic;
 
 /**
  * A FEEL expression (DMN 1.5, chapter 10), parsed once and evaluated as often as needed: the full expression language
@@ -98,6 +101,53 @@ public final class FeelExpression {
     private final List<Unsupported> unsupported;
     private final int depth;
 
+    /**
+     * A part of a boxed expression that FEEL does not evaluate itself, a decision table within a context or a function's
+     * body, which the caller of {@link #compose(DecisionLogic, Scope, Function)} evaluates: given the value of each name
+     * in scope where it is, it gives its value. It is shared by every evaluation, from any thread.
+     */
+    public interface Embedded {
+
+        /**
+         * The names it reads, each a name in scope where it is, or such a name and a path into its value
+         * ({@code Applicant.age}).
+         */
+        List<String> names();
+
+        /** The type of its values; {@link FeelType#ANY} where only the values tell. */
+        FeelType type();
+
+        /**
+         * Its value.
+         *
+         * @param values the value of each name in scope where it is
+         * @param errors receives each error FEEL reports; null to ignore them
+         */
+        Object evaluate(Function<String, Object> values, Consumer<String> errors);
+    }
+
+    /**
+     * Where a decision table is within a boxed expression: the table, and the names in scope there, those of the scope
+     * the expression is composed in and those its enclosing constructs bind (a context's entries, a function's
+     * parameters, an iterator's variable, a filter's {@code item}).
+     *
+     * @param locals the names the enclosing constructs bind, innermost last
+     */
+    public record TableSite(DecisionLogic.Table table, Scope scope, List<String> locals) {
+
+        /** Every name in scope where the table is, those of the enclosing constructs last. */
+        public List<String> names() {
+            var names = new ArrayList<>(scope.given);
+            names.addAll(locals);
+            return List.copyOf(names);
+        }
+
+        /** The types the model names, which the table's FEEL may name; empty where the scope gives none. */
+        public Map<String, FeelType> types() {
+            return scope.types == null ? Map.of() : scope.types;
+        }
+    }
+
     private FeelExpression(String text, FeelParser.Parsed parsed) {
         this.text = text;
         this.depth = parsed.depth();
@@ -157,6 +207,36 @@ public final class FeelExpression {
      * @param names the names in scope
      * @param types the types the model defines, by name
      */
+    /**
+     * Composes a boxed expression (DMN 1.5, 10.2), {@link DecisionLogic} other than a decision table, into the FEEL
+     * expression it boxes, as {@link #parse(String, Scope)} parses a text: its literal expressions are parsed with the
+     * names of {@code scope} in scope and those its own constructs bind, and its {@link #names()} are the names it reads
+     * from the scope. Its {@link #text()} describes it by its kind. A decision table within it is rejected: it is
+     * evaluated only within a decision model, whose graph composes it with {@link #compose(DecisionLogic, Scope, Function)}.
+     *
+     * @throws ExpressionSyntaxException if a literal expression within it is not FEEL, saying where it is, or it holds a
+     *                                   decision table
+     */
+    public static FeelExpression compose(DecisionLogic logic, Scope scope) {
+        return compose(logic, scope, null);
+    }
+
+    /**
+     * Composes a boxed expression as {@link #compose(DecisionLogic, Scope)} does, each decision table within it being the
+     * expression {@code tables} embeds there; the names an embedded table reads that its enclosing constructs do not
+     * bind are among the composed expression's {@link #names()}.
+     *
+     * @throws ExpressionSyntaxException if a literal expression within it is not FEEL, saying where it is
+     */
+    public static FeelExpression compose(DecisionLogic logic, Scope scope, Function<TableSite, Embedded> tables) {
+        Objects.requireNonNull(logic, "logic");
+        Objects.requireNonNull(scope, "scope");
+        if (logic instanceof DecisionLogic.LiteralExpression literal) {
+            return parse(literal.text(), scope);
+        }
+        return new FeelExpression(BoxedComposer.describe(logic), BoxedComposer.compose(logic, scope, tables));
+    }
+
     public static Scope scope(Collection<String> names, Map<String, FeelType> types) {
         return new Scope(List.copyOf(names), Map.copyOf(types));
     }
@@ -171,7 +251,7 @@ public final class FeelExpression {
 
     /** Names, and the types a model defines, in scope for parsing expressions; immutable and thread-safe. */
     public static final class Scope {
-        private final List<String> given;
+        final List<String> given;
         final Map<String, FeelType> types;
         /** The names, indexed when the first expression is parsed, so a scope no expression is parsed in costs nothing. */
         private final AtomicReference<FeelParser.Names> names = new AtomicReference<>();

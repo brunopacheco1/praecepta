@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Every kind of boxed expression of DMN 1.5, chapter 10, as decision logic, nested in one another. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="boxed" name="Loans" namespace="https://example.com/boxed">
+  <itemDefinition name="tLoan">
+    <itemComponent name="principal"><typeRef>number</typeRef></itemComponent>
+    <itemComponent name="rate"><typeRef>number</typeRef></itemComponent>
+    <itemComponent name="months"><typeRef>number</typeRef></itemComponent>
+  </itemDefinition>
+  <itemDefinition name="tLoans" isCollection="true"><typeRef>tLoan</typeRef></itemDefinition>
+  <itemDefinition name="tNumbers" isCollection="true"><typeRef>number</typeRef></itemDefinition>
+  <inputData id="loans" name="Loans"><variable name="Loans" typeRef="tLoans"/></inputData>
+  <inputData id="limit" name="Limit"><variable name="Limit" typeRef="number"/></inputData>
+  <!-- a context with a final result, whose entries read one another, and a function one of them defines -->
+  <decision id="payments" name="Payments">
+    <variable name="Payments" typeRef="tNumbers"/>
+    <informationRequirement><requiredInput href="#loans"/></informationRequirement>
+    <context>
+      <contextEntry>
+        <variable name="payment"/>
+        <functionDefinition>
+          <formalParameter name="loan" typeRef="tLoan"/>
+          <literalExpression typeRef="number"><text>(loan.principal * loan.rate / 12) / (1 - (1 + loan.rate / 12) ** -loan.months)</text></literalExpression>
+        </functionDefinition>
+      </contextEntry>
+      <contextEntry>
+        <variable name="all" typeRef="tNumbers"/>
+        <for iteratorVariable="loan">
+          <in><literalExpression><text>Loans</text></literalExpression></in>
+          <return>
+            <invocation>
+              <literalExpression><text>payment</text></literalExpression>
+              <binding><parameter name="loan"/><literalExpression><text>loan</text></literalExpression></binding>
+            </invocation>
+          </return>
+        </for>
+      </contextEntry>
+      <contextEntry>
+        <literalExpression><text>for p in all return decimal(p, 2)</text></literalExpression>
+      </contextEntry>
+    </context>
+  </decision>
+  <!-- a filter, a conditional, quantifiers, a list and a relation -->
+  <decision id="affordable" name="Affordable">
+    <variable name="Affordable"/>
+    <informationRequirement><requiredDecision href="#payments"/></informationRequirement>
+    <informationRequirement><requiredInput href="#limit"/></informationRequirement>
+    <filter>
+      <in><literalExpression><text>Payments</text></literalExpression></in>
+      <match><literalExpression><text>item &lt;= Limit</text></literalExpression></match>
+    </filter>
+  </decision>
+  <decision id="verdict" name="Verdict">
+    <variable name="Verdict" typeRef="string"/>
+    <informationRequirement><requiredDecision href="#payments"/></informationRequirement>
+    <informationRequirement><requiredInput href="#limit"/></informationRequirement>
+    <conditional>
+      <if>
+        <every iteratorVariable="p">
+          <in><literalExpression><text>Payments</text></literalExpression></in>
+          <satisfies><literalExpression><text>p &lt;= Limit</text></literalExpression></satisfies>
+        </every>
+      </if>
+      <then><literalExpression><text>"all affordable"</text></literalExpression></then>
+      <else>
+        <conditional>
+          <if>
+            <some iteratorVariable="p">
+              <in><literalExpression><text>Payments</text></literalExpression></in>
+              <satisfies><literalExpression><text>p &lt;= Limit</text></literalExpression></satisfies>
+            </some>
+          </if>
+          <then><literalExpression><text>"some affordable"</text></literalExpression></then>
+          <else><literalExpression><text>"none affordable"</text></literalExpression></else>
+        </conditional>
+      </else>
+    </conditional>
+  </decision>
+  <decision id="bounds" name="Bounds">
+    <variable name="Bounds" typeRef="tNumbers"/>
+    <informationRequirement><requiredInput href="#limit"/></informationRequirement>
+    <list>
+      <literalExpression><text>Limit / 2</text></literalExpression>
+      <literalExpression><text>Limit</text></literalExpression>
+      <literalExpression typeRef="number"><text>Limit * 2</text></literalExpression>
+    </list>
+  </decision>
+  <decision id="rates" name="Rates">
+    <variable name="Rates"/>
+    <relation>
+      <column name="term" typeRef="number"/>
+      <column name="rate" typeRef="number"/>
+      <row><literalExpression><text>12</text></literalExpression><literalExpression><text>0.05</text></literalExpression></row>
+      <row><literalExpression><text>24</text></literalExpression><literalExpression><text>0.06</text></literalExpression></row>
+    </relation>
+  </decision>
+</definitions>

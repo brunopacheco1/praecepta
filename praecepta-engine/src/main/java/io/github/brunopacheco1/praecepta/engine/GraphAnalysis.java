@@ -226,9 +226,9 @@ final class GraphAnalysis {
                 tableReads.add(read);
                 names.addAll(read.names());
             }
-            case DecisionLogic.LiteralExpression literal -> {
+            default -> {
                 tableReads.add(TableReads.NONE);
-                parseLiteral(d, literal, scope);
+                parseExpression(d, decision.logic(), scope);
                 if (expressions[d] != null) {
                     names.addAll(expressions[d].names());
                 }
@@ -251,15 +251,15 @@ final class GraphAnalysis {
     }
 
     /**
-     * Parses a decision's literal expression with the names of its requirements in scope (DMN 1.5, 7.3.4 and 10.3.2.11),
-     * and the types the model defines; reports what it uses that Praecepta does not evaluate yet (an external function,
-     * planned for 0.11), and an expression that is not FEEL, or names a type that neither FEEL nor the model defines
-     * ({@link Kind#INVALID_EXPRESSION}).
+     * Parses a decision's literal expression, or composes its boxed expression ({@link FeelExpression#compose}), with the
+     * names of its requirements in scope (DMN 1.5, 7.3.4 and 10.3.2.11), and the types the model defines; reports what it
+     * uses that Praecepta does not evaluate yet (an external function, planned for 0.11), and an expression that is not
+     * FEEL, or names a type that neither FEEL nor the model defines ({@link Kind#INVALID_EXPRESSION}).
      */
-    private void parseLiteral(int d, DecisionLogic.LiteralExpression literal, Set<String> scope) {
+    private void parseExpression(int d, DecisionLogic logic, Set<String> scope) {
         var decision = model.decisions().get(d).name();
         try {
-            expressions[d] = FeelExpression.parse(literal.text(), scope, model.types());
+            expressions[d] = FeelExpression.compose(logic, FeelExpression.scope(scope, model.types()));
         } catch (ExpressionSyntaxException e) {
             report(d, Kind.INVALID_EXPRESSION, "decision '%s': %s".formatted(decision, e.getMessage()));
             return;
@@ -286,9 +286,9 @@ final class GraphAnalysis {
         switch (decision.logic()) {
             case DecisionLogic.Table(var table, var type) ->
                     read.addAll(tableReads(decision.name(), table, tableScope(names, table, types)).names());
-            case DecisionLogic.LiteralExpression literal -> {
+            default -> {
                 try {
-                    read.addAll(FeelExpression.parse(literal.text(), scope).names());
+                    read.addAll(FeelExpression.compose(decision.logic(), scope).names());
                 } catch (ExpressionSyntaxException e) {
                     // reported when the graph is built
                 }
@@ -646,7 +646,7 @@ final class GraphAnalysis {
         var decision = model.decisions().get(d);
         types[inputCount + d] = switch (decision.logic()) {
             case DecisionLogic.Table(var table, var declared) -> bind(d, declared, valueType(table, declared), "decision table");
-            case DecisionLogic.LiteralExpression literal -> literalType(d, literal);
+            default -> expressionType(d, decision.logic());
         };
     }
 
@@ -738,24 +738,25 @@ final class GraphAnalysis {
     private static FeelType declaredType(Decision decision) {
         return switch (decision.logic()) {
             case DecisionLogic.Table(var table, var declared) -> declared instanceof FeelType.Any ? tableType(table) : declared;
-            case DecisionLogic.LiteralExpression literal -> literal.type();
+            default -> decision.logic().type();
         };
     }
 
     /**
-     * The type of a literal expression's value, bound to the type its decision declares ({@link #bind}): its
+     * The type of a literal expression's value, or a boxed expression's, bound to the type its decision declares ({@link #bind}): its
      * expression's, as FEEL types it from the types of the names it reads (DMN 1.5, 10.3.2.9), {@link FeelType#ANY}
      * where only the values tell. An expression whose value is null whatever its inputs (operands FEEL does not combine,
      * such as a string and a number, a path to a component its type does not have) is reported
      * ({@link Kind#ALWAYS_NULL}), and evaluated: FEEL gives null there rather than fail.
      */
-    private FeelType literalType(int d, DecisionLogic.LiteralExpression literal) {
+    private FeelType expressionType(int d, DecisionLogic decisionLogic) {
         var expression = expressions[d];
         checkPaths(d);
         if (blocked[d] != null || expression == null) {
-            return literal.type(); // reported already: a name none of its requirements provides, or what Praecepta does not evaluate
+            return decisionLogic.type(); // reported already: a name none of its requirements provides, or what Praecepta does not evaluate
         }
-        var logic = "literal expression '%s'".formatted(literal.text().strip());
+        var logic = decisionLogic instanceof DecisionLogic.LiteralExpression ? "literal expression '%s'".formatted(expression.text().strip())
+                : expression.text();
         var reasons = new ArrayList<String>();
         var resolved = reads.get(d);
         var type = expression.type(name -> resolved.containsKey(name) ? resolved.get(name).type() : null, reasons::add);
@@ -764,9 +765,9 @@ final class GraphAnalysis {
             var reason = reasons.isEmpty() ? "it is null" : reasons.getFirst();
             issues.add(new Issue(Kind.ALWAYS_NULL, List.of(), "decision '%s': in %s, %s; its value is null (DMN 1.5, 10.3.2.15)"
                     .formatted(model.decisions().get(d).name(), logic, reason), Map.of()));
-            return literal.type();
+            return decisionLogic.type();
         }
-        return bind(d, literal.type(), type, logic);
+        return bind(d, decisionLogic.type(), type, logic);
     }
 
     /** Reports each name a literal expression reads by a path into a requirement's value that its type does not have. */

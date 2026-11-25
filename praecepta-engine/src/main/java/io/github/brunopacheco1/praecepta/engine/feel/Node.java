@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelArithmetic.Operator;
@@ -115,6 +116,12 @@ sealed interface Node {
                     .equals(((In) b).tests().stream().map(Test::questionMark).toList());
             case InstanceOf(var value, var of) -> of.equals(((InstanceOf) b).of());
             case ContextLiteral(var keys, var values) -> keys.equals(((ContextLiteral) b).keys());
+            case ContextResult(var keys, var values, var result) -> keys.equals(((ContextResult) b).keys());
+            case Row(var keys, var values) -> keys.equals(((Row) b).keys());
+            case Bound(var value, var declared) -> declared.equals(((Bound) b).declared());
+            case Embedded(var expression) -> expression == ((Embedded) b).expression();
+            case Strict n -> true;
+            case Checked n -> true;
             case RangeLiteral(var start, var startIncluded, var end, var endIncluded) -> startIncluded == ((RangeLiteral) b).startIncluded()
                     && endIncluded == ((RangeLiteral) b).endIncluded();
             case UnaryRange(var operator, var endpoint) -> operator == ((UnaryRange) b).operator();
@@ -612,6 +619,188 @@ sealed interface Node {
         @Override
         public List<Node> children() {
             return values;
+        }
+    }
+
+    /**
+     * A boxed context with a final result (DMN 1.5, 10.2.1): its entries are evaluated in order, each in the scope of
+     * those before it and of itself, as a context literal's are, and its value is the result's, evaluated in the scope
+     * of them all.
+     */
+    record ContextResult(List<String> keys, List<Node> values, Node result) implements Node {
+        @Override
+        public Object evaluate(Env env) {
+            var context = new LinkedHashMap<String, Object>();
+            var scope = env.with(context);
+            for (int i = 0; i < keys.size(); i++) {
+                context.put(keys.get(i), values.get(i).evaluate(scope));
+            }
+            return result.evaluate(scope);
+        }
+
+        @Override
+        public FeelType type(TypeEnv env) {
+            var types = new LinkedHashMap<String, FeelType>();
+            var scope = env.with(types);
+            for (int i = 0; i < keys.size(); i++) {
+                types.put(keys.get(i), values.get(i).type(scope));
+            }
+            return result.type(scope);
+        }
+
+        @Override
+        public int weight() {
+            return 2;
+        }
+
+        @Override
+        public List<Node> children() {
+            var children = new ArrayList<>(values);
+            children.add(result);
+            return children;
+        }
+    }
+
+    /**
+     * A row of a relation (DMN 1.5, 10.2.6): the context of its cells' values by column, each cell evaluated in the
+     * scope around the relation, not of the other cells.
+     */
+    record Row(List<String> keys, List<Node> values) implements Node {
+        @Override
+        public Object evaluate(Env env) {
+            var context = new LinkedHashMap<String, Object>();
+            for (int i = 0; i < keys.size(); i++) {
+                context.put(keys.get(i), values.get(i).evaluate(env));
+            }
+            return Collections.unmodifiableMap(context);
+        }
+
+        @Override
+        public FeelType type(TypeEnv env) {
+            var types = new LinkedHashMap<String, FeelType>();
+            for (int i = 0; i < keys.size(); i++) {
+                types.put(keys.get(i), values.get(i).type(env));
+            }
+            return new FeelType.Context(types);
+        }
+
+        @Override
+        public List<Node> children() {
+            return values;
+        }
+    }
+
+    /**
+     * A part of a boxed expression whose value is bound to the type the model declares for it (DMN 1.5, 10.3.2.9.4), as
+     * an argument is bound to its parameter's type: as it is where it conforms, a single value to a list as a list of
+     * one, a list of one to a single value as its element, a date to a date and time at UTC midnight; any other value is
+     * null, with an error.
+     */
+    record Bound(Node value, FeelType declared) implements Node {
+        @Override
+        public Object evaluate(Env env) {
+            var result = value.evaluate(env);
+            var bound = Closure.bind(result, declared, env);
+            if (bound == Closure.NOT_BOUND) {
+                return env.error(() -> "%s is not a %s, the type the model declares for it (DMN 1.5, 10.3.2.9.4)"
+                        .formatted(FeelValues.text(result), declared.feelName()));
+            }
+            return bound;
+        }
+
+        @Override
+        public FeelType type(TypeEnv env) {
+            var type = value.type(env);
+            return type instanceof FeelType.Null ? type : declared;
+        }
+
+        @Override
+        public List<Node> children() {
+            return List.of(value);
+        }
+    }
+
+    /**
+     * The condition of a boxed conditional, filter or iterator (DMN 1.5, 10.2.7 to 10.2.9), which must be a boolean or
+     * null: any other value is an error, which makes the whole construct null ({@link Checked}), where FEEL's
+     * {@code if}, filter, {@code some} and {@code every} would take it as not true (the DMN TCK's
+     * {@code 1150-boxed-conditional} to {@code 1154-boxed-every}).
+     */
+    record Strict(Node condition) implements Node {
+
+        /** Thrown, without a stack trace, to the construct's {@link Checked} once its condition is not a boolean. */
+        static final class NotBoolean extends RuntimeException {
+            private static final long serialVersionUID = 1L;
+
+            NotBoolean() {
+                super(null, null, false, false);
+            }
+        }
+
+        private static final NotBoolean NOT_BOOLEAN = new NotBoolean();
+
+        @Override
+        public Object evaluate(Env env) {
+            var value = condition.evaluate(env);
+            if (value != null && !(value instanceof Boolean)) {
+                env.error(() -> "the condition is %s, not a boolean (DMN 1.5, 10.2)".formatted(FeelValues.text(value)));
+                throw NOT_BOOLEAN;
+            }
+            return value;
+        }
+
+        @Override
+        public FeelType type(TypeEnv env) {
+            return condition.type(env);
+        }
+
+        @Override
+        public List<Node> children() {
+            return List.of(condition);
+        }
+    }
+
+    /** A boxed conditional, filter or iterator whose {@link Strict} condition makes it null when it is not a boolean. */
+    record Checked(Node construct) implements Node {
+        @Override
+        public Object evaluate(Env env) {
+            try {
+                return construct.evaluate(env);
+            } catch (Strict.NotBoolean e) {
+                return null;
+            }
+        }
+
+        @Override
+        public FeelType type(TypeEnv env) {
+            return construct.type(env);
+        }
+
+        @Override
+        public List<Node> children() {
+            return List.of(construct);
+        }
+    }
+
+    /**
+     * A part of a boxed expression that FEEL does not evaluate itself, such as a decision table in a context entry or a
+     * business knowledge model's body, given the value of each name it reads, as the scope holds them.
+     */
+    record Embedded(FeelExpression.Embedded expression) implements Node {
+        @Override
+        public Object evaluate(Env env) {
+            Consumer<String> errors = env.reporting() ? env::error : null;
+            return expression.evaluate(env::lookup, errors);
+        }
+
+        @Override
+        public FeelType type(TypeEnv env) {
+            return expression.type();
+        }
+
+        @Override
+        public int weight() {
+            return 2;
         }
     }
 

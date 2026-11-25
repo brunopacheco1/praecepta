@@ -245,7 +245,10 @@ public final class DmnReader {
         return Character.isLetterOrDigit(c) || c == '_';
     }
 
-    /** The FEEL texts of a decision's logic: a literal expression, or a table's input expressions, input and output entries. */
+    /**
+     * The FEEL texts of a decision's logic: a literal expression, a table's input expressions, input and output entries,
+     * and those of every part of a boxed expression.
+     */
     private static Stream<String> texts(DecisionLogic logic) {
         return switch (logic) {
             case DecisionLogic.LiteralExpression literal -> Stream.of(literal.text());
@@ -253,6 +256,18 @@ public final class DmnReader {
                     table.inputs().stream().map(InputColumn::name),
                     table.rules().stream().flatMap(rule -> Stream.concat(rule.input().values().values().stream(),
                             rule.output().expressions().values().stream())).filter(Objects::nonNull));
+            case DecisionLogic.Context(var entries, var result, var type) -> Stream.concat(
+                    entries.stream().flatMap(entry -> texts(entry.value())), result == null ? Stream.empty() : texts(result));
+            case DecisionLogic.Invocation(var function, var bindings, var type) -> Stream.concat(Stream.of(function),
+                    bindings.stream().filter(binding -> binding.value() != null).flatMap(binding -> texts(binding.value())));
+            case DecisionLogic.FunctionDefinition(var parameters, var body, var type) -> texts(body);
+            case DecisionLogic.Relation(var columns, var rows, var type) -> rows.stream().flatMap(List::stream).flatMap(DmnReader::texts);
+            case DecisionLogic.BoxedList(var elements, var type) -> elements.stream().flatMap(DmnReader::texts);
+            case DecisionLogic.Conditional(var condition, var then, var otherwise, var type) ->
+                    Stream.of(condition, then, otherwise).flatMap(DmnReader::texts);
+            case DecisionLogic.Iteration(var kind, var variable, var domain, var body, var type) ->
+                    Stream.of(domain, body).flatMap(DmnReader::texts);
+            case DecisionLogic.Filter(var list, var match, var type) -> Stream.of(list, match).flatMap(DmnReader::texts);
         };
     }
 
@@ -335,7 +350,7 @@ public final class DmnReader {
         return element == null ? id : nameOr(element, "id");
     }
 
-    /** The kinds of boxed expression a decision's logic may be, which Praecepta does not evaluate yet, as messages name them. */
+    /** The kinds of boxed expression (DMN 1.5, 10.2) beside decision tables and literal expressions, as messages name them. */
     private static final Map<String, String> BOXED_EXPRESSIONS = Map.of(
             "context", "a boxed context",
             "invocation", "a boxed invocation",
@@ -348,7 +363,7 @@ public final class DmnReader {
             "some", "a boxed quantified expression (some)",
             "filter", "a boxed filter");
 
-    /** A decision's logic: its decision table or its literal expression. */
+    /** A decision's logic: its decision table, its literal expression, or its boxed expression. */
     private static DecisionLogic logic(Element decision, ItemDefinitions types, ModelTypes model, String where) {
         for (var node = decision.getFirstChild(); node != null; node = node.getNextSibling()) {
             if (node.getNodeType() != Node.ELEMENT_NODE) {
@@ -363,16 +378,222 @@ public final class DmnReader {
                 return literalExpression(decision, element, types, where);
             }
             if (BOXED_EXPRESSIONS.containsKey(kind)) {
-                throw BOXED.exception(("%s: its logic is %s, which Praecepta does not support yet: boxed expressions are "
-                        + "planned for 0.10 (#118)").formatted(where, BOXED_EXPRESSIONS.get(kind)));
+                // the value is bound to the decision's variable (DMN 1.5, 10.3.2.9.4), whose typeRef 7.3.1 requires the
+                // expression's to equal; the expression's own is read only where the variable has none
+                return boxed(element, types, typeOf(variableTypeRef(decision), element, types, where), where);
             }
         }
         throw new InvalidDecisionTableException(where + " has no decision logic; Praecepta evaluates decisions whose logic is a decision "
-                + "table or a literal expression");
+                + "table, a literal expression or a boxed expression");
     }
 
-    /** A literal expression, of the type its decision's variable (or the expression itself) declares. */
-    private static DecisionLogic literalExpression(Element decision, Element literal, ItemDefinitions types, String where) {
+    /** Whether an element is an expression (DMN 1.5, 10.2) that a boxed expression may hold. */
+    private static boolean isExpression(Element element) {
+        var kind = element.getLocalName();
+        return kind.equals("literalExpression") || kind.equals(DECISION_TABLE) || BOXED_EXPRESSIONS.containsKey(kind);
+    }
+
+    /** The expression an element holds as its only expression child ({@code <if>}, {@code <in>}), or null for none. */
+    private static Element expressionIn(Element parent) {
+        for (var node = parent.getFirstChild(); node != null; node = node.getNextSibling()) {
+            if (node.getNodeType() == Node.ELEMENT_NODE && isExpression((Element) node)) {
+                return (Element) node;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The type a part of a boxed expression declares: {@code typeRef}, the one its variable declares (a context entry's,
+     * a decision's), else the expression's own; any type if neither does.
+     */
+    private static FeelType typeOf(String typeRef, Element expression, ItemDefinitions types, String where) {
+        var ref = typeRef.isBlank() && expression != null ? expression.getAttribute(TYPE_REF) : typeRef;
+        return types.feelType(ref, where);
+    }
+
+    /** The expression a child element of a boxed expression holds ({@code <if>}, {@code <in>}...), which it must have. */
+    private static DecisionLogic part(Element parent, String child, ItemDefinitions types, String where) {
+        var element = child(parent, child);
+        var expression = element == null ? null : expressionIn(element);
+        if (expression == null) {
+            throw new InvalidDecisionTableException("%s: its <%s> holds no expression".formatted(where, child));
+        }
+        return expression(expression, types, typeOf("", expression, types, where), where);
+    }
+
+    /**
+     * An expression within a boxed expression: a literal expression (an empty one is {@code null}), or a boxed
+     * expression in turn, of the type {@code type}.
+     */
+    private static DecisionLogic expression(Element element, ItemDefinitions types, FeelType type, String where) {
+        var kind = element.getLocalName();
+        if (kind.equals("literalExpression")) {
+            checkLiteral(element, where);
+            var text = child(element, "text") == null ? "" : textOf(element).strip();
+            try {
+                return new DecisionLogic.LiteralExpression(text.isEmpty() ? "null" : text, type);
+            } catch (IllegalArgumentException e) {
+                throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+            }
+        }
+        if (kind.equals(DECISION_TABLE)) {
+            throw BOXED.exception(("%s: a decision table within a boxed expression, which Praecepta does not support yet: "
+                    + "boxed expressions are planned for 0.10 (#118)").formatted(where));
+        }
+        return boxed(element, types, type, where);
+    }
+
+    /** A boxed expression other than a decision table or a literal expression (DMN 1.5, 10.2), of the type {@code type}. */
+    private static DecisionLogic boxed(Element element, ItemDefinitions types, FeelType type, String where) {
+        try {
+            return switch (element.getLocalName()) {
+                case "context" -> context(element, types, type, where);
+                case "invocation" -> invocation(element, types, type, where);
+                case "functionDefinition" -> functionDefinition(element, types, type, where);
+                case "relation" -> relation(element, types, type, where);
+                case "list" -> {
+                    var elements = new ArrayList<DecisionLogic>();
+                    int i = 0;
+                    for (var node = element.getFirstChild(); node != null; node = node.getNextSibling()) {
+                        if (node.getNodeType() == Node.ELEMENT_NODE && isExpression((Element) node)) {
+                            var item = (Element) node;
+                            elements.add(expression(item, types, typeOf("", item, types, where), "%s, element %d of its list".formatted(where, ++i)));
+                        }
+                    }
+                    yield new DecisionLogic.BoxedList(elements, type);
+                }
+                case "conditional" -> new DecisionLogic.Conditional(part(element, "if", types, where), part(element, "then", types, where),
+                        part(element, "else", types, where), type);
+                case "for" -> iteration(element, DecisionLogic.Iteration.Kind.FOR, "return", types, type, where);
+                case "some" -> iteration(element, DecisionLogic.Iteration.Kind.SOME, "satisfies", types, type, where);
+                case "every" -> iteration(element, DecisionLogic.Iteration.Kind.EVERY, "satisfies", types, type, where);
+                case "filter" -> new DecisionLogic.Filter(part(element, "in", types, where), part(element, "match", types, where), type);
+                default -> throw new InvalidDecisionTableException("%s: <%s> is not an expression".formatted(where, element.getLocalName()));
+            };
+        } catch (IllegalArgumentException e) {
+            throw new InvalidDecisionTableException(where + ": " + e.getMessage());
+        }
+    }
+
+    /** A boxed context: its entries, each of its variable's type, and its final result, the entry without a variable. */
+    private static DecisionLogic context(Element context, ItemDefinitions types, FeelType type, String where) {
+        var entries = new ArrayList<DecisionLogic.ContextEntry>();
+        DecisionLogic result = null;
+        var all = children(context, "contextEntry");
+        for (int i = 0; i < all.size(); i++) {
+            var entry = all.get(i);
+            var variable = child(entry, VARIABLE);
+            var value = expressionIn(entry);
+            if (variable == null) {
+                if (i != all.size() - 1) {
+                    throw new InvalidDecisionTableException(where + ": only a context's last entry may have no variable, as its result "
+                            + "(DMN 1.5, 10.2.1)");
+                }
+                if (value == null) {
+                    throw new InvalidDecisionTableException(where + ": the context's result holds no expression");
+                }
+                result = expression(value, types, typeOf("", value, types, where), where + ", its result");
+                continue;
+            }
+            var name = variable.getAttribute("name").strip();
+            if (name.isEmpty()) {
+                throw new InvalidDecisionTableException(where + ": a context entry's variable has no name");
+            }
+            var at = "%s, context entry '%s'".formatted(where, name);
+            var entryType = typeOf(variable.getAttribute(TYPE_REF), value, types, at);
+            entries.add(new DecisionLogic.ContextEntry(name, value == null
+                    ? new DecisionLogic.LiteralExpression("null", entryType) : expression(value, types, entryType, at)));
+        }
+        return new DecisionLogic.Context(entries, result, type);
+    }
+
+    /** A boxed invocation: the function its first expression names, and its bindings. */
+    private static DecisionLogic invocation(Element invocation, ItemDefinitions types, FeelType type, String where) {
+        var function = expressionIn(invocation);
+        if (function == null || !function.getLocalName().equals("literalExpression")) {
+            throw new InvalidDecisionTableException(where + ": an invocation names the function it invokes with a literal expression");
+        }
+        checkLiteral(function, where);
+        var name = child(function, "text") == null ? "" : textOf(function).strip();
+        if (name.isEmpty()) {
+            throw new InvalidDecisionTableException(where + ": the invocation names no function");
+        }
+        var bindings = new ArrayList<DecisionLogic.Binding>();
+        for (var binding : children(invocation, "binding")) {
+            var parameter = child(binding, "parameter");
+            var parameterName = parameter == null ? "" : parameter.getAttribute("name").strip();
+            if (parameterName.isEmpty()) {
+                throw new InvalidDecisionTableException(where + ": a binding of the invocation names no parameter");
+            }
+            var at = "%s, binding of '%s'".formatted(where, parameterName);
+            var value = expressionIn(binding);
+            bindings.add(new DecisionLogic.Binding(parameterName, value == null ? null
+                    : expression(value, types, typeOf(parameter.getAttribute(TYPE_REF), value, types, at), at)));
+        }
+        return new DecisionLogic.Invocation(name, bindings, type);
+    }
+
+    /** A boxed function definition in FEEL: its formal parameters, of their declared types, and its body. */
+    private static DecisionLogic functionDefinition(Element function, ItemDefinitions types, FeelType type, String where) {
+        var kind = function.getAttribute("kind").strip();
+        if (!kind.isEmpty() && !kind.equals("FEEL")) {
+            throw IMPORTS.exception(("%s defines a function in %s, which Praecepta does not support yet: external functions are "
+                    + "planned for 0.11 (#119)").formatted(where, kind));
+        }
+        var parameters = new ArrayList<DecisionLogic.Parameter>();
+        for (var parameter : children(function, "formalParameter")) {
+            var name = parameter.getAttribute("name").strip();
+            if (name.isEmpty()) {
+                throw new InvalidDecisionTableException(where + ": a parameter of the function has no name");
+            }
+            parameters.add(new DecisionLogic.Parameter(name, types.feelType(parameter.getAttribute(TYPE_REF), where + ", parameter '" + name + "'")));
+        }
+        var body = expressionIn(function);
+        if (body == null) {
+            throw new InvalidDecisionTableException(where + ": the function definition has no body");
+        }
+        var at = where + ", the function's body";
+        return new DecisionLogic.FunctionDefinition(parameters, expression(body, types, typeOf("", body, types, at), at), type);
+    }
+
+    /** A relation: its columns, each of its declared type, and its rows of expressions. */
+    private static DecisionLogic relation(Element relation, ItemDefinitions types, FeelType type, String where) {
+        var columns = new ArrayList<DecisionLogic.Parameter>();
+        for (var column : children(relation, "column")) {
+            var name = column.getAttribute("name").strip();
+            if (name.isEmpty()) {
+                throw new InvalidDecisionTableException(where + ": a column of the relation has no name");
+            }
+            columns.add(new DecisionLogic.Parameter(name, types.feelType(column.getAttribute(TYPE_REF), where + ", column '" + name + "'")));
+        }
+        var rows = new ArrayList<List<DecisionLogic>>();
+        for (var row : children(relation, "row")) {
+            var cells = new ArrayList<DecisionLogic>();
+            for (var node = row.getFirstChild(); node != null; node = node.getNextSibling()) {
+                if (node.getNodeType() == Node.ELEMENT_NODE && isExpression((Element) node)) {
+                    var cell = (Element) node;
+                    var at = "%s, row %d, column %d".formatted(where, rows.size() + 1, cells.size() + 1);
+                    cells.add(expression(cell, types, typeOf("", cell, types, at), at));
+                }
+            }
+            rows.add(cells);
+        }
+        return new DecisionLogic.Relation(columns, rows, type);
+    }
+
+    /** A boxed iterator: its variable, the expression in {@code <in>} and the one in its {@code <return>} or {@code <satisfies>}. */
+    private static DecisionLogic iteration(Element iterator, DecisionLogic.Iteration.Kind kind, String body, ItemDefinitions types,
+            FeelType type, String where) {
+        var variable = iterator.getAttribute("iteratorVariable").strip();
+        if (variable.isEmpty()) {
+            throw new InvalidDecisionTableException(where + ": the iterator has no iteratorVariable");
+        }
+        return new DecisionLogic.Iteration(kind, variable, part(iterator, "in", types, where), part(iterator, body, types, where), type);
+    }
+
+    /** Rejects a literal expression in another language than FEEL, or one that imports values. */
+    private static void checkLiteral(Element literal, String where) {
         var language = literal.getAttribute("expressionLanguage").strip();
         if (!language.isEmpty() && !language.toUpperCase(Locale.ROOT).contains("FEEL")) {
             throw new InvalidDecisionTableException("%s: its literal expression is in '%s'; Praecepta reads FEEL".formatted(where, language));
@@ -381,6 +602,11 @@ public final class DmnReader {
             throw IMPORTS.exception(("%s: its literal expression imports values, which Praecepta does not support yet: "
                     + "imports are planned for 0.11 (#119)").formatted(where));
         }
+    }
+
+    /** A literal expression, of the type its decision's variable (or the expression itself) declares. */
+    private static DecisionLogic literalExpression(Element decision, Element literal, ItemDefinitions types, String where) {
+        checkLiteral(literal, where);
         var text = child(literal, "text") == null ? "" : textOf(literal).strip();
         if (text.isEmpty()) {
             throw new InvalidDecisionTableException(where + ": its literal expression is empty");

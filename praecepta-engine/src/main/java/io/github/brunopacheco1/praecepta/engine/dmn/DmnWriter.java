@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -58,6 +59,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 public final class DmnWriter {
 
     private static final String NAMESPACE = "https://www.omg.org/spec/DMN/20191111/MODEL/";
+    /** DMN 1.5's namespace, for a model with boxed expressions DMN 1.3 does not have: conditionals, iterators and filters. */
+    private static final String NAMESPACE_15 = "https://www.omg.org/spec/DMN/20230324/MODEL/";
     /** The prefix of the ids and item definition names of the table's inputs, followed by their number. */
     private static final String INPUT = "input_";
     /** The prefix of the ids of a model's input data, followed by their position. */
@@ -117,9 +120,11 @@ public final class DmnWriter {
     public static String write(DecisionModel model) {
         var id = identifier(model.name());
         var xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        xml.append("<definitions").append(attribute("xmlns", NAMESPACE)).append(idAndName("definitions_" + id, model.name()))
+        var namespace = model.decisions().stream().anyMatch(decision -> needsDmn15(decision.logic())) ? NAMESPACE_15 : NAMESPACE;
+        xml.append("<definitions").append(attribute("xmlns", namespace)).append(idAndName("definitions_" + id, model.name()))
            .append(attribute("namespace", "https://github.com/brunopacheco1/praecepta/" + id)).append(">\n");
         model.types().forEach((name, type) -> namedType(xml, name, type));
+        var boxedTypes = new BoxedTypes(xml, model.types());
         var ids = new HashMap<String, String>();
         var inputData = model.inputData();
         var decisions = model.decisions();
@@ -140,8 +145,11 @@ public final class DmnWriter {
                     listItemDefinitions(xml, table, prefixes[d]);
                     decisionTypes[d] = elementTypeRef(xml, type, DECISION + d + TYPE_SUFFIX, model.types(), "decision '" + decision.name() + "'");
                 }
-                case DecisionLogic.LiteralExpression literal -> decisionTypes[d] = elementTypeRef(xml, literal.type(), DECISION + d + TYPE_SUFFIX,
-                        model.types(), "decision '" + decision.name() + "'");
+                default -> {
+                    decisionTypes[d] = elementTypeRef(xml, decision.logic().type(), DECISION + d + TYPE_SUFFIX, model.types(),
+                            "decision '" + decision.name() + "'");
+                    boxedTypes.declare(decision.logic(), true, "decision '" + decision.name() + "'");
+                }
             }
         }
         for (int i = 0; i < inputData.size(); i++) {
@@ -151,7 +159,7 @@ public final class DmnWriter {
                .append("  </inputData>\n");
         }
         for (int d = 0; d < decisions.size(); d++) {
-            decision(xml, d, decisions.get(d), decisionTypes[d], prefixes[d], ids);
+            decision(xml, d, decisions.get(d), decisionTypes[d], prefixes[d], ids, boxedTypes);
         }
         xml.append("</definitions>\n");
         return xml.toString();
@@ -220,7 +228,7 @@ public final class DmnWriter {
 
     /** A decision of a model, at position {@code d}: its variable, its information requirements and its logic. */
     private static void decision(StringBuilder xml, int d, DecisionModel.Decision decision, String type, String prefix,
-            Map<String, String> ids) {
+            Map<String, String> ids, BoxedTypes boxedTypes) {
         var where = "Decision '" + decision.name() + "'";
         xml.append("  <decision").append(idAndName(DECISION + d, decision.name())).append(">\n")
            .append(VARIABLE).append(idAndName(DECISION + d + "_variable", decision.name())).append(optionalType(type)).append("/>\n");
@@ -240,8 +248,201 @@ public final class DmnWriter {
             case DecisionLogic.Table(var table, var tableType) -> decisionTable(xml, table, prefix);
             case DecisionLogic.LiteralExpression literal -> xml.append("    <literalExpression").append(id(DECISION + d + "_literal"))
                     .append("><text>").append(escapeText(literal.text())).append("</text></literalExpression>\n");
+            default -> boxed(xml, decision.logic(), null, "    ", boxedTypes);
         }
         xml.append("  </decision>\n");
+    }
+
+    /** Whether a decision's logic holds a boxed expression that DMN 1.3 does not have: a conditional, an iterator or a filter. */
+    private static boolean needsDmn15(DecisionLogic logic) {
+        return switch (logic) {
+            case DecisionLogic.Conditional c -> true;
+            case DecisionLogic.Iteration i -> true;
+            case DecisionLogic.Filter f -> true;
+            case DecisionLogic.Context(var entries, var result, var type) ->
+                    entries.stream().anyMatch(entry -> needsDmn15(entry.value())) || result != null && needsDmn15(result);
+            case DecisionLogic.Invocation(var function, var bindings, var type) ->
+                    bindings.stream().anyMatch(binding -> binding.value() != null && needsDmn15(binding.value()));
+            case DecisionLogic.FunctionDefinition(var parameters, var body, var type) -> needsDmn15(body);
+            case DecisionLogic.Relation(var columns, var rows, var type) -> rows.stream().flatMap(List::stream).anyMatch(DmnWriter::needsDmn15);
+            case DecisionLogic.BoxedList(var elements, var type) -> elements.stream().anyMatch(DmnWriter::needsDmn15);
+            default -> false;
+        };
+    }
+
+    /**
+     * The {@code typeRef}s of the parts of boxed expressions: a simple type's name, or an item definition, written once
+     * for each other type, before the decisions; none for any type.
+     */
+    private static final class BoxedTypes {
+        private final StringBuilder xml;
+        private final Map<String, FeelType> named;
+        private final Map<FeelType, String> written = new HashMap<>();
+
+        BoxedTypes(StringBuilder xml, Map<String, FeelType> named) {
+            this.xml = xml;
+            this.named = named;
+        }
+
+        /** Writes the item definitions of every part's type; the root's, a decision's, is its variable's. */
+        void declare(DecisionLogic logic, boolean root, String where) {
+            if (!root) {
+                declare(logic.type(), where);
+            }
+            switch (logic) {
+                case DecisionLogic.Context(var entries, var result, var type) -> {
+                    entries.forEach(entry -> declare(entry.value(), false, where));
+                    if (result != null) {
+                        declare(result, false, where);
+                    }
+                }
+                case DecisionLogic.Invocation(var function, var bindings, var type) ->
+                        bindings.stream().filter(binding -> binding.value() != null).forEach(binding -> declare(binding.value(), false, where));
+                case DecisionLogic.FunctionDefinition(var parameters, var body, var type) -> {
+                    parameters.forEach(parameter -> declare(parameter.type(), where));
+                    declare(body, false, where);
+                }
+                case DecisionLogic.Relation(var columns, var rows, var type) -> {
+                    columns.forEach(column -> declare(column.type(), where));
+                    rows.forEach(row -> row.forEach(cell -> declare(cell, false, where)));
+                }
+                case DecisionLogic.BoxedList(var elements, var type) -> elements.forEach(element -> declare(element, false, where));
+                case DecisionLogic.Conditional(var condition, var then, var otherwise, var type) ->
+                        List.of(condition, then, otherwise).forEach(part -> declare(part, false, where));
+                case DecisionLogic.Iteration(var kind, var variable, var domain, var body, var type) ->
+                        List.of(domain, body).forEach(part -> declare(part, false, where));
+                case DecisionLogic.Filter(var list, var match, var type) -> List.of(list, match).forEach(part -> declare(part, false, where));
+                default -> {
+                    // a literal expression has no parts
+                }
+            }
+        }
+
+        private void declare(FeelType type, String where) {
+            if (type instanceof FeelType.Simple || type instanceof FeelType.Any || written.containsKey(type)) {
+                return;
+            }
+            var name = named.entrySet().stream().filter(entry -> entry.getValue().equals(type)).map(Map.Entry::getKey).findFirst()
+                    .orElse(null);
+            if (name == null) {
+                name = "boxed_type_" + written.size();
+                for (int k = 1; named.containsKey(name); k++) {
+                    name = "boxed_type_" + written.size() + "_" + k;
+                }
+                if (type instanceof FeelType.FunctionOf) {
+                    namedType(xml, name, type);
+                } else {
+                    typeRef(xml, type, name, where);
+                }
+            }
+            written.put(type, name);
+        }
+
+        /** The attribute {@code typeRef="..."} of a type, or nothing for any type. */
+        String attributeOf(FeelType type) {
+            return switch (type) {
+                case FeelType.Simple(var simple) -> attribute(TYPE_REF, typeName(simple));
+                case FeelType.Any any -> "";
+                default -> attribute(TYPE_REF, written.get(type));
+            };
+        }
+    }
+
+    /**
+     * A boxed expression, or a part of one, at {@code indent}, with its type as {@code typeRef} unless {@code typeRef}
+     * is given in its place (null: none, a decision's or a context entry's type being its variable's).
+     */
+    private static void boxed(StringBuilder xml, DecisionLogic logic, String typeRef, String indent, BoxedTypes types) {
+        var type = typeRef == null ? "" : typeRef;
+        var inner = indent + "  ";
+        switch (logic) {
+            case DecisionLogic.LiteralExpression literal -> xml.append(indent).append("<literalExpression").append(type).append("><text>")
+                    .append(escapeText(literal.text())).append("</text></literalExpression>\n");
+            case DecisionLogic.Table table -> throw new InvalidDecisionTableException(
+                    "a decision table within a boxed expression cannot be written yet");
+            case DecisionLogic.Context(var entries, var result, var contextType) -> {
+                xml.append(indent).append("<context").append(type).append(">\n");
+                for (var entry : entries) {
+                    xml.append(inner).append("<contextEntry>\n").append(inner).append("  <variable").append(attribute("name", entry.name()))
+                       .append(types.attributeOf(entry.value().type())).append("/>\n");
+                    boxed(xml, entry.value(), "", inner + "  ", types);
+                    xml.append(inner).append("</contextEntry>\n");
+                }
+                if (result != null) {
+                    xml.append(inner).append("<contextEntry>\n");
+                    boxed(xml, result, types.attributeOf(result.type()), inner + "  ", types);
+                    xml.append(inner).append("</contextEntry>\n");
+                }
+                xml.append(indent).append("</context>\n");
+            }
+            case DecisionLogic.Invocation(var function, var bindings, var invocationType) -> {
+                xml.append(indent).append("<invocation").append(type).append(">\n").append(inner).append("<literalExpression><text>")
+                   .append(escapeText(function)).append("</text></literalExpression>\n");
+                for (var binding : bindings) {
+                    xml.append(inner).append("<binding>\n").append(inner).append("  <parameter").append(attribute("name", binding.parameter()))
+                       .append(binding.value() == null ? "" : types.attributeOf(binding.value().type())).append("/>\n");
+                    if (binding.value() != null) {
+                        boxed(xml, binding.value(), "", inner + "  ", types);
+                    }
+                    xml.append(inner).append("</binding>\n");
+                }
+                xml.append(indent).append("</invocation>\n");
+            }
+            case DecisionLogic.FunctionDefinition(var parameters, var body, var functionType) -> {
+                xml.append(indent).append("<functionDefinition").append(type).append(">\n");
+                for (var parameter : parameters) {
+                    xml.append(inner).append("<formalParameter").append(attribute("name", parameter.name()))
+                       .append(types.attributeOf(parameter.type())).append("/>\n");
+                }
+                boxed(xml, body, types.attributeOf(body.type()), inner, types);
+                xml.append(indent).append("</functionDefinition>\n");
+            }
+            case DecisionLogic.Relation(var columns, var rows, var relationType) -> {
+                xml.append(indent).append("<relation").append(type).append(">\n");
+                for (var column : columns) {
+                    xml.append(inner).append("<column").append(attribute("name", column.name())).append(types.attributeOf(column.type()))
+                       .append("/>\n");
+                }
+                for (var row : rows) {
+                    xml.append(inner).append("<row>\n");
+                    row.forEach(cell -> boxed(xml, cell, types.attributeOf(cell.type()), inner + "  ", types));
+                    xml.append(inner).append("</row>\n");
+                }
+                xml.append(indent).append("</relation>\n");
+            }
+            case DecisionLogic.BoxedList(var elements, var listType) -> {
+                xml.append(indent).append("<list").append(type).append(">\n");
+                elements.forEach(element -> boxed(xml, element, types.attributeOf(element.type()), inner, types));
+                xml.append(indent).append("</list>\n");
+            }
+            case DecisionLogic.Conditional(var condition, var then, var otherwise, var conditionalType) -> {
+                xml.append(indent).append("<conditional").append(type).append(">\n");
+                part(xml, "if", condition, inner, types);
+                part(xml, "then", then, inner, types);
+                part(xml, "else", otherwise, inner, types);
+                xml.append(indent).append("</conditional>\n");
+            }
+            case DecisionLogic.Iteration(var kind, var variable, var domain, var body, var iterationType) -> {
+                var tag = kind.name().toLowerCase(Locale.ROOT);
+                xml.append(indent).append('<').append(tag).append(type).append(attribute("iteratorVariable", variable)).append(">\n");
+                part(xml, "in", domain, inner, types);
+                part(xml, kind == DecisionLogic.Iteration.Kind.FOR ? "return" : "satisfies", body, inner, types);
+                xml.append(indent).append("</").append(tag).append(">\n");
+            }
+            case DecisionLogic.Filter(var list, var match, var filterType) -> {
+                xml.append(indent).append("<filter").append(type).append(">\n");
+                part(xml, "in", list, inner, types);
+                part(xml, "match", match, inner, types);
+                xml.append(indent).append("</filter>\n");
+            }
+        }
+    }
+
+    /** A child element of a boxed expression holding one expression: {@code <if>}, {@code <in>}, {@code <return>}... */
+    private static void part(StringBuilder xml, String tag, DecisionLogic logic, String indent, BoxedTypes types) {
+        xml.append(indent).append('<').append(tag).append(">\n");
+        boxed(xml, logic, types.attributeOf(logic.type()), indent + "  ", types);
+        xml.append(indent).append("</").append(tag).append(">\n");
     }
 
     /** The attribute {@code typeRef="..."}, or nothing for a value of any type. */

@@ -192,7 +192,26 @@ final class FeelParser {
      *                                   {@link #MAX_CALLS})
      */
     static Parsed parse(String text, Names names, Map<String, FeelType> types) {
+        return parse(text, names, types, List.of(), false);
+    }
+
+    /**
+     * Parses an expression that is part of a boxed expression (DMN 1.5, 10.2), within constructs that bind names of
+     * their own: the entries of a context, a function's parameters, an iterator's variable, a filter's {@code item}.
+     * Those are in scope as names the expression binds, so they are not among its free names.
+     *
+     * @param locals the names the enclosing constructs bind, innermost last
+     * @param filter whether it is a filter's match, where a name in no scope may name an entry of the element tested
+     * @throws ExpressionSyntaxException if it is not a FEEL expression, or nests too deeply
+     */
+    static Parsed parse(String text, Names names, Map<String, FeelType> types, List<String> locals, boolean filter) {
         var parser = new FeelParser(text, names, types);
+        if (!locals.isEmpty()) {
+            parser.locals.push(new Names(locals));
+        }
+        if (filter) {
+            parser.filters++;
+        }
         var root = parser.all();
         int depth = depthOf(root);
         if (depth > MAX_DEPTH) {

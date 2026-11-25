@@ -24,7 +24,7 @@ only on a regression: a node the baseline lists that no longer passes. Semantics
 and the TCK alone; where both leave a case open, what Praecepta does is recorded in
 [DMN conformance](../docs/DMN-CONFORMANCE.md).
 
-**The whole kit: 3,276 of 3,511 result nodes pass (93.3 %).** Of the 3,280 that Praecepta evaluates, 3,276 pass (99.9 %).
+**The whole kit: 3,327 of 3,511 result nodes pass (94.8 %).** Of the 3,331 that Praecepta evaluates, 3,327 pass (99.9 %).
 
 **Decision tables: 83 of 86 checks pass (96.5 %).**
 
@@ -41,8 +41,8 @@ result nodes that are commented out are not counted.
 | Compliance level | Models | Result nodes | Passed | Failed | Not supported |
 |---|---:|---:|---:|---:|---:|
 | 2 | 28 | 126 | 121 | 2 | 3 |
-| 3 | 120 | 3,385 | 3,155 | 2 | 228 |
-| **Total** | **148** | **3,511** | **3,276** | **4** | **231** |
+| 3 | 120 | 3,385 | 3,206 | 2 | 177 |
+| **Total** | **148** | **3,511** | **3,327** | **4** | **180** |
 
 ### By feature area
 
@@ -55,8 +55,8 @@ It does not change as Praecepta grows, so each row shows how far that layer is d
 | Single decision tables and arithmetic | 0.6 | 643 | 641 | 0 | 2 |
 | Decision requirement graphs | 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | 0 | 0 | 0 | 0 |
 | FEEL language | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1,289 | 1,289 | 0 | 0 |
-| Built-in functions | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1,071 | 1,066 | 2 | 3 |
-| Boxed expressions, business knowledge models and structured values | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 456 | 280 | 2 | 174 |
+| Built-in functions | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1,071 | 1,067 | 2 | 2 |
+| Boxed expressions, business knowledge models and structured values | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 456 | 330 | 2 | 124 |
 | Decision services, imports and the rest | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 52 | 0 | 0 | 52 |
 
 ### What each release unlocks
@@ -66,10 +66,10 @@ features, these nodes have all they need once it ships.
 
 | Release | Feature area | Not-supported nodes | Evaluated by then, of all nodes |
 |---|---|---:|---:|
-| 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | Decision requirement graphs | 0 | 3,280 (93.4 %) |
-| 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | FEEL language | 0 | 3,280 (93.4 %) |
-| 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | Built-in functions | 0 | 3,280 (93.4 %) |
-| 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | Boxed expressions, business knowledge models and structured values | 177 | 3,457 (98.5 %) |
+| 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | Decision requirement graphs | 0 | 3,331 (94.9 %) |
+| 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | FEEL language | 0 | 3,331 (94.9 %) |
+| 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | Built-in functions | 0 | 3,331 (94.9 %) |
+| 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | Boxed expressions, business knowledge models and structured values | 126 | 3,457 (98.5 %) |
 | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | Decision services, imports and the rest | 54 | 3,511 (100.0 %) |
 
 ### Not supported, by feature
@@ -90,16 +90,11 @@ not-supported nodes); *alone* counts those that need nothing else.
 | null | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
 | ranges | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
 | sort() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 1 | 0 |
-| boxed contexts | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 117 | 101 | 69 |
+| boxed contexts | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 89 | 73 | 41 |
 | business knowledge models | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 76 | 35 | 25 |
 | invocations | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 33 | 32 | 0 |
-| boxed iterators (for, some, every) | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 12 | 12 | 12 |
 | function definitions and lambdas | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 7 | 2 | 2 |
 | relations | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 6 | 5 | 4 |
-| boxed filters | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 4 | 4 | 4 |
-| boxed conditionals | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 3 | 3 | 3 |
-| boxed lists | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 3 | 3 | 3 |
-| boxed expressions elsewhere in the model | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 1 | 1 | 1 |
 | decision services | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 29 | 26 | 24 |
 | external functions (Java, PMML) | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 17 | 0 | 0 |
 | imports | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 8 | 6 | 6 |
@@ -138,12 +133,12 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-2/0118-multi-priority-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0118-multi-priority-hitpolicy) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-2/0119-multi-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0119-multi-collect-hitpolicy) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-3/0001-filter](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0001-filter) | 1 | 1 | 0 | 0 |  |
-| [compliance-level-3/0002-string-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0002-string-functions) | 4 | 2 | 0 | 2 | boxed contexts (0.10) |
+| [compliance-level-3/0002-string-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0002-string-functions) | 4 | 4 | 0 | 0 |  |
 | [compliance-level-3/0003-iteration](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0003-iteration) | 1 | 0 | 0 | 1 | business knowledge models (0.10) |
 | [compliance-level-3/0004-lending](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0004-lending) | 11 | 1 | 0 | 10 | business knowledge models (0.10); invocations (0.10); boxed contexts (0.10) |
 | [compliance-level-3/0005-literal-invocation](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0005-literal-invocation) | 3 | 0 | 0 | 3 | business knowledge models (0.10) |
 | [compliance-level-3/0006-join](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0006-join) | 1 | 1 | 0 | 0 |  |
-| [compliance-level-3/0007-date-time](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0007-date-time) | 19 | 4 | 0 | 15 | boxed contexts (0.10); boxed expressions elsewhere in the model (0.10) |
+| [compliance-level-3/0007-date-time](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0007-date-time) | 19 | 19 | 0 | 0 |  |
 | [compliance-level-3/0008-listGen](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0008-listGen) | 10 | 10 | 0 | 0 |  |
 | [compliance-level-3/0009-append-flatten](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0009-append-flatten) | 10 | 10 | 0 | 0 |  |
 | [compliance-level-3/0010-concatenate](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0010-concatenate) | 6 | 6 | 0 | 0 |  |
@@ -155,7 +150,7 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-3/0017-tableTests](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0017-tableTests) | 4 | 4 | 0 | 0 |  |
 | [compliance-level-3/0020-vacation-days](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0020-vacation-days) | 7 | 7 | 0 | 0 |  |
 | [compliance-level-3/0021-singleton-list](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0021-singleton-list) | 5 | 5 | 0 | 0 |  |
-| [compliance-level-3/0030-user-defined-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0030-user-defined-functions) | 2 | 0 | 0 | 2 | boxed contexts (0.10) |
+| [compliance-level-3/0030-user-defined-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0030-user-defined-functions) | 2 | 2 | 0 | 0 |  |
 | [compliance-level-3/0031-user-defined-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0031-user-defined-functions) | 3 | 0 | 0 | 3 | boxed contexts (0.10); business knowledge models (0.10) |
 | [compliance-level-3/0032-conditionals](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0032-conditionals) | 6 | 6 | 0 | 0 |  |
 | [compliance-level-3/0033-for-loops](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0033-for-loops) | 4 | 3 | 0 | 1 | business knowledge models (0.10) |
@@ -212,9 +207,9 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-3/0093-feel-at-literals](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0093-feel-at-literals) | 19 | 19 | 0 | 0 |  |
 | [compliance-level-3/0094-feel-product-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0094-feel-product-function) | 13 | 13 | 0 | 0 |  |
 | [compliance-level-3/0095-feel-day-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0095-feel-day-of-year-function) | 19 | 19 | 0 | 0 |  |
-| [compliance-level-3/0096-feel-day-of-week-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0096-feel-day-of-week-function) | 12 | 10 | 0 | 2 | boxed contexts (0.10) |
-| [compliance-level-3/0097-feel-month-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0097-feel-month-of-year-function) | 12 | 10 | 0 | 2 | boxed contexts (0.10) |
-| [compliance-level-3/0098-feel-week-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0098-feel-week-of-year-function) | 19 | 18 | 0 | 1 | boxed lists (0.10) |
+| [compliance-level-3/0096-feel-day-of-week-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0096-feel-day-of-week-function) | 12 | 12 | 0 | 0 |  |
+| [compliance-level-3/0097-feel-month-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0097-feel-month-of-year-function) | 12 | 12 | 0 | 0 |  |
+| [compliance-level-3/0098-feel-week-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0098-feel-week-of-year-function) | 19 | 19 | 0 | 0 |  |
 | [compliance-level-3/0099-arithmetic-negation](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0099-arithmetic-negation) | 14 | 14 | 0 | 0 |  |
 | [compliance-level-3/0100-arithmetic](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0100-arithmetic) | 1,087 | 1,087 | 0 | 0 |  |
 | [compliance-level-3/0103-feel-is-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0103-feel-is-function) | 50 | 49 | 1 | 0 |  |
@@ -243,20 +238,20 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-3/1143-feel-round-half-up-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1143-feel-round-half-up-function) | 16 | 16 | 0 | 0 |  |
 | [compliance-level-3/1144-feel-round-half-down-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1144-feel-round-half-down-function) | 16 | 16 | 0 | 0 |  |
 | [compliance-level-3/1145-feel-context-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1145-feel-context-function) | 18 | 18 | 0 | 0 |  |
-| [compliance-level-3/1146-feel-context-put-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1146-feel-context-put-function) | 30 | 24 | 0 | 6 | boxed contexts (0.10) |
+| [compliance-level-3/1146-feel-context-put-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1146-feel-context-put-function) | 30 | 30 | 0 | 0 |  |
 | [compliance-level-3/1147-feel-context-merge-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1147-feel-context-merge-function) | 14 | 14 | 0 | 0 |  |
 | [compliance-level-3/1148-feel-now-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1148-feel-now-function) | 2 | 2 | 0 | 0 |  |
 | [compliance-level-3/1149-feel-today-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1149-feel-today-function) | 2 | 2 | 0 | 0 |  |
-| [compliance-level-3/1150-boxed-conditional](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1150-boxed-conditional) | 3 | 0 | 0 | 3 | boxed conditionals (0.10) |
-| [compliance-level-3/1151-boxed-filter](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1151-boxed-filter) | 4 | 0 | 0 | 4 | boxed filters (0.10) |
-| [compliance-level-3/1152-boxed-for](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1152-boxed-for) | 2 | 0 | 0 | 2 | boxed iterators (for, some, every) (0.10) |
-| [compliance-level-3/1153-boxed-some](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1153-boxed-some) | 5 | 0 | 0 | 5 | boxed iterators (for, some, every) (0.10) |
-| [compliance-level-3/1154-boxed-every](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1154-boxed-every) | 5 | 0 | 0 | 5 | boxed iterators (for, some, every) (0.10) |
+| [compliance-level-3/1150-boxed-conditional](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1150-boxed-conditional) | 3 | 3 | 0 | 0 |  |
+| [compliance-level-3/1151-boxed-filter](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1151-boxed-filter) | 4 | 4 | 0 | 0 |  |
+| [compliance-level-3/1152-boxed-for](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1152-boxed-for) | 2 | 2 | 0 | 0 |  |
+| [compliance-level-3/1153-boxed-some](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1153-boxed-some) | 5 | 5 | 0 | 0 |  |
+| [compliance-level-3/1154-boxed-every](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1154-boxed-every) | 5 | 5 | 0 | 0 |  |
 | [compliance-level-3/1155-list-replace-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1155-list-replace-function) | 22 | 22 | 0 | 0 |  |
 | [compliance-level-3/1156-range-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1156-range-function) | 56 | 56 | 0 | 0 |  |
 | [compliance-level-3/1157-implicit-conversions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1157-implicit-conversions) | 12 | 4 | 0 | 8 | business knowledge models (0.10); decision services (0.11); boxed contexts (0.10); … |
 | [compliance-level-3/1160-multiple-imports](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1160-multiple-imports) | 4 | 0 | 0 | 4 | imports (0.11) |
-| [compliance-level-3/1161-boxed-list-expression](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1161-boxed-list-expression) | 2 | 0 | 0 | 2 | boxed lists (0.10) |
+| [compliance-level-3/1161-boxed-list-expression](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1161-boxed-list-expression) | 2 | 2 | 0 | 0 |  |
 
 ### Failures
 

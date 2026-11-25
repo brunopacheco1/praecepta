@@ -283,10 +283,12 @@ final class GraphSourceGenerator {
             puts.append("\n        inputData.put(").append(SourceGenerator.stringLiteral(needed.get(i))).append(", ")
                 .append(inputType(needed.get(i)).toValue(getter, 0)).append(");");
         }
+        var logicElement = graph.model().decision(decision).orElseThrow().logic().element();
         var logic = switch (graph.model().decision(decision).orElseThrow().logic()) {
             case DecisionLogic.Table(var table, var declared) -> "a decision table (hit policy %s%s)".formatted(table.hitPolicy(),
                     table.aggregation() == null ? "" : ", " + table.aggregation());
             case DecisionLogic.LiteralExpression literal -> "the literal expression {@code " + SourceGenerator.javadoc(literal.text().strip()) + "}";
+            default -> "a boxed expression ({@code " + logicElement + "})";
         };
         var noMatch = graph.model().decision(decision).orElseThrow().logic() instanceof DecisionLogic.Table
                 ? ", as when no rule matches and the table has no default output" : "";
