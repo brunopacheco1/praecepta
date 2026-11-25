@@ -81,6 +81,13 @@ upgrading if you rely on a model being rejected for invoking a built-in function
   where the TCK keeps a fixed-offset zone id apart from its offset ([DMN conformance](docs/DMN-CONFORMANCE.md), known
   deviations).
 
+### Fixed
+- **A model whose decision or input name holds a type's name is written as DMN that reads back the same**: `DmnReader.readModel`
+  took an item definition as one the model's FEEL names wherever its name was part of an expression's text, also
+  within a longer name (`tFlags` in `decision_3_input_0_listFlags`), and `DmnWriter.write` could then write a table's
+  list type under the name of one of the model's types, twice. A type is now named only by its whole name, and the
+  writer names a table's list types apart from the model's (found by fuzzing, `DmnReaderFuzzer`; since 0.8.0).
+
 ## [0.8.0] - 2026-11-24
 
 The full FEEL language, the second step of Praecepta's plan to grow from a decision-table engine into a full DMN 1.5

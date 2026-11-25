@@ -214,19 +214,35 @@ public final class DmnReader {
 
     /**
      * The model's item definitions that its FEEL may name (in {@code instance of}, or a function's parameters): those whose
-     * name one of its texts holds, a literal expression or a decision table's entry or input expression.
+     * name one of its texts holds as a name, not within a longer one ({@code tFlags} in {@code x instance of tFlags}, not
+     * in {@code tFlagsCount}), a literal expression or a decision table's entry or input expression.
      */
     private static Map<String, FeelType> namedTypes(ItemDefinitions types, List<DecisionModel.Decision> decisions) {
         var texts = decisions.stream().flatMap(decision -> texts(decision.logic())).toList();
         var named = new LinkedHashMap<String, FeelType>();
         if (!texts.isEmpty()) {
             types.all().forEach((name, type) -> {
-                if (texts.stream().anyMatch(text -> text.contains(name))) {
+                if (texts.stream().anyMatch(text -> holdsName(text, name))) {
                     named.put(name, type);
                 }
             });
         }
         return named;
+    }
+
+    /** Whether a text holds a name, neither preceded nor followed by a letter, a digit or an underscore. */
+    private static boolean holdsName(String text, String name) {
+        for (int at = text.indexOf(name); at >= 0; at = text.indexOf(name, at + 1)) {
+            int end = at + name.length();
+            if ((at == 0 || !isNamePart(text.charAt(at - 1))) && (end == text.length() || !isNamePart(text.charAt(end)))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isNamePart(char c) {
+        return Character.isLetterOrDigit(c) || c == '_';
     }
 
     /** The FEEL texts of a decision's logic: a literal expression, or a table's input expressions, input and output entries. */
