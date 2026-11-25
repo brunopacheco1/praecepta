@@ -135,7 +135,7 @@ sealed interface TckValue {
         try {
             return switch (expected.type().toLowerCase(Locale.ROOT)) {
                 case "decimal", "double", "integer", "int", "long", "float" ->
-                        new BigDecimal(expected.text().strip()).compareTo(new BigDecimal(actual.strip())) == 0;
+                        sameNumber(new BigDecimal(expected.text().strip()), new BigDecimal(actual.strip()));
                 case "date" -> FeelTemporals.parseDate(expected.text().strip()).equals(FeelTemporals.parseDate(actual.strip()));
                 case "time" -> sameTemporal(FeelTemporals.parseTime(expected.text().strip()), FeelTemporals.parseTime(actual.strip()));
                 case "datetime" -> sameTemporal(FeelTemporals.parseDateTime(expected.text().strip()),
@@ -147,6 +147,24 @@ sealed interface TckValue {
         } catch (IllegalArgumentException | DateTimeParseException e) {
             return false;
         }
+    }
+
+    /**
+     * Whether a number is the one the kit expects: equal; or, where the kit writes a real number to some digits, at
+     * least 8 significant ones, as {@code exp(4)} is {@code 54.59815003} and the sample standard
+     * deviation of {@code [2, 4, 7, 5]} is {@code 2.0816659994661}, a result of more decimals that is less than one
+     * unit of the last digit away from it, as FEEL's 34 digits are ({@code 54.59815003314423907811026120286088}). The
+     * kit's own values are cut, or rounded, from doubles' 15 or so digits: whatever their last digit, the result is
+     * the number they state. One of fewer digits, such as {@code 0.33}, is exact, and so must the result be.
+     */
+    static boolean sameNumber(BigDecimal expected, BigDecimal actual) {
+        if (expected.compareTo(actual) == 0) {
+            return true;
+        }
+        int statedDigits = 8;
+        var lastDigit = BigDecimal.ONE.scaleByPowerOfTen(-expected.scale());
+        return expected.precision() >= statedDigits && actual.scale() > expected.scale()
+                && actual.subtract(expected).abs().compareTo(lastDigit) < 0;
     }
 
     /**

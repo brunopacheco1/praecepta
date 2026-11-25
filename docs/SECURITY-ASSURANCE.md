@@ -84,8 +84,11 @@ tables to load and how strictly to check them.
 ## Secure design principles applied
 - **Economy of mechanism:** FEEL is an expression language without side effects, input or output: the cells,
   output entries and literal expressions of DMN files read the values they are given and compute values, and
-  the only functions they invoke are those they define themselves (FEEL's built-in functions, 0.9, are rejected;
-  external Java functions, 0.11, too), so evaluating a table or a graph cannot run arbitrary code; the engine has no
+  the only functions they invoke are those they define themselves and FEEL's built-in functions (since 0.9), which
+  compute values from their arguments, none reading or writing anything but `now()` and `today()`, which read the
+  clock; external Java functions (0.11) are rejected. So evaluating a table or a graph cannot run arbitrary code,
+  and each built-in function's work, a regular expression's matching included, counts against the evaluation's
+  limits; the engine has no
   runtime dependencies.
 - **Fail-safe defaults:** unsupported DMN features, unknown cell syntax and undeclared values are
   rejected, not ignored; XML features are off unless needed.

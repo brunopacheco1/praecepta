@@ -141,7 +141,7 @@ class FeelExpressionStackTest {
                 Arguments.of("filters", (IntFunction<String>) n -> "[1][".repeat(n) + "1" + "]".repeat(n), 149),
                 Arguments.of("invocations", (IntFunction<String>) n -> "f(".repeat(n) + "1" + ")".repeat(n), 149),
                 Arguments.of("named arguments", (IntFunction<String>) n -> "f(a: ".repeat(n) + "1" + ")".repeat(n), 149),
-                Arguments.of("built-in functions", (IntFunction<String>) n -> "count(".repeat(n) + "1" + ")".repeat(n), 250),
+                Arguments.of("built-in functions", (IntFunction<String>) n -> "count(".repeat(n) + "1" + ")".repeat(n), 149),
                 Arguments.of("in", (IntFunction<String>) n -> "1 in (".repeat(n) + "1" + ")".repeat(n), 149),
                 Arguments.of("between", (IntFunction<String>) n -> "1 between (".repeat(n) + "1" + ") and 2".repeat(n), 175),
                 Arguments.of("unary ranges", (IntFunction<String>) n -> "< ".repeat(n) + "1", 291),

@@ -23,7 +23,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 /**
  * FEEL's function values (DMN 1.5, 10.3.2.13): a function definition's value keeps the names in scope where it was
  * defined, and nothing of the evaluation that defined it, so that it may be invoked from Java any number of times, from
- * any number of threads; and the built-in functions' shape, which 0.9 fills (#117).
+ * any number of threads; and the built-in functions' shape (#117), which BuiltInFunctionsTest covers function by function.
  */
 class FeelFunctionTest {
 
@@ -94,7 +94,7 @@ class FeelFunctionTest {
 
     @Test
     void a_built_in_function_is_given_the_evaluation_that_invokes_it() {
-        // substring(string, start position, length?), as 0.9 will have it: an optional parameter
+        // a function of an optional parameter, as substring(string, start position, length?) is
         var substring = new BuiltInFunction("substring", List.of("string", "start position", "length"), BuiltInFunction.Arity.optional(2, 1),
                 FeelType.ANY, (arguments, env) -> {
                     if (!(arguments.get(0) instanceof String text) || !(arguments.get(1) instanceof BigDecimal start)) {

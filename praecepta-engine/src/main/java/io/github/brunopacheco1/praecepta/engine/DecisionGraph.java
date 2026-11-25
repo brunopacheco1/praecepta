@@ -90,8 +90,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * value. A graph is immutable and thread-safe.
  *
  * <p>Business knowledge models, invocations and boxed expressions are planned for 0.10
- * (<a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>), FEEL's built-in functions for 0.9
- * (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>), decision services and imports for 0.11
+ * (<a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>), decision services, imports and FEEL's
+ * external functions for 0.11
  * (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>); a model that uses them is rejected when it
  * is read.
  */

@@ -107,8 +107,8 @@ public record ValidationReport(List<Issue> issues) {
          */
         TYPE_MISMATCH(Severity.ERROR),
         /**
-         * Logic of a decision model that DMN 1.5 defines but Praecepta does not evaluate yet, such as a built-in
-         * function a literal expression invokes (DMN 1.5, 10.3.4, planned for 0.9), or a path a decision table's column
+         * Logic of a decision model that DMN 1.5 defines but Praecepta does not evaluate yet, such as an external
+         * function a literal expression defines (DMN 1.5, 10.3.2.13.3, planned for 0.11), or a path a decision table's column
          * reads to a property of a date, time or duration ({@code Birth.year}, Table 65). The model is not wrong: the
          * detail names the decision, what it uses and the release that plans it.
          * The decision cannot be evaluated, nor can any decision that requires it.

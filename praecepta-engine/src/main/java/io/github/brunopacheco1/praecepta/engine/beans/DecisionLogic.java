@@ -52,8 +52,8 @@ public sealed interface DecisionLogic {
      * as {@code "Hello " + Full Name}, {@code if Applicant.age >= 18 then "adult" else "minor"} or
      * {@code Orders[amount > 100].customer}. The names it reads are those of the decision's information requirements, and
      * the graph parses it with them in scope, as FEEL's names may hold spaces and keywords. FEEL's built-in functions are
-     * planned for 0.9 (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>): a decision that invokes
-     * one is reported as not evaluated yet.
+     * evaluated (since 0.9, <a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>); a decision that
+     * defines an external function, planned for 0.11, is reported as not evaluated yet.
      *
      * @param text the expression, as written
      * @param type the type the model declares for the decision's value (its variable's {@code typeRef}), or

@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 
 import io.github.brunopacheco1.praecepta.tck.Feature.Area;
@@ -41,12 +40,15 @@ class SingleDecisionEvaluatorTest {
 
     @Test
     void a_decision_on_other_decisions_needs_graphs_and_what_its_own_logic_needs() {
+        // its literal expression invokes max(), which 0.9 evaluates: alone, it needs only the decisions it requires
         var check = KIT.get("compliance-level-3/0020-vacation-days/0020-vacation-days-test-01.xml #001 Total Vacation Days");
-        assertThat(evaluator.evaluate(check)).isEqualTo(new Evaluation.Unsupported(List.of(Feature.builtIn("max"),
-                Feature.REQUIRED_DECISIONS)));
-        // the tables it requires are read, so a graph evaluator would need max() alone
-        assertThat(evaluator.needsBesideGraphs(check, List.of())).containsExactly(Feature.builtIn("max"));
+        assertThat(evaluator.evaluate(check)).isEqualTo(new Evaluation.Unsupported(List.of(Feature.REQUIRED_DECISIONS)));
+        // the tables it requires are read, so a graph evaluator needs nothing more
+        assertThat(evaluator.needsBesideGraphs(check, List.of())).isEmpty();
         assertThat(TckResults.latest(SingleDecisionEvaluator.content(check))).isEqualTo(Area.BUILT_IN_FUNCTIONS);
+        // a decision that invokes a business knowledge model needs it, and the decisions it requires
+        var lending = KIT.get("compliance-level-3/0004-lending/0004-lending-test-01.xml #001 BureauCallType");
+        assertThat(((Evaluation.Unsupported) evaluator.evaluate(lending)).needs()).contains(Feature.KNOWLEDGE_MODELS, Feature.REQUIRED_DECISIONS);
     }
 
     @Test
@@ -96,11 +98,10 @@ class SingleDecisionEvaluatorTest {
     }
 
     @Test
-    void a_built_in_function_is_not_supported_yet_and_counts_as_its_release() {
+    void a_built_in_function_is_evaluated_and_counts_as_its_release() {
         var check = KIT.get("compliance-level-3/1104-feel-string-length-function/1104-feel-string-length-function-test-01.xml #001_1afe6930d1 "
                 + "feel-string-length-function_001_1afe6930d1");
-        assertThat(evaluator.evaluate(check)).asInstanceOf(InstanceOfAssertFactories.type(Evaluation.Unsupported.class))
-                .extracting(Evaluation.Unsupported::needs, InstanceOfAssertFactories.list(Feature.class))
-                .first().isEqualTo(Feature.builtIn("string length"));
+        assertThat(new TckRunner(evaluator).run(check).status()).isEqualTo(Status.PASSED);
+        assertThat(TckResults.latest(SingleDecisionEvaluator.content(check))).isEqualTo(Area.BUILT_IN_FUNCTIONS);
     }
 }

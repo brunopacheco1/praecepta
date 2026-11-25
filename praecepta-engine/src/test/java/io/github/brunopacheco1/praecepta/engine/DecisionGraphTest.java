@@ -733,16 +733,18 @@ class DecisionGraphTest {
     }
 
     @Test
-    void a_literal_expression_that_invokes_a_built_in_function_is_reported_and_names_the_release_that_plans_it() {
+    void a_literal_expression_that_invokes_a_built_in_function_is_typed_and_evaluated() {
+        // FEEL's built-in functions since 0.9 (#117); an external function is reported, naming the release that plans it
         var graph = DecisionGraph.builder().logValidationReport(false).inputData("Name", ColumnType.STRING)
                 .literalDecision("Upper", "upper case(Name)").literalDecision("Greeting", "\"Hello \" + Upper")
-                .literalDecision("If", "if Name = \"a\" then 1 else 2").build();
+                .literalDecision("External", "(function(a) external {java: {class: \"C\"}})(Name)").build();
 
         assertThat(graph.validationReport().issues()).extracting(ValidationReport.Issue::toString).containsExactly(
-                "ERROR decision 'Upper' uses the built-in function 'upper case', planned for 0.9 (#117), which Praecepta does not "
-                        + "evaluate yet");
-        assertThat(List.of("Upper", "Greeting", "If")).map(graph::canEvaluate).containsExactly(false, false, true);
-        assertThat(graph.evaluate("If", Map.of("Name", "a"))).isEqualTo(BigDecimal.ONE);
+                "ERROR decision 'External' uses an external function (Java or PMML), planned for 0.11 (#119), which Praecepta does "
+                        + "not evaluate yet");
+        assertThat(List.of("Upper", "Greeting", "External")).map(graph::canEvaluate).containsExactly(true, true, false);
+        assertThat(graph.type("Upper")).isEqualTo(FeelType.of(ColumnType.STRING));
+        assertThat(graph.evaluate("Greeting", Map.of("Name", "ada"))).isEqualTo("Hello ADA");
     }
 
     @Test

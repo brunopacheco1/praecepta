@@ -59,11 +59,10 @@ decision replaced by an input data of its type. Input data of a simple type are 
 give them; a structured one as a map of its components, a list as a list; one of no declared type typed by the
 test file's `xsi:type`. It takes a node when the model as a whole is one `readModel` reads and the graph evaluates
 the decision: what is not supported is what the engine rejects. A model with a business knowledge model, a decision
-service, an import, or a literal expression that invokes a built-in function (0.9) is not read, and a decision the
-graph's validation report blocks is not evaluated. Literal expressions, and decision tables' input expressions,
-input entries and output entries, are the full FEEL language since 0.8
-([#116](https://github.com/brunopacheco1/praecepta/issues/116)); a table entry that invokes a built-in function is
-not read either. Where a decision's value is null and its own logic
+service, an import or an external function is not read, and a decision the graph's validation report blocks is not
+evaluated. Literal expressions, and decision tables' input expressions, input entries and output entries, are the
+full FEEL language since 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)), with its built-in
+functions since 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)). Where a decision's value is null and its own logic
 reported an error (`DecisionGraph.evaluateWithErrors`), the node counts as an error where the kit expects one
 (DMN 1.5, 10.3.2.15), and as its null value otherwise.
 
@@ -74,7 +73,7 @@ The nodes it does not take go to `SingleDecisionEvaluator`, which evaluates one 
   data and decisions in scope, through a graph of that one decision whose input data are what it reads, typed by
   their `typeRef` (`TckTypes` reads item definitions), with the test case's values; its value is bound to the
   decision's declared type (10.3.2.9.4), and FEEL's errors count as `GraphEvaluator` counts them. A decision it
-  reads whose value the test case does not give needs graphs; a built-in function, 0.9.
+  reads whose value the test case does not give needs graphs.
 
 Everything else is not supported: other boxed expressions, business knowledge models, decision services, imports,
 and a decision that needs the value of another decision in a model the graph does not take. Where neither
@@ -111,13 +110,17 @@ feature; 0.8 retired their parser, so the kit's expressions it read are listed, 
 `src/test/resources/subset-expressions.txt`.
 
 ## Known failures
-- `0100-arithmetic`, `exponent_lhs_number_exp_rhs_number_005`: a power that is not whole, which the kit gives to
-  13 significant digits, where FEEL's numbers have 34 (DMN 1.5, 10.3.2.3.1 and Table 60), as output expressions
-  keep them (#71).
-- `0008-LX-arithmetic`, the three payments: a literal expression over a structured input data
-  (`(loan.principal*loan.rate/12)/(1-(1+loan.rate/12)**-loan.termMonths)`), evaluated through the graph since 0.7,
-  whose power is not whole: Praecepta computes FEEL's 34 digits (`2778.693549432766768088520383236299`) where the kit
-  gives 15 (`2778.69354943277`), the case of the first failure above.
+- `0008-LX-arithmetic`, two of the three payments: a literal expression over a structured input data
+  (`(loan.principal*loan.rate/12)/(1-(1+loan.rate/12)**-loan.termMonths)`), evaluated through the graph since 0.7.
+  Praecepta computes FEEL's 34 digits (`562.7073593732659271562143285576524`), which a 50-digit computation agrees
+  with, where the kit states `562.707359373292`, off in its last three digits, and `2861.03377700389`, off in its
+  last ([DMN conformance](../docs/DMN-CONFORMANCE.md), case 33). The first payment, which the kit states rightly to
+  its 15 digits, passes, as does a power that is not whole in `0100-arithmetic`, since 0.9 (see *How results are
+  compared*).
+- `1116-feel-time-function`, `string(time("00:01:00@Etc/UTC"))`, and `0103-feel-is-function`,
+  `is(@"23:00:50@Etc/GMT", @"23:00:50Z")`: a time in a zone with one fixed offset is read as the time at that offset,
+  as Table 72's example has it equal, so its zone id is not kept apart from the offset, a known deviation
+  ([DMN conformance](../docs/DMN-CONFORMANCE.md#known-deviations)).
 
 ## How results are compared
 - Inputs are given as text, the way `inputs(...)` takes them, to a decision table evaluated alone; qualified input
@@ -126,7 +129,10 @@ feature; 0.8 retired their parser, so the kit's expressions it read are listed, 
 - A single-hit table (and a COLLECT aggregation) yields one value or null, a multi-hit table a
   list; a multi-output table yields a context per matching rule. COLLECT lists are compared in any
   order, other lists in order. Praecepta has no null list, so an empty list matches null.
-- Numbers compare as decimals; dates, times and date-times by value; booleans ignoring case.
+- Numbers compare as decimals; dates, times and date-times by value; booleans ignoring case. A number the kit writes
+  to at least 8 significant digits, as it writes real numbers such as `exp(4)` (`54.59815003`), is the real number it
+  states: a result of more decimals less than one unit of its last digit away matches it, as FEEL's 34 digits do
+  ([DMN conformance](../docs/DMN-CONFORMANCE.md), case 33). One of fewer digits is compared exactly.
 - DMN reports errors as a null result flagged `errorResult`. A node flagged so passes when evaluation throws
   `HitPolicyViolationException` or `InvalidInputException` (a hit policy violation, an input outside its value
   list), or when its decision's value is null and its literal expression reported an error, which FEEL does where
@@ -137,20 +143,18 @@ feature; 0.8 retired their parser, so the kit's expressions it read are listed, 
 (`compliance-level-3/0099-arithmetic-negation` and `0100-arithmetic`) as the output entry of a decision table, which
 is any FEEL expression since 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)): a one-rule table
 whose output declares no type, so that each value keeps its own (DMN 1.5, 10.3.2.10, step 3c), evaluated through a
-`DecisionGraph`. Every expression must give the kit's result. Of the 1,101 checks, 1,100 do, 826 of them null, which
-FEEL gives for operands it does not combine (0.7 rejected such a table when it was built), and one is known to differ:
-a power that is not whole, which the kit gives to 13 digits where FEEL's numbers have 34. An expression in
-`string(...)` is evaluated without it and compared as FEEL's text of the value. The whole-kit run scores the same
-expressions as literal expression decisions (see *How a model is evaluated*), where all but that one, and those that
-invoke built-in functions, pass.
+`DecisionGraph`. Every expression must give the kit's result, and all 1,101 checks do, 826 of them null, which FEEL
+gives for operands it does not combine (0.7 rejected such a table when it was built). An expression in `string(...)`,
+or one that invokes another built-in function, is evaluated as it is (since 0.9). The whole-kit run scores the same
+expressions as literal expression decisions (see *How a model is evaluated*), where all of them pass.
 
 ## Decision requirement graphs
 `DecisionGraph` (0.7, [#14](https://github.com/brunopacheco1/praecepta/issues/14)) evaluates whole models whose
 decisions are decision tables and literal expressions, in the full FEEL language since 0.8, and `GraphEvaluator`
-scores it. Of the pinned commit's 156 model files of compliance levels 2 and 3, `DmnReader.readModel` reads 49; the
-rest are rejected for what later releases bring: literal expressions that invoke built-in functions (#117), business
-knowledge models and boxed expressions (#118), decision services and imports (#119), and a few types Praecepta does
-not read (a collection of collections). Models it does not read are evaluated decision by decision.
+scores it. Of the pinned commit's 156 model files of compliance levels 2 and 3, `DmnReader.readModel` reads 109; the
+rest are rejected for what later releases bring: business knowledge models and boxed expressions (#118, 35 files),
+decision services, imports and external functions (#119, 11), and one item definition without a base type. Models it
+does not read are evaluated decision by decision.
 
 ## The TCK files
 `src/test/resources/tck` holds every test directory of compliance levels 2 and 3 (their DMN models and test
