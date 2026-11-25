@@ -78,8 +78,8 @@ class GraphEvaluatorTest {
 
     @Test
     void a_node_needs_what_its_decisions_need_but_no_longer_graphs() {
-        // 0004-lending has business knowledge models, so readModel rejects it; its decisions are evaluated alone
-        var check = KIT.get("compliance-level-3/0004-lending/0004-lending-test-01.xml #001 BureauCallType");
+        // 0082-feel-coercion invokes decision services, so readModel rejects it; its decisions are evaluated alone
+        var check = KIT.get("compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_bkm_001 decision_bkm_001");
 
         var needs = ((Evaluation.Unsupported) ModelEvaluator.praecepta().evaluate(check)).needs();
         assertThat(needs).contains(Feature.KNOWLEDGE_MODELS).doesNotContain(Feature.REQUIRED_DECISIONS);

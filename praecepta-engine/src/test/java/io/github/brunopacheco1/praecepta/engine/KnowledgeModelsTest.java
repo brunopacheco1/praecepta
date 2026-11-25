@@ -6,6 +6,7 @@
 package io.github.brunopacheco1.praecepta.engine;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -23,9 +24,14 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
+import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
-/** Business knowledge models (DMN 1.5, 6.3.10) and their invocations, as a decision requirements graph evaluates them (#118). */
+/**
+ * Business knowledge models (DMN 1.5, 6.3.10) and their invocations, and decision tables within boxed expressions, as a decision
+ * requirements graph evaluates them (#118).
+ */
 class KnowledgeModelsTest {
 
     private static final FeelType NUMBER = FeelType.of(ColumnType.NUMBER);
@@ -104,5 +110,45 @@ class KnowledgeModelsTest {
                 "business knowledge model 'requires' requires business knowledge model 'nowhere', which is not in the model",
                 "decision 'C' requires business knowledge model 'Amount', which is input data, not a business knowledge model");
         assertThat(List.of("A", "B", "C", "E")).map(graph::canEvaluate).containsExactly(false, false, false, true);
+    }
+
+    @Test
+    void a_decision_table_within_a_boxed_expression_reads_the_names_in_scope_where_it_is_and_keeps_its_report() {
+        var graph = graph(model("nested-tables.dmn"));
+
+        assertThat(graph.validationReport().issues()).isEmpty();
+        assertThat(graph.evaluate("Person's description", Map.of("Person", Map.of("Name", "Bob", "Gender", "Male")))).isEqualTo("Bob is a man");
+        assertThat(graph.evaluate("Greeting", Map.of("Person", Map.of("Name", "Eve", "Gender", "Female")))).isEqualTo("Ms Eve");
+        assertThat(graph.validationReport("Description").issues()).singleElement().satisfies(issue -> {
+            assertThat(issue.kind()).isEqualTo(Kind.OVERLAPPING_RULES);
+            assertThat(issue.ruleIds()).containsExactly(2, 3);
+        });
+        assertThat(graph.validationReport("Greeting").issues()).isEmpty();
+        assertThatThrownBy(() -> graph.evaluate("Person's description", Map.of("Person", Map.of("Name", "Ada", "Gender", "Female"))))
+                .isInstanceOf(HitPolicyViolationException.class);
+        assertThatThrownBy(() -> DecisionGraph.builder().model(model("nested-tables.dmn")).logValidationReport(false)
+                .failOn(ValidationReport.Severity.ERROR).build())
+                .isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("business knowledge model 'Description'");
+    }
+
+    @Test
+    void a_column_whose_input_expression_is_no_feel_name_reads_the_requirement_of_that_name() {
+        // the DMN TCK's 0004-lending: Pre-bureauRiskCategory is a decision, whose name FEEL reads only where it is in scope
+        var graph = graph(DmnReader.readModel(new ByteArrayInputStream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="m" name="M" namespace="https://example.com/m">
+                  <inputData id="c" name="Pre-bureauRiskCategory"><variable name="Pre-bureauRiskCategory" typeRef="string"/></inputData>
+                  <decision id="d" name="Eligibility">
+                    <informationRequirement><requiredInput href="#c"/></informationRequirement>
+                    <decisionTable>
+                      <input><inputExpression typeRef="string"><text>Pre-bureauRiskCategory</text></inputExpression></input>
+                      <output typeRef="string"/>
+                      <rule><inputEntry><text>"HIGH"</text></inputEntry><outputEntry><text>"INELIGIBLE"</text></outputEntry></rule>
+                      <rule><inputEntry><text>not("HIGH")</text></inputEntry><outputEntry><text>"ELIGIBLE"</text></outputEntry></rule>
+                    </decisionTable>
+                  </decision>
+                </definitions>""".getBytes(StandardCharsets.UTF_8))));
+
+        assertThat(graph.evaluate("Eligibility", Map.of("Pre-bureauRiskCategory", "HIGH"))).isEqualTo("INELIGIBLE");
+        assertThat(graph.evaluate("Eligibility", Map.of("Pre-bureauRiskCategory", "LOW"))).isEqualTo("ELIGIBLE");
     }
 }

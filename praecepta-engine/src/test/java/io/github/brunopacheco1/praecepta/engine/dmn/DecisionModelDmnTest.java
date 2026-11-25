@@ -148,13 +148,13 @@ class DecisionModelDmnTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-        "<decisionService id=\"s\" name=\"Service\"/>|decision service 'Service'|(#119)",
+        "<decisionService id=\"s\" name=\"Service\"/><decision id=\"d\" name=\"D\"><knowledgeRequirement><requiredKnowledge href=\"#s\"/>"
+                + "</knowledgeRequirement><literalExpression><text>Service()</text></literalExpression></decision>"
+                + "|'D' invokes the decision service 'Service'|(#119)",
         "<import namespace=\"https://example.com/other\" name=\"other\" importType=\"https://www.omg.org/spec/DMN/20230324/MODEL/\"/>"
                 + "|imports 'other'|(#119)",
         "<decision id=\"d\" name=\"D\"><functionDefinition kind=\"Java\"><literalExpression><text>1</text></literalExpression>"
                 + "</functionDefinition></decision>|defines a function in Java|(#119)",
-        "<decision id=\"d\" name=\"D\"><context><contextEntry><variable name=\"t\"/><decisionTable/></contextEntry></context></decision>"
-                + "|a decision table within a boxed expression|(#118)",
         "<decision id=\"d\" name=\"D\"><informationRequirement><requiredDecision href=\"other.dmn#x\"/></informationRequirement>"
                 + "<literalExpression><text>1</text></literalExpression></decision>|an element of another model|(#119)",
     })
@@ -168,7 +168,9 @@ class DecisionModelDmnTest {
 
     @Test
     void a_decision_without_logic_an_empty_literal_and_another_expression_language_are_rejected() {
-        var noLogic = dmn("<decision id=\"d\" name=\"D\"><variable name=\"D\"/></decision>");
+        var noLogic = dmn("<decision id=\"d\" name=\"D\"><variable name=\"D\"/></decision><decision id=\"e\" name=\"E\">"
+                + "<informationRequirement><requiredDecision href=\"#d\"/></informationRequirement>"
+                + "<literalExpression><text>D</text></literalExpression></decision>");
         assertThatThrownBy(() -> read(noLogic))
                 .isInstanceOf(InvalidDecisionTableException.class).hasMessage("Decision 'D' has no decision logic; Praecepta evaluates "
                         + "decisions whose logic is a decision table, a literal expression or a boxed expression");
@@ -253,6 +255,31 @@ class DecisionModelDmnTest {
     }
 
     @Test
+    void a_decision_without_logic_or_a_decision_service_that_nothing_requires_is_left_out() {
+        // the DMN TCK's 0087-chapter-11-example: a human decision, and services that group decisions
+        var model = read(dmn("""
+                <decision id="human" name="Adjudication"><variable name="Adjudication"/></decision>
+                <decisionService id="s" name="Service"><outputDecision href="#d"/></decisionService>
+                <decision id="d" name="D"><literalExpression><text>1</text></literalExpression></decision>"""));
+
+        assertThat(model.decisions()).extracting(DecisionModel.Decision::name).containsExactly("D");
+    }
+
+    @Test
+    void a_decision_table_within_a_boxed_expression_is_named_after_what_holds_it_and_reads_its_names() {
+        var model = model("nested-tables.dmn");
+
+        var description = model.knowledgeModel("Description").orElseThrow().logic().body();
+        assertThat(description).isInstanceOfSatisfying(DecisionLogic.Table.class, table -> {
+            assertThat(table.table().name()).isEqualTo("Description");
+            assertThat(table.table().inputs()).extracting(InputColumn::name).containsExactly("Person.Gender", "Person.Name");
+        });
+        var context = (DecisionLogic.Context) model.decision("Greeting").orElseThrow().logic();
+        assertThat(context.entries().get(1).value()).isInstanceOfSatisfying(DecisionLogic.Table.class,
+                table -> assertThat(table.table().name()).isEqualTo("salutation"));
+    }
+
+    @Test
     void a_name_that_holds_a_number_is_read_as_the_requirement_it_names() {
         // the DMN TCK's 0034-drg-scopes: the text is not FEEL but with its requirement's name in scope
         var model = read(dmn("""
@@ -309,7 +336,7 @@ class DecisionModelDmnTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"chain.dmn", "diamond.dmn", "multi-output.dmn", "multiple-results.dmn", "literals.dmn", "cycle.dmn",
-        "missing-free.dmn", "type-mismatch.dmn", "untyped.dmn", "chain-reversed.dmn", "boxed.dmn", "knowledge.dmn"})
+        "missing-free.dmn", "type-mismatch.dmn", "untyped.dmn", "chain-reversed.dmn", "boxed.dmn", "knowledge.dmn", "nested-tables.dmn"})
     void a_model_written_as_dmn_reads_back_as_the_same_model_and_writes_the_same(String name) {
         var model = name.equals("missing-free.dmn") ? withoutMissing(model("missing.dmn")) : model(name);
 

@@ -115,6 +115,12 @@ final class GraphAnalysis {
     final List<Map<String, Integer>> knowledgeReads = new ArrayList<>();
     /** By business knowledge model: why it cannot be evaluated, or null if it can. */
     final String[] knowledgeBlocked;
+    /** By business knowledge model: the decision tables within its logic, each with its validation report. */
+    final List<List<GraphNodes.EmbeddedTable>> knowledgeTables = new ArrayList<>();
+    /** By decision: the decision tables within its boxed expression, each with its validation report. */
+    final List<List<GraphNodes.EmbeddedTable>> embeddedTables = new ArrayList<>();
+    /** Whether the engines of the tables within boxed expressions log their validation reports. */
+    private final boolean log;
     /** Each slot's type: an input data's, declared or worked out from the tables that read it, or a decision's value's. */
     final FeelType[] types;
     /** By decision (index in the model): the names its logic reads, resolved; a name none of its requirements provides is left out. */
@@ -143,7 +149,13 @@ final class GraphAnalysis {
     private final Set<String> conflicting = new HashSet<>();
 
     GraphAnalysis(DecisionModel model) {
+        this(model, false);
+    }
+
+    /** @param log whether the engines of the decision tables within boxed expressions log their validation reports */
+    GraphAnalysis(DecisionModel model, boolean log) {
         this.model = model;
+        this.log = log;
         var decisions = model.decisions();
         inputCount = model.inputData().size();
         decisionCount = decisions.size();
@@ -261,6 +273,7 @@ final class GraphAnalysis {
         var name = knowledgeModel.name();
         var reads = new LinkedHashMap<String, Integer>();
         knowledgeReads.add(reads);
+        knowledgeTables.add(new ArrayList<>());
         var valid = new HashSet<String>();
         for (var required : knowledgeModel.requiredKnowledge()) {
             var slot = slots.get(required);
@@ -279,7 +292,9 @@ final class GraphAnalysis {
         scope.add(name);
         valid.add(name);
         try {
-            knowledgeExpressions[k] = FeelExpression.compose(knowledgeModel.logic(), FeelExpression.scope(scope, model.types()));
+            var tables = knowledgeTables.get(k);
+            knowledgeExpressions[k] = FeelExpression.compose(knowledgeModel.logic(), FeelExpression.scope(scope, model.types()),
+                    site -> embed(site, tables));
         } catch (ExpressionSyntaxException e) {
             reportKnowledge(k, Kind.INVALID_EXPRESSION, "business knowledge model '%s': %s".formatted(name, e.getMessage()));
             return;
@@ -297,6 +312,17 @@ final class GraphAnalysis {
                 reads.put(read, slots.get(required));
             }
         }
+    }
+
+    /**
+     * A decision table within a boxed expression, built into an engine of its own, which keeps its validation report.
+     *
+     * @throws InvalidDecisionTableException if it cannot be built, as a decision's table that cannot be built
+     */
+    private GraphNodes.EmbeddedTable embed(FeelExpression.TableSite site, List<GraphNodes.EmbeddedTable> tables) {
+        var table = new GraphNodes.EmbeddedTable(site, log);
+        tables.add(table);
+        return table;
     }
 
     /** Reports an issue of a business knowledge model, which then cannot be evaluated, nor what requires it. */
@@ -372,6 +398,7 @@ final class GraphAnalysis {
      * left unresolved, that requirement being reported already.
      */
     private void resolveReads(int d) {
+        embeddedTables.add(List.of());
         var decision = model.decisions().get(d);
         var scope = new HashSet<>(decision.requirements());
         var valid = new HashSet<String>();
@@ -419,7 +446,9 @@ final class GraphAnalysis {
     private void parseExpression(int d, DecisionLogic logic, Set<String> scope) {
         var decision = model.decisions().get(d).name();
         try {
-            expressions[d] = FeelExpression.compose(logic, FeelExpression.scope(scope, model.types()));
+            var tables = new ArrayList<GraphNodes.EmbeddedTable>();
+            embeddedTables.set(d, tables);
+            expressions[d] = FeelExpression.compose(logic, FeelExpression.scope(scope, model.types()), site -> embed(site, tables));
         } catch (ExpressionSyntaxException e) {
             report(d, Kind.INVALID_EXPRESSION, "decision '%s': %s".formatted(decision, e.getMessage()));
             return;
@@ -465,7 +494,7 @@ final class GraphAnalysis {
      * The names in scope for a decision table's FEEL: its decision's requirements (DMN 1.5, 7.3.4) and its own columns,
      * with the model's types.
      */
-    private static FeelExpression.Scope tableScope(Set<String> requirements, DecisionTable table, Map<String, FeelType> types) {
+    static FeelExpression.Scope tableScope(Set<String> requirements, DecisionTable table, Map<String, FeelType> types) {
         var names = new LinkedHashSet<>(requirements);
         // a column that is an expression is no name: its text would read as itself
         table.inputs().stream().filter(input -> !TableExpressions.isExpression(input.name())).forEach(input -> names.add(input.name()));
@@ -487,12 +516,13 @@ final class GraphAnalysis {
         var columnNames = new HashSet<String>();
         var parsed = new TableExpressions.Parsed(scope, new HashMap<>(), new HashMap<>());
         for (var input : table.inputs()) {
-            columnNames.add(input.name());
             if (TableExpressions.isExpression(input.name())) {
+                // no name in the table: its text, read as a name, is what the decision requires of that name
                 var expression = parse(decision, input.name(), parsed);
                 computed.put(input.name(), expression);
                 expressions.addAll(expression.names());
             } else {
+                columnNames.add(input.name());
                 columns.add(new ColumnRead(input.name(), input.type(), table.listInputs().contains(input.name())));
             }
         }

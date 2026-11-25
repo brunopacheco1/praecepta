@@ -11,6 +11,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -151,7 +152,7 @@ public final class DmnWriter {
                 default -> {
                     decisionTypes[d] = elementTypeRef(xml, decision.logic().type(), DECISION + d + TYPE_SUFFIX, model.types(),
                             "decision '" + decision.name() + "'");
-                    boxedTypes.declare(decision.logic(), true, "decision '" + decision.name() + "'");
+                    boxedTypes.declare(DECISION + d + "_", decision.logic(), true, "decision '" + decision.name() + "'");
                 }
             }
         }
@@ -159,7 +160,7 @@ public final class DmnWriter {
         for (int k = 0; k < knowledgeModels.size(); k++) {
             var knowledgeModel = knowledgeModels.get(k);
             ids.put(knowledgeModel.name(), KNOWLEDGE_MODEL + k);
-            boxedTypes.declare(knowledgeModel.logic(), false, "business knowledge model '" + knowledgeModel.name() + "'");
+            boxedTypes.declare(KNOWLEDGE_MODEL + k + "_", knowledgeModel.logic(), false, "business knowledge model '" + knowledgeModel.name() + "'");
         }
         for (int i = 0; i < inputData.size(); i++) {
             var name = inputData.get(i).name();
@@ -296,6 +297,21 @@ public final class DmnWriter {
         private final StringBuilder xml;
         private final Map<String, FeelType> named;
         private final Map<FeelType, String> written = new HashMap<>();
+        /** The prefix of the ids of each decision table within a boxed expression, and of the item definitions of its list columns. */
+        private final Map<DecisionTable, String> tables = new IdentityHashMap<>();
+        /** The prefix of the ids of the element whose logic is being declared ({@code decision_2_}). */
+        private String element = "";
+
+        /** Declares the parts of an element's logic, whose ids start with {@code prefix}. */
+        void declare(String prefix, DecisionLogic logic, boolean root, String where) {
+            element = prefix;
+            declare(logic, root, where);
+        }
+
+        /** The prefix of the ids of a decision table within a boxed expression. */
+        String prefix(DecisionTable table) {
+            return tables.get(table);
+        }
 
         BoxedTypes(StringBuilder xml, Map<String, FeelType> named) {
             this.xml = xml;
@@ -330,6 +346,14 @@ public final class DmnWriter {
                 case DecisionLogic.Iteration(var kind, var variable, var domain, var body, var type) ->
                         List.of(domain, body).forEach(part -> declare(part, false, where));
                 case DecisionLogic.Filter(var list, var match, var type) -> List.of(list, match).forEach(part -> declare(part, false, where));
+                case DecisionLogic.Table(var table, var type) -> {
+                    var prefix = element + "table_" + tables.size() + "_";
+                    for (int k = 1; startsAName(named, prefix + INPUT); k++) {
+                        prefix = element + "table_" + tables.size() + "_" + k + "_";
+                    }
+                    tables.put(table, prefix);
+                    listItemDefinitions(xml, table, prefix);
+                }
                 default -> {
                     // a literal expression has no parts
                 }
@@ -376,8 +400,7 @@ public final class DmnWriter {
         switch (logic) {
             case DecisionLogic.LiteralExpression literal -> xml.append(indent).append("<literalExpression").append(type).append("><text>")
                     .append(escapeText(literal.text())).append("</text></literalExpression>\n");
-            case DecisionLogic.Table table -> throw new InvalidDecisionTableException(
-                    "a decision table within a boxed expression cannot be written yet");
+            case DecisionLogic.Table(var table, var tableType) -> decisionTable(xml, table, types.prefix(table));
             case DecisionLogic.Context(var entries, var result, var contextType) -> {
                 xml.append(indent).append("<context").append(type).append(">\n");
                 for (var entry : entries) {

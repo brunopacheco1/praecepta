@@ -136,7 +136,16 @@ compliance-level-3/0002-string-functions/0002-string-functions-test-01.xml #001 
 compliance-level-3/0002-string-functions/0002-string-functions-test-01.xml #002 Matches	graph
 compliance-level-3/0002-string-functions/0002-string-functions-test-01.xml #003 Replace	graph
 compliance-level-3/0002-string-functions/0002-string-functions-test-01.xml #004 Constructor	graph
-compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Adjudication
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Adjudication	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 ApplicationRiskScore	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 BureauCallType	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Eligibility	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Post-bureauAffordability	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Post-bureauRiskCategory	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Pre-bureauAffordability	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Pre-bureauRiskCategory	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Routing	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Strategy	graph
 compliance-level-3/0005-literal-invocation/0005-literal-invocation-test-01.xml #001 MonthlyPayment	graph
 compliance-level-3/0006-join/0006-join-test-01.xml #001 Join	graph
 compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 Date	graph
@@ -264,6 +273,9 @@ compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision C 1
 compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision C 2	graph
 compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision C 3	graph
 compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision C 4	graph
+compliance-level-3/0035-test-structure-output/0035-test-structure-output-test-01.xml #001 Profile of Color	graph
+compliance-level-3/0035-test-structure-output/0035-test-structure-output-test-01.xml #002 Profile of Color	graph
+compliance-level-3/0035-test-structure-output/0035-test-structure-output-test-01.xml #003 Profile of Color	graph
 compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Boolean	graph
 compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Date	graph
 compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Date and Time	graph
@@ -288,8 +300,18 @@ compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9
 compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare String	graph
 compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Time	graph
 compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Years and Months Duration	graph
+compliance-level-3/0037-dt-on-bkm-implicit-params/0037-dt-on-bkm-implicit-params-test-01.xml #_0de87bf9-0269-40b1-b7ac-767ae9a99b89 Person's description	graph
+compliance-level-3/0037-dt-on-bkm-implicit-params/0037-dt-on-bkm-implicit-params-test-01.xml #_20d7e21f-f58f-4a78-8074-a70cbf13de83 Person's description	graph
+compliance-level-3/0038-dt-on-bkm-explicit-params/0038-dt-on-bkm-explicit-params-test-01.xml #_b224d5f5-006f-43bb-9ace-e6af924dc2b3 Person's description	graph
+compliance-level-3/0038-dt-on-bkm-explicit-params/0038-dt-on-bkm-explicit-params-test-01.xml #_bf27c25d-18f6-4891-8370-42d440709d90 Person's description	graph
 compliance-level-3/0039-dt-list-semantics/0039-dt-list-semantics-test-01.xml #_07726176-a1a0-4e9e-9de2-16dba51556e2 Symptom Analysis	graph
 compliance-level-3/0039-dt-list-semantics/0039-dt-list-semantics-test-01.xml #_a217c840-6ead-4cb7-a3e1-ad9df9c0c584 Symptom Analysis	graph
+compliance-level-3/0040-singlenestedcontext/0040-singlenestedcontext-test-01.xml #001 Boxed Context	graph
+compliance-level-3/0040-singlenestedcontext/0040-singlenestedcontext-test-01.xml #002 Boxed Context	graph
+compliance-level-3/0040-singlenestedcontext/0040-singlenestedcontext-test-01.xml #003 Boxed Context	graph
+compliance-level-3/0041-multiple-nestedcontext/0041-multiple-nestedcontext-test-01.xml #001 Boxed Context	graph
+compliance-level-3/0041-multiple-nestedcontext/0041-multiple-nestedcontext-test-01.xml #002 Boxed Context	graph
+compliance-level-3/0041-multiple-nestedcontext/0041-multiple-nestedcontext-test-01.xml #003 Boxed Context	graph
 compliance-level-3/0050-feel-abs-function/0050-feel-abs-function-test-01.xml #001 decision001	graph
 compliance-level-3/0050-feel-abs-function/0050-feel-abs-function-test-01.xml #002 decision002	graph
 compliance-level-3/0050-feel-abs-function/0050-feel-abs-function-test-01.xml #003 decision003	graph
@@ -1378,6 +1400,15 @@ compliance-level-3/0084-feel-for-loops/0084-feel-for-loops-test-01.xml #decision
 compliance-level-3/0084-feel-for-loops/0084-feel-for-loops-test-01.xml #decision_022 decision_022	graph
 compliance-level-3/0084-feel-for-loops/0084-feel-for-loops-test-01.xml #decision_022_a decision_022_a	graph
 compliance-level-3/0084-feel-for-loops/0084-feel-for-loops-test-01.xml #decision_025 decision_025	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #001 Strategy	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #002 Routing	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #003a Application risk score	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #003b Pre-bureau risk category	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #003c Bureau call type	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #003d Eligibility	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #003e Post-bureau affordability	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #004 Routing	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #004 Strategy	graph
 compliance-level-3/0090-feel-paths/0090-feel-paths-test-01.xml #nested_list_001 nested_list_001	graph
 compliance-level-3/0090-feel-paths/0090-feel-paths-test-01.xml #nested_list_002 nested_list_002	graph
 compliance-level-3/0090-feel-paths/0090-feel-paths-test-01.xml #nested_list_003 nested_list_003	graph
@@ -3109,6 +3140,20 @@ compliance-level-3/1121-feel-years-and-months-duration-function/1121-feel-years-
 compliance-level-3/1121-feel-years-and-months-duration-function/1121-feel-years-and-months-duration-function-test-01.xml #034_c2cc06724c feel-years-and-months-duration-function_034_c2cc06724c	graph
 compliance-level-3/1121-feel-years-and-months-duration-function/1121-feel-years-and-months-duration-function-test-01.xml #035_dc05f9555d feel-years-and-months-duration-function_035_dc05f9555d	graph
 compliance-level-3/1121-feel-years-and-months-duration-function/1121-feel-years-and-months-duration-function-test-01.xml #036_f8c8b02ba3 feel-years-and-months-duration-function_036_f8c8b02ba3	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #after after	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #before before	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #coincides coincides	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #during during	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #finished by finished by	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #finishes finishes	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #includes includes	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #met by met by	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #mmets meets	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #overlaps after overlaps after	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #overlaps before overlaps before	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #overlaps overlaps	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #started by started by	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #starts starts	graph
 compliance-level-3/1131-feel-function-invocation/1131-feel-function-invocation-test-01.xml #002 decision002	graph
 compliance-level-3/1131-feel-function-invocation/1131-feel-function-invocation-test-01.xml #003 decision003	graph
 compliance-level-3/1131-feel-function-invocation/1131-feel-function-invocation-test-01.xml #004 decision004	graph
@@ -3365,9 +3410,11 @@ compliance-level-3/1156-range-function/1156-range-function-test-01.xml #024 deci
 compliance-level-3/1156-range-function/1156-range-function-test-01.xml #025 decision025	graph
 compliance-level-3/1156-range-function/1156-range-function-test-01.xml #026 decision026	graph
 compliance-level-3/1156-range-function/1156-range-function-test-01.xml #027 decision027	graph
-compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #001 To Singleton List
-compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #002 From Singleton List
-compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #002_a From Singleton List Error
-compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #003 From Date To Date and Time
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #001 To Singleton List	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #002 From Singleton List	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #002_a From Singleton List Error	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #003 From Date To Date and Time	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #010 Implicit Conversions CE	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #011 Implicit Conversions FUNCT	graph
 compliance-level-3/1161-boxed-list-expression/1161-boxed-list-expression-test-01.xml #001 BList	graph
 compliance-level-3/1161-boxed-list-expression/1161-boxed-list-expression-test-01.xml #002 BList	graph

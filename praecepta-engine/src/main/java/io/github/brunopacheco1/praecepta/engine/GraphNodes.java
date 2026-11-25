@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -20,6 +21,7 @@ import java.util.function.Function;
 
 import io.github.brunopacheco1.praecepta.engine.GraphAnalysis.ColumnRead;
 import io.github.brunopacheco1.praecepta.engine.GraphAnalysis.Resolution;
+import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
@@ -81,14 +83,27 @@ final class GraphNodes {
          * @throws InvalidDecisionTableException if the table cannot be built into an engine
          */
         TableNode(DecisionTable table, GraphAnalysis analysis, int d, FeelType declared, boolean log) {
-            var reads = analysis.tableReads(d);
-            var names = analysis.reads.get(d);
-            var properties = analysis.propertyColumns.get(d);
+            this(table, analysis.tableReads(d), analysis.reads.get(d), analysis.propertyColumns.get(d), analysis.listedNamedInputs.get(d),
+                    analysis.bindings[d], declared, analysis.model.types(), log);
+        }
+
+        /**
+         * @param reads      what the table reads: its columns, the inputs its cells compare with, and the names its FEEL reads
+         * @param names      where each name it reads is, among the slots it is given (a name it cannot read is missing)
+         * @param properties its columns that read a property of a date, time or duration
+         * @param listed     the inputs its cells compare with whose values are lists, though the table reads single values
+         * @param binding    how its value is bound to its declared type
+         * @param types      the types the model defines, which its FEEL may name
+         * @throws InvalidDecisionTableException if the table cannot be built into an engine
+         */
+        TableNode(DecisionTable table, GraphAnalysis.TableReads reads, Map<String, Resolution> names,
+                Map<String, GraphAnalysis.PropertyColumn> properties, Set<String> listed, GraphValues.Binding binding, FeelType declared,
+                Map<String, FeelType> types, boolean log) {
             listResult = !table.hitPolicy().isSingleHit() && table.aggregation() == null;
-            this.binding = analysis.bindings[d];
+            this.binding = binding;
             this.declared = declared;
             var lists = new HashSet<>(table.listInputs());
-            lists.addAll(analysis.listedNamedInputs.get(d));
+            lists.addAll(listed);
             var read = lists.equals(table.listInputs()) ? table : new DecisionTable(table.name(), table.hitPolicy(), table.aggregation(),
                     table.inputs(), table.outputs(), table.rules(), table.feelCells(), lists);
             try {
@@ -98,7 +113,7 @@ final class GraphNodes {
                 var builder = PraeceptaEngine.<Object[], Object>builder()
                         .table(read)
                         .output(new TableOutputs(table.outputs()))
-                        .types(analysis.model.types())
+                        .types(types)
                         .parsed(reads.parsed())
                         .logValidationReport(log);
                 bindColumns(builder, reads, names, properties, lists);
@@ -230,6 +245,73 @@ final class GraphNodes {
         @Override
         public ValidationReport report() {
             return engine.validationReport();
+        }
+    }
+
+    /**
+     * A decision table within a boxed expression (a business knowledge model's body, a context entry): evaluated by a
+     * {@link PraeceptaEngine} as a decision's table is, from the values of the names in scope where it is, which the FEEL
+     * around it gives. A name its enclosing constructs bind (a parameter, an earlier entry) is read from that scope, with
+     * its path, and any other name as the scope outside resolves it, requirement and path; values are checked against
+     * their columns' types, as those of no declared type are. It keeps its validation report.
+     */
+    static final class EmbeddedTable implements FeelExpression.Embedded {
+        private final TableNode node;
+        /** What each of the table's slots is read as: a name in scope, whose value is at the slot's paths. */
+        private final String[] keys;
+        private final List<String> names;
+        private final FeelType type;
+
+        /**
+         * @throws InvalidDecisionTableException if a cell or an expression is invalid, or the table cannot be built
+         */
+        EmbeddedTable(FeelExpression.TableSite site, boolean log) {
+            var table = site.table().table();
+            var scope = GraphAnalysis.tableScope(new LinkedHashSet<>(site.names()), table, site.types());
+            var reads = GraphAnalysis.tableReads(table.name(), table, scope);
+            var locals = site.locals();
+            var keyList = new ArrayList<String>();
+            var slots = new HashMap<String, Integer>();
+            var resolutions = new LinkedHashMap<String, Resolution>();
+            for (var name : reads.names()) {
+                var local = DecisionModel.elementOf(name, locals::contains);
+                var key = local == null ? name : local;
+                var path = local == null || local.length() == name.length() ? new String[0] : name.substring(local.length() + 1).split("\\.");
+                int slot = slots.computeIfAbsent(key, k -> {
+                    keyList.add(k);
+                    return keyList.size() - 1;
+                });
+                resolutions.put(name, new Resolution(slot, path, FeelType.ANY));
+            }
+            keys = keyList.toArray(String[]::new);
+            names = List.copyOf(reads.names());
+            var declared = site.table().type();
+            node = new TableNode(table, reads, resolutions, Map.of(), Set.of(), GraphValues.Binding.AS_IS, declared, site.types(), log);
+            type = declared instanceof FeelType.Any ? GraphAnalysis.tableType(table) : declared;
+        }
+
+        @Override
+        public List<String> names() {
+            return names;
+        }
+
+        @Override
+        public FeelType type() {
+            return type;
+        }
+
+        @Override
+        public Object evaluate(Function<String, Object> values, Consumer<String> errors) {
+            var slots = new Object[keys.length];
+            for (int i = 0; i < keys.length; i++) {
+                slots[i] = values.apply(keys[i]);
+            }
+            return node.evaluate(slots, errors);
+        }
+
+        /** The table's validation report. */
+        ValidationReport report() {
+            return node.report();
         }
     }
 

@@ -129,6 +129,8 @@ public final class DecisionGraph {
     private final Map<Integer, Plan> plans = new ConcurrentHashMap<>();
     private final ValidationReport report;
     private final Map<String, ValidationReport> tableReports;
+    /** The validation report of the decision tables within each business knowledge model's logic, by its name. */
+    private final Map<String, ValidationReport> knowledgeReports;
 
     /**
      * How to evaluate a decision.
@@ -157,7 +159,7 @@ public final class DecisionGraph {
 
     private DecisionGraph(DecisionModel model, Severity failOn, boolean log) {
         this.model = model;
-        var analysis = new GraphAnalysis(model);
+        var analysis = new GraphAnalysis(model, log);
         int inputCount = analysis.inputCount;
         int decisionCount = model.decisions().size();
         slotCount = inputCount + decisionCount + model.knowledgeModels().size();
@@ -181,13 +183,18 @@ public final class DecisionGraph {
             decisionIndexes.put(decision.name(), d);
             allTypes.put(decision.name(), analysis.types[inputCount + d]);
             nodes[d] = node(analysis, d, log);
-            reports.put(decision.name(), nodes[d].report());
+            reports.put(decision.name(), merged(nodes[d].report(), analysis.embeddedTables.get(d)));
             requiredDecisions[d] = analysis.requiredDecisions(d);
             requiredInputs[d] = decision.requiredInputs().stream().map(analysis.slots::get)
                     .filter(slot -> slot != null && slot < inputCount).mapToInt(Integer::intValue).toArray();
         }
         types = Collections.unmodifiableMap(allTypes);
         tableReports = Collections.unmodifiableMap(reports);
+        var knowledgeReports = new LinkedHashMap<String, ValidationReport>();
+        for (int k = 0; k < model.knowledgeModels().size(); k++) {
+            knowledgeReports.put(model.knowledgeModels().get(k).name(), merged(new ValidationReport(List.of()), analysis.knowledgeTables.get(k)));
+        }
+        this.knowledgeReports = Collections.unmodifiableMap(knowledgeReports);
         rank = new int[decisionCount];
         for (int i = 0; i < analysis.order.length; i++) {
             rank[analysis.order[i]] = i;
@@ -264,6 +271,9 @@ public final class DecisionGraph {
         tableReports.forEach((decision, tableReport) -> tableReport.issues().stream()
                 .filter(issue -> issue.severity().compareTo(failOn) >= 0)
                 .forEach(issue -> failing.add("decision '%s': %s".formatted(decision, issue))));
+        knowledgeReports.forEach((knowledgeModel, tableReport) -> tableReport.issues().stream()
+                .filter(issue -> issue.severity().compareTo(failOn) >= 0)
+                .forEach(issue -> failing.add("business knowledge model '%s': %s".formatted(knowledgeModel, issue))));
         if (!failing.isEmpty()) {
             throw new InvalidDecisionTableException("Decision model '%s' has %d validation issue(s) at %s or above:%n%s"
                     .formatted(model.name(), failing.size(), failOn, String.join("\n", failing)));
@@ -473,8 +483,22 @@ public final class DecisionGraph {
      * @throws NoSuchElementException if the graph has no decision of that name
      */
     public ValidationReport validationReport(String decision) {
+        var knowledgeReport = knowledgeReports.get(decision);
+        if (knowledgeReport != null && !decisionIndexes.containsKey(decision)) {
+            return knowledgeReport;
+        }
         index(decision);
         return tableReports.get(decision);
+    }
+
+    /** A report of the issues of a decision's own table, if any, then of each table within its boxed expression. */
+    private static ValidationReport merged(ValidationReport own, List<GraphNodes.EmbeddedTable> tables) {
+        if (tables.isEmpty()) {
+            return own;
+        }
+        var issues = new ArrayList<>(own.issues());
+        tables.forEach(table -> issues.addAll(table.report().issues()));
+        return new ValidationReport(issues);
     }
 
     // ---- builder -------------------------------------------------------------------------------

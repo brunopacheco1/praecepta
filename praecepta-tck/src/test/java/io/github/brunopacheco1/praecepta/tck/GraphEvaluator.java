@@ -167,9 +167,10 @@ final class GraphEvaluator implements ModelEvaluator {
             var requiredDecisions = decision.requiredDecisions().stream().filter(name -> !given.contains(name)).toList();
             var requiredInputs = new ArrayList<>(decision.requiredInputs());
             decision.requiredDecisions().stream().filter(given::contains).forEach(requiredInputs::add);
-            decisions.add(new DecisionModel.Decision(decision.name(), requiredDecisions, requiredInputs, decision.logic()));
+            decisions.add(new DecisionModel.Decision(decision.name(), requiredDecisions, requiredInputs, decision.requiredKnowledge(),
+                    decision.logic()));
         }
-        return new DecisionModel(read.model().name(), inputData, decisions, read.model().types());
+        return new DecisionModel(read.model().name(), inputData, decisions, read.model().knowledgeModels(), read.model().types());
     }
 
     /** The test case's inputs as the graph takes them: values of simple types as text, typed by the kit where undeclared. */
@@ -296,7 +297,12 @@ final class GraphEvaluator implements ModelEvaluator {
                     : "models Praecepta does not read as a whole");
         }
         return switch (unsupported.issue()) {
-            case 119 -> message.startsWith("DMN model has the decision service") ? Feature.DECISION_SERVICES : Feature.IMPORTS;
+            case 119 -> {
+                if (message.contains("decision service")) {
+                    yield Feature.DECISION_SERVICES;
+                }
+                yield message.contains("defines a function in") ? Feature.EXTERNAL_FUNCTIONS : Feature.IMPORTS;
+            }
             case 118 -> message.startsWith("DMN model has the business knowledge model") || message.contains("requires business knowledge")
                     ? Feature.KNOWLEDGE_MODELS : Feature.boxed("boxed expressions elsewhere in the model");
             default -> Feature.feel("FEEL Praecepta does not read elsewhere in the model");

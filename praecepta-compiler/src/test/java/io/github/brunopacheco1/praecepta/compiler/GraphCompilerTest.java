@@ -293,13 +293,13 @@ class GraphCompilerTest {
         var file = out.resolve("bkm.dmn");
         Files.writeString(file, """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
-                  <decisionService id="bkm" name="Rate"/>
+                  <import name="Rate" namespace="https://example.com/rate" importType="https://www.omg.org/spec/DMN/20230324/MODEL/"/>
                   <decision id="a" name="A"><literalExpression><text>1</text></literalExpression></decision>
                 </definitions>""", StandardCharsets.UTF_8);
         var definition = TableDefinition.dmn(file);
         Assertions.assertThatThrownBy(() -> compile(definition, Severity.ERROR))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("decision service 'Rate'")
+                .hasMessageContaining("imports 'Rate'")
                 .hasMessageContaining("#119")
                 .hasCauseInstanceOf(UnsupportedFeatureException.class);
     }
@@ -314,7 +314,7 @@ class GraphCompilerTest {
         var file = out.resolve("later.dmn");
         Files.writeString(file, """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
-                  <decisionService id="bkm" name="Rate"/>
+                  <import name="Rate" namespace="https://example.com/rate" importType="https://www.omg.org/spec/DMN/20230324/MODEL/"/>
                   <decision id="tier" name="Tier"><decisionTable hitPolicy="FIRST">
                     <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>
                     <output name="tier" typeRef="string"/>
@@ -330,7 +330,7 @@ class GraphCompilerTest {
         Assertions.assertThat(lines).singleElement().asString()
                 .startsWith(file + ": its decision table is compiled alone, without its decision requirements graph, "
                         + "which needs Praecepta 0.11 (#119): ")
-                .contains("decision service 'Rate'");
+                .contains("imports 'Rate'");
 
         lines.clear();
         TableCompiler.compile(TableDefinition.dmn(table("chain.dmn")), options);

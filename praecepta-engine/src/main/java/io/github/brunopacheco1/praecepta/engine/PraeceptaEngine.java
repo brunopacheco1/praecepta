@@ -799,16 +799,18 @@ public final class PraeceptaEngine<I, O> {
     }
 
     /**
-     * Where each name the table's FEEL reads is: a column, by position in evaluation order, or a value a graph gives.
+     * Where each name the table's FEEL reads is: a column, by position in evaluation order, or a value a graph gives. A
+     * column whose input expression is an expression is no name in the table, so its text, read as a name, is the value a
+     * graph gives of that name: a requirement named {@code Pre-bureauRiskCategory} that a column of that input expression
+     * reads (the DMN TCK's {@code 0004-lending}).
      *
-     * @throws InvalidDecisionTableException if a computed column reads another computed column, or a name is neither a
-     *                                       column nor a value a graph gives
+     * @throws InvalidDecisionTableException if a name is neither a column nor a value a graph gives
      */
     static Map<String, Integer> nameReads(TableExpressions expressions, List<String> evaluationOrder, List<String> given,
             Map<String, FeelExpression> computed) {
         var reads = new HashMap<String, Integer>();
         for (var name : expressions.names()) {
-            int column = evaluationOrder.indexOf(name);
+            int column = computed.containsKey(name) ? -1 : evaluationOrder.indexOf(name);
             int value = given.indexOf(name);
             if (column < 0 && value < 0) {
                 throw new InvalidDecisionTableException(
@@ -816,13 +818,6 @@ public final class PraeceptaEngine<I, O> {
             }
             reads.put(name, column >= 0 ? column : -1 - value);
         }
-        computed.forEach((column, expression) -> {
-            for (var name : expression.names()) {
-                if (computed.containsKey(name)) {
-                    throw new InvalidDecisionTableException("Input expression '%s' reads '%s', which is computed itself".formatted(column, name));
-                }
-            }
-        });
         return Map.copyOf(reads);
     }
 
