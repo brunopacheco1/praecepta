@@ -25,9 +25,9 @@ on its own or as beans in Spring Boot, Quarkus or Micronaut.
 
 > **Status: 0.x.** The API may still change between minor versions until 1.0. Praecepta is growing from
 > a decision-table engine into a full DMN 1.5 engine, one layer per release
-> ([#120](https://github.com/brunopacheco1/praecepta/issues/120)). 0.8 covers decision tables and the
-> decision requirement graphs of tables and literal expressions, both in the full FEEL language, not yet FEEL's
-> built-in functions or business knowledge models; see [what Praecepta is not](#what-praecepta-is-not).
+> ([#120](https://github.com/brunopacheco1/praecepta/issues/120)). 0.9 covers decision tables and the
+> decision requirement graphs of tables and literal expressions, both in the full FEEL language with its
+> built-in functions, not yet business knowledge models or boxed expressions; see [what Praecepta is not](#what-praecepta-is-not).
 
 # Features
 - All DMN hit policies: UNIQUE, ANY, PRIORITY, FIRST, OUTPUT_ORDER, RULE_ORDER and COLLECT
