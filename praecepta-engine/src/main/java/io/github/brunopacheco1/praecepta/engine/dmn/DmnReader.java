@@ -456,9 +456,6 @@ public final class DmnReader {
         };
     }
 
-    /** Rejects the elements of a model that Praecepta does not evaluate yet, naming the release that plans them. */
-
-
     /**
      * A decision service (DMN 1.5, 6.3.9): its output, encapsulated and input decisions and its input data, each by its
      * {@code href} to an element of the model (one to no element kept as the id it names, which the graph reports), and
