@@ -108,7 +108,12 @@ public final class DecisionGraph {
 
     private static final System.Logger LOG = System.getLogger(DecisionGraph.class.getName());
 
+    /** The model as one with the models it imports, under the names of the graph ({@link ImportedModels}). */
     private final DecisionModel model;
+    /** The model as it was given, with its imports. */
+    private final DecisionModel original;
+    /** By imported model's namespace, the prefix of its elements' names in the graph. */
+    private final Map<String, String> importedPrefixes;
     /** The number of slots: one per input data, then one per decision. */
     private final int slotCount;
     /**
@@ -169,9 +174,13 @@ public final class DecisionGraph {
         }
     }
 
-    private DecisionGraph(DecisionModel model, Severity failOn, boolean log) {
+    private DecisionGraph(DecisionModel original, Severity failOn, boolean log) {
+        this.original = original;
+        var flat = ImportedModels.flatten(original);
+        var model = flat.model();
         this.model = model;
-        var analysis = new GraphAnalysis(model, log);
+        this.importedPrefixes = flat.byModel();
+        var analysis = new GraphAnalysis(model, log, flat.aliases());
         int inputCount = analysis.inputCount;
         int decisionCount = model.decisions().size();
         slotCount = inputCount + decisionCount + model.knowledgeModels().size() + model.decisionServices().size();
@@ -569,7 +578,21 @@ public final class DecisionGraph {
 
     /** The model the graph evaluates; for a graph assembled in code, with the requirements its builder worked out. */
     public DecisionModel model() {
-        return model;
+        return original;
+    }
+
+    /**
+     * The name in the graph of an element of the model, or of a model it imports (DMN 1.5, 6.3.3): its own name for an
+     * element of the model, else its name qualified by the path of imports that first reaches its model
+     * ({@code Model B.modelA.Person name}), under which {@link #evaluate(String, Map)} takes an input data and gives a
+     * decision.
+     *
+     * @param namespace the namespace of the element's model
+     * @param name      the element's name in its model
+     */
+    public String nameOf(String namespace, String name) {
+        var prefix = importedPrefixes.get(namespace);
+        return prefix == null ? name : prefix + name;
     }
 
     /** The decisions' names, in the model's order. */
@@ -667,6 +690,8 @@ public final class DecisionGraph {
         private final Set<String> inferred = new LinkedHashSet<>();
         private final List<DecisionModel.BusinessKnowledgeModel> knowledgeModels = new ArrayList<>();
         private final List<DecisionModel.DecisionService> decisionServices = new ArrayList<>();
+        private final List<DecisionModel.Import> imports = new ArrayList<>();
+        private String namespace = "";
         private final Map<String, FeelType> types = new LinkedHashMap<>();
         private Severity failOn;
         private boolean log = true;
@@ -687,6 +712,8 @@ public final class DecisionGraph {
             decisions.addAll(model.decisions());
             knowledgeModels.addAll(model.knowledgeModels());
             decisionServices.addAll(model.decisionServices());
+            imports.addAll(model.imports());
+            namespace = model.namespace();
             types.putAll(model.types());
             return this;
         }
@@ -812,7 +839,8 @@ public final class DecisionGraph {
             var resolved = decisions.stream()
                     .map(decision -> inferred.contains(decision.name()) ? withRequirements(decision, names, decisionNames, scope, types) : decision)
                     .toList();
-            return new DecisionGraph(new DecisionModel(name, inputData, resolved, knowledgeModels, decisionServices, types), failOn, log);
+            return new DecisionGraph(new DecisionModel(name, inputData, resolved, knowledgeModels, decisionServices, types, namespace, imports),
+                    failOn, log);
         }
 
         /**

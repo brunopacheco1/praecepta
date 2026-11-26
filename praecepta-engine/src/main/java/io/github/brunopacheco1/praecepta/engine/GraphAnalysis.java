@@ -8,6 +8,7 @@ package io.github.brunopacheco1.praecepta.engine;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -130,6 +131,8 @@ final class GraphAnalysis {
     final List<List<GraphNodes.EmbeddedTable>> embeddedTables = new ArrayList<>();
     /** Whether the engines of the tables within boxed expressions log their validation reports. */
     private final boolean log;
+    /** By element, the names its own model reads, each to its element's name in the graph ({@link ImportedModels}). */
+    private final Map<String, Map<String, String>> aliases;
     /** Each slot's type: an input data's, declared or worked out from the tables that read it, or a decision's value's. */
     final FeelType[] types;
     /** By decision (index in the model): the names its logic reads, resolved; a name none of its requirements provides is left out. */
@@ -158,13 +161,18 @@ final class GraphAnalysis {
     private final Set<String> conflicting = new HashSet<>();
 
     GraphAnalysis(DecisionModel model) {
-        this(model, false);
+        this(model, false, Map.of());
     }
 
-    /** @param log whether the engines of the decision tables within boxed expressions log their validation reports */
-    GraphAnalysis(DecisionModel model, boolean log) {
+    /**
+     * @param log     whether the engines of the decision tables within boxed expressions log their validation reports
+     * @param aliases by element, the names its own model reads, each to its element's name in the graph, where the model
+     *                is one with the models it imports ({@link ImportedModels}); none for an element whose names are those
+     */
+    GraphAnalysis(DecisionModel model, boolean log, Map<String, Map<String, String>> aliases) {
         this.model = model;
         this.log = log;
+        this.aliases = aliases;
         var decisions = model.decisions();
         inputCount = model.inputData().size();
         decisionCount = decisions.size();
@@ -275,6 +283,32 @@ final class GraphAnalysis {
         requiredDecisions.add(required.stream().mapToInt(Integer::intValue).toArray());
     }
 
+    /**
+     * The names an element's logic reads its requirements by: their names in its own model, which may be several (an
+     * element of a model imported twice, with and without a name), or the requirements' own names.
+     */
+    private Set<String> localScope(String element, Collection<String> requirements) {
+        var alias = aliases.get(element);
+        if (alias == null) {
+            return new LinkedHashSet<>(requirements);
+        }
+        var required = new HashSet<>(requirements);
+        var scope = new LinkedHashSet<String>();
+        alias.forEach((local, global) -> {
+            if (required.contains(global)) {
+                scope.add(local);
+            }
+        });
+        requirements.stream().filter(requirement -> !alias.containsValue(requirement)).forEach(scope::add);
+        return scope;
+    }
+
+    /** The name in the graph of what an element reads by {@code local}. */
+    private String global(String element, String local) {
+        var alias = aliases.get(element);
+        return alias == null ? local : alias.getOrDefault(local, local);
+    }
+
     /** What kind of element is at a slot, as messages name it. */
     private String kindOf(int slot) {
         if (isInputData(slot)) {
@@ -313,8 +347,8 @@ final class GraphAnalysis {
             }
         }
         // a business knowledge model may invoke itself, as a function a context defines may
-        var scope = new LinkedHashSet<>(knowledgeModel.requiredKnowledge());
-        scope.add(name);
+        var scope = localScope(name, knowledgeModel.requiredKnowledge());
+        scope.addAll(localScope(name, List.of(name)));
         valid.add(name);
         try {
             var tables = knowledgeTables.get(k);
@@ -333,8 +367,8 @@ final class GraphAnalysis {
             if (required == null) {
                 reportKnowledge(k, Kind.MISSING_REQUIREMENT, ("business knowledge model '%s' reads '%s', which is neither one of its parameters "
                         + "nor a business knowledge model it requires (DMN 1.5, 6.3.10)").formatted(name, read));
-            } else if (valid.contains(required)) {
-                reads.put(read, slots.get(required));
+            } else if (valid.contains(global(name, required))) {
+                reads.put(read, slots.get(global(name, required)));
             }
         }
     }
@@ -602,7 +636,7 @@ final class GraphAnalysis {
     private void resolveReads(int d) {
         embeddedTables.add(List.of());
         var decision = model.decisions().get(d);
-        var scope = new HashSet<>(decision.requirements());
+        var scope = localScope(decision.name(), decision.requirements());
         var valid = new HashSet<String>();
         decision.requiredDecisions().stream().filter(name -> isDecision(slots.get(name))).forEach(valid::add);
         decision.requiredInputs().stream().filter(name -> isInputData(slots.get(name))).forEach(valid::add);
@@ -628,9 +662,9 @@ final class GraphAnalysis {
             if (requirement == null) {
                 report(d, Kind.MISSING_REQUIREMENT, "decision '%s' reads '%s', which none of its information requirements provides (DMN 1.5, 7.3.4)"
                         .formatted(decision.name(), name));
-            } else if (valid.contains(requirement)) {
+            } else if (valid.contains(global(decision.name(), requirement))) {
                 var path = requirement.length() == name.length() ? new String[0] : name.substring(requirement.length() + 1).split("\\.");
-                resolved.put(name, new Resolution(slots.get(requirement), path, null));
+                resolved.put(name, new Resolution(slots.get(global(decision.name(), requirement)), path, null));
             }
             // else a requirement the model does not have, or of the other kind, which is reported already
         }

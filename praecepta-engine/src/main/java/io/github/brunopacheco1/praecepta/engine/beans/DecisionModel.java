@@ -32,12 +32,16 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  *                         <a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>)
  * @param decisionServices the decision services, in the model's order (since 0.11,
  *                         <a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>)
+ * @param namespace        the model's namespace (the {@code definitions} element's), by which other models import it;
+ *                         empty if it has none
+ * @param imports          the models it imports (DMN 1.5, 6.3.3; since 0.11), whose elements its own read by qualified
+ *                         names ({@code importName.elementName}), or by their own names for an import without a name
  * @param types           the types the model defines (its item definitions, DMN 1.5, 7.3.2), by name, which a literal
  *                  expression's {@code instance of} and function parameters may name (10.3.2.9); empty if it defines
  *                  none
  */
 public record DecisionModel(String name, List<InputData> inputData, List<Decision> decisions, List<BusinessKnowledgeModel> knowledgeModels,
-        List<DecisionService> decisionServices, Map<String, FeelType> types) {
+        List<DecisionService> decisionServices, Map<String, FeelType> types, String namespace, List<Import> imports) {
 
     /**
      * A model with the given input data and decisions, and no business knowledge models or types of its own.
@@ -68,7 +72,18 @@ public record DecisionModel(String name, List<InputData> inputData, List<Decisio
     }
 
     /**
-     * A model with the given input data, decisions, business knowledge models, decision services and types.
+     * A model with the given input data, decisions, business knowledge models, decision services and types, of no
+     * namespace, importing no other model.
+     *
+     * @throws IllegalArgumentException if two of them have the same name (see the canonical constructor)
+     */
+    public DecisionModel(String name, List<InputData> inputData, List<Decision> decisions, List<BusinessKnowledgeModel> knowledgeModels,
+            List<DecisionService> decisionServices, Map<String, FeelType> types) {
+        this(name, inputData, decisions, knowledgeModels, decisionServices, types, "", List.of());
+    }
+
+    /**
+     * A model with the given elements, types, namespace and imports.
      *
      * @throws IllegalArgumentException if two of them have the same name: DMN 1.5, 6.3.7 and 6.3.11, "the name of a
      *                                  Decision must be different from the name of any other invocable, input data,
@@ -80,6 +95,8 @@ public record DecisionModel(String name, List<InputData> inputData, List<Decisio
         decisions = List.copyOf(decisions);
         knowledgeModels = List.copyOf(knowledgeModels);
         decisionServices = List.copyOf(decisionServices);
+        Objects.requireNonNull(namespace, "namespace");
+        imports = List.copyOf(imports);
         types = Collections.unmodifiableMap(new LinkedHashMap<>(types));
         var names = new HashSet<String>();
         var all = new ArrayList<String>();
@@ -265,6 +282,26 @@ public record DecisionModel(String name, List<InputData> inputData, List<Decisio
             var parameters = new ArrayList<>(inputData);
             parameters.addAll(inputDecisions);
             return List.copyOf(parameters);
+        }
+    }
+
+    /**
+     * An import (DMN 1.5, 6.3.3): another model, whose elements the importing model's decisions, business knowledge
+     * models and decision services read and require by {@code name.elementName}, or by their own names where the import
+     * has no name.
+     *
+     * @param name  the import's name, the prefix of the names it gives the imported elements; empty for none
+     * @param model the imported model, which may import others in turn
+     */
+    public record Import(String name, DecisionModel model) {
+        public Import {
+            Objects.requireNonNull(name, "name");
+            Objects.requireNonNull(model, "model");
+        }
+
+        /** The name an element of the imported model takes in the importing one. */
+        public String qualified(String element) {
+            return name.isEmpty() ? element : name + "." + element;
         }
     }
 }

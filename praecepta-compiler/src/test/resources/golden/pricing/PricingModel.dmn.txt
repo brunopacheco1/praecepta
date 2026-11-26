@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_Pricing" name="Pricing" namespace="https://github.com/brunopacheco1/praecepta/Pricing">
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions_Pricing" name="Pricing" namespace="https://example.com/pricing">
   <itemDefinition name="decision_0_type">
     <itemComponent name="discount">
       <typeRef>number</typeRef>

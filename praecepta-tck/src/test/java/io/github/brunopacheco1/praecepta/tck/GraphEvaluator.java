@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -179,7 +180,7 @@ final class GraphEvaluator implements ModelEvaluator {
     private Read read(DmnModel model) {
         return models.computeIfAbsent(model.file().toString(), file -> {
             try (InputStream dmn = Files.newInputStream(model.file())) {
-                var decisionModel = DmnReader.readModel(dmn);
+                var decisionModel = DmnReader.readModel(dmn, imports(model.file().getParent()));
                 return new Read(decisionModel, build(decisionModel), null);
             } catch (InvalidDecisionTableException e) {
                 return new Read(null, null, rejected(e));
@@ -227,16 +228,50 @@ final class GraphEvaluator implements ModelEvaluator {
                 read.model().types());
     }
 
-    /** The test case's inputs as the graph takes them: values of simple types as text, typed by the kit where undeclared. */
+    /**
+     * The test case's inputs as the graph takes them: values of simple types as text, typed by the kit where undeclared;
+     * an input of an imported model under its name in the graph.
+     */
     private static Map<String, Object> inputs(Check check, DecisionGraph graph) {
+        var given = new HashMap<String, TckValue>();
+        check.inputs().forEach((key, value) -> {
+            if (key.startsWith("{") && key.indexOf('}') > 0) {
+                given.put(graph.nameOf(key.substring(1, key.indexOf('}')), key.substring(key.indexOf('}') + 1)), value);
+            } else {
+                given.put(key, value);
+            }
+        });
         var values = new HashMap<String, Object>();
         graph.inputData().forEach((name, type) -> {
-            var given = check.inputs().get(name);
-            if (given != null) {
-                values.put(name, input(given, type));
+            var value = given.get(name);
+            if (value != null) {
+                values.put(name, input(value, type));
             }
         });
         return values;
+    }
+
+    /**
+     * Finds the models a model imports among the DMN files of its test case's directory: by its {@code locationURI}, else
+     * by namespace.
+     */
+    private static DmnReader.ImportResolver imports(Path directory) {
+        return (namespace, location) -> {
+            if (!location.isEmpty()) {
+                var file = directory.resolve(location).normalize();
+                if (Files.isRegularFile(file)) {
+                    return Files.newInputStream(file);
+                }
+            }
+            try (var files = Files.list(directory)) {
+                for (var file : files.filter(f -> f.toString().endsWith(".dmn")).sorted().toList()) {
+                    if (namespace.equals(TckXml.parse(file).getAttribute("namespace").strip())) {
+                        return Files.newInputStream(file);
+                    }
+                }
+            }
+            return null;
+        };
     }
 
     static Object input(TckValue given, FeelType type) {
@@ -358,7 +393,8 @@ final class GraphEvaluator implements ModelEvaluator {
                 if (message.contains("has no decision logic")) {
                     yield Feature.NO_LOGIC;
                 }
-                yield message.contains("defines a function in") ? Feature.EXTERNAL_FUNCTIONS : Feature.IMPORTS;
+                yield message.contains("defines a function in") || message.contains("external function") ? Feature.EXTERNAL_FUNCTIONS
+                        : Feature.IMPORTS;
             }
             case 118 -> message.startsWith("DMN model has the business knowledge model") || message.contains("requires business knowledge")
                     ? Feature.KNOWLEDGE_MODELS : Feature.boxed("boxed expressions elsewhere in the model");

@@ -26,7 +26,7 @@ class GraphEvaluatorTest {
     private static final Map<String, Check> KIT = TckSuite.load().values().stream().flatMap(List::stream)
             .collect(Collectors.toMap(Check::key, Function.identity()));
     private static final DmnModel OFFERS = new DmnModel(resource("/graphs/offers.dmn"));
-    private static final DmnModel IMPORTS = new DmnModel(resource("/graphs/imports.dmn"));
+    private static final DmnModel EXTERNAL = new DmnModel(resource("/graphs/external.dmn"));
 
     private final SingleDecisionEvaluator single = new SingleDecisionEvaluator();
     private final GraphEvaluator graphs = new GraphEvaluator(single);
@@ -79,11 +79,11 @@ class GraphEvaluatorTest {
 
     @Test
     void a_node_needs_what_its_decisions_need_but_no_longer_graphs() {
-        // the model imports another, so readModel rejects it; Label alone needs Band computed, which the graph would do
-        var check = imports("Label", Map.of("Score", new TckValue.Simple("decimal", "750")), "Band A");
+        // the model defines an external function, so readModel rejects it; Label alone needs Band computed
+        var check = external("Label", Map.of("Score", new TckValue.Simple("decimal", "750")), "Band A");
 
         var needs = ((Evaluation.Unsupported) ModelEvaluator.praecepta().evaluate(check)).needs();
-        assertThat(needs).contains(Feature.IMPORTS).doesNotContain(Feature.REQUIRED_DECISIONS);
+        assertThat(needs).contains(Feature.EXTERNAL_FUNCTIONS).doesNotContain(Feature.REQUIRED_DECISIONS);
     }
 
     @Test
@@ -95,15 +95,15 @@ class GraphEvaluatorTest {
 
     @Test
     void a_model_read_only_in_part_is_left_to_single_decisions() {
-        // the model imports another, so readModel rejects it, and each decision is evaluated alone
-        var check = imports("Band", Map.of("Score", new TckValue.Simple("decimal", "750")), "A");
+        // the model defines an external function, so readModel rejects it, and each decision is evaluated alone
+        var check = external("Band", Map.of("Score", new TckValue.Simple("decimal", "750")), "A");
 
-        assertThat(graphs.evaluate(check)).isEqualTo(new Evaluation.Unsupported(Feature.IMPORTS));
+        assertThat(graphs.evaluate(check)).isEqualTo(new Evaluation.Unsupported(Feature.EXTERNAL_FUNCTIONS));
         assertThat(new TckRunner(ModelEvaluator.praecepta()).run(check).status()).isEqualTo(Status.PASSED);
     }
 
-    private static Check imports(String decision, Map<String, TckValue> inputs, String expected) {
-        return new Check("graphs/imports", "imports-test-01.xml", "001", Invocable.DECISION, "", decision, IMPORTS, inputs,
+    private static Check external(String decision, Map<String, TckValue> inputs, String expected) {
+        return new Check("graphs/external", "external-test-01.xml", "001", Invocable.DECISION, "", decision, EXTERNAL, inputs,
                 new TckValue.Simple("string", expected), false);
     }
 

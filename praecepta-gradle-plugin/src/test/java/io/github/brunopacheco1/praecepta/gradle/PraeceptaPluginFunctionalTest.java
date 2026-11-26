@@ -347,8 +347,8 @@ class PraeceptaPluginFunctionalTest {
         Assertions.assertThat(project.resolve("build/generated/sources/praecepta/java/main/com/acme/rules/OtherTier.java")).exists();
         Assertions.assertThat(result.getOutput().lines().filter(line -> line.contains("compiled alone"))).singleElement().asString()
                 .endsWith("later.dmn: its decision table is compiled alone, without its decision requirements graph, which needs "
-                        + "Praecepta 0.11 (#119): DMN model imports 'Rate', which Praecepta does not "
-                        + "support yet: imports are planned for 0.11 (#119)");
+                        + "Praecepta 0.11 (#119): DMN model imports 'Rate', which Praecepta reads only with the models it imports "
+                        + "(DmnReader.readModel(dmn, imports), #119)");
     }
 
     @Test
