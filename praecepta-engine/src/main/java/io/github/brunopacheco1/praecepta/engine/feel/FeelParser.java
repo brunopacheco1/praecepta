@@ -120,7 +120,11 @@ final class FeelParser {
     private static final Names BUILT_INS = new Names(BuiltInFunctions.NAMES);
 
     /** What parsing gives. */
-    record Parsed(Node root, List<String> names, List<FeelExpression.Unsupported> unsupported, int depth) {
+    record Parsed(Node root, List<String> names, List<FeelExpression.Unsupported> unsupported, int depth, List<String> uninvocable) {
+
+        Parsed(Node root, List<String> names, List<FeelExpression.Unsupported> unsupported, int depth) {
+            this(root, names, unsupported, depth, List.of());
+        }
     }
 
     /**
@@ -168,6 +172,8 @@ final class FeelParser {
     private final Deque<Names> locals = new ArrayDeque<>();
     private final Set<String> free = new LinkedHashSet<>();
     private final Set<FeelExpression.Unsupported> unsupported = new LinkedHashSet<>();
+    /** The names it invokes that nothing in scope names, each invocation null with an error. */
+    private final Set<String> uninvocable = new LinkedHashSet<>();
     private int at;
     /** The parser's calls the nesting at the current token takes ({@link #MAX_CALLS}). */
     private int calls;
@@ -217,7 +223,7 @@ final class FeelParser {
         if (depth > MAX_DEPTH) {
             throw parser.tooDeep();
         }
-        return new Parsed(root, List.copyOf(parser.free), List.copyOf(parser.unsupported), depth);
+        return new Parsed(root, List.copyOf(parser.free), List.copyOf(parser.unsupported), depth, List.copyOf(parser.uninvocable));
     }
 
     /**
@@ -850,6 +856,12 @@ final class FeelParser {
             }
         } else {
             name = wordsName();
+            if (filters == 0 && peek().is("(")) {
+                // the invocation of a function nothing in scope names: null, with an error (the TCK's
+                // 1131-feel-function-invocation), not a name the expression reads
+                uninvocable.add(name);
+                return new Node.Invalid("no function named '%s' is in scope, so it cannot be invoked".formatted(name));
+            }
             if (filters == 0) {
                 free.add(name);
             }

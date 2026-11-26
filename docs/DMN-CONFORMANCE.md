@@ -61,6 +61,7 @@ release meant to remove it.
 | 35 | [A business knowledge model that invokes itself](#35-a-business-knowledge-model-that-invokes-itself) | open |
 | 36 | [A decision service nothing invokes, and a decision without logic nothing requires](#36-a-decision-service-nothing-invokes-and-a-decision-without-logic-nothing-requires) | open until 0.11.0, which reads both |
 | 37 | [What a decision service evaluates, and in what order it takes its arguments](#37-what-a-decision-service-evaluates-and-in-what-order-it-takes-its-arguments) | decided by the TCK for the order; open for decisions it does not list |
+| 38 | [Invoking a function nothing names](#38-invoking-a-function-nothing-names) | decided by the TCK; followed since 0.11.0 |
 
 How Praecepta returns DMN's null result, which is a choice of representation rather than of semantics,
 is [at the end](#how-a-null-result-is-returned).
@@ -599,6 +600,19 @@ integrations alike.
   (`MISSING_REQUIREMENT`), so the service, and what invokes it, is not evaluated. Arguments are bound to their
   parameters' types as a function's are (10.3.2.9.4), and the service's value to the output type of the function type
   its variable declares, if any.
+
+## 38. Invoking a function nothing names
+- **DMN 1.5.** A decision reads only what its requirements provide (7.3.4), and invoking what is not a function is
+  an error, whose value is null (10.3.2.16); it does not say whether invoking a name nothing provides makes the
+  model invalid or the decision null.
+- **TCK.** `1131-feel-function-invocation` has `non_existing_function()` be null, with an error, as it has `null()`
+  and `"abs"(-1)`.
+- **Praecepta (since 0.11.0, [#119](https://github.com/brunopacheco1/praecepta/issues/119)).** As the TCK has it.
+  An invocation of a name that no requirement, and no element of the model, provides is null, with an error, and the
+  graph reports the decision as always null (`ALWAYS_NULL`, a WARNING), so `failOn(Severity.WARNING)` still rejects
+  it; it is no requirement missing, and blocks nothing. One of an element of the model the decision does not
+  require, such as a business knowledge model it forgot, is still a requirement missing (`MISSING_REQUIREMENT`, an
+  ERROR), so a model's slip is not taken for a null. 0.10 reported every such name as a requirement missing.
 
 ## Known deviations
 Where DMN 1.5 or the TCK decides and Praecepta does otherwise. Each is reported or documented where it shows,

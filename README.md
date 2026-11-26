@@ -540,7 +540,8 @@ graph.validationReport("Credit Limit");                    // that table's own a
   their input data, then their input decisions, which decisions invoke by name once they require them
   (`Pricing(10, 3, 0.5)`, `Pricing(Discount: 0.1, Quantity: 2, Price: 5)`): they evaluate their output decisions from
   the arguments, without evaluating their input decisions or touching the model's own values, and give one output's
-  value or a context of them all. `graph.evaluateService("Pricing", arguments)` invokes one from outside.
+  value or a context of them all. `graph.evaluateService("Pricing", arguments)` invokes one from outside, and
+  `graph.invokeKnowledgeModel("Greet", arguments)` a business knowledge model, by parameter name.
 
 - **Imports** (since 0.11): `DmnReader.readModel(dmn, imports)` reads a model with the models it imports, each found by
   its namespace and location (`(namespace, location) -> Files.newInputStream(dir.resolve(location))`), and the graph
@@ -1112,13 +1113,14 @@ build, and gives two numbers:
 - **Decision tables: 86 of 86 checks pass (100.0 %).** These are the decision-table checks counted since the
   first release; the last three, which read inputs computed by other decisions in models that also invoke
   business knowledge models, pass since 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)).
-- **The whole kit: 3,476 of 3,511 result nodes pass (99.0 %).** Every model of compliance levels 2 and 3
+- **The whole kit: 3,480 of 3,511 result nodes pass (99.1 %).** Every model of compliance levels 2 and 3
   (148 models at the pinned commit), each result node scored as passed, failed or not supported, each
   decision evaluated through its model's decision requirement graph where Praecepta reads the model. This
-  measures how much of DMN 1.5 Praecepta covers: of the 3,487 nodes it evaluates, 3,476 pass (the eleven others
+  measures how much of DMN 1.5 Praecepta covers: of the 3,491 nodes it evaluates, 3,480 pass (the eleven others
   are [known failures](praecepta-tck/README.md#known-failures): nine loan payments the kit states as a double
-  computes them, and two known deviations). Of the other 24, 17 need external functions, which Praecepta rejects by
-  design, and 7 invoke business knowledge models or functions in ways it does not evaluate yet.
+  computes them, and two known deviations). Of the other 20, 18 are in the kit's model of external functions, which
+  Praecepta rejects by design, and 2 pass built-in functions as values to business knowledge models
+  (`bkm(abs, sqrt)`), which it does not evaluate yet.
 
 Praecepta is a decision-table engine growing into a full DMN 1.5 engine one layer per release
 ([#120](https://github.com/brunopacheco1/praecepta/issues/120)), so a few of the kit's nodes are still ahead, and

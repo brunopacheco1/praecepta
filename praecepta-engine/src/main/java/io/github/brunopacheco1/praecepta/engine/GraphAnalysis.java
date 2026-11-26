@@ -364,6 +364,12 @@ final class GraphAnalysis {
             reportKnowledge(k, Kind.INVALID_EXPRESSION, "business knowledge model '%s': %s".formatted(name, e.getMessage()));
             return;
         }
+        for (var invoked : knowledgeExpressions[k].uninvocable()) {
+            if (slots.containsKey(global(name, invoked))) {
+                reportKnowledge(k, Kind.MISSING_REQUIREMENT, ("business knowledge model '%s' invokes '%s', which is %s it does not require "
+                        + "(DMN 1.5, 6.3.10)").formatted(name, invoked, kindOf(slots.get(global(name, invoked)))));
+            }
+        }
         for (var what : knowledgeExpressions[k].unsupported()) {
             reportKnowledge(k, Kind.UNSUPPORTED_FEATURE, "business knowledge model '%s' uses %s"
                     .formatted(name, FeelExpression.Unsupported.describe(List.of(what))));
@@ -701,6 +707,14 @@ final class GraphAnalysis {
         } catch (ExpressionSyntaxException e) {
             report(d, Kind.INVALID_EXPRESSION, "decision '%s': %s".formatted(decision, e.getMessage()));
             return;
+        }
+        for (var invoked : expressions[d].uninvocable()) {
+            // a function nothing in the model names is null when invoked, with an error, and its type always null; an
+            // element the decision does not require is a requirement missing
+            if (slots.containsKey(global(decision, invoked))) {
+                report(d, Kind.MISSING_REQUIREMENT, "decision '%s' invokes '%s', which is %s it does not require (DMN 1.5, 7.3.4)"
+                        .formatted(decision, invoked, kindOf(slots.get(global(decision, invoked)))));
+            }
         }
         for (var what : expressions[d].unsupported()) {
             report(d, Kind.UNSUPPORTED_FEATURE, "decision '%s' uses %s".formatted(decision, FeelExpression.Unsupported.describe(List.of(what))));

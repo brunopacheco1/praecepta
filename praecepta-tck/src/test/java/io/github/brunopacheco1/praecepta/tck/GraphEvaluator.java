@@ -84,6 +84,9 @@ final class GraphEvaluator implements ModelEvaluator {
         if (check.kind() == Invocable.DECISION_SERVICE) {
             return service(check, check.invocable(), check.decision());
         }
+        if (check.kind() == Invocable.KNOWLEDGE_MODEL) {
+            return knowledgeModel(check, check.invocable());
+        }
         if (check.kind() == Invocable.DECISION && check.model().decision(check.decision()) == null) {
             // a result node named after a decision service, without the test case's type, is the service's value
             var read = read(check.model());
@@ -161,6 +164,29 @@ final class GraphEvaluator implements ModelEvaluator {
         var errors = new ArrayList<String>();
         outcome.errors().values().forEach(errors::addAll);
         return evaluation(check, new DecisionGraph.Outcome(value, errors.isEmpty() ? Map.of() : Map.of(check.decision(), errors)), true);
+    }
+
+    /** A business knowledge model invoked with the test case's inputs as its arguments, by parameter name (DMN 1.5, 6.3.10). */
+    private Evaluation knowledgeModel(Check check, String knowledgeModel) {
+        var read = read(check.model());
+        if (read.rejected() != null) {
+            return new Evaluation.Unsupported(single.needsBesideGraphs(check, List.of()));
+        }
+        var graph = read.graph();
+        if (!graph.knowledgeModels().contains(knowledgeModel)) {
+            return new Evaluation.Failure("the model has no business knowledge model named '" + knowledgeModel + "'");
+        }
+        var arguments = new HashMap<String, Object>();
+        check.inputs().forEach((name, given) -> arguments.put(name, input(given, FeelType.ANY)));
+        DecisionGraph.Outcome outcome;
+        try {
+            outcome = graph.invokeKnowledgeModel(knowledgeModel, arguments);
+        } catch (InvalidDecisionTableException e) {
+            return notTaken(check, REPORTED);
+        }
+        var errors = new ArrayList<String>();
+        outcome.errors().values().forEach(errors::addAll);
+        return evaluation(check, new DecisionGraph.Outcome(outcome.value(), errors.isEmpty() ? Map.of() : Map.of(check.decision(), errors)), true);
     }
 
     /**

@@ -3214,6 +3214,7 @@ compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #overlaps b
 compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #overlaps overlaps	graph
 compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #started by started by	graph
 compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #starts starts	graph
+compliance-level-3/1131-feel-function-invocation/1131-feel-function-invocation-test-01.xml #001 decision001	graph
 compliance-level-3/1131-feel-function-invocation/1131-feel-function-invocation-test-01.xml #002 decision002	graph
 compliance-level-3/1131-feel-function-invocation/1131-feel-function-invocation-test-01.xml #003 decision003	graph
 compliance-level-3/1131-feel-function-invocation/1131-feel-function-invocation-test-01.xml #004 decision004	graph
@@ -3474,6 +3475,9 @@ compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.x
 compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #002 From Singleton List	graph
 compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #002_a From Singleton List Error	graph
 compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #003 From Date To Date and Time	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #004 To Singleton List BKM	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #005 From Singleton List BKM	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #006 From Date To Date and Time BKM	graph
 compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #007 Body 1	graph
 compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #008 Body 2	graph
 compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #009 Body 3	graph

@@ -31,6 +31,7 @@ final class BoxedComposer {
     private final Function<FeelExpression.TableSite, FeelExpression.Embedded> tables;
     private final Set<String> free = new LinkedHashSet<>();
     private final Set<FeelExpression.Unsupported> unsupported = new LinkedHashSet<>();
+    private final Set<String> uninvocable = new LinkedHashSet<>();
 
     private BoxedComposer(FeelExpression.Scope scope, Function<FeelExpression.TableSite, FeelExpression.Embedded> tables) {
         this.scope = scope;
@@ -51,7 +52,8 @@ final class BoxedComposer {
         if (depth > FeelParser.MAX_DEPTH) {
             throw new ExpressionSyntaxException("the boxed expression nests more than %d levels".formatted(FeelParser.MAX_DEPTH));
         }
-        return new FeelParser.Parsed(root, List.copyOf(composer.free), List.copyOf(composer.unsupported), depth);
+        return new FeelParser.Parsed(root, List.copyOf(composer.free), List.copyOf(composer.unsupported), depth,
+                List.copyOf(composer.uninvocable));
     }
 
     /**
@@ -114,6 +116,11 @@ final class BoxedComposer {
                     types.add(parameter.type());
                 }
                 var bodyNode = node(body, List.copyOf(inner), false, where + " in the function's body");
+                if (type instanceof FeelType.FunctionOf(var declared, var result) && !(result instanceof FeelType.Any)) {
+                    // its value is bound to the output type of the function type declared for it, as a decision
+                    // service's is (the TCK's 1157-implicit-conversions: a number into a list of one)
+                    bodyNode = new Node.Bound(bodyNode, result);
+                }
                 yield new Node.FunctionDefinition(names, types, bodyNode, FeelParser.depthOf(bodyNode));
             }
             case DecisionLogic.Relation(var columns, var rows, var type) -> {
@@ -178,6 +185,7 @@ final class BoxedComposer {
         }
         free.addAll(parsed.names());
         unsupported.addAll(parsed.unsupported());
+        uninvocable.addAll(parsed.uninvocable());
         return parsed.root();
     }
 

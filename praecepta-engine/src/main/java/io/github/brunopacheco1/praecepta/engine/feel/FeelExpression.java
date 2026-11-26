@@ -117,6 +117,7 @@ public final class FeelExpression {
     private final Node root;
     private final List<String> names;
     private final List<Unsupported> unsupported;
+    private final List<String> uninvocable;
     private final int depth;
 
     /**
@@ -172,6 +173,7 @@ public final class FeelExpression {
         this.root = parsed.root();
         this.names = parsed.names();
         this.unsupported = parsed.unsupported();
+        this.uninvocable = parsed.uninvocable();
     }
 
     /**
@@ -335,6 +337,16 @@ public final class FeelExpression {
      */
     public List<Object> literals() {
         return Node.literals(List.of(root));
+    }
+
+    /**
+     * The names the expression invokes as functions that nothing in scope names, in the order first written: each
+     * invocation is null, with an error (the TCK's {@code 1131-feel-function-invocation}), and its type always null.
+     * A caller that knows more than the scope, as a decision requirements graph knows its model's elements, may report
+     * such a name as a requirement missing.
+     */
+    public List<String> uninvocable() {
+        return uninvocable;
     }
 
     /**

@@ -35,6 +35,10 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   source, by `locationURI` or by namespace among the directory's `.dmn` files, never outside that directory; it
   ships each as a resource beside the model's (`CompiledTable.imports`), which the generated model class reads, and
   generates classes for the model's own decisions.
+- **`DecisionGraph.invokeKnowledgeModel`** invokes a business knowledge model from outside the model, by parameter
+  name, as `evaluateService` does a decision service (the TCK's `1157-implicit-conversions`), and
+  `DecisionGraph.knowledgeModels()` lists them. **`FeelExpression.uninvocable()`** names the functions an expression
+  invokes that nothing in scope names.
 - **Decisions without logic** (`DecisionLogic.NoLogic`), such as a decision a person makes: the graph does not
   evaluate one, nor what requires it, but a decision service that takes it as an input decision is given its value
   (the TCK's `0088-no-decision-logic`, [DMN conformance](docs/DMN-CONFORMANCE.md), case 36).
@@ -67,10 +71,19 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 - **A file of the build plugins that is no well-formed model and has no table to compile alone fails naming why its
   model was rejected**, such as an import it cannot find, where it said the file has no decision table; so does a
   file of the framework integrations.
+- **Invoking a function nothing names is null, with an error** (the TCK's `1131-feel-function-invocation`,
+  [DMN conformance](docs/DMN-CONFORMANCE.md), case 38), and the graph reports the decision as always null
+  (`ALWAYS_NULL`, a WARNING), where it reported a requirement missing (`MISSING_REQUIREMENT`, an ERROR) and did not
+  evaluate the decision. Invoking an element of the model that the decision does not require is still a
+  `MISSING_REQUIREMENT`. **Upgrade note:** a graph built with `failOn(Severity.ERROR)` that failed for such an
+  invocation now builds, with a WARNING; `failOn(Severity.WARNING)` still rejects it.
+- **A business knowledge model's value is bound to the output type of the function type its variable declares**, as a
+  decision service's is: a number, where it declares a list of numbers, is a list of one, and a list of one, where it
+  declares a number, its element (the TCK's `1157-implicit-conversions`).
 - **The DMN TCK report lists external functions apart**, as no release brings them, and counts them as what stops
-  the nodes that need them. 3,476 of its 3,511 result nodes pass (99.0 %, from 3,409); the 11 failures are those of
-  0.10, and of the 24 not supported, 17 need the external functions Praecepta does not evaluate by design, and 7
-  invoke business knowledge models or functions in ways it does not evaluate yet.
+  the nodes that need them. 3,480 of its 3,511 result nodes pass (99.1 %, from 3,409); the 11 failures are those of
+  0.10, and of the 20 not supported, 18 are in the model of external functions Praecepta does not evaluate by
+  design, and 2 pass built-in functions as values to business knowledge models.
 
 ## [0.10.0] - 2026-11-26
 

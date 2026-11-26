@@ -170,15 +170,15 @@ sealed interface Node {
     }
 
     /**
-     * What DMN 1.5 defines but Praecepta does not evaluate yet, such as an external function (0.11, #119): its value is
-     * null, with an error; {@link FeelExpression#unsupported()} names it, so a decision that uses it is reported.
+     * What DMN 1.5 defines but Praecepta does not evaluate, such as an external function, which it rejects by design: its
+     * value is null, with an error; {@link FeelExpression#unsupported()} names it, so a decision that uses it is reported.
      *
-     * @param what what it is, and the release that plans it
+     * @param what what it is, and the release that plans it, if one does
      */
     record Unsupported(FeelExpression.Unsupported what, List<Node> arguments) implements Node {
         @Override
         public Object evaluate(Env env) {
-            return env.error(what + " is not supported yet");
+            return env.error(what + ": not evaluated");
         }
 
         @Override

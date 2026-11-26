@@ -121,6 +121,8 @@ public final class DecisionGraph {
      * every evaluation hold; null for one that cannot be evaluated.
      */
     private final Object[] knowledge;
+    /** Why each business knowledge model, then each decision service, cannot be evaluated; null where it can. */
+    private final String[] knowledgeBlocked;
     /** The decision services, by index in the model. */
     private final Service[] services;
     private final Map<String, Integer> serviceIndexes = new HashMap<>();
@@ -185,6 +187,7 @@ public final class DecisionGraph {
         int decisionCount = model.decisions().size();
         slotCount = inputCount + decisionCount + model.knowledgeModels().size() + model.decisionServices().size();
         knowledge = knowledgeFunctions(analysis);
+        knowledgeBlocked = analysis.knowledgeBlocked.clone();
         inputNames = new String[inputCount];
         inputTypes = new FeelType[inputCount];
         var allTypes = new LinkedHashMap<String, FeelType>();
@@ -483,6 +486,39 @@ public final class DecisionGraph {
             }
         }
         return new Outcome(values[inputNames.length + plan.decision()], errors);
+    }
+
+    /** The business knowledge models' names, in the model's order. */
+    public List<String> knowledgeModels() {
+        return model.knowledgeModels().stream().map(DecisionModel.BusinessKnowledgeModel::name).toList();
+    }
+
+    /**
+     * Invokes a business knowledge model (DMN 1.5, 6.3.10) from outside the model, as a decision that requires it
+     * invokes it by parameter name: a parameter the map does not hold is null. The values are FEEL's ({@link FeelType}),
+     * a {@link Number} taken as the {@code BigDecimal} of its value, each bound to its parameter's type as an invocation
+     * binds it (10.3.2.9.4), and the value to the type its function gives.
+     *
+     * @return its value, and the errors FEEL reported, under its name
+     * @throws NoSuchElementException        if the graph has no business knowledge model of that name
+     * @throws InvalidDecisionTableException if it cannot be evaluated: its logic is not FEEL Praecepta evaluates, or it
+     *                                       invokes what the model does not have
+     */
+    public Outcome invokeKnowledgeModel(String knowledgeModel, Map<String, ?> arguments) {
+        int k = knowledgeModels().indexOf(Objects.requireNonNull(knowledgeModel, "knowledgeModel"));
+        if (k < 0) {
+            throw new NoSuchElementException("Decision model '%s' has no business knowledge model named '%s'; it has %s".formatted(model.name(),
+                    knowledgeModel, knowledgeModels()));
+        }
+        if (!(knowledge[k] instanceof FeelFunction function)) {
+            throw new InvalidDecisionTableException("Business knowledge model '%s' cannot be evaluated: %s".formatted(knowledgeModel,
+                    Objects.requireNonNullElse(knowledgeBlocked[k], "its logic is not a function")));
+        }
+        var values = new ArrayList<>();
+        function.parameters().forEach(parameter -> values.add(arguments.get(parameter)));
+        var messages = new ArrayList<String>();
+        var value = function.invoke(values, messages::add);
+        return new Outcome(value, messages.isEmpty() ? Map.of() : Map.of(knowledgeModel, messages));
     }
 
     /** The decision services' names, in the model's order. */

@@ -63,7 +63,8 @@ read, and a decision the graph's validation report blocks is not evaluated. Boxe
 within them are read and evaluated since 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)), and
 decision services since 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)): a test case that invokes a
 service (`type="decisionService"`), or a result node named after one, is the service invoked with the test case's
-values as its arguments (`DecisionGraph.evaluateService`). Literal expressions, and decision tables' input expressions, input entries and output entries, are the
+values as its arguments (`DecisionGraph.evaluateService`), and one that invokes a business knowledge model
+(`type="bkm"`) is that model invoked so, by parameter name (`DecisionGraph.invokeKnowledgeModel`). Literal expressions, and decision tables' input expressions, input entries and output entries, are the
 full FEEL language since 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)), with its built-in
 functions since 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)). Where a decision's value is null and its own logic
 reported an error (`DecisionGraph.evaluateWithErrors`), the node counts as an error where the kit expects one
