@@ -96,13 +96,18 @@ public record DecisionModel(String name, List<InputData> inputData, List<Decisio
         Objects.requireNonNull(namespace, "namespace");
         imports = List.copyOf(imports);
         types = Collections.unmodifiableMap(new LinkedHashMap<>(types));
-        var names = new HashSet<String>();
         var all = new ArrayList<String>();
         inputData.forEach(input -> all.add(input.name()));
         decisions.forEach(decision -> all.add(decision.name()));
         knowledgeModels.forEach(knowledgeModel -> all.add(knowledgeModel.name()));
         decisionServices.forEach(service -> all.add(service.name()));
-        for (var element : all) {
+        requireDistinct(all);
+    }
+
+    /** Rejects the first name that names two elements of the model. */
+    private static void requireDistinct(List<String> elements) {
+        var names = new HashSet<String>();
+        for (var element : elements) {
             if (!names.add(element)) {
                 throw new IllegalArgumentException(("'%s' names two elements of the decision model; the names of its decisions, "
                         + "input data, business knowledge models and decision services must differ (DMN 1.5, 6.3.7 and 6.3.11)")

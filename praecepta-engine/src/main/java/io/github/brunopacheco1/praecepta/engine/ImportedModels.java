@@ -23,7 +23,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * their own names, an imported model's under the names the path of imports that first reaches it gives them
  * ({@code Model B.modelA.Person name}). Each element keeps the names its own model reads, in FEEL and in its requirements:
  * its model's own elements by their names, and those of the models it imports by the names each import gives them
- * ({@code modelA.Greet the Person}), which {@link #aliases} maps to the elements' names in the graph.
+ * ({@code modelA.Greet the Person}), which {@link Flat#aliases} maps to the elements' names in the graph.
  */
 final class ImportedModels {
 
@@ -38,6 +38,22 @@ final class ImportedModels {
     record Flat(DecisionModel model, Map<String, Map<String, String>> aliases, Map<String, String> byModel) {
     }
 
+    /** Each model's prefix: what precedes its elements' names in the graph; empty for the root model. */
+    private final Map<DecisionModel, String> prefixes = new IdentityHashMap<>();
+    /** The one instance of each model that has a namespace. */
+    private final Map<String, DecisionModel> byNamespace = new LinkedHashMap<>();
+    /** The models, the root first, then the others as the imports first reach them, breadth first. */
+    private final List<DecisionModel> order = new ArrayList<>();
+
+    // The parts of the model as one, which add(...) fills, model after model:
+    private final List<DecisionModel.InputData> inputData = new ArrayList<>();
+    private final List<DecisionModel.Decision> decisions = new ArrayList<>();
+    private final List<DecisionModel.BusinessKnowledgeModel> knowledgeModels = new ArrayList<>();
+    private final List<DecisionModel.DecisionService> services = new ArrayList<>();
+    private final Map<String, FeelType> types = new LinkedHashMap<>();
+    private final Map<String, Map<String, String>> aliases = new LinkedHashMap<>();
+    private final Map<String, String> byModel = new LinkedHashMap<>();
+
     private ImportedModels() {
     }
 
@@ -46,9 +62,16 @@ final class ImportedModels {
         if (root.imports().isEmpty()) {
             return new Flat(root, Map.of(), Map.of());
         }
-        var prefixes = new IdentityHashMap<DecisionModel, String>();
-        var byNamespace = new LinkedHashMap<String, DecisionModel>();
-        var order = new ArrayList<DecisionModel>();
+        var models = new ImportedModels();
+        models.reach(root);
+        models.order.forEach(models::add);
+        var flat = new DecisionModel(root.name(), models.inputData, models.decisions, models.knowledgeModels, models.services, models.types,
+                root.namespace(), List.of());
+        return new Flat(flat, models.aliases, models.byModel);
+    }
+
+    /** Finds every model the root imports, directly or not, each once, and gives each its prefix; with a queue of its own. */
+    private void reach(DecisionModel root) {
         var pending = new ArrayDeque<DecisionModel>();
         prefixes.put(root, "");
         order.add(root);
@@ -56,7 +79,7 @@ final class ImportedModels {
         while (!pending.isEmpty()) {
             var model = pending.poll();
             for (var imported : model.imports()) {
-                var child = canonical(imported.model(), byNamespace);
+                var child = canonical(imported.model());
                 if (!prefixes.containsKey(child)) {
                     prefixes.put(child, prefixes.get(model) + (imported.name().isEmpty() ? "" : imported.name() + "."));
                     order.add(child);
@@ -64,50 +87,43 @@ final class ImportedModels {
                 }
             }
         }
-        var inputData = new ArrayList<DecisionModel.InputData>();
-        var decisions = new ArrayList<DecisionModel.Decision>();
-        var knowledgeModels = new ArrayList<DecisionModel.BusinessKnowledgeModel>();
-        var services = new ArrayList<DecisionModel.DecisionService>();
-        var types = new LinkedHashMap<String, FeelType>();
-        var aliases = new LinkedHashMap<String, Map<String, String>>();
-        var byModel = new LinkedHashMap<String, String>();
-        for (var model : order) {
-            var prefix = prefixes.get(model);
-            byModel.putIfAbsent(model.namespace(), prefix);
-            var local = names(model, prefix, prefixes, byNamespace);
-            model.types().forEach(types::putIfAbsent);
-            for (var input : model.inputData()) {
-                inputData.add(new DecisionModel.InputData(prefix + input.name(), input.type()));
-                aliases.put(prefix + input.name(), local);
-            }
-            for (var decision : model.decisions()) {
-                var name = prefix + decision.name();
-                var logic = decision.logic() instanceof DecisionLogic.Table(var table, var type) && !prefix.isEmpty()
-                        ? new DecisionLogic.Table(renamed(table, name), type) : decision.logic();
-                decisions.add(new DecisionModel.Decision(name, global(decision.requiredDecisions(), local),
-                        global(decision.requiredInputs(), local), global(decision.requiredKnowledge(), local), logic));
-                aliases.put(name, local);
-            }
-            for (var knowledgeModel : model.knowledgeModels()) {
-                var name = prefix + knowledgeModel.name();
-                knowledgeModels.add(new DecisionModel.BusinessKnowledgeModel(name, global(knowledgeModel.requiredKnowledge(), local),
-                        knowledgeModel.logic()));
-                aliases.put(name, local);
-            }
-            for (var service : model.decisionServices()) {
-                var name = prefix + service.name();
-                services.add(new DecisionModel.DecisionService(name, global(service.outputDecisions(), local),
-                        global(service.encapsulatedDecisions(), local), global(service.inputDecisions(), local),
-                        global(service.inputData(), local), service.type()));
-                aliases.put(name, local);
-            }
+    }
+
+    /** Adds a model's elements under their names in the graph, each requiring its requirements by their names in the graph. */
+    private void add(DecisionModel model) {
+        var prefix = prefixes.get(model);
+        byModel.putIfAbsent(model.namespace(), prefix);
+        var local = names(model);
+        model.types().forEach(types::putIfAbsent);
+        for (var input : model.inputData()) {
+            inputData.add(new DecisionModel.InputData(prefix + input.name(), input.type()));
+            aliases.put(prefix + input.name(), local);
         }
-        var flat = new DecisionModel(root.name(), inputData, decisions, knowledgeModels, services, types, root.namespace(), List.of());
-        return new Flat(flat, aliases, byModel);
+        for (var decision : model.decisions()) {
+            var name = prefix + decision.name();
+            var logic = decision.logic() instanceof DecisionLogic.Table(var table, var type) && !prefix.isEmpty()
+                    ? new DecisionLogic.Table(renamed(table, name), type) : decision.logic();
+            decisions.add(new DecisionModel.Decision(name, global(decision.requiredDecisions(), local),
+                    global(decision.requiredInputs(), local), global(decision.requiredKnowledge(), local), logic));
+            aliases.put(name, local);
+        }
+        for (var knowledgeModel : model.knowledgeModels()) {
+            var name = prefix + knowledgeModel.name();
+            knowledgeModels.add(new DecisionModel.BusinessKnowledgeModel(name, global(knowledgeModel.requiredKnowledge(), local),
+                    knowledgeModel.logic()));
+            aliases.put(name, local);
+        }
+        for (var service : model.decisionServices()) {
+            var name = prefix + service.name();
+            services.add(new DecisionModel.DecisionService(name, global(service.outputDecisions(), local),
+                    global(service.encapsulatedDecisions(), local), global(service.inputDecisions(), local),
+                    global(service.inputData(), local), service.type()));
+            aliases.put(name, local);
+        }
     }
 
     /** The one instance of a model of that namespace, so a model two others import is one. */
-    private static DecisionModel canonical(DecisionModel model, Map<String, DecisionModel> byNamespace) {
+    private DecisionModel canonical(DecisionModel model) {
         if (model.namespace().isEmpty()) {
             return model;
         }
@@ -118,11 +134,11 @@ final class ImportedModels {
      * The names a model reads, each to its element's name in the graph: its own elements' names, and the names each of its
      * imports gives the imported model's elements.
      */
-    private static Map<String, String> names(DecisionModel model, String prefix, Map<DecisionModel, String> prefixes,
-            Map<String, DecisionModel> byNamespace) {
+    private Map<String, String> names(DecisionModel model) {
+        var prefix = prefixes.get(model);
         var names = new LinkedHashMap<String, String>();
         for (var imported : model.imports()) {
-            var child = canonical(imported.model(), byNamespace);
+            var child = canonical(imported.model());
             var childPrefix = prefixes.get(child);
             for (var element : elements(child)) {
                 names.putIfAbsent(imported.qualified(element), childPrefix + element);

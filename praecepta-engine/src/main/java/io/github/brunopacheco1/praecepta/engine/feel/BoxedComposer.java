@@ -73,106 +73,133 @@ final class BoxedComposer {
         return new Node.Bound(node, type);
     }
 
+    /** A part's tree, by its kind. */
     private Node unbound(DecisionLogic logic, List<String> locals, boolean filter, String where) {
         return switch (logic) {
             case DecisionLogic.LiteralExpression literal -> literal(literal.text(), locals, filter, where);
             case DecisionLogic.Table table -> table(table, locals, where);
-            case DecisionLogic.Context(var entries, var result, var type) -> {
-                var inner = new ArrayList<>(locals);
-                var keys = new ArrayList<String>();
-                var values = new ArrayList<Node>();
-                for (var entry : entries) {
-                    if (!inner.contains(entry.name()) && scope.given.contains(entry.name())) {
-                        // evaluated before it is bound, its value reads the name it hides; a function it defines, itself
-                        free.add(entry.name());
-                    }
-                    inner.add(entry.name()); // in the scope of itself, so that a function it defines may invoke itself
-                    keys.add(entry.name());
-                    values.add(node(entry.value(), List.copyOf(inner), false, where + " in context entry '" + entry.name() + "'"));
-                }
-                if (result == null) {
-                    yield new Node.ContextLiteral(keys, values);
-                }
-                yield new Node.ContextResult(keys, values, node(result, List.copyOf(inner), false, where + " in the context's result"));
-            }
-            case DecisionLogic.Invocation(var function, var bindings, var type) -> {
-                var callee = literal(function, locals, false, where + " in the invoked function");
-                var names = new ArrayList<String>();
-                var arguments = new ArrayList<Node>();
-                for (var binding : bindings) {
-                    names.add(binding.parameter());
-                    arguments.add(binding.value() == null ? new Node.Constant(null)
-                            : node(binding.value(), locals, false, where + " in the binding of '" + binding.parameter() + "'"));
-                }
-                yield new Node.Invocation(callee, arguments, names);
-            }
-            case DecisionLogic.FunctionDefinition(var parameters, var body, var type) -> {
-                var inner = new ArrayList<>(locals);
-                var names = new ArrayList<String>();
-                var types = new ArrayList<FeelType>();
-                for (var parameter : parameters) {
-                    inner.add(parameter.name());
-                    names.add(parameter.name());
-                    types.add(parameter.type());
-                }
-                var bodyNode = node(body, List.copyOf(inner), false, where + " in the function's body");
-                if (type instanceof FeelType.FunctionOf(var declared, var result) && !(result instanceof FeelType.Any)) {
-                    // its value is bound to the output type of the function type declared for it, as a decision
-                    // service's is (the TCK's 1157-implicit-conversions: a number into a list of one)
-                    bodyNode = new Node.Bound(bodyNode, result);
-                }
-                yield new Node.FunctionDefinition(names, types, bodyNode, FeelParser.depthOf(bodyNode));
-            }
-            case DecisionLogic.Relation(var columns, var rows, var type) -> {
-                var keys = columns.stream().map(DecisionLogic.Parameter::name).toList();
-                var list = new ArrayList<Node>();
-                for (int r = 0; r < rows.size(); r++) {
-                    var cells = new ArrayList<Node>();
-                    for (int c = 0; c < columns.size(); c++) {
-                        var cell = rows.get(r).get(c);
-                        var at = where + " in row %d, column '%s' of the relation".formatted(r + 1, keys.get(c));
-                        var node = node(cell, locals, false, at);
-                        var declared = columns.get(c).type();
-                        cells.add(declared instanceof FeelType.Any || !cell.type().equals(FeelType.ANY) ? node : new Node.Bound(node, declared));
-                    }
-                    list.add(new Node.Row(keys, cells));
-                }
-                yield new Node.ListLiteral(list);
-            }
-            case DecisionLogic.BoxedList(var elements, var type) -> {
-                var list = new ArrayList<Node>();
-                for (int i = 0; i < elements.size(); i++) {
-                    list.add(node(elements.get(i), locals, false, where + " in element %d of the list".formatted(i + 1)));
-                }
-                yield new Node.ListLiteral(list);
-            }
+            case DecisionLogic.Context context -> context(context, locals, where);
+            case DecisionLogic.Invocation invocation -> invocation(invocation, locals, where);
+            case DecisionLogic.FunctionDefinition function -> function(function, locals, where);
+            case DecisionLogic.Relation relation -> relation(relation, locals, where);
+            case DecisionLogic.BoxedList list -> boxedList(list, locals, where);
             case DecisionLogic.Conditional(var condition, var then, var otherwise, var type) -> new Node.Checked(new Node.If(
                     new Node.Strict(node(condition, locals, false, where + " in the conditional's if")),
                     node(then, locals, false, where + " in the conditional's then"),
                     node(otherwise, locals, false, where + " in the conditional's else")));
-            case DecisionLogic.Iteration(var kind, var variable, var domain, var body, var type) -> {
-                var domainNode = node(domain, locals, false, where + " in the iterator's in");
-                var inner = new ArrayList<>(locals);
-                inner.add(variable);
-                if (kind == DecisionLogic.Iteration.Kind.FOR) {
-                    inner.add("partial");
-                    var returned = node(body, List.copyOf(inner), false, where + " in the iterator's return");
-                    yield new Node.For(List.of(variable), List.of(domainNode), returned);
-                }
-                var condition = new Node.Strict(node(body, List.copyOf(inner), false, where + " in the iterator's satisfies"));
-                yield new Node.Checked(new Node.Quantified(kind == DecisionLogic.Iteration.Kind.EVERY, List.of(variable), List.of(domainNode),
-                        condition));
-            }
+            case DecisionLogic.Iteration iteration -> iteration(iteration, locals, where);
             case DecisionLogic.NoLogic none -> throw new ExpressionSyntaxException((where.isEmpty() ? "" : where.substring(1) + ": ")
                     + "a decision without logic has no expression");
-            case DecisionLogic.Filter(var list, var match, var type) -> {
-                var target = node(list, locals, false, where + " in the filter's in");
-                var inner = new ArrayList<>(locals);
-                inner.add("item");
-                yield new Node.Checked(new Node.Filter(target, new Node.Strict(node(match, List.copyOf(inner), true,
-                        where + " in the filter's match"))));
-            }
+            case DecisionLogic.Filter(var list, var match, var type) -> boxedFilter(list, match, locals, where);
         };
+    }
+
+    /** A context: each entry in the scope of those before it and of itself, its final result, if any, in the scope of them all. */
+    private Node context(DecisionLogic.Context context, List<String> locals, String where) {
+        var inner = new ArrayList<>(locals);
+        var keys = new ArrayList<String>();
+        var values = new ArrayList<Node>();
+        for (var entry : context.entries()) {
+            if (!inner.contains(entry.name()) && scope.given.contains(entry.name())) {
+                // evaluated before it is bound, its value reads the name it hides; a function it defines, itself
+                free.add(entry.name());
+            }
+            inner.add(entry.name()); // in the scope of itself, so that a function it defines may invoke itself
+            keys.add(entry.name());
+            values.add(node(entry.value(), List.copyOf(inner), false, where + " in context entry '" + entry.name() + "'"));
+        }
+        if (context.result() == null) {
+            return new Node.ContextLiteral(keys, values);
+        }
+        return new Node.ContextResult(keys, values, node(context.result(), List.copyOf(inner), false, where + " in the context's result"));
+    }
+
+    /** An invocation by named parameters; a binding without a value gives its parameter null. */
+    private Node invocation(DecisionLogic.Invocation invocation, List<String> locals, String where) {
+        var callee = literal(invocation.function(), locals, false, where + " in the invoked function");
+        var names = new ArrayList<String>();
+        var arguments = new ArrayList<Node>();
+        for (var binding : invocation.bindings()) {
+            names.add(binding.parameter());
+            arguments.add(binding.value() == null ? new Node.Constant(null)
+                    : node(binding.value(), locals, false, where + " in the binding of '" + binding.parameter() + "'"));
+        }
+        return new Node.Invocation(callee, arguments, names);
+    }
+
+    /** A function definition: its body in the scope of its parameters. */
+    private Node function(DecisionLogic.FunctionDefinition function, List<String> locals, String where) {
+        var inner = new ArrayList<>(locals);
+        var names = new ArrayList<String>();
+        var types = new ArrayList<FeelType>();
+        for (var parameter : function.parameters()) {
+            inner.add(parameter.name());
+            names.add(parameter.name());
+            types.add(parameter.type());
+        }
+        var bodyNode = node(function.body(), List.copyOf(inner), false, where + " in the function's body");
+        if (function.type() instanceof FeelType.FunctionOf(var declared, var result) && !(result instanceof FeelType.Any)) {
+            // its value is bound to the output type of the function type declared for it, as a decision
+            // service's is (the TCK's 1157-implicit-conversions: a number into a list of one)
+            bodyNode = new Node.Bound(bodyNode, result);
+        }
+        return new Node.FunctionDefinition(names, types, bodyNode, FeelParser.depthOf(bodyNode));
+    }
+
+    /** A relation: a list of contexts, one per row, each cell bound to the type its column declares unless it declares its own. */
+    private Node relation(DecisionLogic.Relation relation, List<String> locals, String where) {
+        var columns = relation.columns();
+        var rows = relation.rows();
+        var keys = columns.stream().map(DecisionLogic.Parameter::name).toList();
+        var list = new ArrayList<Node>();
+        for (int r = 0; r < rows.size(); r++) {
+            var cells = new ArrayList<Node>();
+            for (int c = 0; c < columns.size(); c++) {
+                var cell = rows.get(r).get(c);
+                var at = where + " in row %d, column '%s' of the relation".formatted(r + 1, keys.get(c));
+                var node = node(cell, locals, false, at);
+                var declared = columns.get(c).type();
+                cells.add(declared instanceof FeelType.Any || !cell.type().equals(FeelType.ANY) ? node : new Node.Bound(node, declared));
+            }
+            list.add(new Node.Row(keys, cells));
+        }
+        return new Node.ListLiteral(list);
+    }
+
+    private Node boxedList(DecisionLogic.BoxedList boxed, List<String> locals, String where) {
+        var elements = boxed.elements();
+        var list = new ArrayList<Node>();
+        for (int i = 0; i < elements.size(); i++) {
+            list.add(node(elements.get(i), locals, false, where + " in element %d of the list".formatted(i + 1)));
+        }
+        return new Node.ListLiteral(list);
+    }
+
+    /** An iterator: {@code for}, whose return is in the scope of its variable and {@code partial}, or {@code some} or {@code every}. */
+    private Node iteration(DecisionLogic.Iteration iteration, List<String> locals, String where) {
+        var kind = iteration.kind();
+        var variable = iteration.variable();
+        var body = iteration.body();
+        var domainNode = node(iteration.domain(), locals, false, where + " in the iterator's in");
+        var inner = new ArrayList<>(locals);
+        inner.add(variable);
+        if (kind == DecisionLogic.Iteration.Kind.FOR) {
+            inner.add("partial");
+            var returned = node(body, List.copyOf(inner), false, where + " in the iterator's return");
+            return new Node.For(List.of(variable), List.of(domainNode), returned);
+        }
+        var condition = new Node.Strict(node(body, List.copyOf(inner), false, where + " in the iterator's satisfies"));
+        return new Node.Checked(new Node.Quantified(kind == DecisionLogic.Iteration.Kind.EVERY, List.of(variable), List.of(domainNode),
+                condition));
+    }
+
+    /** A filter: its match in the scope of {@code item}, the element tested. */
+    private Node boxedFilter(DecisionLogic list, DecisionLogic match, List<String> locals, String where) {
+        var target = node(list, locals, false, where + " in the filter's in");
+        var inner = new ArrayList<>(locals);
+        inner.add("item");
+        return new Node.Checked(new Node.Filter(target, new Node.Strict(node(match, List.copyOf(inner), true,
+                where + " in the filter's match"))));
     }
 
     /** A literal expression, parsed with the enclosing constructs' names in scope; its free names are the composition's. */
