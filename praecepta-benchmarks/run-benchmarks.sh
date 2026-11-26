@@ -134,6 +134,8 @@ jmh scale EvaluationBenchmark "${runs[@]}" -prof gc -p engine=$engines -p table=
 [ -z "$columns" ] || jmh columns EvaluationBenchmark "${runs[@]}" -prof gc -p engine=$engines -p table=$columns
 jmh policies EvaluationBenchmark "${runs[@]}" -prof gc -p engine=$engines -p table=$policies
 jmh nomatch EvaluationBenchmark "${runs[@]}" -prof gc -p engine=$engines -p table=$nomatch -p workload=nomatch
+# one decision of a decision requirement graph
+jmh graph GraphBenchmark "${runs[@]}" -prof gc -p engine=$engines
 # latency distribution
 jmh tails EvaluationBenchmark "${runs[@]}" -bm sample -tu us -p engine=$engines -p table=$tails
 # one engine shared by several threads

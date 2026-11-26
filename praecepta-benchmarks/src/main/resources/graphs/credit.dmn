@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+The decision requirement graph that GraphBenchmark evaluates: Age -> RiskCategory -> CreditLimit (with Income) -> MonthlyLimit.
+Names have no spaces, so every engine reads them the same way.
+-->
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="credit" name="Credit" namespace="https://bruno.pacheco.lu/praecepta/benchmarks/credit">
+  <inputData id="age" name="Age">
+    <variable id="age_variable" name="Age" typeRef="number"/>
+  </inputData>
+  <inputData id="income" name="Income">
+    <variable id="income_variable" name="Income" typeRef="number"/>
+  </inputData>
+  <decision id="risk" name="RiskCategory">
+    <variable id="risk_variable" name="RiskCategory" typeRef="string"/>
+    <informationRequirement id="risk_age"><requiredInput href="#age"/></informationRequirement>
+    <decisionTable id="risk_table" hitPolicy="UNIQUE">
+      <input id="risk_input">
+        <inputExpression id="risk_input_expression" typeRef="number"><text>Age</text></inputExpression>
+      </input>
+      <output id="risk_output" name="RiskCategory" typeRef="string"/>
+      <rule id="risk_1">
+        <inputEntry id="risk_1_age"><text>&lt; 25</text></inputEntry>
+        <outputEntry id="risk_1_out"><text>"High"</text></outputEntry>
+      </rule>
+      <rule id="risk_2">
+        <inputEntry id="risk_2_age"><text>[25..40)</text></inputEntry>
+        <outputEntry id="risk_2_out"><text>"Medium"</text></outputEntry>
+      </rule>
+      <rule id="risk_3">
+        <inputEntry id="risk_3_age"><text>[40..65)</text></inputEntry>
+        <outputEntry id="risk_3_out"><text>"Low"</text></outputEntry>
+      </rule>
+      <rule id="risk_4">
+        <inputEntry id="risk_4_age"><text>&gt;= 65</text></inputEntry>
+        <outputEntry id="risk_4_out"><text>"Medium"</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="limit" name="CreditLimit">
+    <variable id="limit_variable" name="CreditLimit" typeRef="number"/>
+    <informationRequirement id="limit_risk"><requiredDecision href="#risk"/></informationRequirement>
+    <informationRequirement id="limit_income"><requiredInput href="#income"/></informationRequirement>
+    <decisionTable id="limit_table" hitPolicy="FIRST">
+      <input id="limit_risk_input">
+        <inputExpression id="limit_risk_expression" typeRef="string"><text>RiskCategory</text></inputExpression>
+      </input>
+      <input id="limit_income_input">
+        <inputExpression id="limit_income_expression" typeRef="number"><text>Income</text></inputExpression>
+      </input>
+      <output id="limit_output" name="CreditLimit" typeRef="number"/>
+      <rule id="limit_1">
+        <inputEntry id="limit_1_risk"><text>-</text></inputEntry>
+        <inputEntry id="limit_1_income"><text>&lt; 12000</text></inputEntry>
+        <outputEntry id="limit_1_out"><text>0</text></outputEntry>
+      </rule>
+      <rule id="limit_2">
+        <inputEntry id="limit_2_risk"><text>"High"</text></inputEntry>
+        <inputEntry id="limit_2_income"><text>&lt; 60000</text></inputEntry>
+        <outputEntry id="limit_2_out"><text>Income * 0.25</text></outputEntry>
+      </rule>
+      <rule id="limit_3">
+        <inputEntry id="limit_3_risk"><text>"High"</text></inputEntry>
+        <inputEntry id="limit_3_income"><text>-</text></inputEntry>
+        <outputEntry id="limit_3_out"><text>Income * 0.5</text></outputEntry>
+      </rule>
+      <rule id="limit_4">
+        <inputEntry id="limit_4_risk"><text>"Medium"</text></inputEntry>
+        <inputEntry id="limit_4_income"><text>[12000..100000]</text></inputEntry>
+        <outputEntry id="limit_4_out"><text>Income</text></outputEntry>
+      </rule>
+      <rule id="limit_5">
+        <inputEntry id="limit_5_risk"><text>"Medium"</text></inputEntry>
+        <inputEntry id="limit_5_income"><text>-</text></inputEntry>
+        <outputEntry id="limit_5_out"><text>Income * 1.5</text></outputEntry>
+      </rule>
+      <rule id="limit_6">
+        <inputEntry id="limit_6_risk"><text>"Low"</text></inputEntry>
+        <inputEntry id="limit_6_income"><text>-</text></inputEntry>
+        <outputEntry id="limit_6_out"><text>Income * 2</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <decision id="monthly" name="MonthlyLimit">
+    <variable id="monthly_variable" name="MonthlyLimit" typeRef="number"/>
+    <informationRequirement id="monthly_limit"><requiredDecision href="#limit"/></informationRequirement>
+    <literalExpression id="monthly_expression" typeRef="number"><text>CreditLimit / 12</text></literalExpression>
+  </decision>
+</definitions>
