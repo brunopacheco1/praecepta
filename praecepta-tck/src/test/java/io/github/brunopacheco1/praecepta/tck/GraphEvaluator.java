@@ -385,6 +385,9 @@ final class GraphEvaluator implements ModelEvaluator {
                     ? "item definitions Praecepta does not read, elsewhere in the model"
                     : "models Praecepta does not read as a whole");
         }
+        if (unsupported.release() == null) {
+            return Feature.EXTERNAL_FUNCTIONS; // what Praecepta does not evaluate by design
+        }
         return switch (unsupported.issue()) {
             case 119 -> {
                 if (message.contains("decision service")) {

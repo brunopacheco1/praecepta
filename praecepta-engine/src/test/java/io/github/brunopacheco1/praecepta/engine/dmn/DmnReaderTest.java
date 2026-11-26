@@ -173,7 +173,7 @@ class DmnReaderTest {
     @CsvSource(delimiter = '|', value = {
             "untyped duration   | duration        | at      |                      |         | type 'duration' is not supported",
             "times of two zones | time            | at      | [time(\"10:00:00@Europe/Paris\")..time(\"11:00:00@Asia/Dhaka\")] | | rule 1, column 'at': Invalid cell",
-            "external output    | string          | a       |                      | (function(x) external {java: {class: \"C\"}})(a) | rule 1, output 'result' uses an external function (Java or PMML), planned for 0.11 (#119)",
+            "external output    | string          | a       |                      | (function(x) external {java: {class: \"C\"}})(a) | rule 1, output 'result' uses an external function (Java or PMML), which Praecepta does not evaluate, by design",
     })
     void unsupported_dmn_is_rejected_with_its_location(String description, String typeRef, String inputExpression,
             String inputEntry, String outputEntry, String message) {

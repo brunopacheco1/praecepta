@@ -25,7 +25,9 @@ record Feature(Area area, String name) {
         FEEL("FEEL language", "0.8", 116),
         BUILT_IN_FUNCTIONS("Built-in functions", "0.9", 117),
         BOXED_EXPRESSIONS("Boxed expressions, business knowledge models and structured values", "0.10", 118),
-        DECISION_SERVICES_AND_IMPORTS("Decision services, imports and the rest", "0.11", 119);
+        DECISION_SERVICES_AND_IMPORTS("Decision services, imports and the rest", "0.11", 119),
+        /** What Praecepta does not evaluate by design: external functions (docs/DMN-CONFORMANCE.md, known deviations). */
+        NOT_PLANNED("Not evaluated, by design", "never", 0);
 
         private final String title;
         private final String release;
@@ -88,7 +90,7 @@ record Feature(Area area, String name) {
     static final Feature STRUCTURED_INPUTS = boxed("structured inputs and outputs (item definitions with components)");
     static final Feature DECISION_SERVICES = rest("decision services");
     static final Feature IMPORTS = rest("imports");
-    static final Feature EXTERNAL_FUNCTIONS = rest("external functions (Java, PMML)");
+    static final Feature EXTERNAL_FUNCTIONS = new Feature(Area.NOT_PLANNED, "external functions (Java, PMML)");
     static final Feature NO_LOGIC = rest("decisions without decision logic");
 
     /** The feature as RESULTS.md names it, with the release that brings it: {@code abs() (0.9)}. */

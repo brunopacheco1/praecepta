@@ -509,6 +509,9 @@ public final class DmnWriter {
                 part(xml, kind == DecisionLogic.Iteration.Kind.FOR ? "return" : "satisfies", body, inner, types);
                 xml.append(indent).append("</").append(tag).append(">\n");
             }
+            case DecisionLogic.NoLogic none -> {
+                // a decision without logic holds no expression
+            }
             case DecisionLogic.Filter(var list, var match, var filterType) -> {
                 xml.append(indent).append("<filter").append(type).append(">\n");
                 part(xml, "in", list, inner, types);

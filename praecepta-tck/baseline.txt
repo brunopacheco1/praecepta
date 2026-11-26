@@ -1450,6 +1450,7 @@ compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #
 compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #003e Post-bureau affordability	graph
 compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #004 Routing	graph
 compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #004 Strategy	graph
+compliance-level-3/0088-no-decision-logic/0088-no-decision-logic-test-01.xml #001 Graduation result	graph
 compliance-level-3/0089-nested-inputdata-imports/0089-nested-inputdata-imports-test-01.xml #001 Model C Decision based on Bs	graph
 compliance-level-3/0090-feel-paths/0090-feel-paths-test-01.xml #nested_list_001 nested_list_001	graph
 compliance-level-3/0090-feel-paths/0090-feel-paths-test-01.xml #nested_list_002 nested_list_002	graph

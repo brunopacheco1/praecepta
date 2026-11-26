@@ -148,6 +148,11 @@ final class GraphAnalysis {
     private final List<TableReads> tableReads = new ArrayList<>();
     /** By decision: the decisions it requires that the model has, as their indexes. */
     private final List<int[]> requiredDecisions = new ArrayList<>();
+    /**
+     * By decision: whether why it cannot be evaluated is only that a decision it requires cannot be, which a decision
+     * service that takes that decision as an input decision provides.
+     */
+    private final boolean[] inherited;
     /** By decision: why it cannot be evaluated, or null if it can. */
     final String[] blocked;
     /** By decision: how its logic's value is bound to it (DMN 1.5, 10.3.2.9.4). */
@@ -182,6 +187,7 @@ final class GraphAnalysis {
         knowledgeExpressions = new FeelExpression[knowledgeModels.size()];
         knowledgeBlocked = new String[knowledgeModels.size() + services.size()];
         blocked = new String[decisions.size()];
+        inherited = new boolean[decisions.size()];
         bindings = new GraphValues.Binding[decisions.size()];
         Arrays.fill(bindings, GraphValues.Binding.AS_IS);
         expressions = new FeelExpression[decisions.size()];
@@ -359,8 +365,8 @@ final class GraphAnalysis {
             return;
         }
         for (var what : knowledgeExpressions[k].unsupported()) {
-            reportKnowledge(k, Kind.UNSUPPORTED_FEATURE, "business knowledge model '%s' uses %s, which Praecepta does not evaluate yet"
-                    .formatted(name, what));
+            reportKnowledge(k, Kind.UNSUPPORTED_FEATURE, "business knowledge model '%s' uses %s"
+                    .formatted(name, FeelExpression.Unsupported.describe(List.of(what))));
         }
         for (var read : knowledgeExpressions[k].names()) {
             var required = DecisionModel.elementOf(read, scope::contains);
@@ -512,7 +518,8 @@ final class GraphAnalysis {
                     continue;
                 }
                 for (int d : serviceDecisions.get(k)) {
-                    if (blocked[d] != null) {
+                    // what a decision only inherits from the decisions it requires is the service's to provide: its input decisions
+                    if (blocked[d] != null && !inherited[d]) {
                         knowledgeBlocked[knowledgeCount + k] = "it evaluates decision '%s', which cannot be evaluated: %s"
                                 .formatted(model.decisions().get(d).name(), blocked[d]);
                         changed = true;
@@ -527,6 +534,7 @@ final class GraphAnalysis {
                 changed |= blockOnInvocable(model.decisions().get(d).requiredKnowledge(), base, -1, d);
                 for (int r : requiredDecisions.get(d)) {
                     if (blocked[d] == null && blocked[r] != null) {
+                        inherited[d] = true;
                         blocked[d] = "it requires decision '%s', which cannot be evaluated: %s".formatted(model.decisions().get(r).name(),
                                 blocked[r]);
                         changed = true;
@@ -649,6 +657,11 @@ final class GraphAnalysis {
                 tableReads.add(read);
                 names.addAll(read.names());
             }
+            case DecisionLogic.NoLogic none -> {
+                // a decision a person makes: no issue of the model, but nothing the graph evaluates (DMN 1.5, 6.3.7)
+                tableReads.add(TableReads.NONE);
+                blocked[d] = "it has no decision logic; its value is given only to a decision service that takes it as an input decision";
+            }
             default -> {
                 tableReads.add(TableReads.NONE);
                 parseExpression(d, decision.logic(), scope);
@@ -690,7 +703,7 @@ final class GraphAnalysis {
             return;
         }
         for (var what : expressions[d].unsupported()) {
-            report(d, Kind.UNSUPPORTED_FEATURE, "decision '%s' uses %s, which Praecepta does not evaluate yet".formatted(decision, what));
+            report(d, Kind.UNSUPPORTED_FEATURE, "decision '%s' uses %s".formatted(decision, FeelExpression.Unsupported.describe(List.of(what))));
         }
     }
 
@@ -1445,6 +1458,7 @@ final class GraphAnalysis {
             ordered[d] = true;
             for (int r : requiredDecisions.get(d)) {
                 if (blocked[d] == null && blocked[r] != null) {
+                    inherited[d] = true;
                     blocked[d] = "it requires decision '%s', which cannot be evaluated: %s".formatted(model.decisions().get(r).name(), blocked[r]);
                 }
             }

@@ -174,12 +174,21 @@ final class TckResults {
         int supported = results.size() - unsupported.size();
         for (var area : Area.values()) {
             int unlocked = byRelease.getOrDefault(area, 0);
-            if (area == Area.DECISION_TABLES && unlocked == 0) {
-                continue; // what Praecepta has: only a gap in its decision tables would be counted here
+            if (area == Area.DECISION_TABLES && unlocked == 0 || area == Area.NOT_PLANNED) {
+                continue; // what Praecepta has, or will not have: only a gap in its decision tables would be counted here
             }
             supported += unlocked;
             line(md, "| %s | %s | %s | %s (%s) |".formatted(release(area), area.title(), number(unlocked), number(supported),
                     percent(supported, results.size())));
+        }
+        int never = byRelease.getOrDefault(Area.NOT_PLANNED, 0);
+        if (never > 0) {
+            md.append("""
+
+                    The other %s need what Praecepta does not evaluate by design, and no release plans: external
+                    functions, as it runs no code from outside the model
+                    ([DMN conformance](../docs/DMN-CONFORMANCE.md#known-deviations)).
+                    """.formatted(number(never)));
         }
     }
 

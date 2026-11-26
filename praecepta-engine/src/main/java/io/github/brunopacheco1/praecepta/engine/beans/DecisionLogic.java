@@ -38,7 +38,7 @@ public sealed interface DecisionLogic {
     /**
      * The name of the DMN element that holds it: {@code decisionTable}, {@code literalExpression}, {@code context},
      * {@code invocation}, {@code functionDefinition}, {@code relation}, {@code list}, {@code conditional}, {@code for},
-     * {@code some}, {@code every} or {@code filter}.
+     * {@code some}, {@code every} or {@code filter}; empty for {@link NoLogic}, which no element holds.
      */
     default String element() {
         return switch (this) {
@@ -52,6 +52,7 @@ public sealed interface DecisionLogic {
             case Conditional conditional -> "conditional";
             case Iteration iteration -> iteration.kind().name().toLowerCase(Locale.ROOT);
             case Filter filter -> "filter";
+            case NoLogic none -> "";
         };
     }
 
@@ -327,6 +328,19 @@ public sealed interface DecisionLogic {
         public Filter {
             Objects.requireNonNull(list, "list");
             Objects.requireNonNull(match, "match");
+            Objects.requireNonNull(type, "type");
+        }
+    }
+
+    /**
+     * No logic (DMN 1.5, 6.3.7: a decision's logic is optional), as for a decision a person makes: the decision's value is
+     * not computed but given, as a decision service takes the value of an input decision as its argument. A graph does
+     * not evaluate such a decision, nor what requires it outside a decision service that takes it so.
+     *
+     * @param type the type the model declares for the decision's value, or {@link FeelType#ANY}
+     */
+    record NoLogic(FeelType type) implements DecisionLogic {
+        public NoLogic {
             Objects.requireNonNull(type, "type");
         }
     }

@@ -156,6 +156,8 @@ final class BoxedComposer {
                 yield new Node.Checked(new Node.Quantified(kind == DecisionLogic.Iteration.Kind.EVERY, List.of(variable), List.of(domainNode),
                         condition));
             }
+            case DecisionLogic.NoLogic none -> throw new ExpressionSyntaxException((where.isEmpty() ? "" : where.substring(1) + ": ")
+                    + "a decision without logic has no expression");
             case DecisionLogic.Filter(var list, var match, var type) -> {
                 var target = node(list, locals, false, where + " in the filter's in");
                 var inner = new ArrayList<>(locals);
@@ -207,6 +209,7 @@ final class BoxedComposer {
             case DecisionLogic.Conditional conditional -> "boxed conditional";
             case DecisionLogic.Iteration iteration -> "boxed " + iteration.kind().name().toLowerCase(Locale.ROOT);
             case DecisionLogic.Filter filter -> "boxed filter";
+            case DecisionLogic.NoLogic none -> "no decision logic";
         };
     }
 }

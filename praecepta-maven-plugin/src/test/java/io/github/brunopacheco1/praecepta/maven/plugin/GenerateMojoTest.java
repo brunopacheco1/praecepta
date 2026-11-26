@@ -93,7 +93,9 @@ class GenerateMojoTest {
     void a_table_compiled_alone_for_what_a_later_release_plans_is_logged_once_per_file() throws Exception {
         Files.writeString(basedir.resolve("src/main/rules/later.dmn"), """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
-                  <import name="Rate" namespace="https://example.com/rate" importType="https://www.omg.org/spec/DMN/20230324/MODEL/"/>
+                  <decision id="rate" name="Rate"><literalExpression>
+                    <text>function(x) external {java: {class: "java.lang.Math", method signature: "abs(double)"}}</text>
+                  </literalExpression></decision>
                   <decision id="tier" name="Tier"><decisionTable hitPolicy="FIRST">
                     <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>
                     <output name="tier" typeRef="string"/>
@@ -115,8 +117,8 @@ class GenerateMojoTest {
         Assertions.assertThat(basedir.resolve("target/generated-sources/praecepta/com/acme/rules/OtherTier.java")).exists();
         Assertions.assertThat(infos).filteredOn(line -> line.contains("compiled alone")).singleElement().asString()
                 .startsWith(basedir.resolve("src/main/rules/later.dmn") + ": its decision table is compiled alone, "
-                        + "without its decision requirements graph, which needs Praecepta 0.11 (#119): ")
-                .contains("imports 'Rate'");
+                        + "without its decision requirements graph, which uses what Praecepta does not evaluate: ")
+                .contains("an external function (Java or PMML)");
         Assertions.assertThat(infos).filteredOn(line -> line.startsWith("Compiled table")).hasSize(2);
     }
 
@@ -128,13 +130,15 @@ class GenerateMojoTest {
     void a_source_the_engine_rejects_fails_the_build() throws Exception {
         Files.writeString(basedir.resolve("src/main/rules/bkm.dmn"), """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
-                  <import name="Rate" namespace="https://example.com/rate" importType="https://www.omg.org/spec/DMN/20230324/MODEL/"/>
+                  <decision id="rate" name="Rate"><literalExpression>
+                    <text>function(x) external {java: {class: "java.lang.Math", method signature: "abs(double)"}}</text>
+                  </literalExpression></decision>
                   <decision id="a" name="A"><literalExpression><text>1</text></literalExpression></decision>
                 </definitions>""");
         var later = new TableConfig(new File("src/main/rules/bkm.dmn"), null, null, null, null, List.of(), List.of());
         Assertions.assertThatThrownBy(() -> mojo(List.of(later), "ERROR", null).execute())
                 .isInstanceOf(MojoFailureException.class)
-                .hasMessageContaining("imports 'Rate'")
+                .hasMessageContaining("an external function (Java or PMML)")
                 .hasRootCauseInstanceOf(io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException.class);
 
         Files.writeString(basedir.resolve("src/main/rules/broken.dmn"), """

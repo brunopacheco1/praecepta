@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- A decision table in a model that imports another, which DmnReader.readModel rejects (0.11, #119): the table loads alone -->
+<!-- A decision table beside an external function, which DmnReader.readModel rejects by design: the table loads alone -->
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="rated" name="rated" namespace="https://example.com/rated">
-  <import name="Rate" namespace="https://example.com/rate" importType="https://www.omg.org/spec/DMN/20230324/MODEL/"/>
+  <decision id="rate" name="Rate"><literalExpression><text>function(x) external {java: {class: "java.lang.Math", method signature: "abs(double)"}}</text></literalExpression></decision>
   <decision id="tier" name="Rated">
     <decisionTable hitPolicy="FIRST">
       <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>

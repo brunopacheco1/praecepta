@@ -283,7 +283,7 @@ class FeelTablesTest {
         Assertions.assertThat(graph.evaluate("Price", Map.of("Base", 10, "Rate", 2))).isNull();
     }
 
-    /** FEEL's built-in functions (since 0.9, #117) in a cell and in an output entry; an external function is not supported yet. */
+    /** FEEL's built-in functions (since 0.9, #117) in a cell and in an output entry; an external function is not, by design. */
     @Test
     void an_entry_may_invoke_a_built_in_function() {
         var cell = DecisionGraph.read(stream(AMOUNTS.formatted("&gt; abs(Limit)")));
@@ -294,8 +294,8 @@ class FeelTablesTest {
         var external = stream(AMOUNTS.formatted("&gt; (function(a) external {java: {class: \"C\"}})(Limit)"));
         Assertions.assertThatThrownBy(() -> DmnReader.readModel(external))
                 .isInstanceOf(UnsupportedFeatureException.class)
-                .hasMessageContaining("an external function (Java or PMML), planned for 0.11 (#119)")
-                .extracting(e -> ((UnsupportedFeatureException) e).release()).isEqualTo("0.11");
+                .hasMessageContaining("an external function (Java or PMML), which Praecepta does not evaluate, by design")
+                .extracting(e -> ((UnsupportedFeatureException) e).release()).isNull();
     }
 
     /** A cell that is neither simple unary tests nor FEEL is rejected, naming where it is, as before. */

@@ -1030,7 +1030,8 @@ final class FeelParser {
             if (peek().isWord("external")) {
                 next();
                 var mapping = expression();
-                var what = new FeelExpression.Unsupported("an external function (Java or PMML)", "0.11", 119);
+                // Praecepta runs no code from outside the model, by design (docs/DMN-CONFORMANCE.md, known deviations)
+                var what = new FeelExpression.Unsupported("an external function (Java or PMML)", null, 0);
                 unsupported.add(what);
                 return new Node.Unsupported(what, List.of(mapping));
             }

@@ -31,7 +31,6 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
-import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
 /** Decision models read from DMN by {@link DmnReader#readModel} and written back by {@link DmnWriter#write(DecisionModel)}. */
@@ -152,7 +151,7 @@ class DecisionModelDmnTest {
         "<import namespace=\"https://example.com/other\" name=\"other\" importType=\"https://www.omg.org/spec/DMN/20230324/MODEL/\"/>"
                 + "|imports 'other'|#119",
         "<decision id=\"d\" name=\"D\"><functionDefinition kind=\"Java\"><literalExpression><text>1</text></literalExpression>"
-                + "</functionDefinition></decision>|defines a function in Java|(#119)",
+                + "</functionDefinition></decision>|defines a function in Java|by design",
         "<decision id=\"d\" name=\"D\"><informationRequirement><requiredDecision href=\"other.dmn#x\"/></informationRequirement>"
                 + "<literalExpression><text>1</text></literalExpression></decision>|an element of a model it does not import|Decision 'D'",
     })
@@ -165,17 +164,16 @@ class DecisionModelDmnTest {
     }
 
     @Test
-    void a_decision_without_logic_an_empty_literal_and_another_expression_language_are_rejected() {
-        var noLogic = dmn("<decision id=\"d\" name=\"D\"><variable name=\"D\"/></decision><decision id=\"e\" name=\"E\">"
-                + "<informationRequirement><requiredDecision href=\"#d\"/></informationRequirement>"
-                + "<literalExpression><text>D</text></literalExpression></decision>");
-        assertThatThrownBy(() -> read(noLogic))
-                .isInstanceOfSatisfying(UnsupportedFeatureException.class, e -> {
-                    assertThat(e.release()).isEqualTo("0.11");
-                    assertThat(e.issue()).isEqualTo(119);
-                })
-                .hasMessage("Decision 'D' has no decision logic, and another decision requires it, which Praecepta does not support "
-                        + "yet: decisions without decision logic are planned for 0.11 (#119)");
+    void a_decision_requiring_one_without_logic_is_not_evaluated_and_an_empty_literal_and_another_language_are_rejected() {
+        var noLogic = read(dmn("<decision id=\"d\" name=\"D\"><variable name=\"D\" typeRef=\"string\"/></decision>"
+                + "<decision id=\"e\" name=\"E\"><informationRequirement><requiredDecision href=\"#d\"/></informationRequirement>"
+                + "<literalExpression><text>D</text></literalExpression></decision>"));
+        assertThat(noLogic.decision("D").orElseThrow().logic()).isEqualTo(new DecisionLogic.NoLogic(FeelType.of(ColumnType.STRING)));
+        var graph = DecisionGraph.builder().model(noLogic).logValidationReport(false).build();
+        assertThat(graph.validationReport().issues()).as("a decision a person makes is no issue").isEmpty();
+        assertThat(List.of("D", "E")).map(graph::canEvaluate).containsExactly(false, false);
+        assertThatThrownBy(() -> graph.evaluate("E", Map.of())).isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessageContaining("it requires decision 'D', which cannot be evaluated: it has no decision logic");
         var empty = dmn("<decision id=\"d\" name=\"D\"><literalExpression><text> </text></literalExpression></decision>");
         assertThatThrownBy(() -> read(empty))
                 .isInstanceOf(InvalidDecisionTableException.class).hasMessage("Decision 'D': its literal expression is empty");
@@ -257,14 +255,15 @@ class DecisionModelDmnTest {
     }
 
     @Test
-    void a_decision_without_logic_that_nothing_requires_is_left_out_and_a_decision_service_is_read() {
+    void a_decision_without_logic_and_a_decision_service_are_read() {
         // the DMN TCK's 0087-chapter-11-example: a human decision, and services that group decisions
         var model = read(dmn("""
                 <decision id="human" name="Adjudication"><variable name="Adjudication"/></decision>
                 <decisionService id="s" name="Service"><outputDecision href="#d"/></decisionService>
                 <decision id="d" name="D"><literalExpression><text>1</text></literalExpression></decision>"""));
 
-        assertThat(model.decisions()).extracting(DecisionModel.Decision::name).containsExactly("D");
+        assertThat(model.decisions()).extracting(DecisionModel.Decision::name).containsExactly("Adjudication", "D");
+        assertThat(model.decision("Adjudication").orElseThrow().logic()).isEqualTo(new DecisionLogic.NoLogic(FeelType.ANY));
         assertThat(model.decisionServices()).containsExactly(new DecisionModel.DecisionService("Service", List.of("D"), List.of(), List.of(),
                 List.of(), FeelType.ANY));
     }

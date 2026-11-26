@@ -234,6 +234,17 @@ public final class DmnReader {
         return new Imports(imports).read(parseModel(dmn)).model();
     }
 
+    /**
+     * The namespace of a DMN model (its {@code definitions} element's), by which other models import it: for finding
+     * the models a model imports among a set of files ({@link ImportResolver}).
+     *
+     * @return the namespace; empty if the model has none
+     * @throws InvalidDecisionTableException if it is not DMN XML
+     */
+    public static String namespace(InputStream dmn) {
+        return parseModel(dmn).getAttribute("namespace").strip();
+    }
+
     /** A model read, and the names of its elements by id, which an importing model's hrefs name. */
     private record ReadModel(DecisionModel model, Map<String, String> names, ItemDefinitions types) {
     }
@@ -352,18 +363,7 @@ public final class DmnReader {
             model.types.putIfAbsent(name, declaredTableType(decision, types, decisionWhere(name)));
         }
         var decisions = new ArrayList<DecisionModel.Decision>();
-        var required = requiredDecisionIds(root);
         for (var decision : children(root, DECISION)) {
-            if (expressionIn(decision) == null) {
-                if (required.contains(decision.getAttribute("id"))) {
-                    throw IMPORTS.exception(("%s has no decision logic, and another decision requires it, which Praecepta does not "
-                            + "support yet: decisions without decision logic are planned for 0.11 (#119)").formatted(
-                            decisionWhere(elementName(decision, "a decision"))));
-                }
-                // a decision without logic, such as a human decision, that no decision requires: it changes no value Praecepta
-                // evaluates, and is left out (the DMN TCK's 0087-chapter-11-example)
-                continue;
-            }
             decisions.add(decision(decision, types, model, elements));
         }
         var knowledgeModels = new ArrayList<DecisionModel.BusinessKnowledgeModel>();
@@ -452,25 +452,12 @@ public final class DmnReader {
             case DecisionLogic.Iteration(var kind, var variable, var domain, var body, var type) ->
                     Stream.of(domain, body).flatMap(DmnReader::texts);
             case DecisionLogic.Filter(var list, var match, var type) -> Stream.of(list, match).flatMap(DmnReader::texts);
+            case DecisionLogic.NoLogic none -> Stream.empty();
         };
     }
 
     /** Rejects the elements of a model that Praecepta does not evaluate yet, naming the release that plans them. */
 
-    /** The ids of the decisions that a decision of the model requires, by {@code href="#id"}. */
-    private static Set<String> requiredDecisionIds(Element root) {
-        var ids = new HashSet<String>();
-        for (var decision : children(root, DECISION)) {
-            for (var requirement : children(decision, "informationRequirement")) {
-                var required = child(requirement, "requiredDecision");
-                var href = required == null ? "" : required.getAttribute("href").strip();
-                if (href.startsWith("#")) {
-                    ids.add(href.substring(1));
-                }
-            }
-        }
-        return ids;
-    }
 
     /**
      * A decision service (DMN 1.5, 6.3.9): its output, encapsulated and input decisions and its input data, each by its
@@ -499,6 +486,8 @@ public final class DmnReader {
     }
 
     private static final Planned IMPORTS = new Planned("0.11", 119);
+    /** What Praecepta does not evaluate by design: an external function (docs/DMN-CONFORMANCE.md, known deviations). */
+    private static final Planned NOT_PLANNED = new Planned(null, 0);
 
     /** Rejects the model if it has an element of that kind, naming the first by its name, or {@code fallback} attribute. */
     private static void rejectAny(Element root, String kind, String fallback, String message, Planned planned) {
@@ -634,8 +623,8 @@ public final class DmnReader {
                         types, where), where);
             }
         }
-        throw new InvalidDecisionTableException(where + " has no decision logic; Praecepta evaluates decisions whose logic is a decision "
-                + "table, a literal expression or a boxed expression");
+        // a decision a person makes, whose value is given (DMN 1.5, 6.3.7; the DMN TCK's 0087 and 0088)
+        return new DecisionLogic.NoLogic(declaredTableType(decision, types, where));
     }
 
     /**
@@ -812,8 +801,8 @@ public final class DmnReader {
     private static DecisionLogic functionDefinition(Element function, Site site, FeelType type, String where) {
         var kind = function.getAttribute("kind").strip();
         if (!kind.isEmpty() && !kind.equals("FEEL")) {
-            throw IMPORTS.exception(("%s defines a function in %s, which Praecepta does not support yet: external functions are "
-                    + "planned for 0.11 (#119)").formatted(where, kind));
+            throw NOT_PLANNED.exception(("%s defines a function in %s, an external function, which Praecepta does not evaluate, by "
+                    + "design: it runs no code from outside the model").formatted(where, kind));
         }
         var parameters = new ArrayList<DecisionLogic.Parameter>();
         for (var parameter : children(function, "formalParameter")) {
@@ -915,7 +904,7 @@ public final class DmnReader {
      *                                       function, 0.11)
      */
     private static void checkExpressions(DecisionLogic logic, Collection<String> names, String where) {
-        if (logic instanceof DecisionLogic.Table) {
+        if (logic instanceof DecisionLogic.Table || logic instanceof DecisionLogic.NoLogic) {
             return;
         }
         FeelExpression expression;
@@ -928,9 +917,9 @@ public final class DmnReader {
         var unsupported = expression.unsupported();
         if (!unsupported.isEmpty()) {
             var planned = new Planned(unsupported.getFirst().release(), unsupported.getFirst().issue());
-            throw planned.exception("%s: its %s uses %s, which Praecepta does not support yet".formatted(where,
+            throw planned.exception("%s: its %s uses %s".formatted(where,
                     logic instanceof DecisionLogic.LiteralExpression ? "literal expression" : "logic",
-                    String.join(" and ", unsupported.stream().map(Object::toString).toList())));
+                    FeelExpression.Unsupported.describe(unsupported)));
         }
     }
 
@@ -1482,8 +1471,7 @@ public final class DmnReader {
     private static void rejectUnsupported(String where, List<FeelExpression.Unsupported> unsupported) {
         if (!unsupported.isEmpty()) {
             var planned = new Planned(unsupported.getFirst().release(), unsupported.getFirst().issue());
-            throw planned.exception("%s uses %s, which Praecepta does not support yet".formatted(where,
-                    String.join(" and ", unsupported.stream().map(Object::toString).toList())));
+            throw planned.exception("%s uses %s".formatted(where, FeelExpression.Unsupported.describe(unsupported)));
         }
     }
 

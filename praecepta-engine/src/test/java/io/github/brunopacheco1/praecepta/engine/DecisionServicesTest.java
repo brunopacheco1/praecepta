@@ -123,4 +123,18 @@ class DecisionServicesTest {
         assertThatThrownBy(() -> graph.evaluateService("Partial", Map.of())).isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("Decision service 'Partial' cannot be evaluated");
     }
+
+    @Test
+    void a_service_takes_the_value_of_an_input_decision_without_logic_which_the_graph_cannot_evaluate() {
+        // the DMN TCK's 0088-no-decision-logic: a person's evaluation, given to the service
+        var evaluation = new DecisionModel.Decision("Evaluation", List.of(), List.of(), new DecisionLogic.NoLogic(FeelType.of(ColumnType.STRING)));
+        var result = new DecisionModel.Decision("Result", List.of("Evaluation"), List.of(),
+                new DecisionLogic.LiteralExpression("\"evaluated: \" + Evaluation"));
+        var service = new DecisionModel.DecisionService("Grade", List.of("Result"), List.of(), List.of("Evaluation"), List.of(), FeelType.ANY);
+        var graph = graph(new DecisionModel("M", List.of(), List.of(evaluation, result), List.of(), List.of(service), Map.of()));
+
+        assertThat(graph.validationReport().issues()).isEmpty();
+        assertThat(graph.canEvaluate("Result")).isFalse();
+        assertThat(graph.evaluateService("Grade", Map.of("Evaluation", "good")).value()).isEqualTo(Map.of("Result", "evaluated: good"));
+    }
 }

@@ -155,8 +155,7 @@ final class TableExpressions {
     /** Rejects what an expression uses that Praecepta does not evaluate yet, naming the release that plans it. */
     static void rejectUnsupported(String where, List<FeelExpression.Unsupported> unsupported) {
         if (!unsupported.isEmpty()) {
-            var message = "%s uses %s, which Praecepta does not support yet".formatted(where,
-                    String.join(" and ", unsupported.stream().map(Object::toString).toList()));
+            var message = "%s uses %s".formatted(where, FeelExpression.Unsupported.describe(unsupported));
             var first = unsupported.getFirst();
             throw new UnsupportedFeatureException(message, first.release(), first.issue());
         }

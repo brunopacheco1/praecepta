@@ -76,22 +76,40 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic;
 public final class FeelExpression {
 
     /**
-     * What DMN 1.5 defines but Praecepta does not evaluate yet ({@link #unsupported()}), and the release that plans it.
+     * What DMN 1.5 defines but Praecepta does not evaluate ({@link #unsupported()}), and the release that plans it, if any.
      *
      * @param feature what it is: {@code an external function (Java or PMML)}
-     * @param release the release that plans it: {@code 0.11}
-     * @param issue   the GitHub issue that plans it: 119
+     * @param release the release that plans it; null for what Praecepta does not evaluate by design, as an external
+     *                function, since it runs no code from outside the model
+     * @param issue   the GitHub issue that plans it; 0 for what no release plans
      */
     public record Unsupported(String feature, String release, int issue) {
         public Unsupported {
             java.util.Objects.requireNonNull(feature, "feature");
-            java.util.Objects.requireNonNull(release, "release");
         }
 
-        /** As messages name it: {@code an external function (Java or PMML), planned for 0.11 (#119)}. */
+        /** Whether a release plans it; one with no release Praecepta does not evaluate by design. */
+        public boolean planned() {
+            return release != null;
+        }
+
+        /**
+         * As messages name it: {@code a feature, planned for 0.12 (#121)}, or, for what Praecepta does not evaluate by
+         * design, {@code an external function (Java or PMML), which Praecepta does not evaluate, by design}.
+         */
         @Override
         public String toString() {
-            return "%s, planned for %s (#%d)".formatted(feature, release, issue);
+            return planned() ? "%s, planned for %s (#%d)".formatted(feature, release, issue)
+                    : "%s, which Praecepta does not evaluate, by design".formatted(feature);
+        }
+
+        /**
+         * What an expression uses, as a message says it: each feature as {@link #toString()} names it, and, where a
+         * release plans one, that Praecepta does not evaluate it yet.
+         */
+        public static String describe(List<Unsupported> unsupported) {
+            var what = String.join(" and ", unsupported.stream().map(Object::toString).toList());
+            return unsupported.stream().anyMatch(Unsupported::planned) ? what + ", which Praecepta does not evaluate yet" : what;
         }
     }
 

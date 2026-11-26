@@ -177,11 +177,11 @@ class FeelDecisionsTest {
 
     @Test
     void a_literal_expression_that_defines_an_external_function_is_rejected_when_the_model_is_read() {
-        // external functions are planned for 0.11 (#119): the model is one Praecepta does not evaluate yet
+        // Praecepta does not evaluate external functions, by design: the model is rejected
         assertThatThrownBy(() -> read("""
                 <decision id="d" name="D"><literalExpression><text>function(a) external {java: {class: "C"}}</text></literalExpression></decision>
                 """)).isInstanceOf(UnsupportedFeatureException.class)
-                .hasMessageContaining("uses an external function (Java or PMML), planned for 0.11 (#119)")
-                .satisfies(e -> assertThat(((UnsupportedFeatureException) e).issue()).isEqualTo(119));
+                .hasMessageContaining("uses an external function (Java or PMML), which Praecepta does not evaluate, by design")
+                .satisfies(e -> assertThat(((UnsupportedFeatureException) e).release()).isNull());
     }
 }
