@@ -80,6 +80,16 @@ final class GraphEvaluator implements ModelEvaluator {
 
     @Override
     public Evaluation evaluate(Check check) {
+        if (check.kind() == Invocable.DECISION_SERVICE) {
+            return service(check, check.invocable(), check.decision());
+        }
+        if (check.kind() == Invocable.DECISION && check.model().decision(check.decision()) == null) {
+            // a result node named after a decision service, without the test case's type, is the service's value
+            var read = read(check.model());
+            if (read.graph() != null && read.graph().decisionServices().contains(check.decision())) {
+                return service(check, check.decision(), null);
+            }
+        }
         if (check.kind() != Invocable.DECISION || check.model().decision(check.decision()) == null) {
             return new Evaluation.Unsupported(single.needsBesideGraphs(check, List.of()));
         }
@@ -107,6 +117,49 @@ final class GraphEvaluator implements ModelEvaluator {
         var logic = graph.model().decision(decision).orElseThrow().logic();
         boolean ordered = !(logic instanceof DecisionLogic.Table(var table, var type) && table.hitPolicy() == HitPolicy.COLLECT);
         return evaluation(check, outcome, ordered);
+    }
+
+    /**
+     * A decision service invoked with the test case's inputs as its arguments (DMN 1.5, 6.3.9): the value of the output
+     * decision the node names, or, for {@code output} null, the service's value, its one output decision's or a context
+     * of them all.
+     */
+    private Evaluation service(Check check, String service, String output) {
+        var read = read(check.model());
+        if (read.rejected() != null) {
+            return new Evaluation.Unsupported(single.needsBesideGraphs(check, List.of()));
+        }
+        var graph = read.graph();
+        var model = graph.model().decisionService(service).orElse(null);
+        if (model == null) {
+            return new Evaluation.Failure("the model has no decision service named '" + service + "'");
+        }
+        var arguments = new HashMap<String, Object>();
+        for (var parameter : model.parameters()) {
+            var given = check.inputs().get(parameter);
+            if (given != null) {
+                // FEEL values, typed as the kit types them, which the service binds to its parameters' types as an invocation does
+                arguments.put(parameter, input(given, FeelType.ANY));
+            }
+        }
+        DecisionGraph.Outcome outcome;
+        try {
+            outcome = graph.evaluateService(service, arguments);
+        } catch (InvalidDecisionTableException e) {
+            return notTaken(check, REPORTED);
+        } catch (HitPolicyViolationException | InvalidInputException e) {
+            return new Evaluation.Error(e.getMessage());
+        }
+        var outputs = (Map<?, ?>) outcome.value();
+        Object value;
+        if (output != null) {
+            value = outputs.get(output);
+        } else {
+            value = outputs.size() == 1 ? outputs.values().iterator().next() : outputs;
+        }
+        var errors = new ArrayList<String>();
+        outcome.errors().values().forEach(errors::addAll);
+        return evaluation(check, new DecisionGraph.Outcome(value, errors.isEmpty() ? Map.of() : Map.of(check.decision(), errors)), true);
     }
 
     /**
@@ -170,7 +223,8 @@ final class GraphEvaluator implements ModelEvaluator {
             decisions.add(new DecisionModel.Decision(decision.name(), requiredDecisions, requiredInputs, decision.requiredKnowledge(),
                     decision.logic()));
         }
-        return new DecisionModel(read.model().name(), inputData, decisions, read.model().knowledgeModels(), read.model().types());
+        return new DecisionModel(read.model().name(), inputData, decisions, read.model().knowledgeModels(), read.model().decisionServices(),
+                read.model().types());
     }
 
     /** The test case's inputs as the graph takes them: values of simple types as text, typed by the kit where undeclared. */

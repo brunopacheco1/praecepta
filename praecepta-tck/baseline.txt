@@ -1346,22 +1346,42 @@ compliance-level-3/0081-feel-getentries-function/0081-feel-getentries-function-t
 compliance-level-3/0081-feel-getentries-function/0081-feel-getentries-function-test-01.xml #decision_007 decision_007	graph
 compliance-level-3/0081-feel-getentries-function/0081-feel-getentries-function-test-01.xml #decision_008 decision_008	graph
 compliance-level-3/0081-feel-getentries-function/0081-feel-getentries-function-test-01.xml #decision_009 decision_009	graph
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_001 decision_001
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_003 decision_003
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_004 decision_004
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_005 decision_005
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_006_a decision_006_a
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_007 decision_007
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_007_a decision_007_a
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_008 decision_008
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_context_01 decision_context_01
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_context_02 decision_context_02
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_context_03 decision_context_03
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #literal_001 literal_001
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #literal_002 literal_002
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #literal_004 literal_004
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #literal_005 literal_005
-compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #literal_006 literal_006
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decisionService_001 decision_ds_001	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decisionService_002 decision_ds_002	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decisionService_002_a ds_invoke_002_with_number	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decisionService_002_b decision_ds_002	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decisionService_002_c ds_invoke_002_with_singleton_list	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_001 decision_001	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_003 decision_003	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_004 decision_004	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_005 decision_005	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_006_a decision_006_a	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_007 decision_007	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_007_a decision_007_a	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_008 decision_008	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_bkm_001 decision_bkm_001	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_bkm_002 decision_bkm_002	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_bkm_003 decision_bkm_003	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_bkm_004_a decision_bkm_004_a	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_bkm_004_b decision_bkm_004_b	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_bkm_005 decision_bkm_005	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_bkm_005_a decision_bkm_005_a	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_context_01 decision_context_01	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_context_02 decision_context_02	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_context_03 decision_context_03	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #fd_001 fd_001	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #fd_002 fd_002	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #invoke_001 invoke_001	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #invoke_002 invoke_002	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #invoke_004 invoke_004	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #invoke_005 invoke_005	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #invoke_006 invoke_006	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #invoke_007 invoke_007	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #literal_001 literal_001	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #literal_002 literal_002	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #literal_004 literal_004	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #literal_005 literal_005	graph
+compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #literal_006 literal_006	graph
 compliance-level-3/0083-feel-unicode/0083-feel-unicode-test-01.xml #decision_001 decision_001	graph
 compliance-level-3/0083-feel-unicode/0083-feel-unicode-test-01.xml #decision_001_a decision_001_a	graph
 compliance-level-3/0083-feel-unicode/0083-feel-unicode-test-01.xml #decision_001_b decision_001_b	graph
@@ -1400,6 +1420,25 @@ compliance-level-3/0084-feel-for-loops/0084-feel-for-loops-test-01.xml #decision
 compliance-level-3/0084-feel-for-loops/0084-feel-for-loops-test-01.xml #decision_022 decision_022	graph
 compliance-level-3/0084-feel-for-loops/0084-feel-for-loops-test-01.xml #decision_022_a decision_022_a	graph
 compliance-level-3/0084-feel-for-loops/0084-feel-for-loops-test-01.xml #decision_025 decision_025	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #001 decision_001	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #002 decision_002	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #002_a decision_002	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #002_b decision_002	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #002_c decision_002	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #003 decision_003	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #004 decision_004_1	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #005 decision_005_1	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #006 decision_006_1	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #007 decision_007_1	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #008 decision_008_1	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #009 decision_009_1	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #010 decision_010_1	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #011 decision_011_1	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #012 decision_012_1	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #013 decision_013_1	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #014 decision_014_1	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #015 decision_015_1	graph
+compliance-level-3/0085-decision-services/0085-decision-services-test-01.xml #015 decision_015_2	graph
 compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #001 Strategy	graph
 compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #002 Routing	graph
 compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #003a Application risk score	graph
@@ -1413,6 +1452,22 @@ compliance-level-3/0090-feel-paths/0090-feel-paths-test-01.xml #nested_list_001 
 compliance-level-3/0090-feel-paths/0090-feel-paths-test-01.xml #nested_list_002 nested_list_002	graph
 compliance-level-3/0090-feel-paths/0090-feel-paths-test-01.xml #nested_list_003 nested_list_003	graph
 compliance-level-3/0090-feel-paths/0090-feel-paths-test-01.xml #nested_list_004 nested_list_004	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #001 decision_001_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #002 decision_002_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #003 decision_003_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #004 decision_004_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #005 decision_005_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #006 decision_006_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #007 decision_007_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #008 decision_008_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #009 decision_009_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #010 decision_010_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #010_a decision_010_1_a	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #011 decision_011_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #012 decision_012_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #013 decision_013_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #017 decision_017_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #018 decision_018	graph
 compliance-level-3/0093-feel-at-literals/0093-feel-at-literals-test-01.xml #date_001 date_001	graph
 compliance-level-3/0093-feel-at-literals/0093-feel-at-literals-test-01.xml #date_002 date_002	graph
 compliance-level-3/0093-feel-at-literals/0093-feel-at-literals-test-01.xml #datetime_001 datetime_001	graph
@@ -3414,6 +3469,9 @@ compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.x
 compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #002 From Singleton List	graph
 compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #002_a From Singleton List Error	graph
 compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #003 From Date To Date and Time	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #007 Body 1	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #008 Body 2	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #009 Body 3	graph
 compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #010 Implicit Conversions CE	graph
 compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #011 Implicit Conversions FUNCT	graph
 compliance-level-3/1161-boxed-list-expression/1161-boxed-list-expression-test-01.xml #001 BList	graph

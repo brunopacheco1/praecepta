@@ -149,9 +149,6 @@ class DecisionModelDmnTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-        "<decisionService id=\"s\" name=\"Service\"/><decision id=\"d\" name=\"D\"><knowledgeRequirement><requiredKnowledge href=\"#s\"/>"
-                + "</knowledgeRequirement><literalExpression><text>Service()</text></literalExpression></decision>"
-                + "|'D' invokes the decision service 'Service'|(#119)",
         "<import namespace=\"https://example.com/other\" name=\"other\" importType=\"https://www.omg.org/spec/DMN/20230324/MODEL/\"/>"
                 + "|imports 'other'|(#119)",
         "<decision id=\"d\" name=\"D\"><functionDefinition kind=\"Java\"><literalExpression><text>1</text></literalExpression>"
@@ -260,7 +257,7 @@ class DecisionModelDmnTest {
     }
 
     @Test
-    void a_decision_without_logic_or_a_decision_service_that_nothing_requires_is_left_out() {
+    void a_decision_without_logic_that_nothing_requires_is_left_out_and_a_decision_service_is_read() {
         // the DMN TCK's 0087-chapter-11-example: a human decision, and services that group decisions
         var model = read(dmn("""
                 <decision id="human" name="Adjudication"><variable name="Adjudication"/></decision>
@@ -268,6 +265,8 @@ class DecisionModelDmnTest {
                 <decision id="d" name="D"><literalExpression><text>1</text></literalExpression></decision>"""));
 
         assertThat(model.decisions()).extracting(DecisionModel.Decision::name).containsExactly("D");
+        assertThat(model.decisionServices()).containsExactly(new DecisionModel.DecisionService("Service", List.of("D"), List.of(), List.of(),
+                List.of(), FeelType.ANY));
     }
 
     @Test
@@ -341,7 +340,7 @@ class DecisionModelDmnTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"chain.dmn", "diamond.dmn", "multi-output.dmn", "multiple-results.dmn", "literals.dmn", "cycle.dmn",
-        "missing-free.dmn", "type-mismatch.dmn", "untyped.dmn", "chain-reversed.dmn", "boxed.dmn", "knowledge.dmn", "nested-tables.dmn"})
+        "missing-free.dmn", "type-mismatch.dmn", "untyped.dmn", "chain-reversed.dmn", "boxed.dmn", "knowledge.dmn", "nested-tables.dmn", "services.dmn"})
     void a_model_written_as_dmn_reads_back_as_the_same_model_and_writes_the_same(String name) {
         var model = name.equals("missing-free.dmn") ? withoutMissing(model("missing.dmn")) : model(name);
 

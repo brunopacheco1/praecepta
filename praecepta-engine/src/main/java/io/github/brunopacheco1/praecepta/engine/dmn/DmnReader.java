@@ -106,6 +106,7 @@ public final class DmnReader {
     private static final String INPUT_DATA = "inputData";
     private static final String DECISION = "decision";
     private static final String KNOWLEDGE_MODEL = "businessKnowledgeModel";
+    private static final String DECISION_SERVICE = "decisionService";
     private static final String DECISION_TABLE = "decisionTable";
     private static final String VARIABLE = "variable";
     private static final String LABEL = "label";
@@ -198,10 +199,9 @@ public final class DmnReader {
         rejectUnsupported(root);
         var types = new ItemDefinitions(root);
         var elements = new HashMap<String, Element>();
-        for (var kind : List.of(INPUT_DATA, DECISION, KNOWLEDGE_MODEL)) {
+        for (var kind : List.of(INPUT_DATA, DECISION, KNOWLEDGE_MODEL, DECISION_SERVICE)) {
             children(root, kind).forEach(element -> elements.putIfAbsent(element.getAttribute("id"), element));
         }
-        rejectInvokedServices(root);
         var inputData = new ArrayList<DecisionModel.InputData>();
         var model = new ModelTypes();
         for (var input : children(root, INPUT_DATA)) {
@@ -247,7 +247,11 @@ public final class DmnReader {
             logic.add(knowledgeModel.logic());
         }
         try {
-            return new DecisionModel(root.getAttribute("name"), inputData, decisions, knowledgeModels, namedTypes(types, logic));
+            var services = new ArrayList<DecisionModel.DecisionService>();
+            for (var service : children(root, DECISION_SERVICE)) {
+                services.add(decisionService(service, types, elements));
+            }
+            return new DecisionModel(root.getAttribute("name"), inputData, decisions, knowledgeModels, services, namedTypes(types, logic));
         } catch (IllegalArgumentException e) {
             throw new InvalidDecisionTableException("DMN model: " + e.getMessage());
         }
@@ -334,29 +338,21 @@ public final class DmnReader {
     }
 
     /**
-     * Rejects a model whose decisions or business knowledge models invoke a decision service, planned for 0.11 (#119). A
-     * decision service that nothing in the model invokes only groups decisions, whose values it does not change, and is
-     * ignored (the DMN TCK's {@code 0087-chapter-11-example}).
+     * A decision service (DMN 1.5, 6.3.9): its output, encapsulated and input decisions and its input data, each by its
+     * {@code href} to an element of the model (one to no element kept as the id it names, which the graph reports), and
+     * the type its variable declares.
      */
-    private static void rejectInvokedServices(Element root) {
-        var services = new HashMap<String, String>();
-        children(root, "decisionService").forEach(service -> services.put(service.getAttribute("id"), nameOr(service, "id")));
-        if (services.isEmpty()) {
-            return;
+    private static DecisionModel.DecisionService decisionService(Element service, ItemDefinitions types, Map<String, Element> elements) {
+        var name = elementName(service, "a decision service");
+        var where = "Decision service '" + name + "'";
+        var lists = new ArrayList<List<String>>();
+        for (var kind : List.of("outputDecision", "encapsulatedDecision", "inputDecision", "inputData")) {
+            var names = new ArrayList<String>();
+            children(service, kind).forEach(reference -> names.add(required(reference, elements, where)));
+            lists.add(names);
         }
-        for (var kind : List.of(DECISION, KNOWLEDGE_MODEL)) {
-            for (var element : children(root, kind)) {
-                for (var requirement : children(element, "knowledgeRequirement")) {
-                    var knowledge = child(requirement, "requiredKnowledge");
-                    var href = knowledge == null ? "" : knowledge.getAttribute("href").strip();
-                    var service = href.startsWith("#") ? services.get(href.substring(1)) : null;
-                    if (service != null) {
-                        throw IMPORTS.exception(("'%s' invokes the decision service '%s', which Praecepta does not support yet: decision "
-                                + "services are planned for 0.11 (#119)").formatted(nameOr(element, "id"), service));
-                    }
-                }
-            }
-        }
+        return new DecisionModel.DecisionService(name, lists.get(0), lists.get(1), lists.get(2), lists.get(3),
+                types.feelType(variableTypeRef(service), where));
     }
 
     /** The releases that plan what Praecepta does not evaluate yet, as {@link UnsupportedFeatureException} names them. */

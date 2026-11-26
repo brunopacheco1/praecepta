@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Decision services: invoked by decisions positionally and by name, with input data and input decisions as parameters, and
+     with two output decisions; as the DMN TCK's 0085-decision-services has them. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="services" name="Quotes" namespace="https://example.com/services">
+  <inputData id="price" name="Price"><variable name="Price" typeRef="number"/></inputData>
+  <inputData id="quantity" name="Quantity"><variable name="Quantity" typeRef="number"/></inputData>
+  <decision id="discount" name="Discount">
+    <variable name="Discount" typeRef="number"/>
+    <literalExpression><text>0</text></literalExpression>
+  </decision>
+  <decision id="gross" name="Gross">
+    <variable name="Gross" typeRef="number"/>
+    <informationRequirement><requiredInput href="#price"/></informationRequirement>
+    <informationRequirement><requiredInput href="#quantity"/></informationRequirement>
+    <literalExpression><text>Price * Quantity</text></literalExpression>
+  </decision>
+  <decision id="net" name="Net">
+    <variable name="Net" typeRef="number"/>
+    <informationRequirement><requiredDecision href="#gross"/></informationRequirement>
+    <informationRequirement><requiredDecision href="#discount"/></informationRequirement>
+    <literalExpression><text>Gross * (1 - Discount)</text></literalExpression>
+  </decision>
+  <decision id="label" name="Label">
+    <variable name="Label" typeRef="string"/>
+    <informationRequirement><requiredDecision href="#net"/></informationRequirement>
+    <literalExpression><text>"net " + string(Net)</text></literalExpression>
+  </decision>
+  <decision id="quote" name="Quote">
+    <variable name="Quote"/>
+    <knowledgeRequirement><requiredKnowledge href="#pricing"/></knowledgeRequirement>
+    <knowledgeRequirement><requiredKnowledge href="#both"/></knowledgeRequirement>
+    <context>
+      <contextEntry><variable name="positional"/><literalExpression><text>Pricing(10, 3, 0.5)</text></literalExpression></contextEntry>
+      <contextEntry><variable name="named"/><literalExpression><text>Pricing(Discount: 0.1, Quantity: 2, Price: 5)</text></literalExpression></contextEntry>
+      <contextEntry><variable name="both"/><literalExpression><text>Net and Label(2, 2, 0)</text></literalExpression></contextEntry>
+    </context>
+  </decision>
+  <decisionService id="pricing" name="Pricing">
+    <variable name="Pricing"/>
+    <outputDecision href="#net"/>
+    <encapsulatedDecision href="#gross"/>
+    <inputDecision href="#discount"/>
+    <inputData href="#price"/>
+    <inputData href="#quantity"/>
+  </decisionService>
+  <decisionService id="both" name="Net and Label">
+    <variable name="Net and Label"/>
+    <outputDecision href="#net"/>
+    <outputDecision href="#label"/>
+    <inputDecision href="#discount"/>
+    <inputData href="#price"/>
+    <inputData href="#quantity"/>
+  </decisionService>
+</definitions>

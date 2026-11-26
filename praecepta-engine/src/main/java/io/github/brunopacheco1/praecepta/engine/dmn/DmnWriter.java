@@ -70,6 +70,8 @@ public final class DmnWriter {
     private static final String DECISION = "decision_";
     /** The prefix of a business knowledge model's id. */
     private static final String KNOWLEDGE_MODEL = "knowledge_model_";
+    /** The prefix of a decision service's id. */
+    private static final String DECISION_SERVICE = "decision_service_";
     /** The suffix of the name of the item definition of an input data's or a decision's type. */
     private static final String TYPE_SUFFIX = "_type";
     private static final String VARIABLE = "    <variable";
@@ -162,6 +164,11 @@ public final class DmnWriter {
                 }
             }
         }
+        var services = model.decisionServices();
+        for (int k = 0; k < services.size(); k++) {
+            ids.put(services.get(k).name(), DECISION_SERVICE + k);
+            boxedTypes.declare(services.get(k).type(), "decision service '" + services.get(k).name() + "'");
+        }
         var knowledgeModels = model.knowledgeModels();
         for (int k = 0; k < knowledgeModels.size(); k++) {
             var knowledgeModel = knowledgeModels.get(k);
@@ -179,6 +186,9 @@ public final class DmnWriter {
         }
         for (int k = 0; k < knowledgeModels.size(); k++) {
             knowledgeModel(xml, k, knowledgeModels.get(k), ids, boxedTypes);
+        }
+        for (int k = 0; k < services.size(); k++) {
+            decisionService(xml, k, services.get(k), ids, boxedTypes);
         }
         xml.append("</definitions>\n");
         return xml.toString();
@@ -366,7 +376,7 @@ public final class DmnWriter {
             }
         }
 
-        private void declare(FeelType type, String where) {
+        void declare(FeelType type, String where) {
             if (type instanceof FeelType.Simple || type instanceof FeelType.Any || written.containsKey(type)) {
                 return;
             }
@@ -512,6 +522,28 @@ public final class DmnWriter {
                .append(attribute("href", "#" + href)).append("/></knowledgeRequirement>\n");
         }
         xml.append("  </businessKnowledgeModel>\n");
+    }
+
+    /** A decision service at position {@code k}: its variable, of its type, and its decisions and input data, by reference. */
+    private static void decisionService(StringBuilder xml, int k, DecisionModel.DecisionService service, Map<String, String> ids,
+            BoxedTypes types) {
+        var where = "Decision service '" + service.name() + "'";
+        xml.append("  <decisionService").append(idAndName(DECISION_SERVICE + k, service.name())).append(">\n")
+           .append(VARIABLE).append(idAndName(DECISION_SERVICE + k + "_variable", service.name())).append(types.attributeOf(service.type()))
+           .append("/>\n");
+        var kinds = List.of("outputDecision", "encapsulatedDecision", "inputDecision", "inputData");
+        var lists = List.of(service.outputDecisions(), service.encapsulatedDecisions(), service.inputDecisions(), service.inputData());
+        for (int l = 0; l < kinds.size(); l++) {
+            for (var name : lists.get(l)) {
+                var href = ids.get(name);
+                if (href == null) {
+                    throw new InvalidDecisionTableException("%s refers to '%s', which is not in the model, so DMN cannot refer to it"
+                            .formatted(where, name));
+                }
+                xml.append("    <").append(kinds.get(l)).append(attribute("href", "#" + href)).append("/>\n");
+            }
+        }
+        xml.append("  </decisionService>\n");
     }
 
     /** A child element of a boxed expression holding one expression: {@code <if>}, {@code <in>}, {@code <return>}... */

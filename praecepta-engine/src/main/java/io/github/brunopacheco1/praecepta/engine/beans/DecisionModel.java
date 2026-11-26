@@ -28,14 +28,16 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * @param name            the model's name (the {@code definitions} element's)
  * @param inputData       the input data, in the model's order
  * @param decisions       the decisions, in the model's order
- * @param knowledgeModels the business knowledge models, in the model's order (since 0.10,
- *                        <a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>)
+ * @param knowledgeModels  the business knowledge models, in the model's order (since 0.10,
+ *                         <a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>)
+ * @param decisionServices the decision services, in the model's order (since 0.11,
+ *                         <a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>)
  * @param types           the types the model defines (its item definitions, DMN 1.5, 7.3.2), by name, which a literal
  *                  expression's {@code instance of} and function parameters may name (10.3.2.9); empty if it defines
  *                  none
  */
 public record DecisionModel(String name, List<InputData> inputData, List<Decision> decisions, List<BusinessKnowledgeModel> knowledgeModels,
-        Map<String, FeelType> types) {
+        List<DecisionService> decisionServices, Map<String, FeelType> types) {
 
     /**
      * A model with the given input data and decisions, and no business knowledge models or types of its own.
@@ -43,7 +45,7 @@ public record DecisionModel(String name, List<InputData> inputData, List<Decisio
      * @throws IllegalArgumentException if two of them have the same name (see the canonical constructor)
      */
     public DecisionModel(String name, List<InputData> inputData, List<Decision> decisions) {
-        this(name, inputData, decisions, List.of(), Map.of());
+        this(name, inputData, decisions, List.of(), List.of(), Map.of());
     }
 
     /**
@@ -52,11 +54,21 @@ public record DecisionModel(String name, List<InputData> inputData, List<Decisio
      * @throws IllegalArgumentException if two of them have the same name (see the canonical constructor)
      */
     public DecisionModel(String name, List<InputData> inputData, List<Decision> decisions, Map<String, FeelType> types) {
-        this(name, inputData, decisions, List.of(), types);
+        this(name, inputData, decisions, List.of(), List.of(), types);
     }
 
     /**
-     * A model with the given input data, decisions, business knowledge models and types.
+     * A model with the given input data, decisions, business knowledge models and types, and no decision services.
+     *
+     * @throws IllegalArgumentException if two of them have the same name (see the canonical constructor)
+     */
+    public DecisionModel(String name, List<InputData> inputData, List<Decision> decisions, List<BusinessKnowledgeModel> knowledgeModels,
+            Map<String, FeelType> types) {
+        this(name, inputData, decisions, knowledgeModels, List.of(), types);
+    }
+
+    /**
+     * A model with the given input data, decisions, business knowledge models, decision services and types.
      *
      * @throws IllegalArgumentException if two of them have the same name: DMN 1.5, 6.3.7 and 6.3.11, "the name of a
      *                                  Decision must be different from the name of any other invocable, input data,
@@ -67,16 +79,19 @@ public record DecisionModel(String name, List<InputData> inputData, List<Decisio
         inputData = List.copyOf(inputData);
         decisions = List.copyOf(decisions);
         knowledgeModels = List.copyOf(knowledgeModels);
+        decisionServices = List.copyOf(decisionServices);
         types = Collections.unmodifiableMap(new LinkedHashMap<>(types));
         var names = new HashSet<String>();
         var all = new ArrayList<String>();
         inputData.forEach(input -> all.add(input.name()));
         decisions.forEach(decision -> all.add(decision.name()));
         knowledgeModels.forEach(knowledgeModel -> all.add(knowledgeModel.name()));
+        decisionServices.forEach(service -> all.add(service.name()));
         for (var element : all) {
             if (!names.add(element)) {
                 throw new IllegalArgumentException(("'%s' names two elements of the decision model; the names of its decisions, "
-                        + "input data and business knowledge models must differ (DMN 1.5, 6.3.7 and 6.3.11)").formatted(element));
+                        + "input data, business knowledge models and decision services must differ (DMN 1.5, 6.3.7 and 6.3.11)")
+                        .formatted(element));
             }
         }
     }
@@ -111,6 +126,11 @@ public record DecisionModel(String name, List<InputData> inputData, List<Decisio
      */
     public boolean needsGraph() {
         return decisions.stream().anyMatch(Decision::needsGraph);
+    }
+
+    /** The decision service of that name, if the model has one. */
+    public Optional<DecisionService> decisionService(String name) {
+        return decisionServices.stream().filter(service -> service.name().equals(name)).findFirst();
     }
 
     /** The business knowledge model of that name, if the model has one. */
@@ -212,6 +232,39 @@ public record DecisionModel(String name, List<InputData> inputData, List<Decisio
             Objects.requireNonNull(name, "name");
             requiredKnowledge = List.copyOf(requiredKnowledge);
             Objects.requireNonNull(logic, "logic");
+        }
+    }
+
+    /**
+     * A decision service (DMN 1.5, 6.3.9): a function, named by its variable, that evaluates its output decisions, and the
+     * encapsulated decisions they require, from its parameters, which are its input data, then its input decisions, in
+     * order: the values of the input decisions are the arguments, and those decisions are not evaluated. Its value is its
+     * one output decision's, or a context of its output decisions' by name. Decisions and business knowledge models invoke
+     * it by name, once they require it through a knowledge requirement, as they invoke a business knowledge model.
+     *
+     * @param name                  its name, which is also the name of its variable
+     * @param outputDecisions       the decisions whose values it gives, in order
+     * @param encapsulatedDecisions the other decisions it evaluates, which its output decisions require
+     * @param inputDecisions        the decisions whose values it takes as parameters
+     * @param inputData             the input data whose values it takes as parameters
+     * @param type                  the type its variable declares (a function type), or any type
+     */
+    public record DecisionService(String name, List<String> outputDecisions, List<String> encapsulatedDecisions, List<String> inputDecisions,
+            List<String> inputData, FeelType type) {
+        public DecisionService {
+            Objects.requireNonNull(name, "name");
+            outputDecisions = List.copyOf(outputDecisions);
+            encapsulatedDecisions = List.copyOf(encapsulatedDecisions);
+            inputDecisions = List.copyOf(inputDecisions);
+            inputData = List.copyOf(inputData);
+            Objects.requireNonNull(type, "type");
+        }
+
+        /** Its parameters' names: its input data, then its input decisions (the DMN TCK's {@code 0085-decision-services}). */
+        public List<String> parameters() {
+            var parameters = new ArrayList<>(inputData);
+            parameters.addAll(inputDecisions);
+            return List.copyOf(parameters);
         }
     }
 }

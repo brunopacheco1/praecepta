@@ -231,6 +231,29 @@ public final class FeelExpression {
     }
 
     /**
+     * A function of these parameters, each bound to its declared type when it is invoked (DMN 1.5, 10.3.2.9.4, as a
+     * function definition's are), whose body FEEL does not evaluate itself: given the scope of the invocation, its
+     * parameters bound, the embedded expression gives the value, which is bound to {@code result} the same way (null,
+     * with an error, where it does not conform). A decision service is one. Invoked within an evaluation, it counts
+     * against that evaluation's limits, as any function does, and so does what its body evaluates.
+     *
+     * @param result the type its value is bound to; {@link FeelType#ANY} to take it as it is
+     */
+    public static FeelFunction function(List<DecisionLogic.Parameter> parameters, Embedded body, FeelType result) {
+        var names = new ArrayList<String>();
+        var types = new ArrayList<FeelType>();
+        for (var parameter : parameters) {
+            names.add(parameter.name());
+            types.add(parameter.type());
+        }
+        Node node = new Node.Embedded(Objects.requireNonNull(body, "body"));
+        if (!(Objects.requireNonNull(result, "result") instanceof FeelType.Any)) {
+            node = new Node.Bound(node, result);
+        }
+        return new Closure(new Node.FunctionDefinition(List.copyOf(names), List.copyOf(types), node, FeelParser.depthOf(node)), Env.noNames());
+    }
+
+    /**
      * Names and the types a model defines, in scope for parsing expressions ({@link #parse(String, Scope)}): indexed once,
      * so that each expression parsed against many names costs no more than one parsed against few.
      *
