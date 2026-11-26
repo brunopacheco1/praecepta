@@ -465,7 +465,7 @@ public final class DmnReader {
         var name = elementName(service, "a decision service");
         var where = "Decision service '" + name + "'";
         var lists = new ArrayList<List<String>>();
-        for (var kind : List.of("outputDecision", "encapsulatedDecision", "inputDecision", "inputData")) {
+        for (var kind : List.of("outputDecision", "encapsulatedDecision", "inputDecision", INPUT_DATA)) {
             var names = new ArrayList<String>();
             children(service, kind).forEach(reference -> names.add(required(reference, elements, where)));
             lists.add(names);
@@ -485,14 +485,6 @@ public final class DmnReader {
     private static final Planned IMPORTS = new Planned("0.11", 119);
     /** What Praecepta does not evaluate by design: an external function (docs/DMN-CONFORMANCE.md, known deviations). */
     private static final Planned NOT_PLANNED = new Planned(null, 0);
-
-    /** Rejects the model if it has an element of that kind, naming the first by its name, or {@code fallback} attribute. */
-    private static void rejectAny(Element root, String kind, String fallback, String message, Planned planned) {
-        var elements = children(root, kind);
-        if (!elements.isEmpty()) {
-            throw planned.exception(message.formatted(nameOr(elements.getFirst(), fallback)));
-        }
-    }
 
     /** The name of an input data or a decision of a model, or its id if it has none; one with neither is rejected. */
     private static String elementName(Element element, String kind) {

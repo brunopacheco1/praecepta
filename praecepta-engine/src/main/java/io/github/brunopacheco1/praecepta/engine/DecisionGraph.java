@@ -269,6 +269,26 @@ public final class DecisionGraph {
         Object function() {
             return functionOf.apply(this);
         }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Service service && name.equals(service.name) && Arrays.equals(parameters, service.parameters)
+                    && declared.equals(service.declared) && Arrays.equals(decisions, service.decisions)
+                    && Arrays.equals(outputs, service.outputs) && Objects.equals(result, service.result)
+                    && Objects.equals(blocked, service.blocked) && functionOf.equals(service.functionOf);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(name, Arrays.hashCode(parameters), declared, Arrays.hashCode(decisions), Arrays.hashCode(outputs), result,
+                    blocked);
+        }
+
+        @Override
+        public String toString() {
+            return "Service[%s, parameters=%s, decisions=%s, outputs=%s, blocked=%s]".formatted(name, declared,
+                    Arrays.toString(decisions), Arrays.toString(outputs), blocked);
+        }
     }
 
     /** A decision service of the model, as its analysis works it out. */
