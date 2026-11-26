@@ -187,7 +187,7 @@ public final class FeelExpression {
     }
 
     /** No names, indexed when first parsed against, so that loading this class does not load the parser. */
-    private static final Scope NO_NAMES = new Scope(List.of(), Map.of());
+    private static final Scope NO_NAMES = new Scope(List.of(), Map.of(), false);
 
     /**
      * Parses an expression with names in scope: those its values will be given for (DMN 1.5, 10.3.2.11).
@@ -281,7 +281,17 @@ public final class FeelExpression {
      * @param types the types the model defines, by name
      */
     public static Scope scope(Collection<String> names, Map<String, FeelType> types) {
-        return new Scope(List.copyOf(names), Map.copyOf(types));
+        return new Scope(List.copyOf(names), Map.copyOf(types), false);
+    }
+
+    /**
+     * Names, and the types a model defines, in scope for parsing expressions that read no other names, as a decision of
+     * a decision requirements graph reads only its requirements: a word that is none of them, but a built-in function's
+     * name ({@code abs}, {@code string length}), is that function as a value, where it would be a free name of an open
+     * scope, as a table read alone has, whose columns may be named {@code date} or {@code count}.
+     */
+    public static Scope closedScope(Collection<String> names, Map<String, FeelType> types) {
+        return new Scope(List.copyOf(names), Map.copyOf(types), true);
     }
 
     /**
@@ -289,26 +299,28 @@ public final class FeelExpression {
      * no scope, a type name that is not FEEL's makes its construct null with an error.
      */
     public static Scope namesScope(Collection<String> names) {
-        return new Scope(List.copyOf(names), null);
+        return new Scope(List.copyOf(names), null, false);
     }
 
     /** Names, and the types a model defines, in scope for parsing expressions; immutable and thread-safe. */
     public static final class Scope {
         final List<String> given;
         final Map<String, FeelType> types;
+        final boolean closed;
         /** The names, indexed when the first expression is parsed, so a scope no expression is parsed in costs nothing. */
         private final AtomicReference<FeelParser.Names> names = new AtomicReference<>();
 
-        private Scope(List<String> given, Map<String, FeelType> types) {
+        private Scope(List<String> given, Map<String, FeelType> types, boolean closed) {
             this.given = given;
             this.types = types;
+            this.closed = closed;
         }
 
         /** The names, indexed once; two threads may both index them, which gives equal indexes. */
         FeelParser.Names names() {
             var indexed = names.get();
             if (indexed == null) {
-                indexed = new FeelParser.Names(given);
+                indexed = new FeelParser.Names(given, closed);
                 names.compareAndSet(null, indexed);
             }
             return indexed;

@@ -99,8 +99,18 @@ final class GraphEvaluator implements ModelEvaluator {
         }
         var read = read(check.model());
         if (read.rejected() != null) {
-            return single.needsBesideGraphs(check, List.of()).isEmpty() ? notTaken(check, read.rejected())
-                    : new Evaluation.Unsupported(besideGraphs(check));
+            if (single.needsBesideGraphs(check, List.of()).isEmpty()) {
+                return notTaken(check, read.rejected());
+            }
+            var needs = besideGraphs(check);
+            if (read.rejected().area() == Feature.Area.NOT_PLANNED && !needs.contains(read.rejected())) {
+                // what Praecepta does not evaluate by design, elsewhere in the model, keeps it from the graph for good
+                var all = new ArrayList<Feature>();
+                all.add(read.rejected());
+                all.addAll(needs);
+                needs = all;
+            }
+            return new Evaluation.Unsupported(needs);
         }
         DecisionGraph graph;
         try {

@@ -1471,6 +1471,8 @@ compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #010_a decision
 compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #011 decision_011_1	graph
 compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #012 decision_012_1	graph
 compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #013 decision_013_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #014 decision_014_1	graph
+compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #016 decision_016_1	graph
 compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #017 decision_017_1	graph
 compliance-level-3/0092-feel-lambda/0092-feel-lambda-test-01.xml #018 decision_018	graph
 compliance-level-3/0093-feel-at-literals/0093-feel-at-literals-test-01.xml #date_001 date_001	graph

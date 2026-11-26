@@ -1113,18 +1113,17 @@ build, and gives two numbers:
 - **Decision tables: 86 of 86 checks pass (100.0 %).** These are the decision-table checks counted since the
   first release; the last three, which read inputs computed by other decisions in models that also invoke
   business knowledge models, pass since 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)).
-- **The whole kit: 3,480 of 3,511 result nodes pass (99.1 %).** Every model of compliance levels 2 and 3
+- **The whole kit: 3,482 of 3,511 result nodes pass (99.2 %).** Every model of compliance levels 2 and 3
   (148 models at the pinned commit), each result node scored as passed, failed or not supported, each
   decision evaluated through its model's decision requirement graph where Praecepta reads the model. This
-  measures how much of DMN 1.5 Praecepta covers: of the 3,491 nodes it evaluates, 3,480 pass (the eleven others
+  measures how much of DMN 1.5 Praecepta covers: of the 3,493 nodes it evaluates, 3,482 pass (the eleven others
   are [known failures](praecepta-tck/README.md#known-failures): nine loan payments the kit states as a double
-  computes them, and two known deviations). Of the other 20, 18 are in the kit's model of external functions, which
-  Praecepta rejects by design, and 2 pass built-in functions as values to business knowledge models
-  (`bkm(abs, sqrt)`), which it does not evaluate yet.
+  computes them, and two known deviations). The other 18 are all in the kit's model of external functions, which
+  Praecepta rejects by design.
 
 Praecepta is a decision-table engine growing into a full DMN 1.5 engine one layer per release
-([#120](https://github.com/brunopacheco1/praecepta/issues/120)), so a few of the kit's nodes are still ahead, and
-external functions it rejects by design; [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md) has the results per model and feature area,
+([#120](https://github.com/brunopacheco1/praecepta/issues/120)); it evaluates the whole kit but the external
+functions it rejects by design; [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md) has the results per model and feature area,
 every feature the unsupported nodes need with the release that brings it, and how many nodes each release
 would complete. The build fails only on a regression: a node the committed baseline has passing that no
 longer does. The literal expressions of the TCK's arithmetic test cases also run as decision tables' output

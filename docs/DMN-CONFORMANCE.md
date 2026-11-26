@@ -62,6 +62,7 @@ release meant to remove it.
 | 36 | [A decision service nothing invokes, and a decision without logic nothing requires](#36-a-decision-service-nothing-invokes-and-a-decision-without-logic-nothing-requires) | open until 0.11.0, which reads both |
 | 37 | [What a decision service evaluates, and in what order it takes its arguments](#37-what-a-decision-service-evaluates-and-in-what-order-it-takes-its-arguments) | decided by the TCK for the order; open for decisions it does not list |
 | 38 | [Invoking a function nothing names](#38-invoking-a-function-nothing-names) | decided by the TCK; followed since 0.11.0 |
+| 39 | [A built-in function as a value, of a function type](#39-a-built-in-function-as-a-value-of-a-function-type) | decided by the TCK for binding; open for `instance of` |
 
 How Praecepta returns DMN's null result, which is a choice of representation rather than of semantics,
 is [at the end](#how-a-null-result-is-returned).
@@ -613,6 +614,23 @@ integrations alike.
   it; it is no requirement missing, and blocks nothing. One of an element of the model the decision does not
   require, such as a business knowledge model it forgot, is still a requirement missing (`MISSING_REQUIREMENT`, an
   ERROR), so a model's slip is not taken for a null. 0.10 reported every such name as a requirement missing.
+
+## 39. A built-in function as a value, of a function type
+- **DMN 1.5.** A function conforms to a function type whose parameters conform to its own and whose result its own
+  result conforms to (10.3.2.9.1); built-in functions are named in every scope (10.3.4), but their types are not
+  given, and some give values of several types (`abs` of a number is a number, of a duration a duration).
+- **TCK.** `0092-feel-lambda` passes `abs` and `sqrt` to a business knowledge model whose parameter is a
+  `function<number> -> number`, and expects `abs` to be invoked through it (`decision_014_1`); a built-in passed
+  where it does not fit, `sqrt` for a function of two parameters, is null with an error (`decision_016_1`).
+- **Praecepta (since 0.11.0, [#119](https://github.com/brunopacheco1/praecepta/issues/119)).** A name of a decision or
+  business knowledge model of a graph that no requirement provides, but a built-in function does, is that function
+  as a value; a table read alone, which reads every unknown name as an input, does not (a column may be named `date`
+  or `count`). A built-in's type gives its result as `Any` where it depends on its arguments, and `Any` conforms to
+  no other type, so `abs` is not of the type `function<number> -> number`: `abs instance of function<number> ->
+  number` is false. Bound to that type, as an argument or a declared value, it is taken where its parameters fit,
+  and each of its results is then bound to `number` as a value of a declared type is (10.3.2.9.4): a duration, which
+  is not one, is null with an error. So binding follows the TCK, and `instance of` answers by the type the function
+  has.
 
 ## Known deviations
 Where DMN 1.5 or the TCK decides and Praecepta does otherwise. Each is reported or documented where it shows,

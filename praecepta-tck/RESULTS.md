@@ -24,7 +24,7 @@ only on a regression: a node the baseline lists that no longer passes. Semantics
 and the TCK alone; where both leave a case open, what Praecepta does is recorded in
 [DMN conformance](../docs/DMN-CONFORMANCE.md).
 
-**The whole kit: 3,480 of 3,511 result nodes pass (99.1 %).** Of the 3,491 that Praecepta evaluates, 3,480 pass (99.7 %).
+**The whole kit: 3,482 of 3,511 result nodes pass (99.2 %).** Of the 3,493 that Praecepta evaluates, 3,482 pass (99.7 %).
 
 **Decision tables: 86 of 86 checks pass (100.0 %).**
 
@@ -42,8 +42,8 @@ result nodes that are commented out are not counted.
 | Compliance level | Models | Result nodes | Passed | Failed | Not supported |
 |---|---:|---:|---:|---:|---:|
 | 2 | 28 | 126 | 122 | 4 | 0 |
-| 3 | 120 | 3,385 | 3,358 | 7 | 20 |
-| **Total** | **148** | **3,511** | **3,480** | **11** | **20** |
+| 3 | 120 | 3,385 | 3,360 | 7 | 18 |
+| **Total** | **148** | **3,511** | **3,482** | **11** | **18** |
 
 ### By feature area
 
@@ -57,7 +57,7 @@ It does not change as Praecepta grows, so each row shows how far that layer is d
 | Decision requirement graphs | 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | 0 | 0 | 0 | 0 |
 | FEEL language | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1,289 | 1,289 | 0 | 0 |
 | Built-in functions | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1,071 | 1,069 | 2 | 0 |
-| Boxed expressions, business knowledge models and structured values | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 456 | 444 | 9 | 3 |
+| Boxed expressions, business knowledge models and structured values | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 456 | 446 | 9 | 1 |
 | Decision services, imports and the rest | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 35 | 35 | 0 | 0 |
 | Not evaluated, by design | never | 17 | 0 | 0 | 17 |
 
@@ -68,13 +68,13 @@ features, these nodes have all they need once it ships.
 
 | Release | Feature area | Not-supported nodes | Evaluated by then, of all nodes |
 |---|---|---:|---:|
-| 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | Decision requirement graphs | 0 | 3,491 (99.4 %) |
-| 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | FEEL language | 0 | 3,491 (99.4 %) |
-| 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | Built-in functions | 0 | 3,491 (99.4 %) |
-| 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | Boxed expressions, business knowledge models and structured values | 3 | 3,494 (99.5 %) |
-| 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | Decision services, imports and the rest | 0 | 3,494 (99.5 %) |
+| 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | Decision requirement graphs | 0 | 3,493 (99.5 %) |
+| 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | FEEL language | 0 | 3,493 (99.5 %) |
+| 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | Built-in functions | 0 | 3,493 (99.5 %) |
+| 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | Boxed expressions, business knowledge models and structured values | 0 | 3,493 (99.5 %) |
+| 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | Decision services, imports and the rest | 0 | 3,493 (99.5 %) |
 
-The other 17 need what Praecepta does not evaluate by design, and no release plans: external
+The other 18 need what Praecepta does not evaluate by design, and no release plans: external
 functions, as it runs no code from outside the model
 ([DMN conformance](../docs/DMN-CONFORMANCE.md#known-deviations)).
 
@@ -86,9 +86,8 @@ design (so these add up to the not-supported nodes); *alone* counts those that n
 
 | Feature | Release | Needed by | Stops | Alone |
 |---|---|---:|---:|---:|
-| boxed contexts | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 18 | 1 | 1 |
-| business knowledge models | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 2 | 2 | 2 |
-| external functions (Java, PMML) | never | 17 | 17 | 0 |
+| boxed contexts | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 18 | 0 | 0 |
+| external functions (Java, PMML) | never | 18 | 18 | 0 |
 
 ### By model
 
@@ -193,7 +192,7 @@ design (so these add up to the not-supported nodes); *alone* counts those that n
 | [compliance-level-3/0089-nested-inputdata-imports](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0089-nested-inputdata-imports) | 1 | 1 | 0 | 0 |  |
 | [compliance-level-3/0090-feel-paths](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0090-feel-paths) | 4 | 4 | 0 | 0 |  |
 | [compliance-level-3/0091-local-hrefs](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0091-local-hrefs) | 1 | 1 | 0 | 0 |  |
-| [compliance-level-3/0092-feel-lambda](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0092-feel-lambda) | 18 | 16 | 0 | 2 | business knowledge models (0.10) |
+| [compliance-level-3/0092-feel-lambda](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0092-feel-lambda) | 18 | 18 | 0 | 0 |  |
 | [compliance-level-3/0093-feel-at-literals](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0093-feel-at-literals) | 19 | 19 | 0 | 0 |  |
 | [compliance-level-3/0094-feel-product-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0094-feel-product-function) | 13 | 13 | 0 | 0 |  |
 | [compliance-level-3/0095-feel-day-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0095-feel-day-of-year-function) | 19 | 19 | 0 | 0 |  |

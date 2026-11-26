@@ -80,10 +80,17 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 - **A business knowledge model's value is bound to the output type of the function type its variable declares**, as a
   decision service's is: a number, where it declares a list of numbers, is a list of one, and a list of one, where it
   declares a number, its element (the TCK's `1157-implicit-conversions`).
+- **A built-in function is a value** where a decision or business knowledge model of a graph names it without
+  invoking it (`bkm(abs, sqrt)`, the TCK's `0092-feel-lambda`), where it was a name no requirement provides; tables
+  read alone still read such a name as an input. A built-in whose result depends on its arguments (`abs`: a number
+  for a number, a duration for a duration) binds to a function type of a known result (`function<number> -> number`),
+  each of its results then bound to that type, null with an error where it does not conform; `instance of` still
+  answers by its own type, so `abs instance of function<number> -> number` is false
+  ([DMN conformance](docs/DMN-CONFORMANCE.md), case 39).
 - **The DMN TCK report lists external functions apart**, as no release brings them, and counts them as what stops
-  the nodes that need them. 3,480 of its 3,511 result nodes pass (99.1 %, from 3,409); the 11 failures are those of
-  0.10, and of the 20 not supported, 18 are in the model of external functions Praecepta does not evaluate by
-  design, and 2 pass built-in functions as values to business knowledge models.
+  the nodes that need them, and a node of a model rejected for them. 3,482 of its 3,511 result nodes pass (99.2 %,
+  from 3,409); the 11 failures are those of 0.10, and the 18 not supported are all in the model of external
+  functions, which Praecepta does not evaluate by design.
 
 ## [0.10.0] - 2026-11-26
 

@@ -358,7 +358,7 @@ final class GraphAnalysis {
         valid.add(name);
         try {
             var tables = knowledgeTables.get(k);
-            knowledgeExpressions[k] = FeelExpression.compose(knowledgeModel.logic(), FeelExpression.scope(scope, model.types()),
+            knowledgeExpressions[k] = FeelExpression.compose(knowledgeModel.logic(), FeelExpression.closedScope(scope, model.types()),
                     site -> embed(site, tables));
         } catch (ExpressionSyntaxException e) {
             reportKnowledge(k, Kind.INVALID_EXPRESSION, "business knowledge model '%s': %s".formatted(name, e.getMessage()));
@@ -703,7 +703,7 @@ final class GraphAnalysis {
         try {
             var tables = new ArrayList<GraphNodes.EmbeddedTable>();
             embeddedTables.set(d, tables);
-            expressions[d] = FeelExpression.compose(logic, FeelExpression.scope(scope, model.types()), site -> embed(site, tables));
+            expressions[d] = FeelExpression.compose(logic, FeelExpression.closedScope(scope, model.types()), site -> embed(site, tables));
         } catch (ExpressionSyntaxException e) {
             report(d, Kind.INVALID_EXPRESSION, "decision '%s': %s".formatted(decision, e.getMessage()));
             return;

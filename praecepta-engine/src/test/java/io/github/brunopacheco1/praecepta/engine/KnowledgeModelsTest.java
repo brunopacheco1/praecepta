@@ -89,6 +89,29 @@ class KnowledgeModelsTest {
     }
 
     @Test
+    void a_built_in_function_is_given_as_a_value_and_bound_to_a_function_type_its_result_is_checked_against() {
+        // the DMN TCK's 0092-feel-lambda: abs gives a number for a number and a duration for a duration
+        var numeric = new FeelType.FunctionOf(List.of(NUMBER), NUMBER);
+        var apply = new DecisionModel.BusinessKnowledgeModel("apply", List.of(), new DecisionLogic.FunctionDefinition(
+                List.of(new DecisionLogic.Parameter("fn", numeric), new DecisionLogic.Parameter("x", FeelType.ANY)),
+                new DecisionLogic.LiteralExpression("fn(x)"), FeelType.ANY));
+        var number = new DecisionModel.Decision("Number", List.of(), List.of(), List.of("apply"),
+                new DecisionLogic.LiteralExpression("apply(abs, -5)"));
+        var duration = new DecisionModel.Decision("Duration", List.of(), List.of(), List.of("apply"),
+                new DecisionLogic.LiteralExpression("apply(abs, duration(\"-P1D\"))"));
+        var instance = new DecisionModel.Decision("Instance", List.of(), List.of(), new DecisionLogic.LiteralExpression(
+                "[abs instance of function<number> -> number, abs instance of function<Any> -> Any]"));
+        var graph = graph(new DecisionModel("M", List.of(), List.of(number, duration, instance), List.of(apply), List.of(), Map.of()));
+
+        assertThat(graph.validationReport().issues()).isEmpty();
+        assertThat(graph.evaluate("Number", Map.of())).isEqualTo(new BigDecimal("5"));
+        var outcome = graph.evaluateWithErrors("Duration", Map.of());
+        assertThat(outcome.value()).isNull();
+        assertThat(outcome.errors().get("Duration")).anyMatch(error -> error.contains("abs(...) gives P1D, which is not a number"));
+        assertThat(graph.evaluate("Instance", Map.of())).as("instance of answers by its own type").isEqualTo(List.of(false, true));
+    }
+
+    @Test
     void invoking_a_function_nothing_in_the_model_names_is_null_with_an_error_and_one_it_does_not_require_is_reported() {
         // the DMN TCK's 1131-feel-function-invocation
         var twice = new DecisionModel.BusinessKnowledgeModel("twice", List.of(), new DecisionLogic.FunctionDefinition(

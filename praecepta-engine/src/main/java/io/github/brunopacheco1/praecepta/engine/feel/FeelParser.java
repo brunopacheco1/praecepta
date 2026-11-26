@@ -141,8 +141,18 @@ final class FeelParser {
     /** Names in scope, by their first word, indexed once for any number of expressions. */
     static final class Names {
         private final Map<String, List<Candidate>> byFirst = new HashMap<>();
+        /**
+         * Whether they are every name the expression may read, as a decision's requirements are in a decision requirements
+         * graph: a word that is none of them, but a built-in function's name, is then that function, as a value.
+         */
+        final boolean closed;
 
         Names(Collection<String> names) {
+            this(names, false);
+        }
+
+        Names(Collection<String> names, boolean closed) {
+            this.closed = closed;
             names.forEach(this::add);
         }
 
@@ -846,6 +856,14 @@ final class FeelParser {
             var names = new ArrayList<String>();
             arguments(arguments, names);
             return builtInInvocation(builtIn.name(), arguments, names);
+        }
+        if (known == null && given.closed && filters == 0) {
+            // a built-in function given as a value, as to a business knowledge model (the TCK's 0092-feel-lambda)
+            var function = match(BUILT_INS, false);
+            if (function != null) {
+                at += function.length();
+                return new Node.Constant(BuiltInFunctions.lookup(function.name()));
+            }
         }
         String name;
         if (known != null) {
