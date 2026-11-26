@@ -80,14 +80,20 @@ Released in November 2026 (see the [changelog](../CHANGELOG.md)):
   that Praecepta evaluates. The decision-table checks pass 86 of 86. Nearly all of the 91 nodes not
   supported yet are in models that use decision services, imports or external functions.
 
-## Next: 0.11
+## 0.11
+Released in November 2026 (see the [changelog](../CHANGELOG.md)):
 - **Decision services, imports and the rest of DMN 1.5**
-  ([#119](https://github.com/brunopacheco1/praecepta/issues/119)): decision services, imports and
-  decisions without decision logic. With them Praecepta evaluates the whole TCK but for external functions (Java and
-  PMML), which it rejects by design, as it runs no code from outside the model
-  ([DMN conformance](DMN-CONFORMANCE.md#known-deviations)).
+  ([#119](https://github.com/brunopacheco1/praecepta/issues/119)): decision services, invoked by the
+  decisions that require them and from outside the model; models that import others, evaluated as
+  one, in the engine, the framework integrations and the build plugins; and decisions without
+  decision logic, whose value a decision service is given.
+- **External functions are rejected by design**: Praecepta runs no code from outside the model, a
+  deliberate deviation from DMN 1.5 for security ([DMN conformance](DMN-CONFORMANCE.md#known-deviations)).
+- **The DMN TCK**: 3,482 of its 3,511 result nodes pass (99.2 %, from 3,409), and 3,482 of the 3,493
+  that Praecepta evaluates. The 18 nodes not supported are all in the kit's model of external
+  functions.
 
-## 1.0
+## Next: 1.0
 - **A claim of DMN 1.5 conformance**, scored against the whole TCK, and a stable API, once the
   project has a second maintainer (see [GOVERNANCE.md](../GOVERNANCE.md)). After 1.0, breaking
   changes wait for a major version.

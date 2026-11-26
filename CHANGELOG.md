@@ -11,6 +11,19 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-26
+
+Decision services, imports and the rest of DMN 1.5, the fifth step of Praecepta's plan to grow from a decision-table
+engine into a full DMN 1.5 engine, one layer per release ([#120](https://github.com/brunopacheco1/praecepta/issues/120)):
+decision services, models that import others and decisions without logic are read and evaluated
+([#119](https://github.com/brunopacheco1/praecepta/issues/119)), and Praecepta evaluates the whole DMN TCK but for
+external functions, which it rejects by design, as it runs no code from outside the model. The framework integrations
+and the build plugins load and compile a model with the models it imports. Of the DMN TCK's 3,511 result nodes, 3,482
+now pass (99.2 %, from 3,409 in 0.10), 3,482 of the 3,493 Praecepta evaluates
+([RESULTS.md](praecepta-tck/RESULTS.md)); the 11 that fail are those of 0.10, and the 18 not supported are all in the
+kit's model of external functions. Read *Changed* before upgrading if you construct `DecisionModel`, switch over
+`DecisionLogic`, read `UnsupportedFeatureException.release()`, or build graphs that invoke a function nothing names.
+
 ### Added
 - **Decision services** ([#119](https://github.com/brunopacheco1/praecepta/issues/119)):
   `DecisionModel.decisionServices()` and `DecisionModel.DecisionService`, read by `DmnReader.readModel`, written back
@@ -1636,7 +1649,8 @@ Code written against the prototype needs the changes listed under *Changed*.
 - **`MissingOutputException`** (no match now yields an empty result), **`InvalidPraeceptaException`**
   and the trie visitor API.
 
-[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/brunopacheco1/praecepta/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/brunopacheco1/praecepta/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/brunopacheco1/praecepta/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/brunopacheco1/praecepta/compare/v0.7.0...v0.8.0

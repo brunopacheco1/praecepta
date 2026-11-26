@@ -25,9 +25,10 @@ on its own or as beans in Spring Boot, Quarkus or Micronaut.
 
 > **Status: 0.x.** The API may still change between minor versions until 1.0. Praecepta is growing from
 > a decision-table engine into a full DMN 1.5 engine, one layer per release
-> ([#120](https://github.com/brunopacheco1/praecepta/issues/120)). 0.10 covers decision tables and the
-> decision requirement graphs of tables, literal expressions, boxed expressions and business knowledge models,
-> all in the full FEEL language with its built-in functions, not yet decision services or imports; see
+> ([#120](https://github.com/brunopacheco1/praecepta/issues/120)). 0.11 covers decision tables and the
+> decision requirement graphs of tables, literal and boxed expressions, business knowledge models, decision
+> services and imported models, all in the full FEEL language with its built-in functions: the whole DMN TCK but
+> external functions, which it rejects by design. A claim of DMN 1.5 conformance is planned for 1.0; see
 > [what Praecepta is not](#what-praecepta-is-not).
 
 # Features
@@ -81,14 +82,14 @@ Java 21 or later (tested on 21, 25 and 27). Pick the modules you need:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-engine</artifactId>
-  <version>0.9.0</version>
+  <version>0.11.0</version>
 </dependency>
 
 <!-- optional: load rules from Excel or CSV at runtime (brings Apache POI) -->
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-loader</artifactId>
-  <version>0.9.0</version>
+  <version>0.11.0</version>
 </dependency>
 ```
 
@@ -115,20 +116,20 @@ rebuilds it independently to check it is bit-for-bit identical to Maven Central.
 
 # What Praecepta is not
 Praecepta evaluates DMN decision tables, fast, and the decision requirement graphs whose decisions are
-tables, literal expressions or boxed expressions, with the business knowledge models they invoke, in the full
-FEEL language with its built-in functions ([decision requirement graphs](#decision-requirement-graphs)). It is
-on its way to a full DMN 1.5 engine, one layer per release
-([#120](https://github.com/brunopacheco1/praecepta/issues/120), see the [roadmap](docs/ROADMAP.md)), but it is
-not one yet. It does not have these yet; when you need one of them before its release, use an engine that has
-it, such as Camunda or Drools:
+tables, literal expressions or boxed expressions, with the business knowledge models and decision services they
+invoke and the models they import, in the full FEEL language with its built-in functions
+([decision requirement graphs](#decision-requirement-graphs)). It has grown into a DMN 1.5 engine one layer per
+release ([#120](https://github.com/brunopacheco1/praecepta/issues/120), see the [roadmap](docs/ROADMAP.md)), and
+passes the DMN TCK but for external functions, but it does not have these; when you need one of them, use an
+engine that has it, such as Camunda or Drools:
 - **A claim of DMN 1.5 conformance**, planned for 1.0
   ([#120](https://github.com/brunopacheco1/praecepta/issues/120)).
 - **External functions** (Java and PMML), never: Praecepta runs no code from outside the model it evaluates, a
   deliberate exception to DMN 1.5 for security ([DMN conformance](docs/DMN-CONFORMANCE.md#known-deviations)).
 
 Nor will it be a process engine, a modeller or a server around the decisions: it is a library your
-application calls. `DmnReader.readModel` rejects a model that uses what a later release brings, with a message that names the feature and the
-release that plans it (the decision tables of such a file can still be read alone); how much of the DMN TCK
+application calls. `DmnReader.readModel` rejects a model that uses what Praecepta does not evaluate, with a message that names the feature
+(the decision tables of such a file can still be read alone); how much of the DMN TCK
 Praecepta passes today is under [DMN conformance](#dmn-conformance).
 
 # Getting Started
@@ -607,7 +608,7 @@ needs only `praecepta-engine`; Apache POI stays a build-time dependency.
 <plugin>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-maven-plugin</artifactId>
-  <version>0.9.0</version>
+  <version>0.11.0</version>
   <executions><execution><goals><goal>generate</goal></goals></execution></executions>
   <configuration>
     <packageName>com.acme.pricing</packageName>
@@ -704,11 +705,11 @@ too, with its plugin marker). Version 0.5.0 is on Maven Central only: for it, ad
 // build.gradle.kts
 plugins {
     java
-    id("io.github.brunopacheco1.praecepta") version "0.9.0"
+    id("io.github.brunopacheco1.praecepta") version "0.11.0"
 }
 
 dependencies {
-    implementation("io.github.brunopacheco1:praecepta-engine:0.9.0")
+    implementation("io.github.brunopacheco1:praecepta-engine:0.11.0")
 }
 
 praecepta {
@@ -754,7 +755,7 @@ registers them as beans:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-spring-boot-starter</artifactId>
-  <version>0.9.0</version>
+  <version>0.11.0</version>
 </dependency>
 ```
 
@@ -851,7 +852,7 @@ For Micronaut 4 applications on Java 21+. At startup, the module:
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-micronaut</artifactId>
-  <version>0.9.0</version>
+  <version>0.11.0</version>
 </dependency>
 ```
 
@@ -914,7 +915,7 @@ Runs on Quarkus 3.40 and later with Java 21+. Add the extension to a Quarkus app
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-quarkus</artifactId>
-  <version>0.9.0</version>
+  <version>0.11.0</version>
 </dependency>
 ```
 
@@ -991,7 +992,7 @@ DMN files, builds one engine per decision table, and evaluates them by name. It 
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-integration</artifactId>
-  <version>0.9.0</version>
+  <version>0.11.0</version>
 </dependency>
 ```
 
@@ -1201,9 +1202,9 @@ Quarkus' build uses, brings `praecepta-compiler` and Apache POI; neither reaches
 # Roadmap
 [docs/ROADMAP.md](docs/ROADMAP.md) has the plans for the next year. 0.8 brought the full FEEL language, 0.9 its
 built-in functions ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) and 0.10 boxed expressions and
-business knowledge models ([#118](https://github.com/brunopacheco1/praecepta/issues/118)); next come decision
-services and imports in 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)),
-then a DMN 1.5 conformance claim for 1.0 ([#120](https://github.com/brunopacheco1/praecepta/issues/120)); past
+business knowledge models ([#118](https://github.com/brunopacheco1/praecepta/issues/118)), and 0.11 decision
+services and imports ([#119](https://github.com/brunopacheco1/praecepta/issues/119)); next comes
+a DMN 1.5 conformance claim for 1.0 ([#120](https://github.com/brunopacheco1/praecepta/issues/120)); past
 decisions and their reasons are in
 [docs/MODERNISATION.md](docs/MODERNISATION.md).
 
