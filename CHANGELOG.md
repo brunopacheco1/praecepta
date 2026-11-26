@@ -11,6 +11,87 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+### Added
+- **Decision services** ([#119](https://github.com/brunopacheco1/praecepta/issues/119)):
+  `DecisionModel.decisionServices()` and `DecisionModel.DecisionService`, read by `DmnReader.readModel`, written back
+  by `DmnWriter.write`, and evaluated by a `DecisionGraph`. A decision service is a function of its input data, then its
+  input decisions, which decisions and business knowledge models requiring it invoke by name, positionally or by
+  parameter name; invoked, it evaluates its output decisions, and the decisions they require, from its arguments,
+  without evaluating its input decisions or touching the model's own values, and gives its one output's value, or a
+  context of them all, bound to the output type of the function type its variable declares.
+  `DecisionGraph.evaluateService` invokes one from outside, `decisionServices()` lists them and
+  `DecisionGraph.Builder.decisionService` adds one in code. The graph reports a service that evaluates a decision
+  reading input data it does not take ([DMN conformance](docs/DMN-CONFORMANCE.md), case 37).
+- **`FeelExpression.function`**: a function whose body FEEL does not evaluate itself, as a decision service's is.
+- **Imports** ([#119](https://github.com/brunopacheco1/praecepta/issues/119)): `DmnReader.readModel(dmn, imports)`
+  reads a model and the models it imports (DMN 1.5, 6.3.3), each once by namespace, found by a
+  `DmnReader.ImportResolver` from the import's namespace and `locationURI`; `DecisionModel.namespace()` and
+  `DecisionModel.imports()` hold them. An importing model reads an imported element as `importName.elementName` (by its
+  own name for an import without a name) in FEEL, in a `typeRef` and in an href that names the imported namespace. A
+  `DecisionGraph` evaluates the models as one, an imported element under the name the first path of imports gives it
+  (`DecisionGraph.nameOf`), and `DmnWriter.write` writes a model's imports and the hrefs into them.
+- **Imports in the framework integrations and the build plugins**: `Decisions.load` finds the models a file imports
+  among the files it loads, by namespace (`DmnReader.namespace` reads a file's). The compiler finds them beside the
+  source, by `locationURI` or by namespace among the directory's `.dmn` files, never outside that directory; it
+  ships each as a resource beside the model's (`CompiledTable.imports`), which the generated model class reads, and
+  generates classes for the model's own decisions.
+- **`DecisionGraph.invokeKnowledgeModel`** invokes a business knowledge model from outside the model, by parameter
+  name, as `evaluateService` does a decision service (the TCK's `1157-implicit-conversions`), and
+  `DecisionGraph.knowledgeModels()` lists them. **`FeelExpression.uninvocable()`** names the functions an expression
+  invokes that nothing in scope names.
+- **Decisions without logic** (`DecisionLogic.NoLogic`), such as a decision a person makes: the graph does not
+  evaluate one, nor what requires it, but a decision service that takes it as an input decision is given its value
+  (the TCK's `0088-no-decision-logic`, [DMN conformance](docs/DMN-CONFORMANCE.md), case 36).
+
+### Changed
+- **`DecisionModel` has a component more**, `decisionServices`, before `types`; the constructors without it remain.
+  **Upgrade note:** a record pattern over `DecisionModel` takes the new component.
+- **A model that invokes a decision service now loads**: `DmnReader.readModel`, `DecisionGraph`, the build plugins and
+  the framework integrations read and evaluate it, where they rejected it with an `UnsupportedFeatureException` naming
+  0.11, and a decision service that nothing invokes is read where it was left out. **Upgrade note:** such a file's
+  decisions are evaluated through its graph, where its decision tables were read alone.
+- **`DecisionModel` has two components more**, `namespace` and `imports`, after `types`; the constructors without them
+  remain. **Upgrade note:** a record pattern over `DecisionModel` takes them.
+- **`DmnWriter.write(DecisionModel)` writes the model's own namespace**, where it wrote one of its own making
+  (`https://github.com/brunopacheco1/praecepta/<name>`), so a model written reads back with its namespace, as models
+  importing it name it; the DMN the build plugins write for a model changes so.
+- **An href to an element of a model the model does not import is an invalid model**, an
+  `InvalidDecisionTableException` naming DMN 1.5, 6.3.3, where it was an `UnsupportedFeatureException` naming 0.11; an
+  href that names the model's own namespace (`namespace#id`) refers to its own element (the TCK's
+  `0091-local-hrefs`).
+- **A decision without logic is read**, where one that another decision required was rejected with an
+  `UnsupportedFeatureException` naming 0.11, and one that none required was left out; `DmnWriter` writes it back.
+  **Upgrade note:** a `switch` over `DecisionLogic` takes `NoLogic`; a file whose decision requires one loads as a
+  graph, where its decision tables loaded alone.
+- **External functions are rejected as what Praecepta does not evaluate, by design**, where messages named them
+  planned for 0.11: an `UnsupportedFeatureException` for one has a null `release()` and an `issue()` of 0, as has a
+  `FeelExpression.Unsupported`, whose `planned()` tells them apart, and the line the integrations and build plugins
+  log for a file whose tables load alone says `which uses what Praecepta does not evaluate`. **Upgrade note:** code
+  that reads `release()` handles null.
+- **A file of the build plugins that is no well-formed model and has no table to compile alone fails naming why its
+  model was rejected**, such as an import it cannot find, where it said the file has no decision table; so does a
+  file of the framework integrations.
+- **Invoking a function nothing names is null, with an error** (the TCK's `1131-feel-function-invocation`,
+  [DMN conformance](docs/DMN-CONFORMANCE.md), case 38), and the graph reports the decision as always null
+  (`ALWAYS_NULL`, a WARNING), where it reported a requirement missing (`MISSING_REQUIREMENT`, an ERROR) and did not
+  evaluate the decision. Invoking an element of the model that the decision does not require is still a
+  `MISSING_REQUIREMENT`. **Upgrade note:** a graph built with `failOn(Severity.ERROR)` that failed for such an
+  invocation now builds, with a WARNING; `failOn(Severity.WARNING)` still rejects it.
+- **A business knowledge model's value is bound to the output type of the function type its variable declares**, as a
+  decision service's is: a number, where it declares a list of numbers, is a list of one, and a list of one, where it
+  declares a number, its element (the TCK's `1157-implicit-conversions`).
+- **A built-in function is a value** where a decision or business knowledge model of a graph names it without
+  invoking it (`bkm(abs, sqrt)`, the TCK's `0092-feel-lambda`), where it was a name no requirement provides; tables
+  read alone still read such a name as an input. A built-in whose result depends on its arguments (`abs`: a number
+  for a number, a duration for a duration) binds to a function type of a known result (`function<number> -> number`),
+  each of its results then bound to that type, null with an error where it does not conform; `instance of` still
+  answers by its own type, so `abs instance of function<number> -> number` is false
+  ([DMN conformance](docs/DMN-CONFORMANCE.md), case 39).
+- **The DMN TCK report lists external functions apart**, as no release brings them, and counts them as what stops
+  the nodes that need them, and a node of a model rejected for them. 3,482 of its 3,511 result nodes pass (99.2 %,
+  from 3,409); the 11 failures are those of 0.10, and the 18 not supported are all in the model of external
+  functions, which Praecepta does not evaluate by design.
+
 ## [0.10.0] - 2026-11-26
 
 Boxed expressions and business knowledge models, the fourth step of Praecepta's plan to grow from a decision-table

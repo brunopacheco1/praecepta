@@ -218,12 +218,21 @@ may read in scope, and those its enclosing constructs bind, as a name such as `d
 `typeRef` is typed from the model (`ModelTypes`): an input expression by the input data or decision it names (or the
 component a path names), an output by the decision's variable (its component of the output's name, for several
 outputs), else by the one type its output entries give, as FEEL types them, and else not at all (`typed` false: each
-entry gives its own type). What later releases bring is rejected
-whole with an `UnsupportedFeatureException`, whose `release()` and `issue()` name the release that plans it, so that
-callers fall back by its type, never by its message: invoking a decision service, requiring a decision without logic,
-imports, external functions and references into other models (#119). Knowledge sources, authority requirements, annotations and diagrams take no part
-in evaluation and are ignored, and so are a decision service that nothing invokes and a decision without logic that no
-decision requires ([DMN conformance](DMN-CONFORMANCE.md), case 36). `DmnWriter.write(DecisionModel)` writes DMN 1.3
+entry gives its own type). What Praecepta does not evaluate is rejected
+whole with an `UnsupportedFeatureException`, so that callers fall back by its type, never by its message: its
+`release()` and `issue()` name the release that plans it, or are null and 0 for what none does, external functions,
+which Praecepta rejects by design. Knowledge sources, authority requirements, annotations and diagrams take no
+part in evaluation and are ignored. A decision without logic is read as `DecisionLogic.NoLogic`, which the graph
+blocks, and what requires it, without reporting an issue, but which a decision service may take as an input decision
+([DMN conformance](DMN-CONFORMANCE.md), case 36). `readModel(dmn, imports)` (since 0.11) reads the models a model
+imports, each once by namespace, through an `ImportResolver` (namespace and `locationURI`; a model found under another
+namespace is rejected, so a wrong answer cannot recurse), and resolves an href into an imported namespace, or a
+`typeRef` qualified by an import's name, to the imported element, under the name the import gives it
+(`importName.elementName`). `DecisionGraph` flattens a model and those it imports into one (`ImportedModels`): every
+element under its name in the graph (the path of imports that first reaches its model, so a model two others import is
+one), each element keeping the names its own model reads, which `GraphAnalysis` maps to those names when it resolves
+what the element reads. Decision services (since 0.11) are read with their output,
+encapsulated and input decisions and input data, by reference. `DmnWriter.write(DecisionModel)` writes DMN 1.3
 with ids by position (`input_data_0`, `decision_0`, and `decision_0_` before the ids of a decision's table, so the
 tables of a model never share an id), item definitions for list and context types, and literal expressions as
 written; a model it writes reads back as the same model, and writes the same again. `read(dmn)`, `read(dmn, decision)`
@@ -331,7 +340,7 @@ once, against a `Scope` of names (and a model's types), then `names()`, `unsuppo
   and is a free name the caller resolves, but inside a filter, where it may name an element's entry. Date and time
   functions of literal arguments are folded into literals while parsing (`TemporalLiterals`, as cells read them),
   an invalid one into a node that is null with an error; a built-in function into an invocation of it; an external
-  function, which Praecepta does not evaluate yet, into an `Unsupported` node, which `unsupported()` lists.
+  function, which Praecepta does not evaluate, by design, into an `Unsupported` node, which `unsupported()` lists.
 - **Evaluation** (`Node.evaluate(Env)`): each node evaluates its children in a scope (`Env`: frames of bound names,
   innermost first, then the values given), giving FEEL's values (`FeelValues` holds equality, order, `instance of`
   and the properties of Table 65; `FeelArithmetic` the arithmetic tables cells already used). Where FEEL defines no

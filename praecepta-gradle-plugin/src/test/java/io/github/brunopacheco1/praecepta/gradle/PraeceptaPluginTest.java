@@ -211,14 +211,16 @@ class PraeceptaPluginTest {
         var later = projectDir.resolve("src/main/rules/bkm.dmn");
         Files.writeString(later, """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
-                  <import name="Rate" namespace="https://example.com/rate" importType="https://www.omg.org/spec/DMN/20230324/MODEL/"/>
+                  <decision id="rate" name="Rate"><literalExpression>
+                    <text>function(x) external {java: {class: "java.lang.Math", method signature: "abs(double)"}}</text>
+                  </literalExpression></decision>
                   <decision id="a" name="A"><literalExpression><text>1</text></literalExpression></decision>
                 </definitions>""");
         extension.getTables().register("later", table -> table.getSource().set(later.toFile()));
 
         Assertions.assertThatThrownBy(task()::generate)
                 .isInstanceOf(GradleException.class)
-                .hasMessageContaining("imports 'Rate'")
+                .hasMessageContaining("an external function (Java or PMML)")
                 .hasRootCauseInstanceOf(io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException.class);
     }
 

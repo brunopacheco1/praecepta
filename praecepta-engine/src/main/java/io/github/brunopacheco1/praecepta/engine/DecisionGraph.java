@@ -22,6 +22,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -37,6 +40,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.HitPolicyViolationExc
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
+import io.github.brunopacheco1.praecepta.engine.feel.FeelFunction;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
 /**
@@ -92,9 +96,11 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * evaluated. A literal expression is FEEL (DMN 1.5, chapter 10; {@link io.github.brunopacheco1.praecepta.engine.feel.FeelExpression}):
  * where FEEL defines no value it gives null, and {@link #evaluateWithErrors} gives the errors FEEL reported with the
  * value. A business knowledge model is a function made once, when the graph is built, which may invoke those it
- * requires, and itself. A graph is immutable and thread-safe.
+ * requires, and itself. A decision service (since 0.11) is a function made once too, of its input data and input
+ * decisions, whose invocation evaluates its output decisions from its arguments ({@link #evaluateService} invokes one
+ * from outside). A graph is immutable and thread-safe.
  *
- * <p>Decision services, imports and FEEL's external functions are planned for 0.11
+ * <p>Imports and FEEL's external functions are planned for 0.11
  * (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>); a model that uses them is rejected when it
  * is read.
  */
@@ -102,7 +108,12 @@ public final class DecisionGraph {
 
     private static final System.Logger LOG = System.getLogger(DecisionGraph.class.getName());
 
+    /** The model as one with the models it imports, under the names of the graph ({@link ImportedModels}). */
     private final DecisionModel model;
+    /** The model as it was given, with its imports. */
+    private final DecisionModel original;
+    /** By imported model's namespace, the prefix of its elements' names in the graph. */
+    private final Map<String, String> importedPrefixes;
     /** The number of slots: one per input data, then one per decision. */
     private final int slotCount;
     /**
@@ -110,6 +121,11 @@ public final class DecisionGraph {
      * every evaluation hold; null for one that cannot be evaluated.
      */
     private final Object[] knowledge;
+    /** Why each business knowledge model, then each decision service, cannot be evaluated; null where it can. */
+    private final String[] knowledgeBlocked;
+    /** The decision services, by index in the model. */
+    private final Service[] services;
+    private final Map<String, Integer> serviceIndexes = new HashMap<>();
     /** Each input data's name and type (declared, or worked out from the tables that read it), by slot. */
     private final String[] inputNames;
     private final FeelType[] inputTypes;
@@ -160,13 +176,18 @@ public final class DecisionGraph {
         }
     }
 
-    private DecisionGraph(DecisionModel model, Severity failOn, boolean log) {
+    private DecisionGraph(DecisionModel original, Severity failOn, boolean log) {
+        this.original = original;
+        var flat = ImportedModels.flatten(original);
+        var model = flat.model();
         this.model = model;
-        var analysis = new GraphAnalysis(model, log);
+        this.importedPrefixes = flat.byModel();
+        var analysis = new GraphAnalysis(model, log, flat.aliases());
         int inputCount = analysis.inputCount;
         int decisionCount = model.decisions().size();
-        slotCount = inputCount + decisionCount + model.knowledgeModels().size();
+        slotCount = inputCount + decisionCount + model.knowledgeModels().size() + model.decisionServices().size();
         knowledge = knowledgeFunctions(analysis);
+        knowledgeBlocked = analysis.knowledgeBlocked.clone();
         inputNames = new String[inputCount];
         inputTypes = new FeelType[inputCount];
         var allTypes = new LinkedHashMap<String, FeelType>();
@@ -202,6 +223,14 @@ public final class DecisionGraph {
         for (int i = 0; i < analysis.order.length; i++) {
             rank[analysis.order[i]] = i;
         }
+        services = new Service[model.decisionServices().size()];
+        for (int k = 0; k < services.length; k++) {
+            services[k] = service(analysis, k);
+            serviceIndexes.put(model.decisionServices().get(k).name(), k);
+            if (analysis.knowledgeBlocked[model.knowledgeModels().size() + k] == null) {
+                knowledge[model.knowledgeModels().size() + k] = services[k].function();
+            }
+        }
         report = new ValidationReport(analysis.issues());
         if (log && !report.isEmpty()) {
             LOG.log(Level.WARNING, "Decision model ''{0}'' has {1} validation issue(s):\n{2}", model.name(), report.issues().size(), report);
@@ -215,8 +244,8 @@ public final class DecisionGraph {
      */
     private static Object[] knowledgeFunctions(GraphAnalysis analysis) {
         int base = analysis.inputCount + analysis.decisionCount;
-        var functions = new Object[analysis.knowledgeExpressions.length];
-        for (int k = 0; k < functions.length; k++) {
+        var functions = new Object[analysis.knowledgeBlocked.length];
+        for (int k = 0; k < analysis.knowledgeExpressions.length; k++) {
             var expression = analysis.knowledgeExpressions[k];
             if (expression == null || analysis.knowledgeBlocked[k] != null) {
                 continue;
@@ -228,6 +257,110 @@ public final class DecisionGraph {
             });
         }
         return functions;
+    }
+
+    /**
+     * A decision service, ready to invoke: its parameters' slots and names, the decisions it evaluates in dependency order,
+     * and its output decisions.
+     */
+    private record Service(String name, int[] parameters, List<DecisionLogic.Parameter> declared, int[] decisions, int[] outputs,
+            FeelType result, String blocked, Function<Service, Object> functionOf) {
+
+        Object function() {
+            return functionOf.apply(this);
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Service service && name.equals(service.name) && Arrays.equals(parameters, service.parameters)
+                    && declared.equals(service.declared) && Arrays.equals(decisions, service.decisions)
+                    && Arrays.equals(outputs, service.outputs) && Objects.equals(result, service.result)
+                    && Objects.equals(blocked, service.blocked) && functionOf.equals(service.functionOf);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(name, Arrays.hashCode(parameters), declared, Arrays.hashCode(decisions), Arrays.hashCode(outputs), result,
+                    blocked);
+        }
+
+        @Override
+        public String toString() {
+            return "Service[%s, parameters=%s, decisions=%s, outputs=%s, blocked=%s]".formatted(name, declared,
+                    Arrays.toString(decisions), Arrays.toString(outputs), blocked);
+        }
+    }
+
+    /** A decision service of the model, as its analysis works it out. */
+    private Service service(GraphAnalysis analysis, int k) {
+        var service = model.decisionServices().get(k);
+        var parameterSlots = analysis.serviceParameters.get(k);
+        var names = service.parameters();
+        var declared = new ArrayList<DecisionLogic.Parameter>();
+        for (int i = 0; i < names.size(); i++) {
+            int slot = parameterSlots[i];
+            declared.add(new DecisionLogic.Parameter(names.get(i), slot < 0 || analysis.types[slot] == null ? FeelType.ANY : analysis.types[slot]));
+        }
+        var decisions = IntStream.of(analysis.serviceDecisions.get(k)).boxed().sorted((a, b) -> Integer.compare(rank[a], rank[b]))
+                .mapToInt(Integer::intValue).toArray();
+        var type = analysis.types[analysis.inputCount + analysis.decisionCount + model.knowledgeModels().size() + k];
+        var result = type instanceof FeelType.FunctionOf(var parameters, var output) ? output : FeelType.ANY;
+        var declaredResult = service.type() instanceof FeelType.FunctionOf(var parameters, var output) ? output : FeelType.ANY;
+        var blockedBy = analysis.knowledgeBlocked[model.knowledgeModels().size() + k];
+        return new Service(service.name(), parameterSlots, List.copyOf(declared), decisions, analysis.serviceOutputs.get(k), declaredResult,
+                blockedBy, self -> FeelExpression.function(self.declared(), new FeelExpression.Embedded() {
+                    @Override
+                    public List<String> names() {
+                        return List.of();
+                    }
+
+                    @Override
+                    public FeelType type() {
+                        return result;
+                    }
+
+                    @Override
+                    public Object evaluate(Function<String, Object> values, Consumer<String> errors) {
+                        var outputs = run(self, values, errors == null ? null : (decision, message) -> errors.accept(message));
+                        return result(self, outputs);
+                    }
+                }, self.result()));
+    }
+
+    /**
+     * Evaluates a decision service's decisions from its arguments, which take the slots of its input data and input
+     * decisions, each decision once, in dependency order; the model's own values are untouched.
+     *
+     * @return the slots, its output decisions' values in theirs
+     */
+    private Object[] run(Service service, Function<String, Object> arguments, BiConsumer<String, String> errors) {
+        var values = slots();
+        for (int i = 0; i < service.parameters().length; i++) {
+            int slot = service.parameters()[i];
+            if (slot >= 0) {
+                values[slot] = arguments.apply(service.declared().get(i).name());
+            }
+        }
+        for (int d : service.decisions()) {
+            var name = model.decisions().get(d).name();
+            values[inputNames.length + d] = nodes[d].evaluate(values, errors == null ? null : message -> errors.accept(name, message));
+        }
+        return values;
+    }
+
+    /** A decision service's value: its one output decision's, or a context of its output decisions' by name. */
+    private Object result(Service service, Object[] values) {
+        Object value;
+        if (service.outputs().length == 1) {
+            value = values[inputNames.length + service.outputs()[0]];
+        } else {
+            var context = new LinkedHashMap<String, Object>();
+            for (int d : service.outputs()) {
+                context.put(model.decisions().get(d).name(), values[inputNames.length + d]);
+            }
+            value = Collections.unmodifiableMap(context);
+        }
+        return value;
     }
 
     /** The slots of an evaluation: empty, but for the business knowledge models' functions. */
@@ -375,6 +508,82 @@ public final class DecisionGraph {
         return new Outcome(values[inputNames.length + plan.decision()], errors);
     }
 
+    /** The business knowledge models' names, in the model's order. */
+    public List<String> knowledgeModels() {
+        return model.knowledgeModels().stream().map(DecisionModel.BusinessKnowledgeModel::name).toList();
+    }
+
+    /**
+     * Invokes a business knowledge model (DMN 1.5, 6.3.10) from outside the model, as a decision that requires it
+     * invokes it by parameter name: a parameter the map does not hold is null. The values are FEEL's ({@link FeelType}),
+     * a {@link Number} taken as the {@code BigDecimal} of its value, each bound to its parameter's type as an invocation
+     * binds it (10.3.2.9.4), and the value to the type its function gives.
+     *
+     * @return its value, and the errors FEEL reported, under its name
+     * @throws NoSuchElementException        if the graph has no business knowledge model of that name
+     * @throws InvalidDecisionTableException if it cannot be evaluated: its logic is not FEEL Praecepta evaluates, or it
+     *                                       invokes what the model does not have
+     */
+    public Outcome invokeKnowledgeModel(String knowledgeModel, Map<String, ?> arguments) {
+        int k = knowledgeModels().indexOf(Objects.requireNonNull(knowledgeModel, "knowledgeModel"));
+        if (k < 0) {
+            throw new NoSuchElementException("Decision model '%s' has no business knowledge model named '%s'; it has %s".formatted(model.name(),
+                    knowledgeModel, knowledgeModels()));
+        }
+        if (!(knowledge[k] instanceof FeelFunction function)) {
+            throw new InvalidDecisionTableException("Business knowledge model '%s' cannot be evaluated: %s".formatted(knowledgeModel,
+                    Objects.requireNonNullElse(knowledgeBlocked[k], "its logic is not a function")));
+        }
+        var values = new ArrayList<>();
+        function.parameters().forEach(parameter -> values.add(arguments.get(parameter)));
+        var messages = new ArrayList<String>();
+        var value = function.invoke(values, messages::add);
+        return new Outcome(value, messages.isEmpty() ? Map.of() : Map.of(knowledgeModel, messages));
+    }
+
+    /** The decision services' names, in the model's order. */
+    public List<String> decisionServices() {
+        return model.decisionServices().stream().map(DecisionModel.DecisionService::name).toList();
+    }
+
+    /**
+     * Invokes a decision service (DMN 1.5, 6.3.9) from outside the model, as a decision that requires it invokes it:
+     * evaluates its output decisions, and the decisions they require, from the values of its parameters, its input data
+     * and input decisions, by name; a parameter the map does not hold is null. The values are FEEL's ({@link FeelType}),
+     * a {@link Number} taken as the {@code BigDecimal} of its value, each bound to its parameter's type as an invocation
+     * binds it (10.3.2.9.4): a single value to a list of one, a list of one to its element; one that does not conform
+     * makes every output null, with an error. The input decisions are not evaluated, and the model's other decisions
+     * take no part.
+     *
+     * @return each output decision's value, by name, in the service's order, and the errors FEEL reported, under the
+     *         service's name
+     * @throws NoSuchElementException        if the graph has no decision service of that name
+     * @throws InvalidDecisionTableException if the service cannot be evaluated: it evaluates a decision that cannot be,
+     *                                       or refers to what the model does not have
+     */
+    public Outcome evaluateService(String service, Map<String, ?> arguments) {
+        var index = serviceIndexes.get(Objects.requireNonNull(service, "service"));
+        if (index == null) {
+            throw new NoSuchElementException("Decision model '%s' has no decision service named '%s'; it has %s".formatted(model.name(), service,
+                    decisionServices()));
+        }
+        var target = services[index];
+        if (target.blocked() != null) {
+            throw new InvalidDecisionTableException("Decision service '%s' cannot be evaluated: %s".formatted(service, target.blocked()));
+        }
+        var values = new ArrayList<>();
+        target.declared().forEach(parameter -> values.add(arguments.get(parameter.name())));
+        var messages = new ArrayList<String>();
+        var value = ((FeelFunction) knowledge[model.knowledgeModels().size() + index]).invoke(values, messages::add);
+        var outputs = new LinkedHashMap<String, Object>();
+        for (int d : target.outputs()) {
+            var name = model.decisions().get(d).name();
+            outputs.put(name, target.outputs().length == 1 ? value : value instanceof Map<?, ?> context ? context.get(name) : null);
+        }
+        return new Outcome(Collections.unmodifiableMap(outputs), messages.isEmpty() ? Map.of() : Map.of(service, messages));
+    }
+
+
     /**
      * Evaluates several decisions at once, each decision they require being evaluated once for all of them.
      *
@@ -425,7 +634,21 @@ public final class DecisionGraph {
 
     /** The model the graph evaluates; for a graph assembled in code, with the requirements its builder worked out. */
     public DecisionModel model() {
-        return model;
+        return original;
+    }
+
+    /**
+     * The name in the graph of an element of the model, or of a model it imports (DMN 1.5, 6.3.3): its own name for an
+     * element of the model, else its name qualified by the path of imports that first reaches its model
+     * ({@code Model B.modelA.Person name}), under which {@link #evaluate(String, Map)} takes an input data and gives a
+     * decision.
+     *
+     * @param namespace the namespace of the element's model
+     * @param name      the element's name in its model
+     */
+    public String nameOf(String namespace, String name) {
+        var prefix = importedPrefixes.get(namespace);
+        return prefix == null ? name : prefix + name;
     }
 
     /** The decisions' names, in the model's order. */
@@ -522,6 +745,9 @@ public final class DecisionGraph {
         private final List<Decision> decisions = new ArrayList<>();
         private final Set<String> inferred = new LinkedHashSet<>();
         private final List<DecisionModel.BusinessKnowledgeModel> knowledgeModels = new ArrayList<>();
+        private final List<DecisionModel.DecisionService> decisionServices = new ArrayList<>();
+        private final List<DecisionModel.Import> imports = new ArrayList<>();
+        private String namespace = "";
         private final Map<String, FeelType> types = new LinkedHashMap<>();
         private Severity failOn;
         private boolean log = true;
@@ -541,7 +767,20 @@ public final class DecisionGraph {
             inputData.addAll(model.inputData());
             decisions.addAll(model.decisions());
             knowledgeModels.addAll(model.knowledgeModels());
+            decisionServices.addAll(model.decisionServices());
+            imports.addAll(model.imports());
+            namespace = model.namespace();
             types.putAll(model.types());
+            return this;
+        }
+
+        /**
+         * Adds a decision service (DMN 1.5, 6.3.9), a function of its input data and input decisions that decisions and
+         * business knowledge models requiring it invoke by its name, and that {@link DecisionGraph#evaluateService}
+         * invokes from outside.
+         */
+        public Builder decisionService(DecisionModel.DecisionService service) {
+            decisionServices.add(Objects.requireNonNull(service, "service"));
             return this;
         }
 
@@ -656,7 +895,8 @@ public final class DecisionGraph {
             var resolved = decisions.stream()
                     .map(decision -> inferred.contains(decision.name()) ? withRequirements(decision, names, decisionNames, scope, types) : decision)
                     .toList();
-            return new DecisionGraph(new DecisionModel(name, inputData, resolved, knowledgeModels, types), failOn, log);
+            return new DecisionGraph(new DecisionModel(name, inputData, resolved, knowledgeModels, decisionServices, types, namespace, imports),
+                    failOn, log);
         }
 
         /**

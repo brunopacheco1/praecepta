@@ -18,7 +18,7 @@ import io.github.brunopacheco1.praecepta.integration.Decisions;
 import io.quarkus.test.QuarkusExtensionTest;
 
 /**
- * A DMN file whose model uses what a later release plans (here an import, 0.11) still loads its
+ * A DMN file whose model uses what a later release plans (here an external function, which it does not evaluate by design) still loads its
  * decision tables alone, as in 0.6, whether found at a location or declared under {@code quarkus.praecepta.tables},
  * and the build logs one line at INFO per such file, naming it, the feature and the release and issue that plan it,
  * so that the graph left out is seen.
@@ -35,8 +35,8 @@ class FallbackLoggingTest {
                 Assertions.assertThat(fallbacks).hasSize(2).allSatisfy(logRecord -> {
                     Assertions.assertThat(logRecord.getLevel()).isEqualTo(Level.INFO);
                     Assertions.assertThat(logRecord.getMessage())
-                            .contains(", without its decision requirements graph, which needs Praecepta 0.11 (#119): ",
-                                    "imports 'Rate'");
+                            .contains(", without its decision requirements graph, which uses what Praecepta does not evaluate: ",
+                                    "an external function (Java or PMML)");
                 });
                 // the file found at the default location, loaded by the build step
                 Assertions.assertThat(fallbacks).anySatisfy(logRecord -> Assertions.assertThat(logRecord.getMessage())

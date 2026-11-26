@@ -58,10 +58,13 @@ decision whose value the test case gives is input data instead, as the kit means
 decision replaced by an input data of its type. Input data of a simple type are given as text, as the integrations
 give them; a structured one as a map of its components, a list as a list; one of no declared type typed by the
 test file's `xsi:type`. It takes a node when the model as a whole is one `readModel` reads and the graph evaluates
-the decision: what is not supported is what the engine rejects. A model that invokes a decision service, imports
-another model, defines an external function or requires a decision without logic is not read, and a decision the
-graph's validation report blocks is not evaluated. Boxed expressions, business knowledge models and the decision tables
-within them are read and evaluated since 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)). Literal expressions, and decision tables' input expressions, input entries and output entries, are the
+the decision: what is not supported is what the engine rejects. A model that defines an external function is not
+read, and a decision the graph's validation report blocks is not evaluated. Boxed expressions, business knowledge models and the decision tables
+within them are read and evaluated since 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)), and
+decision services since 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)): a test case that invokes a
+service (`type="decisionService"`), or a result node named after one, is the service invoked with the test case's
+values as its arguments (`DecisionGraph.evaluateService`), and one that invokes a business knowledge model
+(`type="bkm"`) is that model invoked so, by parameter name (`DecisionGraph.invokeKnowledgeModel`). Literal expressions, and decision tables' input expressions, input entries and output entries, are the
 full FEEL language since 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)), with its built-in
 functions since 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)). Where a decision's value is null and its own logic
 reported an error (`DecisionGraph.evaluateWithErrors`), the node counts as an error where the kit expects one
@@ -76,8 +79,8 @@ The nodes it does not take go to `SingleDecisionEvaluator`, which evaluates one 
   decision's declared type (10.3.2.9.4), and FEEL's errors count as `GraphEvaluator` counts them. A decision it
   reads whose value the test case does not give needs graphs.
 
-Everything else is not supported: boxed expressions and business knowledge models in a model the graph does not take,
-decision services, imports, and a decision that needs the value of another decision in a model the graph does not take. Where neither
+Everything else is not supported: boxed expressions, business knowledge models, decision services and imports in a
+model the graph does not take, and a decision that needs the value of another decision in such a model. Where neither
 evaluator supports a node, the reasons are the single evaluator's, without *inputs computed by other decisions*,
 which the graph has (`SingleDecisionEvaluator.needsBesideGraphs`); a node that needs nothing but another decision
 computed, in a model `readModel` rejects for what another decision uses, needs that first. A later release that
@@ -95,7 +98,8 @@ Each is a `Feature` of one area of the plan, named so a release can count what i
 | FEEL language | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | a FEEL construct by name: `if then else`, `for loops`, `lists`, `contexts`, `comparisons`, `in`, `instance of`, `paths`, `null`, errors, a decision's type... |
 | Built-in functions | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | each built-in function by its name: `abs()`, `string length()`... |
 | Boxed expressions, business knowledge models and structured values | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | business knowledge models, invocations, function definitions and lambdas, boxed contexts, relations, lists, conditionals, filters and iterators, structured inputs |
-| Decision services, imports and the rest | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | decision services, imports, external functions, decisions without logic |
+| Decision services, imports and the rest | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | decision services, imports, decisions without logic |
+| Not evaluated, by design | never | external functions (Java, PMML), which Praecepta rejects as it runs no code from outside the model ([DMN conformance](../docs/DMN-CONFORMANCE.md#known-deviations)) |
 
 `FeelScan` names the FEEL a literal expression uses: it drops strings and comments, takes date and time
 functions of literals as the literals output entries read, and finds keywords, operators, brackets and
@@ -155,10 +159,12 @@ expressions as literal expression decisions (see *How a model is evaluated*), wh
 ## Decision requirement graphs
 `DecisionGraph` (0.7, [#14](https://github.com/brunopacheco1/praecepta/issues/14)) evaluates whole models whose
 decisions are decision tables and literal expressions, in the full FEEL language since 0.8, and boxed expressions
-and business knowledge models since 0.10, and `GraphEvaluator` scores it. Of the pinned commit's 156 model files of
-compliance levels 2 and 3, `DmnReader.readModel` reads 142; the rest are rejected for what 0.11 brings (#119): imports
-and references into other models (9 files), invoking a decision service (3), an external function (1) and a decision
-without logic that another requires (1). Models it does not read are evaluated decision by decision.
+and business knowledge models since 0.10, decision services and imports since 0.11, and `GraphEvaluator` scores it. A
+model that imports others is read with them (`DmnReader.readModel(dmn, imports)`), each found among the DMN files of
+its test case's directory by its `locationURI`, else by its namespace; an input of an imported model, which the test
+file names by its namespace, is that model's input in the graph (`DecisionGraph.nameOf`). Of the pinned commit's 156
+model files of compliance levels 2 and 3, `DmnReader.readModel` reads 155; it rejects one for an external function,
+which Praecepta does not evaluate by design. Models it does not read are evaluated decision by decision.
 
 ## The TCK files
 `src/test/resources/tck` holds every test directory of compliance levels 2 and 3 (their DMN models and test

@@ -178,6 +178,11 @@ final class Env implements FeelValues.Budget {
         return new Env(scope.with(frame), shared, quiet);
     }
 
+    /** A scope with no names, as a function made in Java has. */
+    static Scope noNames() {
+        return EMPTY;
+    }
+
     /** The names in scope, as a function value keeps them. */
     Scope scope() {
         return scope;

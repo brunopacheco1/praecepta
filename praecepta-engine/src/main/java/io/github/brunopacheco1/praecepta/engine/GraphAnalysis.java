@@ -8,6 +8,7 @@ package io.github.brunopacheco1.praecepta.engine;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -113,14 +114,25 @@ final class GraphAnalysis {
     final FeelExpression[] knowledgeExpressions;
     /** By business knowledge model: the slot of each business knowledge model its logic reads, by name. */
     final List<Map<String, Integer>> knowledgeReads = new ArrayList<>();
-    /** By business knowledge model: why it cannot be evaluated, or null if it can. */
+    /**
+     * By invocable, the business knowledge models then the decision services: why it cannot be evaluated, or null if it
+     * can.
+     */
     final String[] knowledgeBlocked;
+    /** By decision service: the slots of its parameters, its input data then its input decisions. */
+    final List<int[]> serviceParameters = new ArrayList<>();
+    /** By decision service: the decisions it evaluates, by index, required ones first; its input decisions are not among them. */
+    final List<int[]> serviceDecisions = new ArrayList<>();
+    /** By decision service: its output decisions, by index. */
+    final List<int[]> serviceOutputs = new ArrayList<>();
     /** By business knowledge model: the decision tables within its logic, each with its validation report. */
     final List<List<GraphNodes.EmbeddedTable>> knowledgeTables = new ArrayList<>();
     /** By decision: the decision tables within its boxed expression, each with its validation report. */
     final List<List<GraphNodes.EmbeddedTable>> embeddedTables = new ArrayList<>();
     /** Whether the engines of the tables within boxed expressions log their validation reports. */
     private final boolean log;
+    /** By element, the names its own model reads, each to its element's name in the graph ({@link ImportedModels}). */
+    private final Map<String, Map<String, String>> aliases;
     /** Each slot's type: an input data's, declared or worked out from the tables that read it, or a decision's value's. */
     final FeelType[] types;
     /** By decision (index in the model): the names its logic reads, resolved; a name none of its requirements provides is left out. */
@@ -136,6 +148,11 @@ final class GraphAnalysis {
     private final List<TableReads> tableReads = new ArrayList<>();
     /** By decision: the decisions it requires that the model has, as their indexes. */
     private final List<int[]> requiredDecisions = new ArrayList<>();
+    /**
+     * By decision: whether why it cannot be evaluated is only that a decision it requires cannot be, which a decision
+     * service that takes that decision as an input decision provides.
+     */
+    private final boolean[] inherited;
     /** By decision: why it cannot be evaluated, or null if it can. */
     final String[] blocked;
     /** By decision: how its logic's value is bound to it (DMN 1.5, 10.3.2.9.4). */
@@ -149,21 +166,28 @@ final class GraphAnalysis {
     private final Set<String> conflicting = new HashSet<>();
 
     GraphAnalysis(DecisionModel model) {
-        this(model, false);
+        this(model, false, Map.of());
     }
 
-    /** @param log whether the engines of the decision tables within boxed expressions log their validation reports */
-    GraphAnalysis(DecisionModel model, boolean log) {
+    /**
+     * @param log     whether the engines of the decision tables within boxed expressions log their validation reports
+     * @param aliases by element, the names its own model reads, each to its element's name in the graph, where the model
+     *                is one with the models it imports ({@link ImportedModels}); none for an element whose names are those
+     */
+    GraphAnalysis(DecisionModel model, boolean log, Map<String, Map<String, String>> aliases) {
         this.model = model;
         this.log = log;
+        this.aliases = aliases;
         var decisions = model.decisions();
         inputCount = model.inputData().size();
         decisionCount = decisions.size();
         var knowledgeModels = model.knowledgeModels();
-        types = new FeelType[inputCount + decisions.size() + knowledgeModels.size()];
+        var services = model.decisionServices();
+        types = new FeelType[inputCount + decisions.size() + knowledgeModels.size() + services.size()];
         knowledgeExpressions = new FeelExpression[knowledgeModels.size()];
-        knowledgeBlocked = new String[knowledgeModels.size()];
+        knowledgeBlocked = new String[knowledgeModels.size() + services.size()];
         blocked = new String[decisions.size()];
+        inherited = new boolean[decisions.size()];
         bindings = new GraphValues.Binding[decisions.size()];
         Arrays.fill(bindings, GraphValues.Binding.AS_IS);
         expressions = new FeelExpression[decisions.size()];
@@ -178,8 +202,14 @@ final class GraphAnalysis {
         for (int k = 0; k < knowledgeModels.size(); k++) {
             slots.put(knowledgeModels.get(k).name(), inputCount + decisionCount + k);
         }
+        for (int k = 0; k < services.size(); k++) {
+            slots.put(services.get(k).name(), inputCount + decisionCount + knowledgeModels.size() + k);
+        }
         for (int k = 0; k < knowledgeModels.size(); k++) {
             resolveKnowledge(k);
+        }
+        for (int k = 0; k < services.size(); k++) {
+            checkService(k);
         }
         blockKnowledge();
         for (int d = 0; d < decisions.size(); d++) {
@@ -189,10 +219,16 @@ final class GraphAnalysis {
         var cyclic = findCycles();
         order = topologicalOrder(cyclic);
         inferInputTypes();
+        for (int k = 0; k < services.size(); k++) {
+            // until the decisions are typed, what invokes a decision service reads it as its declared type, or any function
+            types[inputCount + decisionCount + knowledgeModels.size() + k] = services.get(k).type();
+        }
         typeKnowledge();
         typeDecisions();
+        typeServices();
         checkTableReads();
         block(cyclic);
+        blockThroughInvocables();
     }
 
     /** The issues found: of requirements and names, then cycles, then types, each in the model's order of decisions. */
@@ -246,11 +282,37 @@ final class GraphAnalysis {
                 report(d, Kind.MISSING_REQUIREMENT, ("decision '%s' requires business knowledge model '%s', which is %s, not a business "
                         + "knowledge model").formatted(decision.name(), name, kindOf(slot)));
             } else if (knowledgeBlocked[slot - inputCount - decisionCount] != null) {
-                report(d, Kind.MISSING_REQUIREMENT, "decision '%s' requires business knowledge model '%s', which cannot be evaluated: %s"
-                        .formatted(decision.name(), name, knowledgeBlocked[slot - inputCount - decisionCount]), false);
+                report(d, Kind.MISSING_REQUIREMENT, "decision '%s' requires %s '%s', which cannot be evaluated: %s"
+                        .formatted(decision.name(), kindOf(slot), name, knowledgeBlocked[slot - inputCount - decisionCount]), false);
             }
         }
         requiredDecisions.add(required.stream().mapToInt(Integer::intValue).toArray());
+    }
+
+    /**
+     * The names an element's logic reads its requirements by: their names in its own model, which may be several (an
+     * element of a model imported twice, with and without a name), or the requirements' own names.
+     */
+    private Set<String> localScope(String element, Collection<String> requirements) {
+        var alias = aliases.get(element);
+        if (alias == null) {
+            return new LinkedHashSet<>(requirements);
+        }
+        var required = new HashSet<>(requirements);
+        var scope = new LinkedHashSet<String>();
+        alias.forEach((local, global) -> {
+            if (required.contains(global)) {
+                scope.add(local);
+            }
+        });
+        requirements.stream().filter(requirement -> !alias.containsValue(requirement)).forEach(scope::add);
+        return scope;
+    }
+
+    /** The name in the graph of what an element reads by {@code local}. */
+    private String global(String element, String local) {
+        var alias = aliases.get(element);
+        return alias == null ? local : alias.getOrDefault(local, local);
     }
 
     /** What kind of element is at a slot, as messages name it. */
@@ -258,7 +320,10 @@ final class GraphAnalysis {
         if (isInputData(slot)) {
             return "input data";
         }
-        return isDecision(slot) ? "a decision" : "a business knowledge model";
+        if (isDecision(slot)) {
+            return "a decision";
+        }
+        return slot < inputCount + decisionCount + model.knowledgeModels().size() ? "a business knowledge model" : "a decision service";
     }
 
     // ---- business knowledge models -----------------------------------------------------------------
@@ -288,28 +353,34 @@ final class GraphAnalysis {
             }
         }
         // a business knowledge model may invoke itself, as a function a context defines may
-        var scope = new LinkedHashSet<>(knowledgeModel.requiredKnowledge());
-        scope.add(name);
+        var scope = localScope(name, knowledgeModel.requiredKnowledge());
+        scope.addAll(localScope(name, List.of(name)));
         valid.add(name);
         try {
             var tables = knowledgeTables.get(k);
-            knowledgeExpressions[k] = FeelExpression.compose(knowledgeModel.logic(), FeelExpression.scope(scope, model.types()),
+            knowledgeExpressions[k] = FeelExpression.compose(knowledgeModel.logic(), FeelExpression.closedScope(scope, model.types()),
                     site -> embed(site, tables));
         } catch (ExpressionSyntaxException e) {
             reportKnowledge(k, Kind.INVALID_EXPRESSION, "business knowledge model '%s': %s".formatted(name, e.getMessage()));
             return;
         }
+        for (var invoked : knowledgeExpressions[k].uninvocable()) {
+            if (slots.containsKey(global(name, invoked))) {
+                reportKnowledge(k, Kind.MISSING_REQUIREMENT, ("business knowledge model '%s' invokes '%s', which is %s it does not require "
+                        + "(DMN 1.5, 6.3.10)").formatted(name, invoked, kindOf(slots.get(global(name, invoked)))));
+            }
+        }
         for (var what : knowledgeExpressions[k].unsupported()) {
-            reportKnowledge(k, Kind.UNSUPPORTED_FEATURE, "business knowledge model '%s' uses %s, which Praecepta does not evaluate yet"
-                    .formatted(name, what));
+            reportKnowledge(k, Kind.UNSUPPORTED_FEATURE, "business knowledge model '%s' uses %s"
+                    .formatted(name, FeelExpression.Unsupported.describe(List.of(what))));
         }
         for (var read : knowledgeExpressions[k].names()) {
             var required = DecisionModel.elementOf(read, scope::contains);
             if (required == null) {
                 reportKnowledge(k, Kind.MISSING_REQUIREMENT, ("business knowledge model '%s' reads '%s', which is neither one of its parameters "
                         + "nor a business knowledge model it requires (DMN 1.5, 6.3.10)").formatted(name, read));
-            } else if (valid.contains(required)) {
-                reads.put(read, slots.get(required));
+            } else if (valid.contains(global(name, required))) {
+                reads.put(read, slots.get(global(name, required)));
             }
         }
     }
@@ -323,6 +394,180 @@ final class GraphAnalysis {
         var table = new GraphNodes.EmbeddedTable(site, log);
         tables.add(table);
         return table;
+    }
+
+    // ---- decision services --------------------------------------------------------------------------
+
+    /**
+     * Checks a decision service's decisions and input data, and works out what it evaluates: its output decisions and the
+     * decisions they require, directly or not, but its input decisions, whose values are its arguments (DMN 1.5, 6.3.9),
+     * whether the service lists them as encapsulated or not. One of those that requires input data the service does not
+     * take could not be evaluated, and is reported.
+     */
+    private void checkService(int k) {
+        var service = model.decisionServices().get(k);
+        int invocable = model.knowledgeModels().size() + k;
+        var where = "decision service '%s'".formatted(service.name());
+        var parameters = new ArrayList<Integer>();
+        for (var name : service.inputData()) {
+            var slot = slots.get(name);
+            if (!isInputData(slot)) {
+                reportKnowledge(invocable, Kind.MISSING_REQUIREMENT, "%s takes input data '%s', which is %s".formatted(where, name,
+                        slot == null ? "not in the model" : kindOf(slot) + ", not input data"));
+            }
+            parameters.add(slot == null ? -1 : slot);
+        }
+        var inputs = new HashSet<Integer>();
+        for (var name : service.inputDecisions()) {
+            var slot = slots.get(name);
+            if (!isDecision(slot)) {
+                reportKnowledge(invocable, Kind.MISSING_REQUIREMENT, "%s takes decision '%s', which is %s".formatted(where, name,
+                        slot == null ? "not in the model" : kindOf(slot) + ", not a decision"));
+            } else {
+                inputs.add(slot - inputCount);
+            }
+            parameters.add(slot == null ? -1 : slot);
+        }
+        var outputs = new ArrayList<Integer>();
+        var named = new ArrayList<>(service.outputDecisions());
+        named.addAll(service.encapsulatedDecisions());
+        for (int i = 0; i < named.size(); i++) {
+            var slot = slots.get(named.get(i));
+            if (!isDecision(slot)) {
+                reportKnowledge(invocable, Kind.MISSING_REQUIREMENT, "%s evaluates decision '%s', which is %s".formatted(where, named.get(i),
+                        slot == null ? "not in the model" : kindOf(slot) + ", not a decision"));
+            } else if (i < service.outputDecisions().size()) {
+                outputs.add(slot - inputCount);
+            }
+        }
+        var evaluated = new LinkedHashSet<Integer>();
+        var pending = new ArrayDeque<>(outputs);
+        while (!pending.isEmpty()) {
+            int d = pending.pop();
+            if (inputs.contains(d) || !evaluated.add(d)) {
+                continue;
+            }
+            var decision = model.decisions().get(d);
+            for (var name : decision.requiredDecisions()) {
+                var slot = slots.get(name);
+                if (isDecision(slot)) {
+                    pending.push(slot - inputCount);
+                }
+            }
+            for (var name : decision.requiredInputs()) {
+                if (!service.inputData().contains(name) && isInputData(slots.get(name))) {
+                    reportKnowledge(invocable, Kind.MISSING_REQUIREMENT, ("%s evaluates decision '%s', which requires input data '%s', "
+                            + "which the service does not take (DMN 1.5, 6.3.9)").formatted(where, decision.name(), name));
+                }
+            }
+        }
+        serviceParameters.add(parameters.stream().mapToInt(Integer::intValue).toArray());
+        serviceOutputs.add(outputs.stream().mapToInt(Integer::intValue).toArray());
+        serviceDecisions.add(evaluated.stream().mapToInt(Integer::intValue).toArray());
+    }
+
+    /**
+     * Types every decision service as a function of its parameters' types, giving its one output decision's type, or a
+     * context of its output decisions' types; one whose variable declares a function type has that type.
+     */
+    private void typeServices() {
+        for (int k = 0; k < model.decisionServices().size(); k++) {
+            typeService(k);
+        }
+    }
+
+    /**
+     * Types a decision service, once its output decisions are typed; a decision that invokes it, typed before, reads it
+     * as its declared type.
+     */
+    private void typeService(int k) {
+        var service = model.decisionServices().get(k);
+        int slot = inputCount + decisionCount + model.knowledgeModels().size() + k;
+        if (service.type() instanceof FeelType.FunctionOf) {
+            types[slot] = service.type();
+            return;
+        }
+        var outputs = serviceOutputs.get(k);
+        for (int d : outputs) {
+            if (types[inputCount + d] == null) {
+                return;
+            }
+        }
+        var parameters = new ArrayList<FeelType>();
+        for (int parameter : serviceParameters.get(k)) {
+            parameters.add(parameter < 0 || types[parameter] == null ? FeelType.ANY : types[parameter]);
+        }
+        FeelType result;
+        if (outputs.length == 1) {
+            result = types[inputCount + outputs[0]];
+        } else {
+            var components = new LinkedHashMap<String, FeelType>();
+            for (int d : outputs) {
+                components.put(model.decisions().get(d).name(), types[inputCount + d]);
+            }
+            result = new FeelType.Context(components);
+        }
+        types[slot] = new FeelType.FunctionOf(parameters, result);
+    }
+
+    /**
+     * Blocks, until nothing changes, a decision service that evaluates a decision that cannot be evaluated, and the
+     * decisions and business knowledge models that require an invocable that cannot be.
+     */
+    private void blockThroughInvocables() {
+        int knowledgeCount = model.knowledgeModels().size();
+        int base = inputCount + decisionCount;
+        for (boolean changed = true; changed;) {
+            changed = false;
+            for (int k = 0; k < model.decisionServices().size(); k++) {
+                if (knowledgeBlocked[knowledgeCount + k] != null) {
+                    continue;
+                }
+                for (int d : serviceDecisions.get(k)) {
+                    // what a decision only inherits from the decisions it requires is the service's to provide: its input decisions
+                    if (blocked[d] != null && !inherited[d]) {
+                        knowledgeBlocked[knowledgeCount + k] = "it evaluates decision '%s', which cannot be evaluated: %s"
+                                .formatted(model.decisions().get(d).name(), blocked[d]);
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            for (int k = 0; k < knowledgeCount; k++) {
+                changed |= blockOnInvocable(model.knowledgeModels().get(k).requiredKnowledge(), base, k, -1);
+            }
+            for (int d = 0; d < decisionCount; d++) {
+                changed |= blockOnInvocable(model.decisions().get(d).requiredKnowledge(), base, -1, d);
+                for (int r : requiredDecisions.get(d)) {
+                    if (blocked[d] == null && blocked[r] != null) {
+                        inherited[d] = true;
+                        blocked[d] = "it requires decision '%s', which cannot be evaluated: %s".formatted(model.decisions().get(r).name(),
+                                blocked[r]);
+                        changed = true;
+                    }
+                }
+            }
+        }
+    }
+
+    /** Blocks business knowledge model {@code k}, or decision {@code d}, if one of the invocables it requires cannot be evaluated. */
+    private boolean blockOnInvocable(List<String> required, int base, int k, int d) {
+        if (k >= 0 ? knowledgeBlocked[k] != null : blocked[d] != null) {
+            return false;
+        }
+        for (var name : required) {
+            var slot = slots.get(name);
+            if (slot != null && isKnowledge(slot) && knowledgeBlocked[slot - base] != null) {
+                var reason = "it requires %s '%s', which cannot be evaluated".formatted(kindOf(slot), name);
+                if (k >= 0) {
+                    knowledgeBlocked[k] = reason;
+                } else {
+                    blocked[d] = reason;
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Reports an issue of a business knowledge model, which then cannot be evaluated, nor what requires it. */
@@ -382,7 +627,12 @@ final class GraphAnalysis {
             var reads = knowledgeReads.get(k);
             var computed = expression.type(name -> {
                 var read = reads.get(name);
-                return read == null ? null : typeKnowledge(read - inputCount - decisionCount, state);
+                if (read == null) {
+                    return null;
+                }
+                int index = read - inputCount - decisionCount;
+                // a decision service is typed after the decisions, so a business knowledge model reads it as any function
+                return index < state.length ? typeKnowledge(index, state) : FeelType.ANY;
             });
             type = declared instanceof FeelType.Any ? computed : declared;
         }
@@ -400,7 +650,7 @@ final class GraphAnalysis {
     private void resolveReads(int d) {
         embeddedTables.add(List.of());
         var decision = model.decisions().get(d);
-        var scope = new HashSet<>(decision.requirements());
+        var scope = localScope(decision.name(), decision.requirements());
         var valid = new HashSet<String>();
         decision.requiredDecisions().stream().filter(name -> isDecision(slots.get(name))).forEach(valid::add);
         decision.requiredInputs().stream().filter(name -> isInputData(slots.get(name))).forEach(valid::add);
@@ -412,6 +662,11 @@ final class GraphAnalysis {
                 var read = tableReads(decision.name(), table, tableScope(scope, table, model.types()));
                 tableReads.add(read);
                 names.addAll(read.names());
+            }
+            case DecisionLogic.NoLogic none -> {
+                // a decision a person makes: no issue of the model, but nothing the graph evaluates (DMN 1.5, 6.3.7)
+                tableReads.add(TableReads.NONE);
+                blocked[d] = "it has no decision logic; its value is given only to a decision service that takes it as an input decision";
             }
             default -> {
                 tableReads.add(TableReads.NONE);
@@ -426,9 +681,9 @@ final class GraphAnalysis {
             if (requirement == null) {
                 report(d, Kind.MISSING_REQUIREMENT, "decision '%s' reads '%s', which none of its information requirements provides (DMN 1.5, 7.3.4)"
                         .formatted(decision.name(), name));
-            } else if (valid.contains(requirement)) {
+            } else if (valid.contains(global(decision.name(), requirement))) {
                 var path = requirement.length() == name.length() ? new String[0] : name.substring(requirement.length() + 1).split("\\.");
-                resolved.put(name, new Resolution(slots.get(requirement), path, null));
+                resolved.put(name, new Resolution(slots.get(global(decision.name(), requirement)), path, null));
             }
             // else a requirement the model does not have, or of the other kind, which is reported already
         }
@@ -448,13 +703,21 @@ final class GraphAnalysis {
         try {
             var tables = new ArrayList<GraphNodes.EmbeddedTable>();
             embeddedTables.set(d, tables);
-            expressions[d] = FeelExpression.compose(logic, FeelExpression.scope(scope, model.types()), site -> embed(site, tables));
+            expressions[d] = FeelExpression.compose(logic, FeelExpression.closedScope(scope, model.types()), site -> embed(site, tables));
         } catch (ExpressionSyntaxException e) {
             report(d, Kind.INVALID_EXPRESSION, "decision '%s': %s".formatted(decision, e.getMessage()));
             return;
         }
+        for (var invoked : expressions[d].uninvocable()) {
+            // a function nothing in the model names is null when invoked, with an error, and its type always null; an
+            // element the decision does not require is a requirement missing
+            if (slots.containsKey(global(decision, invoked))) {
+                report(d, Kind.MISSING_REQUIREMENT, "decision '%s' invokes '%s', which is %s it does not require (DMN 1.5, 7.3.4)"
+                        .formatted(decision, invoked, kindOf(slots.get(global(decision, invoked)))));
+            }
+        }
         for (var what : expressions[d].unsupported()) {
-            report(d, Kind.UNSUPPORTED_FEATURE, "decision '%s' uses %s, which Praecepta does not evaluate yet".formatted(decision, what));
+            report(d, Kind.UNSUPPORTED_FEATURE, "decision '%s' uses %s".formatted(decision, FeelExpression.Unsupported.describe(List.of(what))));
         }
     }
 
@@ -819,7 +1082,7 @@ final class GraphAnalysis {
      */
     private void typeDecisions() {
         var typed = new boolean[model.decisions().size()];
-        for (int d : order) {
+        for (int d : typingOrder()) {
             typeDecision(d);
             typed[d] = true;
         }
@@ -835,7 +1098,65 @@ final class GraphAnalysis {
         }
     }
 
+    /**
+     * The order the decisions in no cycle are typed in: {@link #order}, but each decision that invokes a decision service
+     * after the decisions the service evaluates, so that it reads the service's type, unless they invoke it in turn.
+     * Worked out with a stack of its own.
+     */
+    private int[] typingOrder() {
+        var inOrder = new boolean[decisionCount];
+        for (int d : order) {
+            inOrder[d] = true;
+        }
+        int services = inputCount + decisionCount + model.knowledgeModels().size();
+        var state = new int[decisionCount]; // 0: not visited, 1: being visited, 2: placed
+        var result = new ArrayList<Integer>();
+        for (int start : order) {
+            var stack = new ArrayDeque<int[]>(); // decision, and whether its predecessors were pushed
+            stack.push(new int[] {start, 0});
+            while (!stack.isEmpty()) {
+                var top = stack.peek();
+                int d = top[0];
+                if (state[d] == 2) {
+                    stack.pop();
+                    continue;
+                }
+                if (top[1] == 1) {
+                    stack.pop();
+                    state[d] = 2;
+                    result.add(d);
+                    continue;
+                }
+                top[1] = 1;
+                state[d] = 1;
+                for (int r : requiredDecisions.get(d)) {
+                    if (state[r] == 0 && inOrder[r]) {
+                        stack.push(new int[] {r, 0});
+                    }
+                }
+                for (var name : model.decisions().get(d).requiredKnowledge()) {
+                    var slot = slots.get(name);
+                    if (slot != null && slot >= services) {
+                        for (int e : serviceDecisions.get(slot - services)) {
+                            if (state[e] == 0 && inOrder[e]) {
+                                stack.push(new int[] {e, 0});
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return result.stream().mapToInt(Integer::intValue).toArray();
+    }
+
     private void typeDecision(int d) {
+        int services = inputCount + decisionCount + model.knowledgeModels().size();
+        for (var name : model.decisions().get(d).requiredKnowledge()) {
+            var slot = slots.get(name);
+            if (slot != null && slot >= services) {
+                typeService(slot - services); // its outputs, which do not require this decision, are typed already
+            }
+        }
         locateReads(d);
         var decision = model.decisions().get(d);
         types[inputCount + d] = switch (decision.logic()) {
@@ -861,7 +1182,8 @@ final class GraphAnalysis {
     private void locateReads(int d) {
         reads.get(d).replaceAll((name, resolution) -> {
             var path = resolution.path();
-            var type = types[resolution.slot()];
+            // a decision service not typed yet reads as any type
+            var type = types[resolution.slot()] == null ? FeelType.ANY : types[resolution.slot()];
             var at = new StringBuilder(rootName(name, path));
             for (var component : path) {
                 var next = type.component(component);
@@ -1150,6 +1472,7 @@ final class GraphAnalysis {
             ordered[d] = true;
             for (int r : requiredDecisions.get(d)) {
                 if (blocked[d] == null && blocked[r] != null) {
+                    inherited[d] = true;
                     blocked[d] = "it requires decision '%s', which cannot be evaluated: %s".formatted(model.decisions().get(r).name(), blocked[r]);
                 }
             }

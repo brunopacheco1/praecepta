@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -80,13 +81,36 @@ final class GraphEvaluator implements ModelEvaluator {
 
     @Override
     public Evaluation evaluate(Check check) {
+        if (check.kind() == Invocable.DECISION_SERVICE) {
+            return service(check, check.invocable(), check.decision());
+        }
+        if (check.kind() == Invocable.KNOWLEDGE_MODEL) {
+            return knowledgeModel(check, check.invocable());
+        }
+        if (check.kind() == Invocable.DECISION && check.model().decision(check.decision()) == null) {
+            // a result node named after a decision service, without the test case's type, is the service's value
+            var read = read(check.model());
+            if (read.graph() != null && read.graph().decisionServices().contains(check.decision())) {
+                return service(check, check.decision(), null);
+            }
+        }
         if (check.kind() != Invocable.DECISION || check.model().decision(check.decision()) == null) {
             return new Evaluation.Unsupported(single.needsBesideGraphs(check, List.of()));
         }
         var read = read(check.model());
         if (read.rejected() != null) {
-            return single.needsBesideGraphs(check, List.of()).isEmpty() ? notTaken(check, read.rejected())
-                    : new Evaluation.Unsupported(besideGraphs(check));
+            if (single.needsBesideGraphs(check, List.of()).isEmpty()) {
+                return notTaken(check, read.rejected());
+            }
+            var needs = besideGraphs(check);
+            if (read.rejected().area() == Feature.Area.NOT_PLANNED && !needs.contains(read.rejected())) {
+                // what Praecepta does not evaluate by design, elsewhere in the model, keeps it from the graph for good
+                var all = new ArrayList<Feature>();
+                all.add(read.rejected());
+                all.addAll(needs);
+                needs = all;
+            }
+            return new Evaluation.Unsupported(needs);
         }
         DecisionGraph graph;
         try {
@@ -110,6 +134,72 @@ final class GraphEvaluator implements ModelEvaluator {
     }
 
     /**
+     * A decision service invoked with the test case's inputs as its arguments (DMN 1.5, 6.3.9): the value of the output
+     * decision the node names, or, for {@code output} null, the service's value, its one output decision's or a context
+     * of them all.
+     */
+    private Evaluation service(Check check, String service, String output) {
+        var read = read(check.model());
+        if (read.rejected() != null) {
+            return new Evaluation.Unsupported(single.needsBesideGraphs(check, List.of()));
+        }
+        var graph = read.graph();
+        var model = graph.model().decisionService(service).orElse(null);
+        if (model == null) {
+            return new Evaluation.Failure("the model has no decision service named '" + service + "'");
+        }
+        var arguments = new HashMap<String, Object>();
+        for (var parameter : model.parameters()) {
+            var given = check.inputs().get(parameter);
+            if (given != null) {
+                // FEEL values, typed as the kit types them, which the service binds to its parameters' types as an invocation does
+                arguments.put(parameter, input(given, FeelType.ANY));
+            }
+        }
+        DecisionGraph.Outcome outcome;
+        try {
+            outcome = graph.evaluateService(service, arguments);
+        } catch (InvalidDecisionTableException e) {
+            return notTaken(check, REPORTED);
+        } catch (HitPolicyViolationException | InvalidInputException e) {
+            return new Evaluation.Error(e.getMessage());
+        }
+        var outputs = (Map<?, ?>) outcome.value();
+        Object value;
+        if (output != null) {
+            value = outputs.get(output);
+        } else {
+            value = outputs.size() == 1 ? outputs.values().iterator().next() : outputs;
+        }
+        var errors = new ArrayList<String>();
+        outcome.errors().values().forEach(errors::addAll);
+        return evaluation(check, new DecisionGraph.Outcome(value, errors.isEmpty() ? Map.of() : Map.of(check.decision(), errors)), true);
+    }
+
+    /** A business knowledge model invoked with the test case's inputs as its arguments, by parameter name (DMN 1.5, 6.3.10). */
+    private Evaluation knowledgeModel(Check check, String knowledgeModel) {
+        var read = read(check.model());
+        if (read.rejected() != null) {
+            return new Evaluation.Unsupported(single.needsBesideGraphs(check, List.of()));
+        }
+        var graph = read.graph();
+        if (!graph.knowledgeModels().contains(knowledgeModel)) {
+            return new Evaluation.Failure("the model has no business knowledge model named '" + knowledgeModel + "'");
+        }
+        var arguments = new HashMap<String, Object>();
+        check.inputs().forEach((name, given) -> arguments.put(name, input(given, FeelType.ANY)));
+        DecisionGraph.Outcome outcome;
+        try {
+            outcome = graph.invokeKnowledgeModel(knowledgeModel, arguments);
+        } catch (InvalidDecisionTableException e) {
+            return notTaken(check, REPORTED);
+        }
+        var errors = new ArrayList<String>();
+        outcome.errors().values().forEach(errors::addAll);
+        return evaluation(check, new DecisionGraph.Outcome(outcome.value(), errors.isEmpty() ? Map.of() : Map.of(check.decision(), errors)), true);
+    }
+
+    /**
      * What a graph's outcome is for the kit: the error FEEL reported, where the decision's value is null, its own logic
      * reported one and the kit expects an error (DMN 1.5, 10.3.2.15: the value is null, and the error is reported);
      * otherwise the value.
@@ -126,7 +216,7 @@ final class GraphEvaluator implements ModelEvaluator {
     private Read read(DmnModel model) {
         return models.computeIfAbsent(model.file().toString(), file -> {
             try (InputStream dmn = Files.newInputStream(model.file())) {
-                var decisionModel = DmnReader.readModel(dmn);
+                var decisionModel = DmnReader.readModel(dmn, imports(model.file().getParent()));
                 return new Read(decisionModel, build(decisionModel), null);
             } catch (InvalidDecisionTableException e) {
                 return new Read(null, null, rejected(e));
@@ -170,19 +260,54 @@ final class GraphEvaluator implements ModelEvaluator {
             decisions.add(new DecisionModel.Decision(decision.name(), requiredDecisions, requiredInputs, decision.requiredKnowledge(),
                     decision.logic()));
         }
-        return new DecisionModel(read.model().name(), inputData, decisions, read.model().knowledgeModels(), read.model().types());
+        return new DecisionModel(read.model().name(), inputData, decisions, read.model().knowledgeModels(), read.model().decisionServices(),
+                read.model().types());
     }
 
-    /** The test case's inputs as the graph takes them: values of simple types as text, typed by the kit where undeclared. */
+    /**
+     * The test case's inputs as the graph takes them: values of simple types as text, typed by the kit where undeclared;
+     * an input of an imported model under its name in the graph.
+     */
     private static Map<String, Object> inputs(Check check, DecisionGraph graph) {
+        var given = new HashMap<String, TckValue>();
+        check.inputs().forEach((key, value) -> {
+            if (key.startsWith("{") && key.indexOf('}') > 0) {
+                given.put(graph.nameOf(key.substring(1, key.indexOf('}')), key.substring(key.indexOf('}') + 1)), value);
+            } else {
+                given.put(key, value);
+            }
+        });
         var values = new HashMap<String, Object>();
         graph.inputData().forEach((name, type) -> {
-            var given = check.inputs().get(name);
-            if (given != null) {
-                values.put(name, input(given, type));
+            var value = given.get(name);
+            if (value != null) {
+                values.put(name, input(value, type));
             }
         });
         return values;
+    }
+
+    /**
+     * Finds the models a model imports among the DMN files of its test case's directory: by its {@code locationURI}, else
+     * by namespace.
+     */
+    private static DmnReader.ImportResolver imports(Path directory) {
+        return (namespace, location) -> {
+            if (!location.isEmpty()) {
+                var file = directory.resolve(location).normalize();
+                if (Files.isRegularFile(file)) {
+                    return Files.newInputStream(file);
+                }
+            }
+            try (var files = Files.list(directory)) {
+                for (var file : files.filter(f -> f.toString().endsWith(".dmn")).sorted().toList()) {
+                    if (namespace.equals(TckXml.parse(file).getAttribute("namespace").strip())) {
+                        return Files.newInputStream(file);
+                    }
+                }
+            }
+            return null;
+        };
     }
 
     static Object input(TckValue given, FeelType type) {
@@ -296,6 +421,9 @@ final class GraphEvaluator implements ModelEvaluator {
                     ? "item definitions Praecepta does not read, elsewhere in the model"
                     : "models Praecepta does not read as a whole");
         }
+        if (unsupported.release() == null) {
+            return Feature.EXTERNAL_FUNCTIONS; // what Praecepta does not evaluate by design
+        }
         return switch (unsupported.issue()) {
             case 119 -> {
                 if (message.contains("decision service")) {
@@ -304,7 +432,8 @@ final class GraphEvaluator implements ModelEvaluator {
                 if (message.contains("has no decision logic")) {
                     yield Feature.NO_LOGIC;
                 }
-                yield message.contains("defines a function in") ? Feature.EXTERNAL_FUNCTIONS : Feature.IMPORTS;
+                yield message.contains("defines a function in") || message.contains("external function") ? Feature.EXTERNAL_FUNCTIONS
+                        : Feature.IMPORTS;
             }
             case 118 -> message.startsWith("DMN model has the business knowledge model") || message.contains("requires business knowledge")
                     ? Feature.KNOWLEDGE_MODELS : Feature.boxed("boxed expressions elsewhere in the model");

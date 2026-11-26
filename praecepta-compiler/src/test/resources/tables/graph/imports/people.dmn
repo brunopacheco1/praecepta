@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A model other models import: a type, an input data, a decision and a business knowledge model. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="people" name="People" namespace="https://example.com/people">
+  <itemDefinition name="tPerson">
+    <itemComponent name="name"><typeRef>string</typeRef></itemComponent>
+    <itemComponent name="age"><typeRef>number</typeRef></itemComponent>
+  </itemDefinition>
+  <inputData id="person" name="Person"><variable name="Person" typeRef="tPerson"/></inputData>
+  <decision id="adult" name="Adult">
+    <variable name="Adult" typeRef="boolean"/>
+    <informationRequirement><requiredInput href="#person"/></informationRequirement>
+    <literalExpression><text>Person.age &gt;= 18</text></literalExpression>
+  </decision>
+  <businessKnowledgeModel id="greet" name="Greet">
+    <variable name="Greet"/>
+    <encapsulatedLogic>
+      <formalParameter name="who" typeRef="tPerson"/>
+      <literalExpression><text>"Hello " + who.name</text></literalExpression>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+</definitions>

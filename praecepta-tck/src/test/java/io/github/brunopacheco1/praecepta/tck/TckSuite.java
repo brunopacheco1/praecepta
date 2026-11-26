@@ -79,6 +79,11 @@ final class TckSuite {
     private TckSuite() {
     }
 
+    /** The key of an input of an imported model among a test case's inputs: its namespace and its name. */
+    static String imported(String namespace, String name) {
+        return "{" + namespace + "}" + name;
+    }
+
     static Path root() {
         try {
             return Path.of(TckSuite.class.getResource("/tck").toURI());
@@ -114,7 +119,10 @@ final class TckSuite {
             var kind = Invocable.of(test.getAttribute("type"));
             var inputs = new LinkedHashMap<String, TckValue>();
             for (var input : TckXml.children(test, "inputNode")) {
-                inputs.put(input.getAttribute("name"), TckValue.read(input));
+                // an input of a model the test file's model imports names that model's namespace
+                var namespace = input.getAttribute("namespace").strip();
+                inputs.put(namespace.isEmpty() ? input.getAttribute("name") : imported(namespace, input.getAttribute("name")),
+                        TckValue.read(input));
             }
             for (var result : TckXml.children(test, "resultNode")) {
                 checks.add(check(testCase, testFile, test, kind, result, model, inputs));

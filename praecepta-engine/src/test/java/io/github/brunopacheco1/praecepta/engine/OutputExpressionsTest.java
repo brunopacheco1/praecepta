@@ -197,14 +197,14 @@ class OutputExpressionsTest {
         Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, unknown))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessage("The table's expressions read 'tax', which has no input binding");
-        // FEEL's built-in functions since 0.9 (#117); external functions are planned for 0.11 (#119)
+        // FEEL's built-in functions since 0.9 (#117); external functions Praecepta does not evaluate, by design
         var call = byColumn(HitPolicy.FIRST, List.of(rule(1, Map.of(), Map.of(), Map.of("x", "abs(price)"))));
         Assertions.assertThat(call.evaluate(new Order("PT", new BigDecimal("-2.5"), null, null))).containsExactly(values("x", "2.5"));
         var external = List.of(rule(1, Map.of(), Map.of(), Map.of("x", "(function(a) external {java: {class: \"C\"}})(price)")));
         Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, external))
                 .isInstanceOf(UnsupportedFeatureException.class)
-                .hasMessage("Rule 1, output 'x' uses an external function (Java or PMML), planned for 0.11 (#119), which Praecepta "
-                        + "does not support yet");
+                .hasMessage("Rule 1, output 'x' uses an external function (Java or PMML), which Praecepta does not evaluate, by "
+                        + "design");
     }
 
     @Test

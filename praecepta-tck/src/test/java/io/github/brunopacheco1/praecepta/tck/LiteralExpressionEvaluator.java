@@ -88,6 +88,12 @@ final class LiteralExpressionEvaluator {
         var builder = DecisionGraph.builder().name(String.valueOf(model.root().getAttribute("name"))).logValidationReport(false);
         var inputs = new HashMap<String, Object>();
         var required = new ArrayList<String>();
+        for (var name : expression.uninvocable()) {
+            // a function the model has, a business knowledge model or a decision service, which the expression alone lacks
+            if (model.knowledgeModel(name) != null || model.service(name) != null || model.decision(name) != null) {
+                throw new Unsupported(unknownName(text, model));
+            }
+        }
         for (var name : expression.names()) {
             Element owner = model.inputData(name);
             if (owner == null && model.decision(name) != null) {

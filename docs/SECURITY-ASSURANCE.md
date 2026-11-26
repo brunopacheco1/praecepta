@@ -93,13 +93,15 @@ tables to load and how strictly to check them.
   limits; the engine has no
   runtime dependencies.
 - **Fail-safe defaults:** unsupported DMN features, unknown cell syntax and undeclared values are
-  rejected, not ignored; the only elements left out are a decision service nothing invokes and a decision without
-  logic nothing requires (since 0.10), which change no value evaluated. XML features are off unless needed.
+  rejected, not ignored; a decision without logic is read but not evaluated, as its value is a person's to give
+  (since 0.11). XML features are off unless needed.
 - **Complete mediation:** every table goes through the same parser and validation, whatever its
   source.
 - **Least privilege and least common mechanism:** no network, file (except reading the tables the
   caller or the application's settings name), process or reflection access at runtime, in the engine and
-  in the integrations alike; no shared mutable state.
+  in the integrations alike; no shared mutable state. A model's imports (since 0.11) are found among the files the
+  integrations load, or, at build time, in the model's own directory, never outside it, whatever its `locationURI`
+  says; the engine reads only what the caller's `ImportResolver` gives it.
 - **Open design:** everything, including the threat model and the fuzzing, is public.
 - **Psychological acceptability:** validation errors name the decision, rule and column, so the safe
   path is also the easy one.

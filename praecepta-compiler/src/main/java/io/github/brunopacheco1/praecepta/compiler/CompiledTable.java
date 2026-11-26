@@ -34,13 +34,23 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
  * @param reports     every report to give as the tool's warnings, by the generated class it concerns: the table's by
  *                    {@code className}; of a decision model, its graph's by the model class and each decision table's
  *                    by its decision's class
+ * @param imports     the models a decision model imports (DMN 1.5, 6.3.3), as DMN, by their resource's file name, to ship
+ *                    in the package's directory beside {@link #resourcePath()}, where the model class reads them; empty
+ *                    for a model that imports none, and for a table
  */
 public record CompiledTable(DecisionTable table, String packageName, String className, ValidationReport report, String dmn,
-        Map<String, String> sources, DecisionModel model, Map<String, ValidationReport> reports) {
+        Map<String, String> sources, DecisionModel model, Map<String, ValidationReport> reports, Map<String, String> imports) {
 
     public CompiledTable {
         sources = Collections.unmodifiableMap(new LinkedHashMap<>(sources));
         reports = Collections.unmodifiableMap(new LinkedHashMap<>(reports));
+        imports = Collections.unmodifiableMap(new LinkedHashMap<>(imports));
+    }
+
+    /** A compiled decision model that imports no other. */
+    public CompiledTable(DecisionTable table, String packageName, String className, ValidationReport report, String dmn,
+            Map<String, String> sources, DecisionModel model, Map<String, ValidationReport> reports) {
+        this(table, packageName, className, report, dmn, sources, model, reports, Map.of());
     }
 
     /** A compiled table: its report is the only one, by its class. */
@@ -81,11 +91,14 @@ public record CompiledTable(DecisionTable table, String packageName, String clas
      * Writes the DMN resource under {@code resourceRoot} and the Java sources under {@code sourceRoot}, each
      * in the package's directory.
      *
-     * @return the files written: the DMN resource, then the sources
+     * @return the files written: the DMN resource, those of the models it imports, then the sources
      */
     public List<Path> write(Path sourceRoot, Path resourceRoot) throws IOException {
         var written = new ArrayList<Path>();
         written.add(write(resourceRoot.resolve(resourcePath()), dmn));
+        for (var imported : imports.entrySet()) {
+            written.add(write(resourceRoot.resolve(packagePath() + imported.getKey()), imported.getValue()));
+        }
         for (var source : sources.entrySet()) {
             written.add(write(sourceRoot.resolve(packagePath() + source.getKey() + ".java"), source.getValue()));
         }

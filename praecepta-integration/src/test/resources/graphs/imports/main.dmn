@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A model that imports People by name and Labels, which imports People too: People is one model, and Person one input. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="main" name="Main" namespace="https://example.com/main">
+  <import name="people" namespace="https://example.com/people" importType="https://www.omg.org/spec/DMN/20230324/MODEL/" locationURI="people.dmn"/>
+  <import name="labels" namespace="https://example.com/labels" importType="https://www.omg.org/spec/DMN/20230324/MODEL/" locationURI="labels.dmn"/>
+  <inputData id="guest" name="Guest"><variable name="Guest" typeRef="people.tPerson"/></inputData>
+  <decision id="welcome" name="Welcome">
+    <variable name="Welcome" typeRef="string"/>
+    <informationRequirement><requiredInput href="#guest"/></informationRequirement>
+    <informationRequirement><requiredDecision href="https://example.com/labels#label"/></informationRequirement>
+    <knowledgeRequirement><requiredKnowledge href="https://example.com/people#greet"/></knowledgeRequirement>
+    <literalExpression><text>people.Greet(Guest) + "; host: " + labels.Label</text></literalExpression>
+  </decision>
+</definitions>

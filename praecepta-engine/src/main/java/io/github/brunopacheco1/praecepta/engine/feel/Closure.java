@@ -114,6 +114,13 @@ final class Closure implements FeelFunction {
         if (type.equals(FeelType.of(ColumnType.DATE_TIME)) && value instanceof LocalDate date) {
             return date.atStartOfDay(ZoneOffset.UTC);
         }
+        if (type instanceof FeelType.FunctionOf function && value instanceof BuiltInFunction builtIn) {
+            // a built-in whose result depends on its arguments, bound to a function of a known result type
+            var bound = builtIn.returning(function);
+            if (bound != null) {
+                return bound;
+            }
+        }
         return NOT_BOUND;
     }
 

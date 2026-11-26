@@ -70,6 +70,8 @@ public final class DmnWriter {
     private static final String DECISION = "decision_";
     /** The prefix of a business knowledge model's id. */
     private static final String KNOWLEDGE_MODEL = "knowledge_model_";
+    /** The prefix of a decision service's id. */
+    private static final String DECISION_SERVICE = "decision_service_";
     /** The suffix of the name of the item definition of an input data's or a decision's type. */
     private static final String TYPE_SUFFIX = "_type";
     private static final String VARIABLE = "    <variable";
@@ -132,15 +134,18 @@ public final class DmnWriter {
         var namespace = model.decisions().stream().anyMatch(decision -> needsDmn15(decision.logic()))
                 || model.knowledgeModels().stream().anyMatch(knowledgeModel -> needsDmn15(knowledgeModel.logic())) ? NAMESPACE_15 : NAMESPACE;
         xml.append("<definitions").append(attribute("xmlns", namespace)).append(idAndName("definitions_" + id, model.name()))
-           .append(attribute("namespace", "https://github.com/brunopacheco1/praecepta/" + id)).append(">\n");
+           .append(attribute("namespace", model.namespace().isEmpty() ? "https://github.com/brunopacheco1/praecepta/" + id : model.namespace())).append(">\n");
+        var ids = new HashMap<String, String>();
+        for (var imported : model.imports()) {
+            imports(xml, imported, ids);
+        }
         model.types().forEach((name, type) -> namedType(xml, name, type));
         var boxedTypes = new BoxedTypes(xml, model.types());
-        var ids = new HashMap<String, String>();
         var inputData = model.inputData();
         var decisions = model.decisions();
         var inputTypes = new String[inputData.size()];
         for (int i = 0; i < inputData.size(); i++) {
-            ids.put(inputData.get(i).name(), INPUT_DATA + i);
+            ids.put(inputData.get(i).name(), "#" + INPUT_DATA + i);
             inputTypes[i] = elementTypeRef(xml, inputData.get(i).type(), INPUT_DATA + i + TYPE_SUFFIX, model.types(),
                     "input data '" + inputData.get(i).name() + "'");
         }
@@ -149,7 +154,7 @@ public final class DmnWriter {
         for (int d = 0; d < decisions.size(); d++) {
             prefixes[d] = tablePrefix(d, model.types());
             var decision = decisions.get(d);
-            ids.put(decision.name(), DECISION + d);
+            ids.put(decision.name(), "#" + DECISION + d);
             switch (decision.logic()) {
                 case DecisionLogic.Table(var table, var type) -> {
                     listItemDefinitions(xml, table, prefixes[d]);
@@ -162,10 +167,15 @@ public final class DmnWriter {
                 }
             }
         }
+        var services = model.decisionServices();
+        for (int k = 0; k < services.size(); k++) {
+            ids.put(services.get(k).name(), "#" + DECISION_SERVICE + k);
+            boxedTypes.declare(services.get(k).type(), "decision service '" + services.get(k).name() + "'");
+        }
         var knowledgeModels = model.knowledgeModels();
         for (int k = 0; k < knowledgeModels.size(); k++) {
             var knowledgeModel = knowledgeModels.get(k);
-            ids.put(knowledgeModel.name(), KNOWLEDGE_MODEL + k);
+            ids.put(knowledgeModel.name(), "#" + KNOWLEDGE_MODEL + k);
             boxedTypes.declare(KNOWLEDGE_MODEL + k + "_", knowledgeModel.logic(), false, "business knowledge model '" + knowledgeModel.name() + "'");
         }
         for (int i = 0; i < inputData.size(); i++) {
@@ -179,6 +189,9 @@ public final class DmnWriter {
         }
         for (int k = 0; k < knowledgeModels.size(); k++) {
             knowledgeModel(xml, k, knowledgeModels.get(k), ids, boxedTypes);
+        }
+        for (int k = 0; k < services.size(); k++) {
+            decisionService(xml, k, services.get(k), ids, boxedTypes);
         }
         xml.append("</definitions>\n");
         return xml.toString();
@@ -262,12 +275,12 @@ public final class DmnWriter {
             }
             if (r >= information) {
                 xml.append("    <knowledgeRequirement").append(id(DECISION + d + "_requirement_" + r)).append("><requiredKnowledge")
-                   .append(attribute("href", "#" + href)).append("/></knowledgeRequirement>\n");
+                   .append(attribute("href", href)).append("/></knowledgeRequirement>\n");
                 continue;
             }
             var kind = r < decision.requiredDecisions().size() ? "requiredDecision" : "requiredInput";
             xml.append("    <informationRequirement").append(id(DECISION + d + "_requirement_" + r)).append("><").append(kind)
-               .append(attribute("href", "#" + href)).append("/></informationRequirement>\n");
+               .append(attribute("href", href)).append("/></informationRequirement>\n");
         }
         switch (decision.logic()) {
             case DecisionLogic.Table(var table, var tableType) -> decisionTable(xml, table, prefix);
@@ -276,6 +289,34 @@ public final class DmnWriter {
             default -> boxed(xml, decision.logic(), null, "    ", boxedTypes);
         }
         xml.append("  </decision>\n");
+    }
+
+    /**
+     * An import (DMN 1.5, 6.3.3) of a model, and the hrefs of the elements the importing model reads of it: its namespace
+     * and the id {@link #write(DecisionModel)} gives each in that model's own file ({@code namespace#decision_0}).
+     *
+     * @throws InvalidDecisionTableException if the imported model has no namespace, by which the import names it
+     */
+    private static void imports(StringBuilder xml, DecisionModel.Import imported, Map<String, String> ids) {
+        var model = imported.model();
+        if (model.namespace().isEmpty()) {
+            throw new InvalidDecisionTableException("The model imports model '%s', which has no namespace to import it by".formatted(model.name()));
+        }
+        xml.append("  <import").append(attribute("name", imported.name())).append(attribute("namespace", model.namespace()))
+           .append(attribute("importType", NAMESPACE_15)).append("/>\n");
+        var prefix = model.namespace() + "#";
+        for (int i = 0; i < model.inputData().size(); i++) {
+            ids.putIfAbsent(imported.qualified(model.inputData().get(i).name()), prefix + INPUT_DATA + i);
+        }
+        for (int d = 0; d < model.decisions().size(); d++) {
+            ids.putIfAbsent(imported.qualified(model.decisions().get(d).name()), prefix + DECISION + d);
+        }
+        for (int k = 0; k < model.knowledgeModels().size(); k++) {
+            ids.putIfAbsent(imported.qualified(model.knowledgeModels().get(k).name()), prefix + KNOWLEDGE_MODEL + k);
+        }
+        for (int k = 0; k < model.decisionServices().size(); k++) {
+            ids.putIfAbsent(imported.qualified(model.decisionServices().get(k).name()), prefix + DECISION_SERVICE + k);
+        }
     }
 
     /** Whether a decision's logic holds a boxed expression that DMN 1.3 does not have: a conditional, an iterator or a filter. */
@@ -366,7 +407,7 @@ public final class DmnWriter {
             }
         }
 
-        private void declare(FeelType type, String where) {
+        void declare(FeelType type, String where) {
             if (type instanceof FeelType.Simple || type instanceof FeelType.Any || written.containsKey(type)) {
                 return;
             }
@@ -468,6 +509,9 @@ public final class DmnWriter {
                 part(xml, kind == DecisionLogic.Iteration.Kind.FOR ? "return" : "satisfies", body, inner, types);
                 xml.append(indent).append("</").append(tag).append(">\n");
             }
+            case DecisionLogic.NoLogic none -> {
+                // a decision without logic holds no expression
+            }
             case DecisionLogic.Filter(var list, var match, var filterType) -> {
                 xml.append(indent).append("<filter").append(type).append(">\n");
                 part(xml, "in", list, inner, types);
@@ -509,9 +553,31 @@ public final class DmnWriter {
                         .formatted(where, required.get(r)));
             }
             xml.append("    <knowledgeRequirement").append(id(KNOWLEDGE_MODEL + k + "_requirement_" + r)).append("><requiredKnowledge")
-               .append(attribute("href", "#" + href)).append("/></knowledgeRequirement>\n");
+               .append(attribute("href", href)).append("/></knowledgeRequirement>\n");
         }
         xml.append("  </businessKnowledgeModel>\n");
+    }
+
+    /** A decision service at position {@code k}: its variable, of its type, and its decisions and input data, by reference. */
+    private static void decisionService(StringBuilder xml, int k, DecisionModel.DecisionService service, Map<String, String> ids,
+            BoxedTypes types) {
+        var where = "Decision service '" + service.name() + "'";
+        xml.append("  <decisionService").append(idAndName(DECISION_SERVICE + k, service.name())).append(">\n")
+           .append(VARIABLE).append(idAndName(DECISION_SERVICE + k + "_variable", service.name())).append(types.attributeOf(service.type()))
+           .append("/>\n");
+        var kinds = List.of("outputDecision", "encapsulatedDecision", "inputDecision", "inputData");
+        var lists = List.of(service.outputDecisions(), service.encapsulatedDecisions(), service.inputDecisions(), service.inputData());
+        for (int l = 0; l < kinds.size(); l++) {
+            for (var name : lists.get(l)) {
+                var href = ids.get(name);
+                if (href == null) {
+                    throw new InvalidDecisionTableException("%s refers to '%s', which is not in the model, so DMN cannot refer to it"
+                            .formatted(where, name));
+                }
+                xml.append("    <").append(kinds.get(l)).append(attribute("href", href)).append("/>\n");
+            }
+        }
+        xml.append("  </decisionService>\n");
     }
 
     /** A child element of a boxed expression holding one expression: {@code <if>}, {@code <in>}, {@code <return>}... */

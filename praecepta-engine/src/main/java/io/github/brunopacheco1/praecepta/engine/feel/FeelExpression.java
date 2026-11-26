@@ -76,22 +76,40 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic;
 public final class FeelExpression {
 
     /**
-     * What DMN 1.5 defines but Praecepta does not evaluate yet ({@link #unsupported()}), and the release that plans it.
+     * What DMN 1.5 defines but Praecepta does not evaluate ({@link #unsupported()}), and the release that plans it, if any.
      *
      * @param feature what it is: {@code an external function (Java or PMML)}
-     * @param release the release that plans it: {@code 0.11}
-     * @param issue   the GitHub issue that plans it: 119
+     * @param release the release that plans it; null for what Praecepta does not evaluate by design, as an external
+     *                function, since it runs no code from outside the model
+     * @param issue   the GitHub issue that plans it; 0 for what no release plans
      */
     public record Unsupported(String feature, String release, int issue) {
         public Unsupported {
             java.util.Objects.requireNonNull(feature, "feature");
-            java.util.Objects.requireNonNull(release, "release");
         }
 
-        /** As messages name it: {@code an external function (Java or PMML), planned for 0.11 (#119)}. */
+        /** Whether a release plans it; one with no release Praecepta does not evaluate by design. */
+        public boolean planned() {
+            return release != null;
+        }
+
+        /**
+         * As messages name it: {@code a feature, planned for 0.12 (#121)}, or, for what Praecepta does not evaluate by
+         * design, {@code an external function (Java or PMML), which Praecepta does not evaluate, by design}.
+         */
         @Override
         public String toString() {
-            return "%s, planned for %s (#%d)".formatted(feature, release, issue);
+            return planned() ? "%s, planned for %s (#%d)".formatted(feature, release, issue)
+                    : "%s, which Praecepta does not evaluate, by design".formatted(feature);
+        }
+
+        /**
+         * What an expression uses, as a message says it: each feature as {@link #toString()} names it, and, where a
+         * release plans one, that Praecepta does not evaluate it yet.
+         */
+        public static String describe(List<Unsupported> unsupported) {
+            var what = String.join(" and ", unsupported.stream().map(Object::toString).toList());
+            return unsupported.stream().anyMatch(Unsupported::planned) ? what + ", which Praecepta does not evaluate yet" : what;
         }
     }
 
@@ -99,6 +117,7 @@ public final class FeelExpression {
     private final Node root;
     private final List<String> names;
     private final List<Unsupported> unsupported;
+    private final List<String> uninvocable;
     private final int depth;
 
     /**
@@ -154,6 +173,7 @@ public final class FeelExpression {
         this.root = parsed.root();
         this.names = parsed.names();
         this.unsupported = parsed.unsupported();
+        this.uninvocable = parsed.uninvocable();
     }
 
     /**
@@ -167,7 +187,7 @@ public final class FeelExpression {
     }
 
     /** No names, indexed when first parsed against, so that loading this class does not load the parser. */
-    private static final Scope NO_NAMES = new Scope(List.of(), Map.of());
+    private static final Scope NO_NAMES = new Scope(List.of(), Map.of(), false);
 
     /**
      * Parses an expression with names in scope: those its values will be given for (DMN 1.5, 10.3.2.11).
@@ -231,6 +251,29 @@ public final class FeelExpression {
     }
 
     /**
+     * A function of these parameters, each bound to its declared type when it is invoked (DMN 1.5, 10.3.2.9.4, as a
+     * function definition's are), whose body FEEL does not evaluate itself: given the scope of the invocation, its
+     * parameters bound, the embedded expression gives the value, which is bound to {@code result} the same way (null,
+     * with an error, where it does not conform). A decision service is one. Invoked within an evaluation, it counts
+     * against that evaluation's limits, as any function does, and so does what its body evaluates.
+     *
+     * @param result the type its value is bound to; {@link FeelType#ANY} to take it as it is
+     */
+    public static FeelFunction function(List<DecisionLogic.Parameter> parameters, Embedded body, FeelType result) {
+        var names = new ArrayList<String>();
+        var types = new ArrayList<FeelType>();
+        for (var parameter : parameters) {
+            names.add(parameter.name());
+            types.add(parameter.type());
+        }
+        Node node = new Node.Embedded(Objects.requireNonNull(body, "body"));
+        if (!(Objects.requireNonNull(result, "result") instanceof FeelType.Any)) {
+            node = new Node.Bound(node, result);
+        }
+        return new Closure(new Node.FunctionDefinition(List.copyOf(names), List.copyOf(types), node, FeelParser.depthOf(node)), Env.noNames());
+    }
+
+    /**
      * Names and the types a model defines, in scope for parsing expressions ({@link #parse(String, Scope)}): indexed once,
      * so that each expression parsed against many names costs no more than one parsed against few.
      *
@@ -238,7 +281,17 @@ public final class FeelExpression {
      * @param types the types the model defines, by name
      */
     public static Scope scope(Collection<String> names, Map<String, FeelType> types) {
-        return new Scope(List.copyOf(names), Map.copyOf(types));
+        return new Scope(List.copyOf(names), Map.copyOf(types), false);
+    }
+
+    /**
+     * Names, and the types a model defines, in scope for parsing expressions that read no other names, as a decision of
+     * a decision requirements graph reads only its requirements: a word that is none of them, but a built-in function's
+     * name ({@code abs}, {@code string length}), is that function as a value, where it would be a free name of an open
+     * scope, as a table read alone has, whose columns may be named {@code date} or {@code count}.
+     */
+    public static Scope closedScope(Collection<String> names, Map<String, FeelType> types) {
+        return new Scope(List.copyOf(names), Map.copyOf(types), true);
     }
 
     /**
@@ -246,26 +299,28 @@ public final class FeelExpression {
      * no scope, a type name that is not FEEL's makes its construct null with an error.
      */
     public static Scope namesScope(Collection<String> names) {
-        return new Scope(List.copyOf(names), null);
+        return new Scope(List.copyOf(names), null, false);
     }
 
     /** Names, and the types a model defines, in scope for parsing expressions; immutable and thread-safe. */
     public static final class Scope {
         final List<String> given;
         final Map<String, FeelType> types;
+        final boolean closed;
         /** The names, indexed when the first expression is parsed, so a scope no expression is parsed in costs nothing. */
         private final AtomicReference<FeelParser.Names> names = new AtomicReference<>();
 
-        private Scope(List<String> given, Map<String, FeelType> types) {
+        private Scope(List<String> given, Map<String, FeelType> types, boolean closed) {
             this.given = given;
             this.types = types;
+            this.closed = closed;
         }
 
         /** The names, indexed once; two threads may both index them, which gives equal indexes. */
         FeelParser.Names names() {
             var indexed = names.get();
             if (indexed == null) {
-                indexed = new FeelParser.Names(given);
+                indexed = new FeelParser.Names(given, closed);
                 names.compareAndSet(null, indexed);
             }
             return indexed;
@@ -294,6 +349,16 @@ public final class FeelExpression {
      */
     public List<Object> literals() {
         return Node.literals(List.of(root));
+    }
+
+    /**
+     * The names the expression invokes as functions that nothing in scope names, in the order first written: each
+     * invocation is null, with an error (the TCK's {@code 1131-feel-function-invocation}), and its type always null.
+     * A caller that knows more than the scope, as a decision requirements graph knows its model's elements, may report
+     * such a name as a requirement missing.
+     */
+    public List<String> uninvocable() {
+        return uninvocable;
     }
 
     /**

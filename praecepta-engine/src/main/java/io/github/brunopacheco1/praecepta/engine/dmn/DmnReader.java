@@ -106,6 +106,7 @@ public final class DmnReader {
     private static final String INPUT_DATA = "inputData";
     private static final String DECISION = "decision";
     private static final String KNOWLEDGE_MODEL = "businessKnowledgeModel";
+    private static final String DECISION_SERVICE = "decisionService";
     private static final String DECISION_TABLE = "decisionTable";
     private static final String VARIABLE = "variable";
     private static final String LABEL = "label";
@@ -176,17 +177,19 @@ public final class DmnReader {
      * declares for it (the variable's for a single output, its component's of the output's name for several), else of
      * the type of its output entries and default, when they are all literals of one type ({@code 10} is a number, as
      * FEEL reads it); else they are strings, as {@link #read(InputStream, String)} reads them. A
-     * requirement names a decision, an input data or a business knowledge model of the model by its {@code href}
+     * requirement names a decision, an input data, a business knowledge model or a decision service of the model by its
+     * {@code href}
      * ({@code #id}); one that refers to
      * no element of the model is kept as the {@code id} it refers to, which {@code DecisionGraph} reports as a missing
      * requirement. Knowledge sources and authority requirements, which do not take part in evaluation, text annotations,
-     * groups and diagrams are ignored, and so are a decision service that nothing in the model invokes and a decision
-     * without logic that no decision requires, which change no value Praecepta evaluates. The model's item definitions are
+     * groups and diagrams are ignored, and so is a decision without logic that no decision requires, which changes no
+     * value Praecepta evaluates. Decision services are read with their output, encapsulated and input decisions and input
+     * data, by reference, and the function type their variable declares. The model's item definitions are
      * its {@linkplain DecisionModel#types() types}, by name, which a literal expression's {@code instance of} may name; a
      * function item among them is a function type, and one with neither a base type nor components is any type.
      *
-     * <p>What Praecepta does not evaluate yet is rejected, naming the element and the release that plans it: invoking a
-     * decision service, a decision without logic that another decision requires, imports and external functions (in
+     * <p>What Praecepta does not evaluate yet is rejected, naming the element and the release that plans it: a decision
+     * without logic that another decision requires, imports and external functions (in
      * FEEL, or a boxed function definition in Java or PMML), planned for 0.11 (#119).
      *
      * @throws InvalidDecisionTableException if the model cannot be read (a literal expression that is not FEEL among
@@ -194,14 +197,157 @@ public final class DmnReader {
      *                                       decisions, input data and business knowledge models alike
      */
     public static DecisionModel readModel(InputStream dmn) {
-        var root = parseModel(dmn);
-        rejectUnsupported(root);
-        var types = new ItemDefinitions(root);
-        var elements = new HashMap<String, Element>();
-        for (var kind : List.of(INPUT_DATA, DECISION, KNOWLEDGE_MODEL)) {
-            children(root, kind).forEach(element -> elements.putIfAbsent(element.getAttribute("id"), element));
+        return readModel(dmn, null);
+    }
+
+    /**
+     * Finds the DMN of a model another model imports (DMN 1.5, 6.3.3), for {@link #readModel(InputStream, ImportResolver)}.
+     */
+    @FunctionalInterface
+    public interface ImportResolver {
+
+        /**
+         * Opens the DMN of the model of that namespace, which the importing model may say where to find.
+         *
+         * @param namespace   the imported model's namespace
+         * @param locationUri the import's {@code locationURI}, relative to the importing model's file; empty if it gives
+         *                    none
+         * @return the model's DMN, which the reader closes; null if there is none
+         * @throws IOException if it cannot be opened
+         */
+        InputStream open(String namespace, String locationUri) throws IOException;
+    }
+
+    /**
+     * Reads a whole decision model, as {@link #readModel(InputStream)} does, and the models it imports (DMN 1.5, 6.3.3),
+     * each found by its namespace with {@code imports}, read in turn with the models they import, each once
+     * ({@link DecisionModel#imports()}). The importing model reads an imported element by {@code importName.elementName}
+     * (by its own name for an import without a name), in FEEL, in a {@code typeRef}, and in an {@code href} that names
+     * the imported model's namespace ({@code namespace#id}).
+     *
+     * @param imports finds the models imported; null to reject a model that imports another, as
+     *                {@link #readModel(InputStream)} does
+     * @throws InvalidDecisionTableException if a model cannot be read, imports one {@code imports} does not find or one
+     *                                       that imports it in turn, or imports anything but a DMN model
+     */
+    public static DecisionModel readModel(InputStream dmn, ImportResolver imports) {
+        return new Imports(imports).read(parseModel(dmn)).model();
+    }
+
+    /**
+     * The namespace of a DMN model (its {@code definitions} element's), by which other models import it: for finding
+     * the models a model imports among a set of files ({@link ImportResolver}).
+     *
+     * @return the namespace; empty if the model has none
+     * @throws InvalidDecisionTableException if it is not DMN XML
+     */
+    public static String namespace(InputStream dmn) {
+        return parseModel(dmn).getAttribute("namespace").strip();
+    }
+
+    /** A model read, and the names of its elements by id, which an importing model's hrefs name. */
+    private record ReadModel(DecisionModel model, Map<String, String> names, ItemDefinitions types) {
+    }
+
+    /** The reading of a model and of the models it imports, each once, by namespace. */
+    private static final class Imports {
+        private final ImportResolver resolver;
+        private final Map<String, ReadModel> read = new HashMap<>();
+        private final Set<String> reading = new HashSet<>();
+
+        Imports(ImportResolver resolver) {
+            this.resolver = resolver;
         }
-        rejectInvokedServices(root);
+
+        ReadModel read(Element root) {
+            var imported = new ArrayList<DecisionModel.Import>();
+            var references = new References(root.getAttribute("namespace").strip());
+            var importedTypes = new LinkedHashMap<String, ItemDefinitions>();
+            var imports = children(root, "import");
+            if (!imports.isEmpty() && resolver == null) {
+                throw IMPORTS.exception(("DMN model imports '%s', which Praecepta reads only with the models it imports "
+                        + "(DmnReader.readModel(dmn, imports), #119)").formatted(nameOr(imports.getFirst(), "namespace")));
+            }
+            var namespace = root.getAttribute("namespace").strip();
+            reading.add(namespace);
+            try {
+                for (var element : imports) {
+                    var name = element.getAttribute("name").strip();
+                    var importedNamespace = element.getAttribute("namespace").strip();
+                    var importType = element.getAttribute("importType").strip();
+                    if (!importType.contains("/DMN/") || !importType.endsWith("/MODEL/")) {
+                        throw IMPORTS.exception("DMN model imports '%s' of type '%s', which Praecepta does not read: it imports DMN models"
+                                .formatted(nameOr(element, "namespace"), importType));
+                    }
+                    var model = model(importedNamespace, element.getAttribute("locationURI").strip());
+                    imported.add(new DecisionModel.Import(name, model.model()));
+                    references.imports.computeIfAbsent(importedNamespace, ns -> new ArrayList<>()).add(new ImportedNames(name, model.names()));
+                    importedTypes.put(name, model.types());
+                }
+            } finally {
+                reading.remove(namespace);
+            }
+            return readOne(root, references, importedTypes, imported);
+        }
+
+        private ReadModel model(String namespace, String location) {
+            var known = read.get(namespace);
+            if (known != null) {
+                return known;
+            }
+            if (reading.contains(namespace)) {
+                throw new InvalidDecisionTableException("DMN model '%s' imports itself, directly or through the models it imports"
+                        .formatted(namespace));
+            }
+            Element root;
+            try (var dmn = resolver.open(namespace, location)) {
+                if (dmn == null) {
+                    throw new InvalidDecisionTableException("DMN model imports the model '%s'%s, which cannot be found".formatted(namespace,
+                            location.isEmpty() ? "" : " at '" + location + "'"));
+                }
+                root = parseModel(dmn);
+            } catch (IOException e) {
+                throw new InvalidDecisionTableException("DMN model imports the model '%s', which cannot be read: %s".formatted(namespace,
+                        e.getMessage()));
+            }
+            var found = root.getAttribute("namespace").strip();
+            if (!found.equals(namespace)) {
+                throw new InvalidDecisionTableException("DMN model imports the model '%s', but what was found for it is the model '%s'"
+                        .formatted(namespace, found));
+            }
+            var model = read(root);
+            read.put(namespace, model);
+            return model;
+        }
+    }
+
+    /** The names an import gives the elements of an imported model: by id, then qualified by the import's name. */
+    private record ImportedNames(String name, Map<String, String> byId) {
+    }
+
+    /**
+     * What a model's hrefs refer to: its own elements, by id, and those of the models it imports, by namespace and id
+     * ({@code namespace#id}), qualified by the import's name.
+     */
+    private static final class References {
+        private final String namespace;
+        private final Map<String, Element> elements = new HashMap<>();
+        private final Map<String, List<ImportedNames>> imports = new HashMap<>();
+
+        References(String namespace) {
+            this.namespace = namespace;
+        }
+    }
+
+    /** One model, its imports read already. */
+    private static ReadModel readOne(Element root, References references, Map<String, ItemDefinitions> importedTypes,
+            List<DecisionModel.Import> imported) {
+        var types = new ItemDefinitions(root);
+        types.imported.putAll(importedTypes);
+        var elements = references;
+        for (var kind : List.of(INPUT_DATA, DECISION, KNOWLEDGE_MODEL, DECISION_SERVICE)) {
+            children(root, kind).forEach(element -> elements.elements.putIfAbsent(element.getAttribute("id"), element));
+        }
         var inputData = new ArrayList<DecisionModel.InputData>();
         var model = new ModelTypes();
         for (var input : children(root, INPUT_DATA)) {
@@ -217,18 +363,7 @@ public final class DmnReader {
             model.types.putIfAbsent(name, declaredTableType(decision, types, decisionWhere(name)));
         }
         var decisions = new ArrayList<DecisionModel.Decision>();
-        var required = requiredDecisionIds(root);
         for (var decision : children(root, DECISION)) {
-            if (expressionIn(decision) == null) {
-                if (required.contains(decision.getAttribute("id"))) {
-                    throw IMPORTS.exception(("%s has no decision logic, and another decision requires it, which Praecepta does not "
-                            + "support yet: decisions without decision logic are planned for 0.11 (#119)").formatted(
-                            decisionWhere(elementName(decision, "a decision"))));
-                }
-                // a decision without logic, such as a human decision, that no decision requires: it changes no value Praecepta
-                // evaluates, and is left out (the DMN TCK's 0087-chapter-11-example)
-                continue;
-            }
             decisions.add(decision(decision, types, model, elements));
         }
         var knowledgeModels = new ArrayList<DecisionModel.BusinessKnowledgeModel>();
@@ -247,7 +382,15 @@ public final class DmnReader {
             logic.add(knowledgeModel.logic());
         }
         try {
-            return new DecisionModel(root.getAttribute("name"), inputData, decisions, knowledgeModels, namedTypes(types, logic));
+            var services = new ArrayList<DecisionModel.DecisionService>();
+            for (var service : children(root, DECISION_SERVICE)) {
+                services.add(decisionService(service, types, elements));
+            }
+            var names = new HashMap<String, String>();
+            elements.elements.forEach((id, element) -> names.put(id, nameOr(element, "id")));
+            var decisionModel = new DecisionModel(root.getAttribute("name"), inputData, decisions, knowledgeModels, services,
+                    namedTypes(types, logic), references.namespace, imported);
+            return new ReadModel(decisionModel, names, types);
         } catch (IllegalArgumentException e) {
             throw new InvalidDecisionTableException("DMN model: " + e.getMessage());
         }
@@ -309,54 +452,26 @@ public final class DmnReader {
             case DecisionLogic.Iteration(var kind, var variable, var domain, var body, var type) ->
                     Stream.of(domain, body).flatMap(DmnReader::texts);
             case DecisionLogic.Filter(var list, var match, var type) -> Stream.of(list, match).flatMap(DmnReader::texts);
+            case DecisionLogic.NoLogic none -> Stream.empty();
         };
     }
 
-    /** Rejects the elements of a model that Praecepta does not evaluate yet, naming the release that plans them. */
-    private static void rejectUnsupported(Element root) {
-        rejectAny(root, "import", "namespace", "DMN model imports '%s', which Praecepta does not support yet: imports are planned for 0.11 (#119)",
-                IMPORTS);
-    }
-
-    /** The ids of the decisions that a decision of the model requires, by {@code href="#id"}. */
-    private static Set<String> requiredDecisionIds(Element root) {
-        var ids = new HashSet<String>();
-        for (var decision : children(root, DECISION)) {
-            for (var requirement : children(decision, "informationRequirement")) {
-                var required = child(requirement, "requiredDecision");
-                var href = required == null ? "" : required.getAttribute("href").strip();
-                if (href.startsWith("#")) {
-                    ids.add(href.substring(1));
-                }
-            }
-        }
-        return ids;
-    }
-
     /**
-     * Rejects a model whose decisions or business knowledge models invoke a decision service, planned for 0.11 (#119). A
-     * decision service that nothing in the model invokes only groups decisions, whose values it does not change, and is
-     * ignored (the DMN TCK's {@code 0087-chapter-11-example}).
+     * A decision service (DMN 1.5, 6.3.9): its output, encapsulated and input decisions and its input data, each by its
+     * {@code href} to an element of the model (one to no element kept as the id it names, which the graph reports), and
+     * the type its variable declares.
      */
-    private static void rejectInvokedServices(Element root) {
-        var services = new HashMap<String, String>();
-        children(root, "decisionService").forEach(service -> services.put(service.getAttribute("id"), nameOr(service, "id")));
-        if (services.isEmpty()) {
-            return;
+    private static DecisionModel.DecisionService decisionService(Element service, ItemDefinitions types, References elements) {
+        var name = elementName(service, "a decision service");
+        var where = "Decision service '" + name + "'";
+        var lists = new ArrayList<List<String>>();
+        for (var kind : List.of("outputDecision", "encapsulatedDecision", "inputDecision", INPUT_DATA)) {
+            var names = new ArrayList<String>();
+            children(service, kind).forEach(reference -> names.add(required(reference, elements, where)));
+            lists.add(names);
         }
-        for (var kind : List.of(DECISION, KNOWLEDGE_MODEL)) {
-            for (var element : children(root, kind)) {
-                for (var requirement : children(element, "knowledgeRequirement")) {
-                    var knowledge = child(requirement, "requiredKnowledge");
-                    var href = knowledge == null ? "" : knowledge.getAttribute("href").strip();
-                    var service = href.startsWith("#") ? services.get(href.substring(1)) : null;
-                    if (service != null) {
-                        throw IMPORTS.exception(("'%s' invokes the decision service '%s', which Praecepta does not support yet: decision "
-                                + "services are planned for 0.11 (#119)").formatted(nameOr(element, "id"), service));
-                    }
-                }
-            }
-        }
+        return new DecisionModel.DecisionService(name, lists.get(0), lists.get(1), lists.get(2), lists.get(3),
+                types.feelType(variableTypeRef(service), where));
     }
 
     /** The releases that plan what Praecepta does not evaluate yet, as {@link UnsupportedFeatureException} names them. */
@@ -368,14 +483,8 @@ public final class DmnReader {
     }
 
     private static final Planned IMPORTS = new Planned("0.11", 119);
-
-    /** Rejects the model if it has an element of that kind, naming the first by its name, or {@code fallback} attribute. */
-    private static void rejectAny(Element root, String kind, String fallback, String message, Planned planned) {
-        var elements = children(root, kind);
-        if (!elements.isEmpty()) {
-            throw planned.exception(message.formatted(nameOr(elements.getFirst(), fallback)));
-        }
-    }
+    /** What Praecepta does not evaluate by design: an external function (docs/DMN-CONFORMANCE.md, known deviations). */
+    private static final Planned NOT_PLANNED = new Planned(null, 0);
 
     /** The name of an input data or a decision of a model, or its id if it has none; one with neither is rejected. */
     private static String elementName(Element element, String kind) {
@@ -387,7 +496,7 @@ public final class DmnReader {
     }
 
     /** A decision of a model: its information requirements and its logic. */
-    private static DecisionModel.Decision decision(Element decision, ItemDefinitions types, ModelTypes model, Map<String, Element> elements) {
+    private static DecisionModel.Decision decision(Element decision, ItemDefinitions types, ModelTypes model, References elements) {
         var name = elementName(decision, "a decision");
         var where = decisionWhere(name);
         var requiredKnowledge = knowledgeRequirements(decision, elements, where);
@@ -410,7 +519,7 @@ public final class DmnReader {
     }
 
     /** The business knowledge models an element requires through its knowledge requirements (DMN 1.5, 6.3.14). */
-    private static List<String> knowledgeRequirements(Element element, Map<String, Element> elements, String where) {
+    private static List<String> knowledgeRequirements(Element element, References elements, String where) {
         var required = new ArrayList<String>();
         for (var requirement : children(element, "knowledgeRequirement")) {
             var knowledge = child(requirement, "requiredKnowledge");
@@ -427,7 +536,7 @@ public final class DmnReader {
      * ({@code encapsulatedLogic}) of the function type its variable declares.
      */
     private static DecisionModel.BusinessKnowledgeModel knowledgeModel(Element knowledgeModel, ItemDefinitions types, ModelTypes model,
-            Map<String, Element> elements) {
+            References elements) {
         var name = elementName(knowledgeModel, "a business knowledge model");
         var where = "Business knowledge model '" + name + "'";
         var required = knowledgeRequirements(knowledgeModel, elements, where);
@@ -445,18 +554,28 @@ public final class DmnReader {
     }
 
     /**
-     * The name of the element a requirement refers to ({@code href="#id"}), or the {@code id} it refers to if the model
-     * has no element with that id.
+     * The name of the element a requirement refers to: {@code href="#id"} (or {@code namespace#id} with the model's own
+     * namespace, the DMN TCK's {@code 0091-local-hrefs}) for an element of the model, or the {@code id} it refers to if the
+     * model has no element with that id; {@code namespace#id} with an imported model's namespace for that model's element,
+     * by the name the import gives it ({@code importName.elementName}).
      */
-    private static String required(Element requirement, Map<String, Element> elements, String where) {
+    private static String required(Element requirement, References elements, String where) {
         var href = requirement.getAttribute("href").strip();
-        if (!href.startsWith("#")) {
-            throw IMPORTS.exception(("%s requires '%s', an element of another model, which Praecepta does not support "
-                    + "yet: imports are planned for 0.11 (#119)").formatted(where, href));
+        int hash = href.indexOf('#');
+        var namespace = hash < 0 ? href : href.substring(0, hash);
+        var id = hash < 0 ? "" : href.substring(hash + 1);
+        if (namespace.isEmpty() || namespace.equals(elements.namespace)) {
+            var element = elements.elements.get(id);
+            return element == null ? id : nameOr(element, "id");
         }
-        var id = href.substring(1);
-        var element = elements.get(id);
-        return element == null ? id : nameOr(element, "id");
+        var imported = elements.imports.get(namespace);
+        if (imported == null) {
+            throw new InvalidDecisionTableException("%s requires '%s', an element of a model it does not import (DMN 1.5, 6.3.3)"
+                    .formatted(where, href));
+        }
+        var names = imported.getFirst();
+        var name = names.byId().get(id);
+        return names.name().isEmpty() || name == null ? (name == null ? id : name) : names.name() + "." + name;
     }
 
     /** The kinds of boxed expression (DMN 1.5, 10.2) beside decision tables and literal expressions, as messages name them. */
@@ -493,8 +612,8 @@ public final class DmnReader {
                         types, where), where);
             }
         }
-        throw new InvalidDecisionTableException(where + " has no decision logic; Praecepta evaluates decisions whose logic is a decision "
-                + "table, a literal expression or a boxed expression");
+        // a decision a person makes, whose value is given (DMN 1.5, 6.3.7; the DMN TCK's 0087 and 0088)
+        return new DecisionLogic.NoLogic(declaredTableType(decision, types, where));
     }
 
     /**
@@ -671,8 +790,8 @@ public final class DmnReader {
     private static DecisionLogic functionDefinition(Element function, Site site, FeelType type, String where) {
         var kind = function.getAttribute("kind").strip();
         if (!kind.isEmpty() && !kind.equals("FEEL")) {
-            throw IMPORTS.exception(("%s defines a function in %s, which Praecepta does not support yet: external functions are "
-                    + "planned for 0.11 (#119)").formatted(where, kind));
+            throw NOT_PLANNED.exception(("%s defines a function in %s, an external function, which Praecepta does not evaluate, by "
+                    + "design: it runs no code from outside the model").formatted(where, kind));
         }
         var parameters = new ArrayList<DecisionLogic.Parameter>();
         for (var parameter : children(function, "formalParameter")) {
@@ -774,7 +893,7 @@ public final class DmnReader {
      *                                       function, 0.11)
      */
     private static void checkExpressions(DecisionLogic logic, Collection<String> names, String where) {
-        if (logic instanceof DecisionLogic.Table) {
+        if (logic instanceof DecisionLogic.Table || logic instanceof DecisionLogic.NoLogic) {
             return;
         }
         FeelExpression expression;
@@ -787,9 +906,9 @@ public final class DmnReader {
         var unsupported = expression.unsupported();
         if (!unsupported.isEmpty()) {
             var planned = new Planned(unsupported.getFirst().release(), unsupported.getFirst().issue());
-            throw planned.exception("%s: its %s uses %s, which Praecepta does not support yet".formatted(where,
+            throw planned.exception("%s: its %s uses %s".formatted(where,
                     logic instanceof DecisionLogic.LiteralExpression ? "literal expression" : "logic",
-                    String.join(" and ", unsupported.stream().map(Object::toString).toList())));
+                    FeelExpression.Unsupported.describe(unsupported)));
         }
     }
 
@@ -1341,8 +1460,7 @@ public final class DmnReader {
     private static void rejectUnsupported(String where, List<FeelExpression.Unsupported> unsupported) {
         if (!unsupported.isEmpty()) {
             var planned = new Planned(unsupported.getFirst().release(), unsupported.getFirst().issue());
-            throw planned.exception("%s uses %s, which Praecepta does not support yet".formatted(where,
-                    String.join(" and ", unsupported.stream().map(Object::toString).toList())));
+            throw planned.exception("%s uses %s".formatted(where, FeelExpression.Unsupported.describe(unsupported)));
         }
     }
 
@@ -1910,6 +2028,9 @@ public final class DmnReader {
         /** Every type the item definitions define ({@link #all}), read once. */
         private Map<String, FeelType> all;
 
+        /** The item definitions of the models the model imports, by import name. */
+        private final Map<String, ItemDefinitions> imported = new LinkedHashMap<>();
+
         ItemDefinitions(Element root) {
             this.root = root;
             children(root, "itemDefinition").forEach(definition -> byName.putIfAbsent(definition.getAttribute("name"), definition));
@@ -2017,6 +2138,13 @@ public final class DmnReader {
             var name = byName.containsKey(typeRef.strip()) ? typeRef.strip() : localName(typeRef);
             var definition = byName.get(name);
             if (definition == null) {
+                for (var entry : imported.entrySet()) {
+                    var prefix = entry.getKey().isEmpty() ? "" : entry.getKey() + ".";
+                    var rest = typeRef.strip();
+                    if (rest.startsWith(prefix) && entry.getValue().byName.containsKey(rest.substring(prefix.length()))) {
+                        return entry.getValue().feelType(rest.substring(prefix.length()), where);
+                    }
+                }
                 throw new InvalidDecisionTableException("%s: type '%s' is not a built-in type or an item definition of the model"
                         .formatted(where, typeRef));
             }

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A model with an external function, which DmnReader.readModel rejects by design: its decisions are evaluated alone. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="external" name="External" namespace="https://example.com/external">
+  <inputData id="score" name="Score"><variable name="Score" typeRef="number"/></inputData>
+  <decision id="band" name="Band">
+    <variable name="Band" typeRef="string"/>
+    <informationRequirement><requiredInput href="#score"/></informationRequirement>
+    <decisionTable>
+      <input><inputExpression typeRef="number"><text>Score</text></inputExpression></input>
+      <output/>
+      <rule><inputEntry><text>&gt;= 700</text></inputEntry><outputEntry><text>"A"</text></outputEntry></rule>
+      <rule><inputEntry><text>&lt; 700</text></inputEntry><outputEntry><text>"B"</text></outputEntry></rule>
+    </decisionTable>
+  </decision>
+  <decision id="label" name="Label">
+    <variable name="Label" typeRef="string"/>
+    <informationRequirement><requiredDecision href="#band"/></informationRequirement>
+    <literalExpression><text>"Band " + Band</text></literalExpression>
+  </decision>
+  <decision id="max" name="Max">
+    <variable name="Max"/>
+    <literalExpression><text>function(a, b) external {java: {class: "java.lang.Math", method signature: "max(double,double)"}}</text></literalExpression>
+  </decision>
+</definitions>

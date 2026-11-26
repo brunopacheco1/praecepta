@@ -120,7 +120,11 @@ final class FeelParser {
     private static final Names BUILT_INS = new Names(BuiltInFunctions.NAMES);
 
     /** What parsing gives. */
-    record Parsed(Node root, List<String> names, List<FeelExpression.Unsupported> unsupported, int depth) {
+    record Parsed(Node root, List<String> names, List<FeelExpression.Unsupported> unsupported, int depth, List<String> uninvocable) {
+
+        Parsed(Node root, List<String> names, List<FeelExpression.Unsupported> unsupported, int depth) {
+            this(root, names, unsupported, depth, List.of());
+        }
     }
 
     /**
@@ -137,8 +141,18 @@ final class FeelParser {
     /** Names in scope, by their first word, indexed once for any number of expressions. */
     static final class Names {
         private final Map<String, List<Candidate>> byFirst = new HashMap<>();
+        /**
+         * Whether they are every name the expression may read, as a decision's requirements are in a decision requirements
+         * graph: a word that is none of them, but a built-in function's name, is then that function, as a value.
+         */
+        final boolean closed;
 
         Names(Collection<String> names) {
+            this(names, false);
+        }
+
+        Names(Collection<String> names, boolean closed) {
+            this.closed = closed;
             names.forEach(this::add);
         }
 
@@ -168,6 +182,8 @@ final class FeelParser {
     private final Deque<Names> locals = new ArrayDeque<>();
     private final Set<String> free = new LinkedHashSet<>();
     private final Set<FeelExpression.Unsupported> unsupported = new LinkedHashSet<>();
+    /** The names it invokes that nothing in scope names, each invocation null with an error. */
+    private final Set<String> uninvocable = new LinkedHashSet<>();
     private int at;
     /** The parser's calls the nesting at the current token takes ({@link #MAX_CALLS}). */
     private int calls;
@@ -217,7 +233,7 @@ final class FeelParser {
         if (depth > MAX_DEPTH) {
             throw parser.tooDeep();
         }
-        return new Parsed(root, List.copyOf(parser.free), List.copyOf(parser.unsupported), depth);
+        return new Parsed(root, List.copyOf(parser.free), List.copyOf(parser.unsupported), depth, List.copyOf(parser.uninvocable));
     }
 
     /**
@@ -841,6 +857,14 @@ final class FeelParser {
             arguments(arguments, names);
             return builtInInvocation(builtIn.name(), arguments, names);
         }
+        if (known == null && given.closed && filters == 0) {
+            // a built-in function given as a value, as to a business knowledge model (the TCK's 0092-feel-lambda)
+            var function = match(BUILT_INS, false);
+            if (function != null) {
+                at += function.length();
+                return new Node.Constant(BuiltInFunctions.lookup(function.name()));
+            }
+        }
         String name;
         if (known != null) {
             at += known.length();
@@ -850,6 +874,12 @@ final class FeelParser {
             }
         } else {
             name = wordsName();
+            if (filters == 0 && peek().is("(")) {
+                // the invocation of a function nothing in scope names: null, with an error (the TCK's
+                // 1131-feel-function-invocation), not a name the expression reads
+                uninvocable.add(name);
+                return new Node.Invalid("no function named '%s' is in scope, so it cannot be invoked".formatted(name));
+            }
             if (filters == 0) {
                 free.add(name);
             }
@@ -1030,7 +1060,8 @@ final class FeelParser {
             if (peek().isWord("external")) {
                 next();
                 var mapping = expression();
-                var what = new FeelExpression.Unsupported("an external function (Java or PMML)", "0.11", 119);
+                // Praecepta runs no code from outside the model, by design (docs/DMN-CONFORMANCE.md, known deviations)
+                var what = new FeelExpression.Unsupported("an external function (Java or PMML)", null, 0);
                 unsupported.add(what);
                 return new Node.Unsupported(what, List.of(mapping));
             }

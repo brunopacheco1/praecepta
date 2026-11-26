@@ -59,7 +59,10 @@ release meant to remove it.
 | 33 | [Real numbers the TCK states to some digits](#33-real-numbers-the-tck-states-to-some-digits) | open |
 | 34 | [A boxed condition that is not a boolean](#34-a-boxed-condition-that-is-not-a-boolean) | decided by the TCK for a value that is not a boolean; open for null |
 | 35 | [A business knowledge model that invokes itself](#35-a-business-knowledge-model-that-invokes-itself) | open |
-| 36 | [A decision service nothing invokes, and a decision without logic nothing requires](#36-a-decision-service-nothing-invokes-and-a-decision-without-logic-nothing-requires) | open |
+| 36 | [A decision service nothing invokes, and a decision without logic nothing requires](#36-a-decision-service-nothing-invokes-and-a-decision-without-logic-nothing-requires) | open until 0.11.0, which reads both |
+| 37 | [What a decision service evaluates, and in what order it takes its arguments](#37-what-a-decision-service-evaluates-and-in-what-order-it-takes-its-arguments) | decided by the TCK for the order; open for decisions it does not list |
+| 38 | [Invoking a function nothing names](#38-invoking-a-function-nothing-names) | decided by the TCK; followed since 0.11.0 |
+| 39 | [A built-in function as a value, of a function type](#39-a-built-in-function-as-a-value-of-a-function-type) | decided by the TCK for binding; open for `instance of` |
 
 How Praecepta returns DMN's null result, which is a choice of representation rather than of semantics,
 is [at the end](#how-a-null-result-is-returned).
@@ -576,6 +579,58 @@ integrations alike.
   `DmnWriter` therefore does not write. A model that invokes a decision service, or requires a decision without
   logic, is rejected, as decision services and such decisions are planned for 0.11
   ([#119](https://github.com/brunopacheco1/praecepta/issues/119)).
+- **Praecepta (since 0.11.0).** Decision services are read, and evaluated when invoked (case 37), whether anything
+  invokes them or not. Every decision without logic is read (`DecisionLogic.NoLogic`): the graph does not evaluate
+  it, nor a decision that requires it, without reporting either, as the model is valid and the value is a person's
+  to give; a decision service that takes it as an input decision is given that value as an argument, as
+  `0088-no-decision-logic` has it.
+
+## 37. What a decision service evaluates, and in what order it takes its arguments
+- **DMN 1.5.** A decision service (6.3.9) has output decisions, encapsulated decisions, input decisions and input
+  data; invoked, it evaluates its output decisions from its inputs, and its value is its one output decision's, or a
+  context of them.
+- **TCK.** `0085-decision-services` invokes services positionally with their input data first, then their input
+  decisions, whatever order the service lists them in (`decisionService_011("A", "B", "C", "D")`), and by parameter name;
+  an input decision is not evaluated, its argument taking its place ("I never get invoked"), and invoking a service
+  leaves the model's own decisions and input data as they are. An argument of another type than its parameter's makes
+  the invocation null, with an error (`decision_007_1`).
+- **Praecepta (since 0.11.0, [#119](https://github.com/brunopacheco1/praecepta/issues/119)).** As the TCK has it. A
+  service evaluates its output decisions and every decision they require, directly or not, but its input decisions,
+  whether it lists them as encapsulated or not: one it does not list is evaluated as an encapsulated decision would be.
+  One of those that requires input data the service does not take could only read null, and is reported
+  (`MISSING_REQUIREMENT`), so the service, and what invokes it, is not evaluated. Arguments are bound to their
+  parameters' types as a function's are (10.3.2.9.4), and the service's value to the output type of the function type
+  its variable declares, if any.
+
+## 38. Invoking a function nothing names
+- **DMN 1.5.** A decision reads only what its requirements provide (7.3.4), and invoking what is not a function is
+  an error, whose value is null (10.3.2.16); it does not say whether invoking a name nothing provides makes the
+  model invalid or the decision null.
+- **TCK.** `1131-feel-function-invocation` has `non_existing_function()` be null, with an error, as it has `null()`
+  and `"abs"(-1)`.
+- **Praecepta (since 0.11.0, [#119](https://github.com/brunopacheco1/praecepta/issues/119)).** As the TCK has it.
+  An invocation of a name that no requirement, and no element of the model, provides is null, with an error, and the
+  graph reports the decision as always null (`ALWAYS_NULL`, a WARNING), so `failOn(Severity.WARNING)` still rejects
+  it; it is no requirement missing, and blocks nothing. One of an element of the model the decision does not
+  require, such as a business knowledge model it forgot, is still a requirement missing (`MISSING_REQUIREMENT`, an
+  ERROR), so a model's slip is not taken for a null. 0.10 reported every such name as a requirement missing.
+
+## 39. A built-in function as a value, of a function type
+- **DMN 1.5.** A function conforms to a function type whose parameters conform to its own and whose result its own
+  result conforms to (10.3.2.9.1); built-in functions are named in every scope (10.3.4), but their types are not
+  given, and some give values of several types (`abs` of a number is a number, of a duration a duration).
+- **TCK.** `0092-feel-lambda` passes `abs` and `sqrt` to a business knowledge model whose parameter is a
+  `function<number> -> number`, and expects `abs` to be invoked through it (`decision_014_1`); a built-in passed
+  where it does not fit, `sqrt` for a function of two parameters, is null with an error (`decision_016_1`).
+- **Praecepta (since 0.11.0, [#119](https://github.com/brunopacheco1/praecepta/issues/119)).** A name of a decision or
+  business knowledge model of a graph that no requirement provides, but a built-in function does, is that function
+  as a value; a table read alone, which reads every unknown name as an input, does not (a column may be named `date`
+  or `count`). A built-in's type gives its result as `Any` where it depends on its arguments, and `Any` conforms to
+  no other type, so `abs` is not of the type `function<number> -> number`: `abs instance of function<number> ->
+  number` is false. Bound to that type, as an argument or a declared value, it is taken where its parameters fit,
+  and each of its results is then bound to `number` as a value of a declared type is (10.3.2.9.4): a duration, which
+  is not one, is null with an error. So binding follows the TCK, and `instance of` answers by the type the function
+  has.
 
 ## Known deviations
 Where DMN 1.5 or the TCK decides and Praecepta does otherwise. Each is reported or documented where it shows,

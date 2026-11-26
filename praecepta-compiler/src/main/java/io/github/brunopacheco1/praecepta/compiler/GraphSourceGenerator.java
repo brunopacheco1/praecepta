@@ -112,6 +112,11 @@ final class GraphSourceGenerator {
                             ? duration.toPeriod() : (java.time.Period) value;
                 }
 
+            ${build}${records}}
+            """;
+
+    /** How the model class builds its graph: from its DMN resource alone. */
+    private static final String BUILD = """
                 private static ${Graph} build() {
                     try (var dmn = ${Model}.class.getResourceAsStream(RESOURCE)) {
                         if (dmn == null) {
@@ -122,7 +127,29 @@ final class GraphSourceGenerator {
                         throw new java.io.UncheckedIOException(e);
                     }
                 }
-            ${records}}
+            """;
+
+    /** How the model class builds its graph from its DMN resource and those of the models it imports (DMN 1.5, 6.3.3). */
+    private static final String BUILD_WITH_IMPORTS = """
+                private static ${Graph} build() {
+                    // the DMN resources of the models the model imports, relative to this class, by namespace
+                    var imports = java.util.Map.of(${imports});
+                    try (var dmn = open(RESOURCE)) {
+                        var model = io.github.brunopacheco1.praecepta.engine.dmn.DmnReader.readModel(dmn,
+                                (namespace, location) -> imports.containsKey(namespace) ? open(imports.get(namespace)) : null);
+                        return ${Graph}.builder().model(model).build();
+                    } catch (java.io.IOException e) {
+                        throw new java.io.UncheckedIOException(e);
+                    }
+                }
+
+                private static java.io.InputStream open(String resource) {
+                    var dmn = ${Model}.class.getResourceAsStream(resource);
+                    if (dmn == null) {
+                        throw new IllegalStateException("Missing resource " + resource + " next to " + ${Model}.class.getName());
+                    }
+                    return dmn;
+                }
             """;
 
     private static final String INPUT_RECORD = """
@@ -202,6 +229,13 @@ final class GraphSourceGenerator {
      */
     GraphSourceGenerator(CompilerOptions options, String sourceFile, DecisionGraph graph, String modelClass,
             Map<String, String> decisionClasses) {
+        this(options, sourceFile, graph, modelClass, decisionClasses, Map.of());
+    }
+
+    /** @param imports the DMN resources of the models the model imports, relative to the model class, by namespace */
+    GraphSourceGenerator(CompilerOptions options, String sourceFile, DecisionGraph graph, String modelClass,
+            Map<String, String> decisionClasses, Map<String, String> imports) {
+        this.imports = new LinkedHashMap<>(imports);
         this.packageName = options.packageName();
         this.generator = options.generator();
         this.fileHeader = SourceGenerator.headerLines(options.fileHeader(), options.setting("fileHeader"));
@@ -209,6 +243,20 @@ final class GraphSourceGenerator {
         this.graph = graph;
         this.modelClass = modelClass;
         this.decisionClasses = new LinkedHashMap<>(decisionClasses);
+    }
+
+    /** The DMN resources of the models the model imports, relative to the model class, by namespace. */
+    private final Map<String, String> imports;
+
+    /** How the model class builds its graph, reading the resources of the models its model imports, if any. */
+    private String build() {
+        if (imports.isEmpty()) {
+            return fill(BUILD, Map.of("Model", modelClass));
+        }
+        var entries = new StringJoiner(", ");
+        imports.forEach((namespace, resource) -> entries.add(SourceGenerator.stringLiteral(namespace) + ", "
+                + SourceGenerator.stringLiteral(resource)));
+        return fill(BUILD_WITH_IMPORTS, Map.of("Model", modelClass, "imports", entries.toString()));
     }
 
     /** The generated sources by class name: the model class, then for each decision its input, output and class. */
@@ -247,6 +295,7 @@ final class GraphSourceGenerator {
                 "generator", SourceGenerator.javadoc(generator),
                 "source", SourceGenerator.javadoc(sourceFile),
                 "resource", SourceGenerator.stringLiteral(modelClass + ".dmn"),
+                "build", build(),
                 "records", records.toString()));
     }
 

@@ -72,6 +72,71 @@ class KnowledgeModelsTest {
     }
 
     @Test
+    void a_business_knowledge_model_invoked_from_outside_gives_its_value_bound_to_the_output_type_its_function_type_declares() {
+        // the DMN TCK's 1157-implicit-conversions: a number, where the function type gives a list of numbers, is a list of one
+        var listOfTwice = new DecisionModel.BusinessKnowledgeModel("twice", List.of(), new DecisionLogic.FunctionDefinition(
+                List.of(new DecisionLogic.Parameter("x", NUMBER)), new DecisionLogic.LiteralExpression("x * 2"),
+                new FeelType.FunctionOf(List.of(NUMBER), new FeelType.ListOf(NUMBER))));
+        var graph = graph(new DecisionModel("M", List.of(), List.of(), List.of(listOfTwice), List.of(), Map.of()));
+
+        assertThat(graph.knowledgeModels()).containsExactly("twice");
+        var outcome = graph.invokeKnowledgeModel("twice", Map.of("x", 2));
+        assertThat(outcome.value()).isEqualTo(List.of(new BigDecimal("4")));
+        assertThat(outcome.errors()).isEmpty();
+        assertThat(graph.invokeKnowledgeModel("twice", Map.of("x", "two")).errors()).containsKey("twice");
+        assertThatThrownBy(() -> graph.invokeKnowledgeModel("thrice", Map.of())).isInstanceOf(java.util.NoSuchElementException.class)
+                .hasMessageContaining("has no business knowledge model named 'thrice'");
+    }
+
+    @Test
+    void a_built_in_function_is_given_as_a_value_and_bound_to_a_function_type_its_result_is_checked_against() {
+        // the DMN TCK's 0092-feel-lambda: abs gives a number for a number and a duration for a duration
+        var numeric = new FeelType.FunctionOf(List.of(NUMBER), NUMBER);
+        var apply = new DecisionModel.BusinessKnowledgeModel("apply", List.of(), new DecisionLogic.FunctionDefinition(
+                List.of(new DecisionLogic.Parameter("fn", numeric), new DecisionLogic.Parameter("x", FeelType.ANY)),
+                new DecisionLogic.LiteralExpression("fn(x)"), FeelType.ANY));
+        var number = new DecisionModel.Decision("Number", List.of(), List.of(), List.of("apply"),
+                new DecisionLogic.LiteralExpression("apply(abs, -5)"));
+        var duration = new DecisionModel.Decision("Duration", List.of(), List.of(), List.of("apply"),
+                new DecisionLogic.LiteralExpression("apply(abs, duration(\"-P1D\"))"));
+        var instance = new DecisionModel.Decision("Instance", List.of(), List.of(), new DecisionLogic.LiteralExpression(
+                "[abs instance of function<number> -> number, abs instance of function<Any> -> Any]"));
+        var graph = graph(new DecisionModel("M", List.of(), List.of(number, duration, instance), List.of(apply), List.of(), Map.of()));
+
+        assertThat(graph.validationReport().issues()).isEmpty();
+        assertThat(graph.evaluate("Number", Map.of())).isEqualTo(new BigDecimal("5"));
+        var outcome = graph.evaluateWithErrors("Duration", Map.of());
+        assertThat(outcome.value()).isNull();
+        assertThat(outcome.errors().get("Duration")).anyMatch(error -> error.contains("abs(...) gives P1D, which is not a number"));
+        assertThat(graph.evaluate("Instance", Map.of())).as("instance of answers by its own type").isEqualTo(List.of(false, true));
+    }
+
+    @Test
+    void invoking_a_function_nothing_in_the_model_names_is_null_with_an_error_and_one_it_does_not_require_is_reported() {
+        // the DMN TCK's 1131-feel-function-invocation
+        var twice = new DecisionModel.BusinessKnowledgeModel("twice", List.of(), new DecisionLogic.FunctionDefinition(
+                List.of(new DecisionLogic.Parameter("x", NUMBER)), new DecisionLogic.LiteralExpression("x * 2"), FeelType.ANY));
+        var missing = new DecisionModel.Decision("Missing", List.of(), List.of(), new DecisionLogic.LiteralExpression("non_existing_function(1)"));
+        var unrequired = new DecisionModel.Decision("Unrequired", List.of(), List.of(), new DecisionLogic.LiteralExpression("twice(1)"));
+        var graph = graph(new DecisionModel("M", List.of(), List.of(missing, unrequired), List.of(twice), List.of(), Map.of()));
+
+        assertThat(graph.validationReport().issues()).satisfiesExactlyInAnyOrder(
+                issue -> {
+                    assertThat(issue.kind()).isEqualTo(Kind.ALWAYS_NULL);
+                    assertThat(issue.detail()).contains("no function named 'non_existing_function' is in scope");
+                },
+                issue -> {
+                    assertThat(issue.kind()).isEqualTo(Kind.MISSING_REQUIREMENT);
+                    assertThat(issue.detail())
+                            .contains("decision 'Unrequired' invokes 'twice', which is a business knowledge model it does not require");
+                });
+        var outcome = graph.evaluateWithErrors("Missing", Map.of());
+        assertThat(outcome.value()).isNull();
+        assertThat(outcome.errors().get("Missing")).anyMatch(error -> error.contains("no function named 'non_existing_function'"));
+        assertThat(graph.canEvaluate("Unrequired")).isFalse();
+    }
+
+    @Test
     void a_business_knowledge_model_built_in_code_is_invoked_by_the_decisions_that_require_it() {
         var twice = new DecisionModel.BusinessKnowledgeModel("twice", List.of(), new DecisionLogic.FunctionDefinition(
                 List.of(new DecisionLogic.Parameter("x", NUMBER)), new DecisionLogic.LiteralExpression("x * 2"), FeelType.ANY));

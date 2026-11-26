@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.stream.IntStream;
 
 /**
  * A built-in function of FEEL (DMN 1.5, 10.3.4), as {@link BuiltInFunctions} registers it: its name, its parameters'
@@ -227,6 +228,32 @@ final class BuiltInFunction implements FeelFunction {
         } finally {
             env.finish();
         }
+    }
+
+    /**
+     * It, bound to a function type whose result its own does not conform to only because its result is {@code Any}, as
+     * {@code abs}'s is, a number for a number and a duration for a duration: the same function, of the target's result
+     * type, whose every result is bound to that type, null with an error where it does not conform (the TCK's
+     * {@code 0092-feel-lambda}). Null if its type does not fit the target otherwise: other parameters, a known result of
+     * another type. Its own type is unchanged, so {@code instance of} still answers by it.
+     */
+    BuiltInFunction returning(FeelType.FunctionOf target) {
+        if (!(type instanceof FeelType.FunctionOf(var parameters, var result)) || !(result instanceof FeelType.Any)
+                || parameters.size() != target.parameters().size()
+                || !IntStream.range(0, parameters.size()).allMatch(i -> target.parameters().get(i).conformsTo(parameters.get(i)))) {
+            return null;
+        }
+        var declared = target.result();
+        Overloaded bound = (arguments, signature, env) -> {
+            var value = body.apply(arguments, signature, env);
+            var conforming = Closure.bind(value, declared, env);
+            if (conforming == Closure.NOT_BOUND) {
+                throw new Invalid("gives %s, which is not a %s, the type declared for it".formatted(FeelValues.text(value),
+                        declared.feelName()));
+            }
+            return conforming;
+        };
+        return new BuiltInFunction(name, arity, new FeelType.FunctionOf(parameters, declared), bound, signatures);
     }
 
     /** Invokes it from an evaluation, whose limits it counts against and to which it reports its errors. */

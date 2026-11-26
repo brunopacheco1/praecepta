@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A model that imports People without a name, so it reads People's elements by their own names. -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="labels" name="Labels" namespace="https://example.com/labels">
+  <import name="" namespace="https://example.com/people" importType="https://www.omg.org/spec/DMN/20230324/MODEL/" locationURI="people.dmn"/>
+  <decision id="label" name="Label">
+    <variable name="Label" typeRef="string"/>
+    <informationRequirement><requiredDecision href="https://example.com/people#adult"/></informationRequirement>
+    <informationRequirement><requiredInput href="https://example.com/people#person"/></informationRequirement>
+    <literalExpression><text>Person.name + (if Adult then " (adult)" else " (minor)")</text></literalExpression>
+  </decision>
+</definitions>

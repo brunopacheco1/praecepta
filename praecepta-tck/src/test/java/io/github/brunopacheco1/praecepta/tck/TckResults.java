@@ -174,12 +174,21 @@ final class TckResults {
         int supported = results.size() - unsupported.size();
         for (var area : Area.values()) {
             int unlocked = byRelease.getOrDefault(area, 0);
-            if (area == Area.DECISION_TABLES && unlocked == 0) {
-                continue; // what Praecepta has: only a gap in its decision tables would be counted here
+            if (area == Area.DECISION_TABLES && unlocked == 0 || area == Area.NOT_PLANNED) {
+                continue; // what Praecepta has, or will not have: only a gap in its decision tables would be counted here
             }
             supported += unlocked;
             line(md, "| %s | %s | %s | %s (%s) |".formatted(release(area), area.title(), number(unlocked), number(supported),
                     percent(supported, results.size())));
+        }
+        int never = byRelease.getOrDefault(Area.NOT_PLANNED, 0);
+        if (never > 0) {
+            md.append("""
+
+                    The other %s need what Praecepta does not evaluate by design, and no release plans: external
+                    functions, as it runs no code from outside the model
+                    ([DMN conformance](../docs/DMN-CONFORMANCE.md#known-deviations)).
+                    """.formatted(number(never)));
         }
     }
 
@@ -194,8 +203,8 @@ final class TckResults {
                 ### Not supported, by feature
 
                 Every feature the not-supported nodes need. *Needed by* counts the nodes that need it, whatever else
-                they need; *stops* counts those it is the first missing feature of (so these add up to the
-                not-supported nodes); *alone* counts those that need nothing else.
+                they need; *stops* counts those it is the first missing feature of, or the one Praecepta does not evaluate by
+                design (so these add up to the not-supported nodes); *alone* counts those that need nothing else.
 
                 | Feature | Release | Needed by | Stops | Alone |
                 |---|---|---:|---:|---:|
@@ -203,10 +212,12 @@ final class TckResults {
         var needed = new LinkedHashMap<Feature, int[]>();
         for (var result : unsupported) {
             var needs = result.outcome().needs();
+            // what Praecepta does not evaluate by design stops a node whatever else it needs
+            var stops = needs.stream().filter(feature -> feature.area() == Area.NOT_PLANNED).findFirst().orElse(needs.getFirst());
             for (var feature : needs) {
                 var counts = needed.computeIfAbsent(feature, f -> new int[3]);
                 counts[0]++;
-                if (feature.equals(needs.getFirst())) {
+                if (feature.equals(stops)) {
                     counts[1]++;
                 }
                 if (needs.size() == 1) {

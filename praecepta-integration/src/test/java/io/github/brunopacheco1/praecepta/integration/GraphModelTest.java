@@ -270,11 +270,11 @@ class GraphModelTest {
 
     /**
      * Decision tables in the full FEEL language (#116) load as graphs, their cells and output entries read as FEEL, built-in
-     * functions (#117) included; a table entry that defines an external function (0.11, #119) is rejected as a literal
+     * functions (#117) included; a table entry that defines an external function (by design) is rejected as a literal
      * expression is, naming the release.
      */
     @Test
-    void tables_in_the_full_feel_language_load_as_graphs_and_external_functions_name_their_release() {
+    void tables_in_the_full_feel_language_load_as_graphs_and_external_functions_are_rejected_by_design() {
         var file = """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
                   <inputData id="age" name="Age"><variable name="Age" typeRef="number"/></inputData>
@@ -310,7 +310,7 @@ class GraphModelTest {
         Assertions.assertThatThrownBy(() -> Decisions.load(sources, Severity.ERROR))
                 .isInstanceOfSatisfying(DecisionsException.class, e -> Assertions.assertThat(e.problems()).singleElement().asString()
                         .startsWith("external.dmn: ")
-                        .contains("an external function (Java or PMML), planned for 0.11 (#119)"));
+                        .contains("an external function (Java or PMML), which Praecepta does not evaluate, by design"));
     }
 
     /**
@@ -321,7 +321,9 @@ class GraphModelTest {
     void what_later_releases_bring_is_not_evaluated_and_a_file_without_tables_fails_naming_it() {
         var file = """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
-                  <import name="Rate" namespace="https://example.com/rate" importType="https://www.omg.org/spec/DMN/20230324/MODEL/"/>
+                  <decision id="rate" name="Rate"><literalExpression>
+                    <text>function(x) external {java: {class: "java.lang.Math", method signature: "abs(double)"}}</text>
+                  </literalExpression></decision>
                   <decision id="tier" name="Tier"><decisionTable hitPolicy="FIRST">
                     <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>
                     <output name="tier" typeRef="string"/>
@@ -356,20 +358,22 @@ class GraphModelTest {
         Assertions.assertThat(infos).hasSize(2).first().asString().startsWith("Loaded 4 decision(s) from 2 DMN file(s): ");
         Assertions.assertThat(infos.get(1))
                 .startsWith("rules/bkm.dmn: its decision tables are loaded alone, without its decision requirements graph, "
-                        + "which needs Praecepta 0.11 (#119): ")
-                .contains("imports 'Rate'");
+                        + "which uses what Praecepta does not evaluate: ")
+                .contains("an external function (Java or PMML)");
         Assertions.assertThat(warnings).isEmpty();
 
         var withoutTables = """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
-                  <import name="Rate" namespace="https://example.com/rate" importType="https://www.omg.org/spec/DMN/20230324/MODEL/"/>
+                  <decision id="rate" name="Rate"><literalExpression>
+                    <text>function(x) external {java: {class: "java.lang.Math", method signature: "abs(double)"}}</text>
+                  </literalExpression></decision>
                   <decision id="a" name="A"><literalExpression><text>1</text></literalExpression></decision>
                 </definitions>""";
         var sources = List.of(TableSource.of("bkm.dmn", withoutTables.getBytes(StandardCharsets.UTF_8)));
         Assertions.assertThatThrownBy(() -> Decisions.load(sources, Severity.ERROR))
                 .isInstanceOfSatisfying(DecisionsException.class, e -> Assertions.assertThat(e.problems()).singleElement().asString()
                         .startsWith("bkm.dmn: ")
-                        .contains("imports 'Rate'", "#119"));
+                        .contains("an external function (Java or PMML)", "by design"));
     }
 
     @Test
@@ -533,5 +537,20 @@ class GraphModelTest {
         for (var name : List.of("Risk Category", "Credit Limit")) {
             Assertions.assertThat(decisions.get(name).report()).isEqualTo(graph.validationReport(name));
         }
+    }
+
+    @Test
+    void a_file_that_imports_others_is_evaluated_with_them_when_they_are_loaded_together() {
+        // DMN 1.5, 6.3.3: each model it imports is found among the files loaded, by namespace
+        var decisions = Decisions.load(List.of(source("imports/main.dmn"), source("imports/people.dmn"), source("imports/labels.dmn")),
+                Severity.ERROR);
+
+        Assertions.assertThat(decisions.names()).contains("Welcome", "Adult", "Label");
+        Assertions.assertThat(decisions.evaluate("Welcome", Map.of("Guest.name", "Ada", "Guest.age", "36", "people.Person.name", "Bob",
+                "people.Person.age", "15"))).containsExactly(Map.of("Welcome", "Hello Ada; host: Bob (minor)"));
+
+        // without the models it imports, only its decision tables load, of which it has none
+        Assertions.assertThatThrownBy(() -> Decisions.load(List.of(source("imports/main.dmn")), Severity.ERROR))
+                .isInstanceOf(DecisionsException.class).hasMessageContaining("cannot be found");
     }
 }

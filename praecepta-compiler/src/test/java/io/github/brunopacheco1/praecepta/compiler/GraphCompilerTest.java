@@ -293,14 +293,16 @@ class GraphCompilerTest {
         var file = out.resolve("bkm.dmn");
         Files.writeString(file, """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
-                  <import name="Rate" namespace="https://example.com/rate" importType="https://www.omg.org/spec/DMN/20230324/MODEL/"/>
+                  <decision id="rate" name="Rate"><literalExpression>
+                    <text>function(x) external {java: {class: "java.lang.Math", method signature: "abs(double)"}}</text>
+                  </literalExpression></decision>
                   <decision id="a" name="A"><literalExpression><text>1</text></literalExpression></decision>
                 </definitions>""", StandardCharsets.UTF_8);
         var definition = TableDefinition.dmn(file);
         Assertions.assertThatThrownBy(() -> compile(definition, Severity.ERROR))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("imports 'Rate'")
-                .hasMessageContaining("#119")
+                .hasMessageContaining("an external function (Java or PMML)")
+                .hasMessageContaining("by design")
                 .hasCauseInstanceOf(UnsupportedFeatureException.class);
     }
 
@@ -314,7 +316,9 @@ class GraphCompilerTest {
         var file = out.resolve("later.dmn");
         Files.writeString(file, """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
-                  <import name="Rate" namespace="https://example.com/rate" importType="https://www.omg.org/spec/DMN/20230324/MODEL/"/>
+                  <decision id="rate" name="Rate"><literalExpression>
+                    <text>function(x) external {java: {class: "java.lang.Math", method signature: "abs(double)"}}</text>
+                  </literalExpression></decision>
                   <decision id="tier" name="Tier"><decisionTable hitPolicy="FIRST">
                     <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>
                     <output name="tier" typeRef="string"/>
@@ -329,8 +333,8 @@ class GraphCompilerTest {
         Assertions.assertThat(result.className()).isEqualTo("Tier");
         Assertions.assertThat(lines).singleElement().asString()
                 .startsWith(file + ": its decision table is compiled alone, without its decision requirements graph, "
-                        + "which needs Praecepta 0.11 (#119): ")
-                .contains("imports 'Rate'");
+                        + "which uses what Praecepta does not evaluate: ")
+                .contains("an external function (Java or PMML)");
 
         lines.clear();
         TableCompiler.compile(TableDefinition.dmn(table("chain.dmn")), options);
@@ -404,6 +408,44 @@ class GraphCompilerTest {
                         .containsExactly(Map.of("Greeting", String.valueOf(graph.evaluate("Greeting", inputData))));
             }
         }
+    }
+
+    @Test
+    void a_model_that_imports_others_compiles_with_them_and_its_classes_read_them_at_run_time() throws Exception {
+        var result = compile(TableDefinition.dmn(table("imports/main.dmn")), Severity.ERROR);
+
+        Assertions.assertThat(result.imports()).containsOnlyKeys("MainModel-0.dmn", "MainModel-1.dmn");
+        Assertions.assertThat(result.sources().get("MainModel")).contains("var imports = java.util.Map.of(\"https://example.com/people\", "
+                + "\"MainModel-0.dmn\"");
+        try (var loader = compileAndLoad(result)) {
+            var welcome = loader.loadClass(PACKAGE + ".Welcome");
+            var input = loader.loadClass(PACKAGE + ".WelcomeInput");
+            var components = input.getRecordComponents();
+            var values = new Object[components.length];
+            for (int i = 0; i < components.length; i++) {
+                var person = components[i].getType().getDeclaredConstructors()[0];
+                values[i] = components[i].getName().equals("guest") ? person.newInstance("Ada", new BigDecimal(36))
+                        : person.newInstance("Bob", new BigDecimal(15));
+            }
+            var value = welcome.getMethod("evaluate", input).invoke(null, input.getDeclaredConstructors()[0].newInstance(values));
+            Assertions.assertThat(value).isEqualTo("Hello Ada; host: Bob (minor)");
+        }
+    }
+
+    @Test
+    void an_import_whose_location_is_outside_the_models_directory_is_not_followed() throws IOException {
+        var rules = Files.createDirectories(out.resolve("rules"));
+        Files.copy(table("imports/people.dmn"), out.resolve("people.dmn"));
+        var main = rules.resolve("main.dmn");
+        Files.writeString(main, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="m" name="M" namespace="https://example.com/m">
+                  <import name="people" namespace="https://example.com/people"
+                          importType="https://www.omg.org/spec/DMN/20230324/MODEL/" locationURI="../people.dmn"/>
+                  <decision id="d" name="D"><literalExpression><text>people.Greet("Ada")</text></literalExpression></decision>
+                </definitions>""");
+
+        Assertions.assertThatThrownBy(() -> compile(TableDefinition.dmn(main), Severity.ERROR))
+                .hasMessageContaining("imports the model 'https://example.com/people' at '../people.dmn', which cannot be found");
     }
 
     private static DecisionGraph graph(Path file) {
