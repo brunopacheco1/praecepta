@@ -11,6 +11,38 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+A clean-up release: no new features. The plan to grow Praecepta into a DMN 1.5 engine one layer per release is
+finished, so the code and the documentation no longer speak of planned releases. Read *Changed* before upgrading if
+you call `UnsupportedFeatureException.release()` or `issue()`, or construct `FeelExpression.Unsupported`.
+
+### Added
+- **A user guide**, [docs/GUIDE.md](docs/GUIDE.md): cells, typed columns, list inputs, hit policies, validation, DMN
+  files and decision requirement graphs, which the README held before.
+- **C4 diagrams** in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): system context, containers, components and code,
+  and sequence diagrams of the main flows.
+- **`GraphBenchmark`** in `praecepta-benchmarks`: the latency of one decision of a decision requirement graph, in
+  Praecepta, Camunda and Drools. [praecepta-benchmarks/README.md](praecepta-benchmarks/README.md) describes every
+  benchmark.
+
+### Changed
+- **`UnsupportedFeatureException` no longer names a release.** `release()` and `issue()` are removed, and its
+  constructor takes only the message. **Upgrade note:** both methods returned null and 0 for everything Praecepta
+  0.11 rejects but an import read without the models it imports; tell an unsupported model from an invalid one by the
+  exception's type, as before.
+- **`FeelExpression.Unsupported` is `record Unsupported(String feature)`.** Its `release` and `issue` components and
+  `planned()` are removed.
+- **Messages no longer speak of planned releases.** A literal expression with `importedValues` is rejected with
+  `... imports values (importedValues), which Praecepta does not read`. A model that imports another, read without
+  it, no longer cites an issue number. The line the framework integrations and the build plugins log for a file
+  whose tables they load alone always ends `which uses what Praecepta does not evaluate: ...`.
+- **The documentation is shorter and has one place per fact.** The README is an overview.
+  [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) is the one guide to the build plugins, the framework integrations and
+  native images. [docs/ROADMAP.md](docs/ROADMAP.md) lists only what comes next.
+
+### Removed
+- **`docs/MODERNISATION.md`.** The modernisation is finished. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#design-decisions)
+  keeps its design decisions.
+
 ## [0.11.0] - 2026-11-26
 
 Decision services, imports and the rest of DMN 1.5, the fifth step of Praecepta's plan to grow from a decision-table

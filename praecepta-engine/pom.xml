@@ -17,7 +17,8 @@
     <packaging>jar</packaging>
     <name>praecepta-engine</name>
     <description>
-        DMN decision tables for Java with strict hit policies, bitset matching and validation.
+        A DMN 1.5 engine for Java: decision tables with strict hit policies, bitset matching and validation, the
+        FEEL language, and decision requirement graphs.
         No dependencies; a JPMS module (io.github.brunopacheco1.praecepta.engine).
     </description>
     <properties>
