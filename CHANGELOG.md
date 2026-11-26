@@ -23,6 +23,15 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `DecisionGraph.Builder.decisionService` adds one in code. The graph reports a service that evaluates a decision
   reading input data it does not take ([DMN conformance](docs/DMN-CONFORMANCE.md), case 37).
 - **`FeelExpression.function`**: a function whose body FEEL does not evaluate itself, as a decision service's is.
+- **Imports** ([#119](https://github.com/brunopacheco1/praecepta/issues/119)): `DmnReader.readModel(dmn, imports)`
+  reads a model and the models it imports (DMN 1.5, 6.3.3), each once by namespace, found by a
+  `DmnReader.ImportResolver` from the import's namespace and `locationURI`; `DecisionModel.namespace()` and
+  `DecisionModel.imports()` hold them. An importing model reads an imported element as `importName.elementName` (by its
+  own name for an import without a name) in FEEL, in a `typeRef` and in an href that names the imported namespace. A
+  `DecisionGraph` evaluates the models as one, an imported element under the name the first path of imports gives it
+  (`DecisionGraph.nameOf`), and `DmnWriter.write` writes a model's imports and the hrefs into them. The framework
+  integrations and the build plugins read each file alone still, so a file that imports another loads its decision
+  tables alone, as before.
 
 ### Changed
 - **`DecisionModel` has a component more**, `decisionServices`, before `types`; the constructors without it remain.
@@ -31,7 +40,17 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   the framework integrations read and evaluate it, where they rejected it with an `UnsupportedFeatureException` naming
   0.11, and a decision service that nothing invokes is read where it was left out. **Upgrade note:** such a file's
   decisions are evaluated through its graph, where its decision tables were read alone.
-- **The DMN TCK**: 3,467 of its 3,511 result nodes pass (98.7 %, from 3,409); the 11 failures are those of 0.10.
+- **`DecisionModel` has two components more**, `namespace` and `imports`, after `types`; the constructors without them
+  remain. **Upgrade note:** a record pattern over `DecisionModel` takes them.
+- **`DmnWriter.write(DecisionModel)` writes the model's own namespace**, where it wrote one of its own making
+  (`https://github.com/brunopacheco1/praecepta/<name>`), so a model written reads back with its namespace, as models
+  importing it name it; the DMN the build plugins write for a model changes so.
+- **An href to an element of a model the model does not import is an invalid model**, an
+  `InvalidDecisionTableException` naming DMN 1.5, 6.3.3, where it was an `UnsupportedFeatureException` naming 0.11; an
+  href that names the model's own namespace (`namespace#id`) refers to its own element (the TCK's
+  `0091-local-hrefs`).
+- **The DMN TCK**: 3,475 of its 3,511 result nodes pass (99.0 %, from 3,409); the 11 failures are those of 0.10, and of
+  the 25 not supported, 18 are the external functions Praecepta does not evaluate by design.
 
 ## [0.10.0] - 2026-11-26
 

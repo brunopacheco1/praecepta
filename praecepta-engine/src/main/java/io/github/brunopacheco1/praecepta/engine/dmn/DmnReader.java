@@ -299,6 +299,11 @@ public final class DmnReader {
                 throw new InvalidDecisionTableException("DMN model imports the model '%s', which cannot be read: %s".formatted(namespace,
                         e.getMessage()));
             }
+            var found = root.getAttribute("namespace").strip();
+            if (!found.equals(namespace)) {
+                throw new InvalidDecisionTableException("DMN model imports the model '%s', but what was found for it is the model '%s'"
+                        .formatted(namespace, found));
+            }
             var model = read(root);
             read.put(namespace, model);
             return model;

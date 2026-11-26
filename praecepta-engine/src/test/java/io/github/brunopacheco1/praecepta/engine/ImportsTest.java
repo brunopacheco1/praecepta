@@ -84,6 +84,9 @@ class ImportsTest {
                 </definitions>""";
         assertThatThrownBy(() -> DmnReader.readModel(stream(selfImporting), (namespace, location) -> stream(selfImporting)))
                 .isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("imports itself");
+        assertThatThrownBy(() -> DmnReader.readModel(resource("main.dmn"), (namespace, location) -> resource("main.dmn")))
+                .as("a model found for an import that is another one").isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessageContaining("but what was found for it is the model 'https://example.com/main'");
         var schema = """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="x" name="X" namespace="https://example.com/x">
                   <import name="types" namespace="https://example.com/types" importType="http://www.w3.org/2001/XMLSchema"/>

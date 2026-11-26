@@ -223,7 +223,14 @@ whole with an `UnsupportedFeatureException`, whose `release()` and `issue()` nam
 callers fall back by its type, never by its message: requiring a decision without logic, imports, external functions
 and references into other models (#119). Knowledge sources, authority requirements, annotations and diagrams take no
 part in evaluation and are ignored, and so is a decision without logic that no decision requires
-([DMN conformance](DMN-CONFORMANCE.md), case 36). Decision services (since 0.11) are read with their output,
+([DMN conformance](DMN-CONFORMANCE.md), case 36). `readModel(dmn, imports)` (since 0.11) reads the models a model
+imports, each once by namespace, through an `ImportResolver` (namespace and `locationURI`; a model found under another
+namespace is rejected, so a wrong answer cannot recurse), and resolves an href into an imported namespace, or a
+`typeRef` qualified by an import's name, to the imported element, under the name the import gives it
+(`importName.elementName`). `DecisionGraph` flattens a model and those it imports into one (`ImportedModels`): every
+element under its name in the graph (the path of imports that first reaches its model, so a model two others import is
+one), each element keeping the names its own model reads, which `GraphAnalysis` maps to those names when it resolves
+what the element reads. Decision services (since 0.11) are read with their output,
 encapsulated and input decisions and input data, by reference. `DmnWriter.write(DecisionModel)` writes DMN 1.3
 with ids by position (`input_data_0`, `decision_0`, and `decision_0_` before the ids of a decision's table, so the
 tables of a model never share an id), item definitions for list and context types, and literal expressions as

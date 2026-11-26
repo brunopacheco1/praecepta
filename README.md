@@ -543,9 +543,17 @@ graph.validationReport("Credit Limit");                    // that table's own a
   the arguments, without evaluating their input decisions or touching the model's own values, and give one output's
   value or a context of them all. `graph.evaluateService("Pricing", arguments)` invokes one from outside.
 
-Imports (0.11, [#119](https://github.com/brunopacheco1/praecepta/issues/119)) come later, and external functions never,
-by design ([DMN conformance](docs/DMN-CONFORMANCE.md#known-deviations)): a model that uses them is rejected when it is read with an `UnsupportedFeatureException`, whose message, `release()`
-and `issue()` name the feature's release and issue; so is a model whose decision requires a decision without logic. A
+- **Imports** (since 0.11): `DmnReader.readModel(dmn, imports)` reads a model with the models it imports, each found by
+  its namespace and location (`(namespace, location) -> Files.newInputStream(dir.resolve(location))`), and the graph
+  evaluates them as one: the importing model reads an imported element as `importName.elementName` (`people.Greet(Guest)`),
+  and gives an imported input data, or decision, under that name (`graph.nameOf(namespace, name)` gives it).
+  `DmnReader.readModel(dmn)` rejects a model that imports another, and so do the framework integrations and the build
+  plugins, which read each file alone: such a file's decision tables load alone.
+
+External functions never come, by design ([DMN conformance](docs/DMN-CONFORMANCE.md#known-deviations)): a model that
+defines one is rejected when it is read with an `UnsupportedFeatureException`, whose message, `release()` and `issue()`
+name the feature and its issue; so is a model whose decision requires a decision without logic (0.11,
+[#119](https://github.com/brunopacheco1/praecepta/issues/119)). A
 decision without logic that no decision requires is left out, as it changes no value Praecepta evaluates. What DMN 1.5 decides and Praecepta does not do yet is listed in
 [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md#known-deviations).
 

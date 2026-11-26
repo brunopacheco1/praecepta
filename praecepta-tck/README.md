@@ -158,10 +158,12 @@ expressions as literal expression decisions (see *How a model is evaluated*), wh
 ## Decision requirement graphs
 `DecisionGraph` (0.7, [#14](https://github.com/brunopacheco1/praecepta/issues/14)) evaluates whole models whose
 decisions are decision tables and literal expressions, in the full FEEL language since 0.8, and boxed expressions
-and business knowledge models since 0.10, decision services since 0.11, and `GraphEvaluator` scores it. Of the pinned
-commit's 156 model files of compliance levels 2 and 3, `DmnReader.readModel` reads 145; the rest are rejected for what
-0.11 still has to bring (#119): imports and references into other models (9 files), an external function (1) and a
-decision without logic that another requires (1). Models it does not read are evaluated decision by decision.
+and business knowledge models since 0.10, decision services and imports since 0.11, and `GraphEvaluator` scores it. A
+model that imports others is read with them (`DmnReader.readModel(dmn, imports)`), each found among the DMN files of
+its test case's directory by its `locationURI`, else by its namespace; an input of an imported model, which the test
+file names by its namespace, is that model's input in the graph (`DecisionGraph.nameOf`). Of the pinned commit's 156
+model files of compliance levels 2 and 3, `DmnReader.readModel` reads 154; it rejects one for an external function,
+which Praecepta does not evaluate by design, and one for a decision without logic that another requires (#119). Models it does not read are evaluated decision by decision.
 
 ## The TCK files
 `src/test/resources/tck` holds every test directory of compliance levels 2 and 3 (their DMN models and test
