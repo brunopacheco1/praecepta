@@ -121,9 +121,8 @@ on its way to a full DMN 1.5 engine, one layer per release
 ([#120](https://github.com/brunopacheco1/praecepta/issues/120), see the [roadmap](docs/ROADMAP.md)), but it is
 not one yet. It does not have these yet; when you need one of them before its release, use an engine that has
 it, such as Camunda or Drools:
-- **Imports and decisions without logic** (0.11,
-  [#119](https://github.com/brunopacheco1/praecepta/issues/119)), and with them a claim of DMN 1.5 conformance,
-  planned for 1.0.
+- **A claim of DMN 1.5 conformance**, planned for 1.0
+  ([#120](https://github.com/brunopacheco1/praecepta/issues/120)).
 - **External functions** (Java and PMML), never: Praecepta runs no code from outside the model it evaluates, a
   deliberate exception to DMN 1.5 for security ([DMN conformance](docs/DMN-CONFORMANCE.md#known-deviations)).
 
@@ -520,8 +519,8 @@ graph.validationReport("Credit Limit");                    // that table's own a
 - **Checked when the graph is built**, as ERRORs of its validation report: decisions that require one another in
   a cycle (`DECISION_CYCLE`), a requirement the model does not have or a name no requirement provides
   (`MISSING_REQUIREMENT`), a value that does not fit where it goes, such as a string into a number column or
-  a list into a column of single values (`TYPE_MISMATCH`), and what Praecepta does not evaluate yet, such as an
-  external function, naming the release that plans it (`UNSUPPORTED_FEATURE`), and a literal expression that is not
+  a list into a column of single values (`TYPE_MISMATCH`), and what Praecepta does not evaluate, such as an
+  external function, which it rejects by design (`UNSUPPORTED_FEATURE`), and a literal expression that is not
   FEEL (`INVALID_EXPRESSION`). Such a decision, and every decision
   that requires it, cannot be evaluated; the others can. A decision whose value DMN 1.5 defines as null whatever
   its inputs (operands FEEL does not combine, a path to a component its type does not have, a value that does
@@ -547,15 +546,16 @@ graph.validationReport("Credit Limit");                    // that table's own a
   its namespace and location (`(namespace, location) -> Files.newInputStream(dir.resolve(location))`), and the graph
   evaluates them as one: the importing model reads an imported element as `importName.elementName` (`people.Greet(Guest)`),
   and gives an imported input data, or decision, under that name (`graph.nameOf(namespace, name)` gives it).
-  `DmnReader.readModel(dmn)` rejects a model that imports another, and so do the framework integrations and the build
-  plugins, which read each file alone: such a file's decision tables load alone.
+  `DmnReader.readModel(dmn)` rejects a model that imports another. The framework integrations find the models a file
+  imports among the files they load, by namespace, and the build plugins beside the file, by location or namespace.
+
+- **Decisions without logic** (since 0.11), such as a decision a person makes, are read: the graph does not evaluate
+  one, nor what requires it, but a decision service that takes it as an input decision is given its value.
 
 External functions never come, by design ([DMN conformance](docs/DMN-CONFORMANCE.md#known-deviations)): a model that
-defines one is rejected when it is read with an `UnsupportedFeatureException`, whose message, `release()` and `issue()`
-name the feature and its issue; so is a model whose decision requires a decision without logic (0.11,
-[#119](https://github.com/brunopacheco1/praecepta/issues/119)). A
-decision without logic that no decision requires is left out, as it changes no value Praecepta evaluates. What DMN 1.5 decides and Praecepta does not do yet is listed in
-[docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md#known-deviations).
+defines one is rejected when it is read with an `UnsupportedFeatureException`, whose message says Praecepta does not
+evaluate it, and whose `release()` is null as no release plans it. What DMN 1.5 decides and Praecepta does not do is
+listed in [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md#known-deviations).
 
 ## Praecepta Loader
 Loads rules from the first sheet of an Excel file (or a semicolon-separated CSV file), from the
@@ -682,11 +682,13 @@ DecisionGraph graph = CreditModel.graph();     // the whole graph, e.g. to evalu
   class (`<name>Model`). See the [changelog](CHANGELOG.md).
 - The graph's issues fail the build at `<failOn>` (its ERRORs, and at `WARNING` its WARNINGs too, such as a
   decision that is always null); below it they are logged, and a decision that cannot be evaluated gets no
-  classes. A file that imports another model or defines external functions is no graph
-  Praecepta evaluates yet: its decision table compiles alone, as before, and the build logs one line at info level per
-  such file, naming it, what it uses and the release that plans it (`.../fees.dmn: its decision table is compiled
-  alone, without its decision requirements graph, which needs Praecepta 0.11 (#119): ...`); without one the build
-  fails, naming the release that plans what it uses.
+  classes. A file that imports other models compiles with them, each found beside it by its `locationURI`, or among
+  the `.dmn` files of its directory by namespace, and shipped as a resource beside the model's, which the generated
+  classes read; classes are generated for the file's own decisions. A file that defines external functions is no
+  graph Praecepta evaluates: its decision table compiles alone, as before, and the build logs one line at info level
+  per such file, naming it and what it uses (`.../fees.dmn: its decision table is compiled alone, without its decision
+  requirements graph, which uses what Praecepta does not evaluate: ...`); without one the build fails, naming what
+  it uses.
 
 ## Praecepta Gradle Plugin
 Does for Gradle what the Maven plugin does, with the same settings and the same generated files.
@@ -831,12 +833,12 @@ requirement, a type mismatch, what Praecepta does not evaluate yet: ERRORs; a de
 and each table's analysis as the graph evaluates it, stop the startup at `praecepta.fail-on`, as they fail the
 build plugins, or are logged as `Decision model Credit: ERROR ...`; the endpoint lists each model under `models`, with its input data
 and issues, and gives each of its decisions its `model`, `logic`, `type`, `requiredDecisions`, `inputData` and
-`canEvaluate`. Files without such decisions load exactly as before, and so does a file with what later releases
-bring (imports, external functions): its decision tables load alone, as in 0.6, and
-nothing else of it, and the startup logs one line at INFO
-per such file, naming it, what it uses and the release that plans it (`rules/fees.dmn: its decision tables are
-loaded alone, without its decision requirements graph, which needs Praecepta 0.11 (#119): ...`); without one, it
-fails, naming the release that plans what it uses.
+`canEvaluate`. Files without such decisions load exactly as before. A file that imports other models loads with
+them, found among the files loaded by namespace, so load them together. A file that defines external functions, which
+Praecepta does not evaluate, loads its decision tables alone, as in 0.6, and nothing else of it, and the startup logs
+one line at INFO per such file, naming it and what it uses (`rules/fees.dmn: its decision tables are loaded alone,
+without its decision requirements graph, which uses what Praecepta does not evaluate: ...`); without one, it fails,
+naming what it uses.
 
 ## Praecepta Micronaut
 For Micronaut 4 applications on Java 21+. At startup, the module:
@@ -1110,16 +1112,16 @@ build, and gives two numbers:
 - **Decision tables: 86 of 86 checks pass (100.0 %).** These are the decision-table checks counted since the
   first release; the last three, which read inputs computed by other decisions in models that also invoke
   business knowledge models, pass since 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)).
-- **The whole kit: 3,409 of 3,511 result nodes pass (97.1 %).** Every model of compliance levels 2 and 3
+- **The whole kit: 3,476 of 3,511 result nodes pass (99.0 %).** Every model of compliance levels 2 and 3
   (148 models at the pinned commit), each result node scored as passed, failed or not supported, each
   decision evaluated through its model's decision requirement graph where Praecepta reads the model. This
-  measures how much of DMN 1.5 Praecepta covers: of the 3,420 nodes it evaluates, 3,409 pass (the eleven others
+  measures how much of DMN 1.5 Praecepta covers: of the 3,487 nodes it evaluates, 3,476 pass (the eleven others
   are [known failures](praecepta-tck/README.md#known-failures): nine loan payments the kit states as a double
-  computes them, and two known deviations), and the other 91 need features it does not
-  have yet, nearly all in models that use imports (0.11) or external functions, which Praecepta rejects by design.
+  computes them, and two known deviations). Of the other 24, 17 need external functions, which Praecepta rejects by
+  design, and 7 invoke business knowledge models or functions in ways it does not evaluate yet.
 
 Praecepta is a decision-table engine growing into a full DMN 1.5 engine one layer per release
-([#120](https://github.com/brunopacheco1/praecepta/issues/120)), so part of the kit (imports) is still ahead, and
+([#120](https://github.com/brunopacheco1/praecepta/issues/120)), so a few of the kit's nodes are still ahead, and
 external functions it rejects by design; [praecepta-tck/RESULTS.md](praecepta-tck/RESULTS.md) has the results per model and feature area,
 every feature the unsupported nodes need with the release that brings it, and how many nodes each release
 would complete. The build fails only on a regression: a node the committed baseline has passing that no

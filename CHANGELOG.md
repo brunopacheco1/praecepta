@@ -29,9 +29,15 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `DecisionModel.imports()` hold them. An importing model reads an imported element as `importName.elementName` (by its
   own name for an import without a name) in FEEL, in a `typeRef` and in an href that names the imported namespace. A
   `DecisionGraph` evaluates the models as one, an imported element under the name the first path of imports gives it
-  (`DecisionGraph.nameOf`), and `DmnWriter.write` writes a model's imports and the hrefs into them. The framework
-  integrations and the build plugins read each file alone still, so a file that imports another loads its decision
-  tables alone, as before.
+  (`DecisionGraph.nameOf`), and `DmnWriter.write` writes a model's imports and the hrefs into them.
+- **Imports in the framework integrations and the build plugins**: `Decisions.load` finds the models a file imports
+  among the files it loads, by namespace (`DmnReader.namespace` reads a file's). The compiler finds them beside the
+  source, by `locationURI` or by namespace among the directory's `.dmn` files, never outside that directory; it
+  ships each as a resource beside the model's (`CompiledTable.imports`), which the generated model class reads, and
+  generates classes for the model's own decisions.
+- **Decisions without logic** (`DecisionLogic.NoLogic`), such as a decision a person makes: the graph does not
+  evaluate one, nor what requires it, but a decision service that takes it as an input decision is given its value
+  (the TCK's `0088-no-decision-logic`, [DMN conformance](docs/DMN-CONFORMANCE.md), case 36).
 
 ### Changed
 - **`DecisionModel` has a component more**, `decisionServices`, before `types`; the constructors without it remain.
@@ -49,8 +55,22 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   `InvalidDecisionTableException` naming DMN 1.5, 6.3.3, where it was an `UnsupportedFeatureException` naming 0.11; an
   href that names the model's own namespace (`namespace#id`) refers to its own element (the TCK's
   `0091-local-hrefs`).
-- **The DMN TCK**: 3,475 of its 3,511 result nodes pass (99.0 %, from 3,409); the 11 failures are those of 0.10, and of
-  the 25 not supported, 18 are the external functions Praecepta does not evaluate by design.
+- **A decision without logic is read**, where one that another decision required was rejected with an
+  `UnsupportedFeatureException` naming 0.11, and one that none required was left out; `DmnWriter` writes it back.
+  **Upgrade note:** a `switch` over `DecisionLogic` takes `NoLogic`; a file whose decision requires one loads as a
+  graph, where its decision tables loaded alone.
+- **External functions are rejected as what Praecepta does not evaluate, by design**, where messages named them
+  planned for 0.11: an `UnsupportedFeatureException` for one has a null `release()` and an `issue()` of 0, as has a
+  `FeelExpression.Unsupported`, whose `planned()` tells them apart, and the line the integrations and build plugins
+  log for a file whose tables load alone says `which uses what Praecepta does not evaluate`. **Upgrade note:** code
+  that reads `release()` handles null.
+- **A file of the build plugins that is no well-formed model and has no table to compile alone fails naming why its
+  model was rejected**, such as an import it cannot find, where it said the file has no decision table; so does a
+  file of the framework integrations.
+- **The DMN TCK report lists external functions apart**, as no release brings them, and counts them as what stops
+  the nodes that need them. 3,476 of its 3,511 result nodes pass (99.0 %, from 3,409); the 11 failures are those of
+  0.10, and of the 24 not supported, 17 need the external functions Praecepta does not evaluate by design, and 7
+  invoke business knowledge models or functions in ways it does not evaluate yet.
 
 ## [0.10.0] - 2026-11-26
 

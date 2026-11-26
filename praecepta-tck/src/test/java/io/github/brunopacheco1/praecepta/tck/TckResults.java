@@ -203,8 +203,8 @@ final class TckResults {
                 ### Not supported, by feature
 
                 Every feature the not-supported nodes need. *Needed by* counts the nodes that need it, whatever else
-                they need; *stops* counts those it is the first missing feature of (so these add up to the
-                not-supported nodes); *alone* counts those that need nothing else.
+                they need; *stops* counts those it is the first missing feature of, or the one Praecepta does not evaluate by
+                design (so these add up to the not-supported nodes); *alone* counts those that need nothing else.
 
                 | Feature | Release | Needed by | Stops | Alone |
                 |---|---|---:|---:|---:|
@@ -212,10 +212,12 @@ final class TckResults {
         var needed = new LinkedHashMap<Feature, int[]>();
         for (var result : unsupported) {
             var needs = result.outcome().needs();
+            // what Praecepta does not evaluate by design stops a node whatever else it needs
+            var stops = needs.stream().filter(feature -> feature.area() == Area.NOT_PLANNED).findFirst().orElse(needs.getFirst());
             for (var feature : needs) {
                 var counts = needed.computeIfAbsent(feature, f -> new int[3]);
                 counts[0]++;
-                if (feature.equals(needs.getFirst())) {
+                if (feature.equals(stops)) {
                     counts[1]++;
                 }
                 if (needs.size() == 1) {

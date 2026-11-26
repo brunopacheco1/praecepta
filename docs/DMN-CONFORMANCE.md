@@ -59,7 +59,7 @@ release meant to remove it.
 | 33 | [Real numbers the TCK states to some digits](#33-real-numbers-the-tck-states-to-some-digits) | open |
 | 34 | [A boxed condition that is not a boolean](#34-a-boxed-condition-that-is-not-a-boolean) | decided by the TCK for a value that is not a boolean; open for null |
 | 35 | [A business knowledge model that invokes itself](#35-a-business-knowledge-model-that-invokes-itself) | open |
-| 36 | [A decision service nothing invokes, and a decision without logic nothing requires](#36-a-decision-service-nothing-invokes-and-a-decision-without-logic-nothing-requires) | open; decision services read since 0.11.0 |
+| 36 | [A decision service nothing invokes, and a decision without logic nothing requires](#36-a-decision-service-nothing-invokes-and-a-decision-without-logic-nothing-requires) | open until 0.11.0, which reads both |
 | 37 | [What a decision service evaluates, and in what order it takes its arguments](#37-what-a-decision-service-evaluates-and-in-what-order-it-takes-its-arguments) | decided by the TCK for the order; open for decisions it does not list |
 
 How Praecepta returns DMN's null result, which is a choice of representation rather than of semantics,
@@ -578,8 +578,10 @@ integrations alike.
   logic, is rejected, as decision services and such decisions are planned for 0.11
   ([#119](https://github.com/brunopacheco1/praecepta/issues/119)).
 - **Praecepta (since 0.11.0).** Decision services are read, and evaluated when invoked (case 37), whether anything
-  invokes them or not. A decision without logic that no decision requires is still left out, and one that another
-  requires still rejected.
+  invokes them or not. Every decision without logic is read (`DecisionLogic.NoLogic`): the graph does not evaluate
+  it, nor a decision that requires it, without reporting either, as the model is valid and the value is a person's
+  to give; a decision service that takes it as an input decision is given that value as an argument, as
+  `0088-no-decision-logic` has it.
 
 ## 37. What a decision service evaluates, and in what order it takes its arguments
 - **DMN 1.5.** A decision service (6.3.9) has output decisions, encapsulated decisions, input decisions and input

@@ -36,14 +36,14 @@ final class GraphCompiler {
 
     /**
      * The model to compile as a graph, or null to compile the source as a table: one whose decisions do not need a
-     * graph, or that Praecepta does not evaluate as a graph (it uses what a later release plans, or is not a
+     * graph, or that Praecepta does not evaluate as a graph (it uses what Praecepta does not evaluate, or is not a
      * well-formed decision model, as a DMN file of tables never had to be) but whose table reads alone, as before. A
-     * table compiled alone because the model uses what a later release plans is logged ({@link CompilerOptions#log()},
+     * table compiled alone because the model uses what Praecepta does not evaluate is logged ({@link CompilerOptions#log()},
      * {@link #fallbackMessage}).
      *
      * @param source the source's path, as the line logged names it
-     * @throws InvalidDecisionTableException if the model uses what a later release plans, naming it, and its table
-     *                                       cannot be read alone either
+     * @throws InvalidDecisionTableException if the model uses what Praecepta does not evaluate, or is not well formed,
+     *                                       naming why, and its table cannot be read alone either
      */
     static DecisionModel model(byte[] dmn, String decision, String source, CompilerOptions options) {
         DecisionModel model;
@@ -56,6 +56,9 @@ final class GraphCompiler {
             options.log().accept(fallbackMessage(source, e));
             return null;
         } catch (InvalidDecisionTableException e) {
+            if (!readsAlone(dmn, decision)) {
+                throw e; // no file of tables either: why the model was rejected, such as an import it cannot find, says more
+            }
             return null;
         }
         if (decision == null) {
@@ -66,16 +69,18 @@ final class GraphCompiler {
 
     /**
      * Finds the models a DMN source imports beside it: by the import's {@code locationURI}, relative to the source's
-     * directory, else among that directory's DMN files by namespace.
+     * directory, else among that directory's DMN files by namespace. A location outside the directory is not followed,
+     * so a model cannot have the build read files it was not given.
      */
-    private static DmnReader.ImportResolver imports(Path directory) {
+    private static DmnReader.ImportResolver imports(Path parent) {
+        var directory = parent == null ? null : parent.normalize();
         return (namespace, location) -> {
             if (directory == null) {
                 return null;
             }
             if (!location.isEmpty()) {
                 var file = directory.resolve(location).normalize();
-                if (Files.isRegularFile(file)) {
+                if (file.startsWith(directory) && Files.isRegularFile(file)) {
                     return Files.newInputStream(file);
                 }
             }
@@ -96,9 +101,10 @@ final class GraphCompiler {
 
     /**
      * The line logged of a DMN source whose decision table is compiled alone because {@code DmnReader.readModel}
-     * rejects its model with what a later release plans: {@code src/main/rules/fees.dmn: its decision table is
-     * compiled alone, without its decision requirements graph, which needs Praecepta 0.11 (#119): DMN model imports
-     * 'Rate', ...}.
+     * rejects its model with what Praecepta does not evaluate: {@code src/main/rules/fees.dmn: its decision table is
+     * compiled alone, without its decision requirements graph, which uses what Praecepta does not evaluate: decision
+     * 'Rate' uses an external function ...}, or, for what a later release plans, {@code ... which needs Praecepta 0.12
+     * (#n): ...}.
      */
     static String fallbackMessage(String source, UnsupportedFeatureException rejected) {
         if (rejected.release() == null) {

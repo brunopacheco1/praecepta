@@ -101,22 +101,26 @@ integrations find their tables at runtime, so their engines take maps instead:
   a decision an ERROR concerns throws `InvalidDecisionTableException` when evaluated, and the others evaluate. A
   decision table of the graph is checked against its analysis as the graph evaluates it
   (`DecisionGraph.validationReport(decision)`, its `Decision.report()`), the report the build plugins check, so a
-  file fails at the same `fail-on` in both. Whether a file is no graph Praecepta evaluates yet is told by the
-  `UnsupportedFeatureException` `DmnReader.readModel` throws, not by its message. A file without such decisions loads
-  exactly as before, its decision tables read alone. So does a file that is no graph Praecepta evaluates yet:
-  one that uses what later releases bring (decisions without logic that others require, imports, external functions), or that is not a well-formed decision model (two elements of one name, as `DmnWriter`
-  writes a table with a column of its own name), which a file of
-  tables never had to be. Its decision tables load alone, as in 0.6, and nothing else of it is evaluated; a file
-  with no decision table fails, naming the feature and its issue. A file whose tables load alone because it uses
-  what a later release plans is logged, one line at INFO per file through the framework's logging (the same
-  `DecisionsLoader.Log` that reports what was loaded; `Decisions.load` on its own logs it through its
-  `System.Logger`, `io.github.brunopacheco1.praecepta.integration.Decisions`, unless told not to log), naming the
-  file, what it uses and the release and issue that plan it, so that the graph left out is seen:
-  `rules/fees.dmn: its decision tables are loaded alone, without its decision requirements graph, which needs
-  Praecepta 0.11 (#119): DMN model imports 'Rate', ...`. The build plugins compile such a
-  file's table the same way, and log it likewise at info level (Maven's info, Gradle's lifecycle, the Quarkus build
-  step's INFO), once per file, through the compiler's `CompilerOptions.log`: `.../fees.dmn: its decision table is
-  compiled alone, ...`.
+  file fails at the same `fail-on` in both. A file that imports other models (since 0.11) is read with them, found
+  among the files loaded with it by namespace (`DmnReader.namespace`), so put them where the same locations find
+  them; the build plugins find them beside the file, by `locationURI` or by namespace among the directory's `.dmn`
+  files, never outside that directory, and ship each as a resource beside the model's, which the generated classes
+  read. Whether a file is no graph Praecepta evaluates is told by the `UnsupportedFeatureException`
+  `DmnReader.readModel` throws, not by its message. A file without such decisions loads exactly as before, its
+  decision tables read alone. So does a file that is no graph Praecepta evaluates: one that defines external
+  functions, which Praecepta rejects by design, or that is not a well-formed decision model (two elements of one
+  name, as `DmnWriter` writes a table with a column of its own name), which a file of tables never had to be. Its
+  decision tables load alone, as in 0.6, and nothing else of it is evaluated; a file with no decision table fails,
+  naming why its model was rejected. A file whose tables load alone because it uses what Praecepta does not evaluate
+  is logged, one line at INFO per file through the framework's logging (the same `DecisionsLoader.Log` that reports
+  what was loaded; `Decisions.load` on its own logs it through its `System.Logger`,
+  `io.github.brunopacheco1.praecepta.integration.Decisions`, unless told not to log), naming the file and what it
+  uses, so that the graph left out is seen: `rules/fees.dmn: its decision tables are loaded alone, without its
+  decision requirements graph, which uses what Praecepta does not evaluate: ...`; for what a later release plans,
+  the line names the release and issue instead (`... which needs Praecepta 0.12 (#n): ...`). The build plugins
+  compile such a file's table the same way, and log it likewise at info level (Maven's info, Gradle's lifecycle,
+  the Quarkus build step's INFO), once per file, through the compiler's `CompilerOptions.log`: `.../fees.dmn: its
+  decision table is compiled alone, ...`.
 - **Generated classes are not beans.** They are static and need no container; declare one as a bean
   yourself if you want it injected. The DMN resources the build plugins write are ordinary DMN files, so a
   location pattern that covers their package (`classpath*:com/acme/pricing/*.dmn`) gives them map-based

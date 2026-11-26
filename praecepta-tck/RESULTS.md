@@ -81,15 +81,15 @@ functions, as it runs no code from outside the model
 ### Not supported, by feature
 
 Every feature the not-supported nodes need. *Needed by* counts the nodes that need it, whatever else
-they need; *stops* counts those it is the first missing feature of (so these add up to the
-not-supported nodes); *alone* counts those that need nothing else.
+they need; *stops* counts those it is the first missing feature of, or the one Praecepta does not evaluate by
+design (so these add up to the not-supported nodes); *alone* counts those that need nothing else.
 
 | Feature | Release | Needed by | Stops | Alone |
 |---|---|---:|---:|---:|
-| boxed contexts | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 18 | 18 | 1 |
+| boxed contexts | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 18 | 1 | 1 |
 | business knowledge models | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 5 | 5 | 5 |
 | function definitions and lambdas | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 1 | 1 | 1 |
-| external functions (Java, PMML) | never | 17 | 0 | 0 |
+| external functions (Java, PMML) | never | 17 | 17 | 0 |
 
 ### By model
 

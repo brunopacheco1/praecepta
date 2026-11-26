@@ -75,13 +75,13 @@ public final class Decisions {
      * ({@code DmnReader.readModel}): if one of its decisions requires another decision or business knowledge, or is not
      * a decision table, its decisions are evaluated through its decision requirements graph ({@link GraphModel}), whose
      * validation report is checked too; otherwise each of its decision tables is a decision of its own, evaluated alone.
-     * A model that uses what Praecepta does not evaluate yet (imports, external functions),
-     * or that is not a well-formed decision model (two elements of one
-     * name, such as a table with a column of its own name as {@code DmnWriter} writes it, a decision without logic),
+     * The models a source imports are found among the sources, by namespace. A model that uses what Praecepta does not
+     * evaluate (external functions), or that is not a well-formed decision model (two elements of one
+     * name, such as a table with a column of its own name as {@code DmnWriter} writes it),
      * which a file of decision tables never had to be, has its decision tables read alone, as before
      * ({@code DmnReader.readAll}), and nothing else of it is evaluated; one that has no decision table is rejected,
-     * naming the feature and its issue. A file whose tables are read alone because the model uses what a later release
-     * plans is logged, one line at INFO, naming the file, the feature and the release and issue that plan it
+     * naming the feature. A file whose tables are read alone because the model uses what Praecepta does not evaluate
+     * is logged, one line at INFO, naming the file and the feature, and the release and issue that plan it if one does
      * ({@link #fallbackMessage}), so that its graph is not left out unseen.
      *
      * @param failOn     the validation severity that fails loading: ERROR, WARNING, or null for none
@@ -147,7 +147,7 @@ public final class Decisions {
 
     /**
      * What a source holds: its decisions, the graph they are evaluated through, or null if they need none, and the line
-     * to log if its decision tables are read alone because its model uses what a later release plans, else null.
+     * to log if its decision tables are read alone because its model uses what Praecepta does not evaluate, else null.
      */
     private record Read(List<Decision> decisions, GraphModel model, String fallback) {
 
@@ -156,8 +156,9 @@ public final class Decisions {
 
     /**
      * The line logged, at INFO, of a DMN file whose decision tables are loaded alone because {@code DmnReader.readModel}
-     * rejects its model with what a later release plans: {@code rules/fees.dmn: its decision tables are loaded alone,
-     * without its decision requirements graph, which needs Praecepta 0.11 (#119): DMN model imports 'Rate', ...}.
+     * rejects its model with what Praecepta does not evaluate: {@code rules/fees.dmn: its decision tables are loaded alone,
+     * without its decision requirements graph, which uses what Praecepta does not evaluate: decision 'Rate' uses an
+     * external function ...}, or, for what a later release plans, {@code ... which needs Praecepta 0.12 (#n): ...}.
      */
     static String fallbackMessage(String location, UnsupportedFeatureException rejected) {
         if (rejected.release() == null) {
@@ -198,8 +199,8 @@ public final class Decisions {
             problems.add("%s: cannot be read (%s)".formatted(source.location(), e.getMessage()));
             return Read.NOTHING;
         } catch (RuntimeException e) {
-            // not a decision model Praecepta evaluates as a graph: one with what a later release plans, or not well
-            // formed (two elements of one name, a decision without logic...), which a file of decision tables read alone
+            // not a decision model Praecepta evaluates as a graph: one with what Praecepta does not evaluate, or not well
+            // formed (two elements of one name, an import it cannot find...), which a file of decision tables read alone
             // never had to be; its tables are read as before, and if it has none, why the model was rejected is the problem
             rejected = e;
         }

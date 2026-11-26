@@ -432,6 +432,22 @@ class GraphCompilerTest {
         }
     }
 
+    @Test
+    void an_import_whose_location_is_outside_the_models_directory_is_not_followed() throws IOException {
+        var rules = Files.createDirectories(out.resolve("rules"));
+        Files.copy(table("imports/people.dmn"), out.resolve("people.dmn"));
+        var main = rules.resolve("main.dmn");
+        Files.writeString(main, """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="m" name="M" namespace="https://example.com/m">
+                  <import name="people" namespace="https://example.com/people"
+                          importType="https://www.omg.org/spec/DMN/20230324/MODEL/" locationURI="../people.dmn"/>
+                  <decision id="d" name="D"><literalExpression><text>people.Greet("Ada")</text></literalExpression></decision>
+                </definitions>""");
+
+        Assertions.assertThatThrownBy(() -> compile(TableDefinition.dmn(main), Severity.ERROR))
+                .hasMessageContaining("imports the model 'https://example.com/people' at '../people.dmn', which cannot be found");
+    }
+
     private static DecisionGraph graph(Path file) {
         try (var dmn = Files.newInputStream(file)) {
             return DecisionGraph.read(dmn);
