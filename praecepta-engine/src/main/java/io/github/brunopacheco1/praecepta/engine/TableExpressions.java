@@ -54,7 +54,7 @@ final class TableExpressions {
     private final Map<String, ColumnType> named = new LinkedHashMap<>();
 
     /**
-     * The table's FEEL as {@link GraphAnalysis} parsed it, by text, so that a {@link DecisionGraph} parses each of its
+     * The table's FEEL as {@link TableReads} parsed it, by text, so that a {@link DecisionGraph} parses each of its
      * tables' entries once: its input entries beyond the simple unary tests, and its input expressions and output
      * entries, parsed in {@link #scope}, which the engine then parses in, too.
      */
