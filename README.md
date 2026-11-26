@@ -537,8 +537,9 @@ graph.validationReport("Credit Limit");                    // that table's own a
 Decision services, imports and FEEL's external functions (0.11,
 [#119](https://github.com/brunopacheco1/praecepta/issues/119)) come later: a model that uses them is rejected when it is
 read with an `UnsupportedFeatureException`, whose message, `release()` and `issue()` name the feature's release and
-issue. A decision service that nothing in the model invokes, and a decision without logic that no decision requires,
-are left out, as they change no value Praecepta evaluates. What DMN 1.5 decides and Praecepta does not do yet is listed in
+issue; so is a model whose decision requires a decision without logic. A decision service that nothing in the model
+invokes, and a decision without logic that no decision requires, are left out, as they change no value Praecepta
+evaluates. What DMN 1.5 decides and Praecepta does not do yet is listed in
 [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md#known-deviations).
 
 ## Praecepta Loader

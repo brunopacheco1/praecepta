@@ -301,6 +301,9 @@ final class GraphEvaluator implements ModelEvaluator {
                 if (message.contains("decision service")) {
                     yield Feature.DECISION_SERVICES;
                 }
+                if (message.contains("has no decision logic")) {
+                    yield Feature.NO_LOGIC;
+                }
                 yield message.contains("defines a function in") ? Feature.EXTERNAL_FUNCTIONS : Feature.IMPORTS;
             }
             case 118 -> message.startsWith("DMN model has the business knowledge model") || message.contains("requires business knowledge")

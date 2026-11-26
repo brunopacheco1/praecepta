@@ -104,9 +104,9 @@ integrations find their tables at runtime, so their engines take maps instead:
   file fails at the same `fail-on` in both. Whether a file is no graph Praecepta evaluates yet is told by the
   `UnsupportedFeatureException` `DmnReader.readModel` throws, not by its message. A file without such decisions loads
   exactly as before, its decision tables read alone. So does a file that is no graph Praecepta evaluates yet:
-  one that uses what later releases bring (invoked decision services, imports, external functions), or that is not a
-  well-formed decision model (two elements of one name, as `DmnWriter` writes a table with a column of its own name,
-  a decision without logic that another requires), which a file of
+  one that uses what later releases bring (invoked decision services, decisions without logic that others require,
+  imports, external functions), or that is not a well-formed decision model (two elements of one name, as `DmnWriter`
+  writes a table with a column of its own name), which a file of
   tables never had to be. Its decision tables load alone, as in 0.6, and nothing else of it is evaluated; a file
   with no decision table fails, naming the feature and its issue. A file whose tables load alone because it uses
   what a later release plans is logged, one line at INFO per file through the framework's logging (the same

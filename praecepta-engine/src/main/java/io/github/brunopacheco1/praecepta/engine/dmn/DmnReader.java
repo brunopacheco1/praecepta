@@ -186,8 +186,8 @@ public final class DmnReader {
      * function item among them is a function type, and one with neither a base type nor components is any type.
      *
      * <p>What Praecepta does not evaluate yet is rejected, naming the element and the release that plans it: invoking a
-     * decision service, imports and external functions (in FEEL, or a boxed function definition in Java or PMML),
-     * planned for 0.11 (#119).
+     * decision service, a decision without logic that another decision requires, imports and external functions (in
+     * FEEL, or a boxed function definition in Java or PMML), planned for 0.11 (#119).
      *
      * @throws InvalidDecisionTableException if the model cannot be read (a literal expression that is not FEEL among
      *                                       other things), uses what Praecepta does not support yet, or names two of its
@@ -219,9 +219,14 @@ public final class DmnReader {
         var decisions = new ArrayList<DecisionModel.Decision>();
         var required = requiredDecisionIds(root);
         for (var decision : children(root, DECISION)) {
-            if (expressionIn(decision) == null && !required.contains(decision.getAttribute("id"))) {
+            if (expressionIn(decision) == null) {
+                if (required.contains(decision.getAttribute("id"))) {
+                    throw IMPORTS.exception(("%s has no decision logic, and another decision requires it, which Praecepta does not "
+                            + "support yet: decisions without decision logic are planned for 0.11 (#119)").formatted(
+                            decisionWhere(elementName(decision, "a decision"))));
+                }
                 // a decision without logic, such as a human decision, that no decision requires: it changes no value Praecepta
-                // evaluates, and is left out (the DMN TCK's 0087-chapter-11-example); one that is required is rejected
+                // evaluates, and is left out (the DMN TCK's 0087-chapter-11-example)
                 continue;
             }
             decisions.add(decision(decision, types, model, elements));

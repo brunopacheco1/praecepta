@@ -31,6 +31,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
 /** Decision models read from DMN by {@link DmnReader#readModel} and written back by {@link DmnWriter#write(DecisionModel)}. */
@@ -172,8 +173,12 @@ class DecisionModelDmnTest {
                 + "<informationRequirement><requiredDecision href=\"#d\"/></informationRequirement>"
                 + "<literalExpression><text>D</text></literalExpression></decision>");
         assertThatThrownBy(() -> read(noLogic))
-                .isInstanceOf(InvalidDecisionTableException.class).hasMessage("Decision 'D' has no decision logic; Praecepta evaluates "
-                        + "decisions whose logic is a decision table, a literal expression or a boxed expression");
+                .isInstanceOfSatisfying(UnsupportedFeatureException.class, e -> {
+                    assertThat(e.release()).isEqualTo("0.11");
+                    assertThat(e.issue()).isEqualTo(119);
+                })
+                .hasMessage("Decision 'D' has no decision logic, and another decision requires it, which Praecepta does not support "
+                        + "yet: decisions without decision logic are planned for 0.11 (#119)");
         var empty = dmn("<decision id=\"d\" name=\"D\"><literalExpression><text> </text></literalExpression></decision>");
         assertThatThrownBy(() -> read(empty))
                 .isInstanceOf(InvalidDecisionTableException.class).hasMessage("Decision 'D': its literal expression is empty");

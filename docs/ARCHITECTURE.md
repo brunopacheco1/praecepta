@@ -220,8 +220,8 @@ component a path names), an output by the decision's variable (its component of 
 outputs), else by the one type its output entries give, as FEEL types them, and else not at all (`typed` false: each
 entry gives its own type). What later releases bring is rejected
 whole with an `UnsupportedFeatureException`, whose `release()` and `issue()` name the release that plans it, so that
-callers fall back by its type, never by its message: invoking a decision service, imports, external functions and
-references into other models (#119). Knowledge sources, authority requirements, annotations and diagrams take no part
+callers fall back by its type, never by its message: invoking a decision service, requiring a decision without logic,
+imports, external functions and references into other models (#119). Knowledge sources, authority requirements, annotations and diagrams take no part
 in evaluation and are ignored, and so are a decision service that nothing invokes and a decision without logic that no
 decision requires ([DMN conformance](DMN-CONFORMANCE.md), case 36). `DmnWriter.write(DecisionModel)` writes DMN 1.3
 with ids by position (`input_data_0`, `decision_0`, and `decision_0_` before the ids of a decision's table, so the
@@ -481,7 +481,7 @@ when it names none, one of the model's decisions, requires another decision or i
 else compiles as before, byte for byte (the golden files of single tables are unchanged): a decision table that
 requires only input data, a model without such decisions, and a file that is not a well-formed model in a way a
 file of tables never had to be (two elements of one name, which `DmnWriter` writes for a table with a column of its
-own name; a decision without logic), and a model that uses what a later release plans (#116 to #119) but has the
+own name), and a model that uses what a later release plans (#116 to #119) but has the
 table to compile, which 0.6 compiled; without such a table, the reader's message, which names the release, fails
 the build. `GraphCompiler` builds the graph (`DecisionGraph.Builder.failOn` at the build's `failOn`, without
 logging), writes the model with `DmnWriter.write(model)`, and `GraphSourceGenerator` generates:

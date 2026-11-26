@@ -66,8 +66,9 @@ models being loaded only in part.
   decisions are evaluated through its graph, and its tables report as the graph's.
 - **A decision service that nothing in the model invokes, and a decision without logic that no decision requires, are
   left out** when a model is read, as they change no value Praecepta evaluates (the TCK's `0087-chapter-11-example`);
-  a model that invokes a decision service is still rejected, naming 0.11
-  ([#119](https://github.com/brunopacheco1/praecepta/issues/119)).
+  a model that invokes a decision service, or requires a decision without logic, is rejected with an
+  `UnsupportedFeatureException` naming 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)), where
+  0.9 rejected a decision without logic as an invalid model.
 - **An item definition with neither a base type nor components is any type**, where it was rejected, and a function
   item types an input data, a decision or a parameter wherever it is.
 
