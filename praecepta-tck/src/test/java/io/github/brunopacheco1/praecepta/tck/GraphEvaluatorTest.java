@@ -78,8 +78,8 @@ class GraphEvaluatorTest {
 
     @Test
     void a_node_needs_what_its_decisions_need_but_no_longer_graphs() {
-        // 0004-lending has business knowledge models, so readModel rejects it; its decisions are evaluated alone
-        var check = KIT.get("compliance-level-3/0004-lending/0004-lending-test-01.xml #001 BureauCallType");
+        // 0082-feel-coercion invokes decision services, so readModel rejects it; its decisions are evaluated alone
+        var check = KIT.get("compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_bkm_001 decision_bkm_001");
 
         var needs = ((Evaluation.Unsupported) ModelEvaluator.praecepta().evaluate(check)).needs();
         assertThat(needs).contains(Feature.KNOWLEDGE_MODELS).doesNotContain(Feature.REQUIRED_DECISIONS);
@@ -94,10 +94,10 @@ class GraphEvaluatorTest {
 
     @Test
     void a_model_read_only_in_part_is_left_to_single_decisions() {
-        // 0004-lending has business knowledge models, so readModel rejects it, and each decision is evaluated alone
-        var check = KIT.get("compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Adjudication");
+        // 0082-feel-coercion has decision services, so readModel rejects it, and each decision is evaluated alone
+        var check = KIT.get("compliance-level-3/0082-feel-coercion/0082-feel-coercion-test-01.xml #decision_001 decision_001");
 
-        assertThat(graphs.evaluate(check)).isEqualTo(new Evaluation.Unsupported(Feature.KNOWLEDGE_MODELS));
+        assertThat(graphs.evaluate(check)).isEqualTo(new Evaluation.Unsupported(Feature.DECISION_SERVICES));
         assertThat(new TckRunner(ModelEvaluator.praecepta()).run(check).status()).isEqualTo(Status.PASSED);
     }
 

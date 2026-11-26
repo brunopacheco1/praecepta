@@ -11,6 +11,74 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+Boxed expressions and business knowledge models, the fourth step of Praecepta's plan to grow from a decision-table
+engine into a full DMN 1.5 engine, one layer per release ([#120](https://github.com/brunopacheco1/praecepta/issues/120)):
+a decision's logic may be any boxed expression of DMN 1.5, chapter 10, and a model's business knowledge models are
+functions its decisions invoke ([#118](https://github.com/brunopacheco1/praecepta/issues/118)), where 0.9 rejected the
+model. Decision tables keep their bitset index and validation report wherever they are, as a business knowledge model's
+body or in a context entry. Of the DMN TCK's 3,511 result nodes, 3,409 now pass (97.1 %, from 3,276 in 0.9), 3,409 of
+the 3,420 Praecepta evaluates; the decision-table checks pass 86 of 86, from 83
+([RESULTS.md](praecepta-tck/RESULTS.md)). Of the 11 that fail, 9 are loan payments the kit states as a double computes
+them, which differ from FEEL's 34 digits beyond the digits it states, as 0.9's two of `0008-LX-arithmetic` do, and 2 the
+known deviations of 0.9. Read *Changed* before upgrading if you construct `DecisionModel` or `Decision`
+records, rely on `DecisionLogic.LiteralExpression` rejecting text that is not FEEL, or on a model with business knowledge
+models being loaded only in part.
+
+### Added
+- **Boxed expressions** ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) as decision logic, and as parts
+  of one another, new kinds of `DecisionLogic`: `Context` (entries, each in the scope of those before it and of itself,
+  and an optional final result), `Invocation` (a function bound by parameter name), `FunctionDefinition` (in FEEL),
+  `Relation`, `BoxedList`, `Conditional`, `Iteration` (`for`, `some`, `every`) and `Filter`. `DmnReader.readModel`
+  reads them, `DmnWriter.write` writes them back (in DMN 1.5's namespace where the model has a conditional, an iterator
+  or a filter, which DMN 1.3 does not), and a `DecisionGraph` evaluates each as the FEEL it boxes
+  (`FeelExpression.compose`), so it is typed, limited and reports its errors as FEEL is. A part whose model declares a
+  type, such as a context entry's variable, is bound to it as DMN 1.5, 10.3.2.9.4, binds a value; a boxed conditional,
+  filter or iterator whose condition is neither a boolean nor null is null, with an error.
+- **Business knowledge models** and knowledge requirements: `DecisionModel.knowledgeModels()`,
+  `DecisionModel.BusinessKnowledgeModel` and `Decision.requiredKnowledge()`, read, written and evaluated. Each is a
+  function made once when the graph is built, which the decisions requiring it invoke by name or through a boxed
+  invocation, and which may invoke the business knowledge models it requires, and itself. The graph reports what one
+  reads or requires that the model does not provide, and the decisions that require it are not evaluated.
+  `DecisionGraph.Builder.knowledgeModel` adds one in code.
+- **Decision tables within boxed expressions**: a business knowledge model's body, a context entry, or any other part.
+  Each is read with the names its enclosing constructs bind in scope, named after what holds it, and built into an
+  engine of its own, which keeps its validation report: `DecisionGraph.validationReport(name)` gives a decision's,
+  with those of the tables within its logic, and a business knowledge model's, and `Builder.failOn` fails on them.
+- **`DecisionLogic.type()` and `DecisionLogic.element()`**: every kind's declared type, and the name of the DMN element
+  that holds it, which the framework integrations' `describe()` gives as a decision's `logic`.
+- **The build plugins and the framework integrations** compile and load models with boxed expressions and business
+  knowledge models through their decision requirements graph, as they do models whose decisions require others.
+
+### Changed
+- **`DecisionModel` and `Decision` have a component more**: `DecisionModel(name, inputData, decisions, knowledgeModels,
+  types)` and `Decision(name, requiredDecisions, requiredInputs, requiredKnowledge, logic)`; the constructors without
+  them remain, and `Decision.requirements()` lists the business knowledge models required last. **Upgrade note:** a
+  record pattern over either takes the new component.
+- **A literal expression is checked to be FEEL where the names it may read are in scope**: `DmnReader.readModel`
+  checks each decision's and business knowledge model's expressions with their requirements' names, so a name such as
+  `decision A 2.1` reads as the requirement it names, and `DecisionGraph` reports one built in code
+  (`INVALID_EXPRESSION`). The `DecisionLogic.LiteralExpression` constructor no longer parses its text, and
+  `expression()` throws an `IllegalArgumentException` for text that is not FEEL without those names in scope.
+  `DecisionGraph.Builder.literalDecision` still rejects text that is not FEEL.
+- **A model with business knowledge models or boxed expressions now loads whole**: `DmnReader.readModel`,
+  `DecisionGraph`, the build plugins and the framework integrations read and evaluate it, where they rejected it with
+  an `UnsupportedFeatureException` naming 0.10 and read its decision tables alone. **Upgrade note:** such a file's
+  decisions are evaluated through its graph, and its tables report as the graph's.
+- **A decision service that nothing in the model invokes, and a decision without logic that no decision requires, are
+  left out** when a model is read, as they change no value Praecepta evaluates (the TCK's `0087-chapter-11-example`);
+  a model that invokes a decision service, or requires a decision without logic, is rejected with an
+  `UnsupportedFeatureException` naming 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)), where
+  0.9 rejected a decision without logic as an invalid model.
+- **An item definition with neither a base type nor components is any type**, where it was rejected, and a function
+  item types an input data, a decision or a parameter wherever it is.
+
+### Fixed
+- **A path may follow a range that ends with `[`**: `[1..10[.start included` is the range's property, where it was a
+  syntax error (the TCK's `0074-feel-properties`).
+- **A decision table column whose input expression is no FEEL name reads the requirement of that name**: a column
+  `Pre-bureauRiskCategory` reads the decision so named, where the table was rejected as computing it from itself (the
+  TCK's `0004-lending`).
+
 ## [0.9.0] - 2026-11-25
 
 FEEL's built-in functions, the third step of Praecepta's plan to grow from a decision-table engine into a full DMN 1.5

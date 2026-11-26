@@ -6,8 +6,8 @@ SPDX-License-Identifier: Apache-2.0
 
 # Architecture
 
-Praecepta evaluates DMN decision tables, and the decision requirement graphs of tables and literal expressions
-around them. It is a library, not a service: an application builds an engine, or a graph, once and calls it.
+Praecepta evaluates DMN decision tables, and the decision requirement graphs of tables, literal expressions, boxed
+expressions and business knowledge models around them. It is a library, not a service: an application builds an engine, or a graph, once and calls it.
 
 ## Modules
 
@@ -193,12 +193,15 @@ implementations of the same types (see *Growing it* below).
  DecisionModel ──(DmnWriter.write)──► DMN                            └──► validationReport(decision): each table's own analysis
 ```
 
-**The model** (`beans`, plain records, no behaviour): `DecisionModel(name, inputData, decisions, types)`, `types`
-being the item definitions a literal expression's `instance of` may name; an
-`InputData(name, FeelType type)`; a `Decision(name, requiredDecisions, requiredInputs, DecisionLogic logic)`, whose
-requirements are names of the model's elements (the information requirements of DMN 1.5, 6.3.13). `DecisionLogic` is
-a sealed interface with two kinds today: `Table(DecisionTable)`, named after its decision, and
-`LiteralExpression(text, declared FeelType)`, checked to be FEEL when it is made (`FeelExpression.parse`).
+**The model** (`beans`, plain records, no behaviour): `DecisionModel(name, inputData, decisions, knowledgeModels,
+types)`, `types` being the item definitions a literal expression's `instance of` may name; an
+`InputData(name, FeelType type)`; a `Decision(name, requiredDecisions, requiredInputs, requiredKnowledge, DecisionLogic
+logic)`, whose requirements are names of the model's elements (the information requirements of DMN 1.5, 6.3.13, and
+its knowledge requirements, 6.3.14); a `BusinessKnowledgeModel(name, requiredKnowledge, FunctionDefinition logic)`
+(since 0.10). `DecisionLogic` is a sealed interface, every kind with its declared `type()`: `Table(DecisionTable)`,
+named after its decision, `LiteralExpression(text, declared FeelType)`, and the boxed expressions of
+[Boxed expressions and business knowledge models](#boxed-expressions-and-business-knowledge-models-118), whose parts are
+`DecisionLogic` in turn.
 `FeelType` (`feel`) is the type of a value: `Simple(ColumnType)`, `ListOf(FeelType)`, `Context(components by name,
 ordered)`, `RangeOf(FeelType)`, `FunctionOf(parameter types, result type)`, `Null`, or `Any` where the model declares
 none. The model
@@ -208,17 +211,19 @@ rejects two elements of one name (6.3.7, 6.3.11), and nothing else: a model may 
 item definitions to a `FeelType`: collections, components, nested to `MAX_TYPE_DEPTH` levels, with a check for types
 defined in terms of themselves) and every `decision`: its information requirements, by `href` to an element of the
 model (one to no element is kept as the id it names, which the graph reports as missing), and its logic, a decision
-table or a literal expression, each with the type the decision variable's `typeRef` declares (`FeelType.ANY` for
-none), which its value is bound to. A table is read as `read(dmn, decision)` reads it, except that what declares no
+table, a literal expression or a boxed expression, each with the type the decision variable's `typeRef` declares
+(`FeelType.ANY` for none), which its value is bound to; and every `businessKnowledgeModel`, with its knowledge
+requirements and its `encapsulatedLogic`. Each literal expression is then checked to be FEEL with the names its element
+may read in scope, and those its enclosing constructs bind, as a name such as `decision A 2.1` is one only there. A table is read as `read(dmn, decision)` reads it, except that what declares no
 `typeRef` is typed from the model (`ModelTypes`): an input expression by the input data or decision it names (or the
 component a path names), an output by the decision's variable (its component of the output's name, for several
 outputs), else by the one type its output entries give, as FEEL types them, and else not at all (`typed` false: each
 entry gives its own type). What later releases bring is rejected
 whole with an `UnsupportedFeatureException`, whose `release()` and `issue()` name the release that plans it, so that
-callers fall back by its type, never by its message: business knowledge models, knowledge requirements and boxed
-expressions as logic (#118), decision services,
-imports, external functions and references into other models (#119). Knowledge sources, authority requirements,
-annotations and diagrams take no part in evaluation and are ignored. `DmnWriter.write(DecisionModel)` writes DMN 1.3
+callers fall back by its type, never by its message: invoking a decision service, requiring a decision without logic,
+imports, external functions and references into other models (#119). Knowledge sources, authority requirements, annotations and diagrams take no part
+in evaluation and are ignored, and so are a decision service that nothing invokes and a decision without logic that no
+decision requires ([DMN conformance](DMN-CONFORMANCE.md), case 36). `DmnWriter.write(DecisionModel)` writes DMN 1.3
 with ids by position (`input_data_0`, `decision_0`, and `decision_0_` before the ids of a decision's table, so the
 tables of a model never share an id), item definitions for list and context types, and literal expressions as
 written; a model it writes reads back as the same model, and writes the same again. `read(dmn)`, `read(dmn, decision)`
@@ -293,9 +298,11 @@ literal expressions a FEEL interpreter over the same slots, and `FeelType` FEEL'
 cells, input expressions and output entries adopted the same interpreter in 0.8 too ([Decision tables in
 FEEL](#decision-tables-in-feel-116)); built-in functions (0.9, #117) are registered in
 `BuiltInFunctions`, where the parser resolves their names, each a `BuiltInFunction` of its signatures and a body given
-the evaluation that invokes it, one class per family (`StringFunctions`, `ListFunctions`...); boxed expressions and business knowledge models (0.10, #118) are further
-`DecisionLogic` kinds with nodes of their own, and invocables become elements with slots that hold functions,
-required through knowledge requirements, with the same cycle and type checks; decision services and imports (0.11,
+the evaluation that invokes it, one class per family (`StringFunctions`, `ListFunctions`...); boxed expressions and
+business knowledge models (0.10, #118) are further `DecisionLogic` kinds, composed into FEEL's own nodes, and business
+knowledge models elements whose slots hold functions, required through knowledge requirements
+([Boxed expressions and business knowledge models](#boxed-expressions-and-business-knowledge-models-118)); decision
+services and imports (0.11,
 #119) add elements and qualified names to the resolution of step 2. The reader rejects each of them by name until
 then.
 
@@ -344,6 +351,55 @@ once, against a `Scope` of names (and a model's types), then `names()`, `unsuppo
   a `Node.Test`, as `in` has them; `= e` and `!= e` are `Node.Equality` of `?` and `e`, so `= null` holds for a missing
   value. `isSimple()` tells the tests `CellParser` reads (literals, names, comparisons and intervals of them) from
   the others by the shape of the tree. `literals()` walks the tree with a stack of its own.
+
+## Boxed expressions and business knowledge models (#118)
+DMN 1.5's boxed expressions (10.2) are FEEL in boxes: a context is a context literal whose last entry may be its
+result, a relation a list of contexts, a conditional `if`, an iterator `for`, `some` or `every`, a filter a filter, a
+function definition a function, an invocation an invocation by named parameters. So they are composed into the same
+node tree FEEL text parses to, and nothing evaluates them but the FEEL interpreter:
+
+```
+ DMN ──(DmnReader)──► DecisionLogic: Context, Invocation, FunctionDefinition, Relation, BoxedList, Conditional, Iteration, Filter
+                           │  parts: DecisionLogic again; literal expressions as text; decision tables as DecisionTable
+                           └──(FeelExpression.compose)──► Node tree ──► type(TypeEnv), evaluate(Env), as any FEEL expression
+                                     │ literal expressions parsed with the names enclosing constructs bind (FeelParser.parse, locals)
+                                     └ a decision table: Node.Embedded ──► GraphNodes.EmbeddedTable ──► its own PraeceptaEngine
+```
+
+- **Composing** (`BoxedComposer`, package-private, behind `FeelExpression.compose`). Each literal expression within is
+  parsed with the names of the scope it is composed in (a decision's requirements) and those its enclosing constructs
+  bind: a context's entries before it and itself (so a function an entry defines may invoke itself), a function's
+  parameters, an iterator's variable (and `partial` in `for`), a filter's `item`. Those are the parser's locals, never
+  free names, so the composed expression's `names()` are what it reads from outside, which the graph resolves as it
+  resolves a literal expression's. An entry named as a requirement reads the requirement where its value is evaluated,
+  before the entry is bound (the TCK's `1146-feel-context-put-function`). A part whose model declares a type is wrapped
+  in `Node.Bound`, which binds its value as an argument is bound to its parameter (10.3.2.9.4: a list of one to its
+  element, a single value to a list of one, a date to a date and time; anything else null, with an error). The TCK has
+  a boxed conditional, filter and iterator be null, with an error, when their condition is not a boolean, where FEEL's
+  forms take it as false: `Node.Strict` throws a stackless exception that the construct's `Node.Checked` turns into
+  null ([DMN conformance](DMN-CONFORMANCE.md), case 34). The tree's depth is checked against FEEL's limit, as a parsed
+  expression's is.
+- **Decision tables within** keep what sets Praecepta apart. `compose` hands each to the caller as a
+  `FeelExpression.TableSite` (the table, and the names in scope there); a graph builds it into a `PraeceptaEngine` of its
+  own (`GraphNodes.EmbeddedTable`, the same `TableNode` a decision's table is), whose slots are the names it reads: one
+  an enclosing construct binds is read from the FEEL scope by its name, the rest of the column's name a path into it
+  (`Person.Gender`, where `Person` is a parameter, or the parameter `Person.Gender` itself); any other as the scope
+  outside resolves it, a requirement and a path. Values are checked against the columns' types, as values of no
+  declared type are. The table keeps its validation report, which its decision's or business knowledge model's report
+  holds. `DmnReader` reads it with those names in scope, naming it after what holds it: the context entry, the business
+  knowledge model, or else its decision.
+- **Business knowledge models** are elements of the graph, after the decisions, each with a slot. Its logic is a function
+  definition, composed with the names of the business knowledge models it requires, and its own, in scope; `GraphAnalysis`
+  reports a name it reads that is neither its parameter nor one of those (`MISSING_REQUIREMENT`), and a requirement that
+  is missing, of another kind or not evaluable, which blocks what requires it. Its type is the function type its
+  variable declares, else the one its logic gives, worked out from those it invokes, any type where it invokes itself.
+  `DecisionGraph` evaluates each function definition once, when it is built, into a closure whose names read the other
+  functions, itself among them, lazily ([DMN conformance](DMN-CONFORMANCE.md), case 35), and every evaluation's slots
+  start with them: a decision invokes one by name, as FEEL invokes any function value, or through a boxed invocation.
+- **Writing** (`DmnWriter.write`) writes every part with its type, an item definition (`boxed_type_0`) for a type that
+  is no simple type, a table within with ids and list item definitions of its own prefix, and business knowledge models
+  after the decisions, with `encapsulatedLogic`; a model with a conditional, an iterator or a filter in DMN 1.5's
+  namespace, as DMN 1.3 does not have them.
 
 ## Decision tables in FEEL (#116)
 The bitset index and the build-time analysis are what set Praecepta apart, so decision tables adopted the full FEEL
@@ -425,7 +481,7 @@ when it names none, one of the model's decisions, requires another decision or i
 else compiles as before, byte for byte (the golden files of single tables are unchanged): a decision table that
 requires only input data, a model without such decisions, and a file that is not a well-formed model in a way a
 file of tables never had to be (two elements of one name, which `DmnWriter` writes for a table with a column of its
-own name; a decision without logic), and a model that uses what a later release plans (#116 to #119) but has the
+own name), and a model that uses what a later release plans (#116 to #119) but has the
 table to compile, which 0.6 compiled; without such a table, the reader's message, which names the release, fails
 the build. `GraphCompiler` builds the graph (`DecisionGraph.Builder.failOn` at the build's `failOn`, without
 logging), writes the model with `DmnWriter.write(model)`, and `GraphSourceGenerator` generates:

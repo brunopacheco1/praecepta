@@ -71,11 +71,11 @@ public final class Decisions {
 
     /**
      * Reads every decision of every source and builds their engines. Each source is read as a decision model
-     * ({@code DmnReader.readModel}): if one of its decisions requires another decision, or is a literal expression,
-     * its decisions are evaluated through its decision requirements graph ({@link GraphModel}), whose validation
-     * report is checked too; otherwise each of its decision tables is a decision of its own, evaluated alone. A model
-     * that uses what Praecepta does not evaluate yet (business knowledge models, boxed expressions, decision services,
-     * imports, FEEL's built-in functions), or that is not a well-formed decision model (two elements of one
+     * ({@code DmnReader.readModel}): if one of its decisions requires another decision or business knowledge, or is not
+     * a decision table, its decisions are evaluated through its decision requirements graph ({@link GraphModel}), whose
+     * validation report is checked too; otherwise each of its decision tables is a decision of its own, evaluated alone.
+     * A model that uses what Praecepta does not evaluate yet (invoked decision services, imports, external functions),
+     * or that is not a well-formed decision model (two elements of one
      * name, such as a table with a column of its own name as {@code DmnWriter} writes it, a decision without logic),
      * which a file of decision tables never had to be, has its decision tables read alone, as before
      * ({@code DmnReader.readAll}), and nothing else of it is evaluated; one that has no decision table is rejected,
@@ -155,8 +155,7 @@ public final class Decisions {
     /**
      * The line logged, at INFO, of a DMN file whose decision tables are loaded alone because {@code DmnReader.readModel}
      * rejects its model with what a later release plans: {@code rules/fees.dmn: its decision tables are loaded alone,
-     * without its decision requirements graph, which needs Praecepta 0.10 (#118): DMN model has the business
-     * knowledge model 'Rate', ...}.
+     * without its decision requirements graph, which needs Praecepta 0.11 (#119): DMN model imports 'Rate', ...}.
      */
     static String fallbackMessage(String location, UnsupportedFeatureException rejected) {
         return "%s: its decision tables are loaded alone, without its decision requirements graph, which needs Praecepta %s (#%d): %s"

@@ -64,8 +64,8 @@ final class GraphCompiler {
     /**
      * The line logged of a DMN source whose decision table is compiled alone because {@code DmnReader.readModel}
      * rejects its model with what a later release plans: {@code src/main/rules/fees.dmn: its decision table is
-     * compiled alone, without its decision requirements graph, which needs Praecepta 0.10 (#118): DMN model has the
-     * business knowledge model 'Rate', ...}.
+     * compiled alone, without its decision requirements graph, which needs Praecepta 0.11 (#119): DMN model imports
+     * 'Rate', ...}.
      */
     static String fallbackMessage(String source, UnsupportedFeatureException rejected) {
         return "%s: its decision table is compiled alone, without its decision requirements graph, which needs Praecepta %s (#%d): %s"

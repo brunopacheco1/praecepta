@@ -31,6 +31,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.InputColumn;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
 /** Decision models read from DMN by {@link DmnReader#readModel} and written back by {@link DmnWriter#write(DecisionModel)}. */
@@ -148,17 +149,13 @@ class DecisionModelDmnTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-        "<businessKnowledgeModel id=\"k\" name=\"Rates\"/>|business knowledge model 'Rates'|(#118)",
-        "<decisionService id=\"s\" name=\"Service\"/>|decision service 'Service'|(#119)",
+        "<decisionService id=\"s\" name=\"Service\"/><decision id=\"d\" name=\"D\"><knowledgeRequirement><requiredKnowledge href=\"#s\"/>"
+                + "</knowledgeRequirement><literalExpression><text>Service()</text></literalExpression></decision>"
+                + "|'D' invokes the decision service 'Service'|(#119)",
         "<import namespace=\"https://example.com/other\" name=\"other\" importType=\"https://www.omg.org/spec/DMN/20230324/MODEL/\"/>"
                 + "|imports 'other'|(#119)",
-        "<decision id=\"d\" name=\"D\"><knowledgeRequirement><requiredKnowledge href=\"#k\"/></knowledgeRequirement>"
-                + "<literalExpression><text>1</text></literalExpression></decision>|Decision 'D' requires business knowledge|(#118)",
-        "<decision id=\"d\" name=\"D\"><context/></decision>|its logic is a boxed context|(#118)",
-        "<decision id=\"d\" name=\"D\"><invocation/></decision>|its logic is a boxed invocation|(#118)",
-        "<decision id=\"d\" name=\"D\"><relation/></decision>|its logic is a relation|(#118)",
-        "<decision id=\"d\" name=\"D\"><conditional/></decision>|its logic is a boxed conditional|(#118)",
-        "<decision id=\"d\" name=\"D\"><functionDefinition/></decision>|its logic is a function definition|(#118)",
+        "<decision id=\"d\" name=\"D\"><functionDefinition kind=\"Java\"><literalExpression><text>1</text></literalExpression>"
+                + "</functionDefinition></decision>|defines a function in Java|(#119)",
         "<decision id=\"d\" name=\"D\"><informationRequirement><requiredDecision href=\"other.dmn#x\"/></informationRequirement>"
                 + "<literalExpression><text>1</text></literalExpression></decision>|an element of another model|(#119)",
     })
@@ -172,10 +169,16 @@ class DecisionModelDmnTest {
 
     @Test
     void a_decision_without_logic_an_empty_literal_and_another_expression_language_are_rejected() {
-        var noLogic = dmn("<decision id=\"d\" name=\"D\"><variable name=\"D\"/></decision>");
+        var noLogic = dmn("<decision id=\"d\" name=\"D\"><variable name=\"D\"/></decision><decision id=\"e\" name=\"E\">"
+                + "<informationRequirement><requiredDecision href=\"#d\"/></informationRequirement>"
+                + "<literalExpression><text>D</text></literalExpression></decision>");
         assertThatThrownBy(() -> read(noLogic))
-                .isInstanceOf(InvalidDecisionTableException.class).hasMessage("Decision 'D' has no decision logic; Praecepta evaluates "
-                        + "decisions whose logic is a decision table or a literal expression");
+                .isInstanceOfSatisfying(UnsupportedFeatureException.class, e -> {
+                    assertThat(e.release()).isEqualTo("0.11");
+                    assertThat(e.issue()).isEqualTo(119);
+                })
+                .hasMessage("Decision 'D' has no decision logic, and another decision requires it, which Praecepta does not support "
+                        + "yet: decisions without decision logic are planned for 0.11 (#119)");
         var empty = dmn("<decision id=\"d\" name=\"D\"><literalExpression><text> </text></literalExpression></decision>");
         assertThatThrownBy(() -> read(empty))
                 .isInstanceOf(InvalidDecisionTableException.class).hasMessage("Decision 'D': its literal expression is empty");
@@ -183,6 +186,136 @@ class DecisionModelDmnTest {
                 + "<text>1</text></literalExpression></decision>");
         assertThatThrownBy(() -> read(xpath))
                 .isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("Praecepta reads FEEL");
+    }
+
+    @Test
+    void boxed_expressions_are_read_with_their_parts_and_the_types_their_model_declares() {
+        var model = model("boxed.dmn");
+        var number = FeelType.of(ColumnType.NUMBER);
+        var numbers = new FeelType.ListOf(number);
+
+        var payments = (DecisionLogic.Context) model.decision("Payments").orElseThrow().logic();
+        assertThat(payments.type()).isEqualTo(numbers);
+        assertThat(payments.entries()).extracting(DecisionLogic.ContextEntry::name).containsExactly("payment", "all");
+        var payment = (DecisionLogic.FunctionDefinition) payments.entries().getFirst().value();
+        assertThat(payment.parameters()).singleElement().satisfies(parameter -> {
+            assertThat(parameter.name()).isEqualTo("loan");
+            assertThat(parameter.type().component("rate")).isEqualTo(number);
+        });
+        assertThat(payment.body().type()).isEqualTo(number);
+        var all = (DecisionLogic.Iteration) payments.entries().get(1).value();
+        assertThat(all.kind()).isEqualTo(DecisionLogic.Iteration.Kind.FOR);
+        assertThat(all.type()).as("an entry's type is its variable's").isEqualTo(numbers);
+        assertThat(all.body()).isEqualTo(new DecisionLogic.Invocation("payment",
+                List.of(new DecisionLogic.Binding("loan", new DecisionLogic.LiteralExpression("loan"))), FeelType.ANY));
+        assertThat(payments.result()).isEqualTo(new DecisionLogic.LiteralExpression("for p in all return decimal(p, 2)"));
+
+        assertThat(model.decision("Affordable").orElseThrow().logic()).isEqualTo(new DecisionLogic.Filter(
+                new DecisionLogic.LiteralExpression("Payments"), new DecisionLogic.LiteralExpression("item <= Limit"), FeelType.ANY));
+        var verdict = (DecisionLogic.Conditional) model.decision("Verdict").orElseThrow().logic();
+        assertThat(verdict.type()).isEqualTo(FeelType.of(ColumnType.STRING));
+        assertThat(((DecisionLogic.Iteration) verdict.condition()).kind()).isEqualTo(DecisionLogic.Iteration.Kind.EVERY);
+        assertThat(model.decision("Bounds").orElseThrow().logic()).isEqualTo(new DecisionLogic.BoxedList(List.of(
+                new DecisionLogic.LiteralExpression("Limit / 2"), new DecisionLogic.LiteralExpression("Limit"),
+                new DecisionLogic.LiteralExpression("Limit * 2", number)), numbers));
+        var rates = (DecisionLogic.Relation) model.decision("Rates").orElseThrow().logic();
+        assertThat(rates.columns()).containsExactly(new DecisionLogic.Parameter("term", number), new DecisionLogic.Parameter("rate", number));
+        assertThat(rates.rows()).hasSize(2);
+    }
+
+    @Test
+    void business_knowledge_models_are_read_with_their_knowledge_requirements_and_logic() {
+        var model = model("knowledge.dmn");
+        var number = FeelType.of(ColumnType.NUMBER);
+
+        assertThat(model.knowledgeModels()).extracting(DecisionModel.BusinessKnowledgeModel::name).containsExactly("PMT", "Rounded PMT",
+                "factorial");
+        var pmt = model.knowledgeModel("PMT").orElseThrow();
+        assertThat(pmt.requiredKnowledge()).isEmpty();
+        assertThat(pmt.logic().type()).as("its variable's function type").isEqualTo(new FeelType.FunctionOf(List.of(number, number, number),
+                number));
+        assertThat(pmt.logic().parameters()).extracting(DecisionLogic.Parameter::name).containsExactly("principal", "rate", "months");
+        assertThat(model.knowledgeModel("Rounded PMT").orElseThrow().requiredKnowledge()).containsExactly("PMT");
+        var payment = model.decision("Monthly Payment").orElseThrow();
+        assertThat(payment.requiredKnowledge()).containsExactly("PMT");
+        assertThat(payment.requirements()).containsExactly("Principal", "Rate", "Months", "PMT");
+        assertThat(payment.logic()).isInstanceOf(DecisionLogic.Invocation.class);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "<businessKnowledgeModel id=\"k\" name=\"K\"/>|Business knowledge model 'K' has no encapsulated logic",
+        "<businessKnowledgeModel id=\"k\" name=\"K\"><informationRequirement><requiredInput href=\"#x\"/></informationRequirement>"
+                + "<encapsulatedLogic><literalExpression><text>1</text></literalExpression></encapsulatedLogic></businessKnowledgeModel>"
+                + "|a business knowledge model has no information requirements",
+        "<decision id=\"d\" name=\"D\"><knowledgeRequirement/><literalExpression><text>1</text></literalExpression></decision>"
+                + "|a knowledge requirement must name the required knowledge",
+        "<businessKnowledgeModel id=\"k\" name=\"K\"><encapsulatedLogic><literalExpression><text>1 +</text></literalExpression>"
+                + "</encapsulatedLogic></businessKnowledgeModel>|Business knowledge model 'K': in the function's body",
+    })
+    void a_business_knowledge_model_that_is_not_well_formed_is_rejected(String row) {
+        var parts = row.split("\\|");
+
+        assertThatThrownBy(() -> read(dmn(parts[0]))).isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining(parts[1]);
+    }
+
+    @Test
+    void a_decision_without_logic_or_a_decision_service_that_nothing_requires_is_left_out() {
+        // the DMN TCK's 0087-chapter-11-example: a human decision, and services that group decisions
+        var model = read(dmn("""
+                <decision id="human" name="Adjudication"><variable name="Adjudication"/></decision>
+                <decisionService id="s" name="Service"><outputDecision href="#d"/></decisionService>
+                <decision id="d" name="D"><literalExpression><text>1</text></literalExpression></decision>"""));
+
+        assertThat(model.decisions()).extracting(DecisionModel.Decision::name).containsExactly("D");
+    }
+
+    @Test
+    void a_decision_table_within_a_boxed_expression_is_named_after_what_holds_it_and_reads_its_names() {
+        var model = model("nested-tables.dmn");
+
+        var description = model.knowledgeModel("Description").orElseThrow().logic().body();
+        assertThat(description).isInstanceOfSatisfying(DecisionLogic.Table.class, table -> {
+            assertThat(table.table().name()).isEqualTo("Description");
+            assertThat(table.table().inputs()).extracting(InputColumn::name).containsExactly("Person.Gender", "Person.Name");
+        });
+        var context = (DecisionLogic.Context) model.decision("Greeting").orElseThrow().logic();
+        assertThat(context.entries().get(1).value()).isInstanceOfSatisfying(DecisionLogic.Table.class,
+                table -> assertThat(table.table().name()).isEqualTo("salutation"));
+    }
+
+    @Test
+    void a_name_that_holds_a_number_is_read_as_the_requirement_it_names() {
+        // the DMN TCK's 0034-drg-scopes: the text is not FEEL but with its requirement's name in scope
+        var model = read(dmn("""
+                <inputData id="a" name="decision A 2.1"/>
+                <decision id="d" name="D">
+                  <informationRequirement><requiredInput href="#a"/></informationRequirement>
+                  <literalExpression><text>decision A 2.1</text></literalExpression>
+                </decision>"""));
+
+        assertThat(model.decision("D").orElseThrow().logic()).isEqualTo(new DecisionLogic.LiteralExpression("decision A 2.1"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "<conditional><if><literalExpression><text>true</text></literalExpression></if></conditional>|its <then> holds no expression",
+        "<context><contextEntry><literalExpression><text>1</text></literalExpression></contextEntry><contextEntry><variable name=\"a\"/>"
+                + "<literalExpression><text>1</text></literalExpression></contextEntry></context>|only a context's last entry may have no variable",
+        "<context><contextEntry><variable name=\"a\"/><literalExpression><text>1</text></literalExpression></contextEntry>"
+                + "<contextEntry><variable name=\"a\"/><literalExpression><text>2</text></literalExpression></contextEntry></context>"
+                + "|two entries named 'a'",
+        "<for><in><literalExpression><text>[1]</text></literalExpression></in></for>|the iterator has no iteratorVariable",
+        "<invocation><binding><parameter name=\"x\"/></binding></invocation>|names the function it invokes with a literal expression",
+        "<list><literalExpression><text>1 +</text></literalExpression></list>|in element 1 of the list",
+        "<relation><column name=\"a\"/><row/></relation>|a row of the relation has 0 cells for 1 columns",
+    })
+    void a_boxed_expression_that_is_not_well_formed_is_rejected_saying_where(String row) {
+        var parts = row.split("\\|");
+        var xml = dmn("<decision id=\"d\" name=\"D\">" + parts[0] + "</decision>");
+
+        assertThatThrownBy(() -> read(xml)).isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("Decision 'D'")
+                .hasMessageContaining(parts[1]);
     }
 
     @Test
@@ -208,7 +341,7 @@ class DecisionModelDmnTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"chain.dmn", "diamond.dmn", "multi-output.dmn", "multiple-results.dmn", "literals.dmn", "cycle.dmn",
-        "missing-free.dmn", "type-mismatch.dmn", "untyped.dmn", "chain-reversed.dmn"})
+        "missing-free.dmn", "type-mismatch.dmn", "untyped.dmn", "chain-reversed.dmn", "boxed.dmn", "knowledge.dmn", "nested-tables.dmn"})
     void a_model_written_as_dmn_reads_back_as_the_same_model_and_writes_the_same(String name) {
         var model = name.equals("missing-free.dmn") ? withoutMissing(model("missing.dmn")) : model(name);
 

@@ -164,7 +164,8 @@ public final class GraphModel {
 
     /**
      * A decision as {@link Decision#describe()} adds it for a decision of a model: {@code model}, {@code logic}
-     * ({@code decisionTable} or {@code literalExpression}), its {@code expression} for a literal expression, its value's
+     * (the DMN element that holds it, {@link DecisionLogic#element()}: {@code decisionTable}, {@code literalExpression},
+     * {@code context}...), its {@code expression} for a literal expression, its value's
      * {@code type} as FEEL writes it, {@code requiredDecisions}, {@code inputData} (what it reads, directly or through
      * the decisions it requires; empty if it cannot be evaluated) and {@code canEvaluate}.
      */
@@ -172,12 +173,9 @@ public final class GraphModel {
         var element = graph.model().decision(decision).orElseThrow();
         var description = new LinkedHashMap<String, Object>();
         description.put("model", name());
-        switch (element.logic()) {
-            case DecisionLogic.Table table -> description.put("logic", "decisionTable");
-            case DecisionLogic.LiteralExpression literal -> {
-                description.put("logic", "literalExpression");
-                description.put("expression", literal.text().strip());
-            }
+        description.put("logic", element.logic().element());
+        if (element.logic() instanceof DecisionLogic.LiteralExpression literal) {
+            description.put("expression", literal.text().strip());
         }
         description.put("type", graph.type(decision).feelName());
         description.put("requiredDecisions", element.requiredDecisions());

@@ -11,10 +11,11 @@ import java.util.Objects;
 /**
  * A DMN model uses what DMN 1.5 defines but Praecepta does not evaluate yet, and a later release of its plan to
  * become a full DMN 1.5 engine brings (<a href="https://github.com/brunopacheco1/praecepta/issues/120">#120</a>): the
- * full FEEL language, its built-in functions, business knowledge models and boxed expressions, decision services or
- * imports. The model is not wrong; {@link #release()} and {@link #issue()} name the release that plans the feature, as
- * the message does. Callers that fall back to what they can evaluate (a framework integration reading a file's
- * decision tables alone) tell it apart from an invalid model by its type, never by its message.
+ * full FEEL language (0.8), its built-in functions (0.9), business knowledge models and boxed expressions (0.10),
+ * decision services, imports and external functions (0.11). The model is not wrong; {@link #release()} and
+ * {@link #issue()} name the release that plans the feature, as the message does. Callers that fall back to what they can
+ * evaluate (a framework integration reading a file's decision tables alone) tell it apart from an invalid model by its
+ * type, never by its message.
  */
 public class UnsupportedFeatureException extends InvalidDecisionTableException {
 

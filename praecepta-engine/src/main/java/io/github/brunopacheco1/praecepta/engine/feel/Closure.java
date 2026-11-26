@@ -31,7 +31,8 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
  */
 final class Closure implements FeelFunction {
 
-    private static final Object NOT_BOUND = new Object();
+    /** What {@link #bind} gives for a value that cannot be bound to a type. */
+    static final Object NOT_BOUND = new Object();
 
     private final Node.FunctionDefinition definition;
     private final Env.Scope scope;
@@ -100,7 +101,7 @@ final class Closure implements FeelFunction {
     }
 
     /** An argument bound to a parameter's declared type (DMN 1.5, 10.3.2.9.4), or {@link #NOT_BOUND}. */
-    private static Object bind(Object value, FeelType type, Env budget) {
+    static Object bind(Object value, FeelType type, Env budget) {
         if (value == null || type instanceof FeelType.Any || FeelValues.isInstance(value, type, budget)) {
             return value;
         }

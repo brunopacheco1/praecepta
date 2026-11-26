@@ -293,14 +293,14 @@ class GraphCompilerTest {
         var file = out.resolve("bkm.dmn");
         Files.writeString(file, """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
-                  <businessKnowledgeModel id="bkm" name="Rate"/>
+                  <import name="Rate" namespace="https://example.com/rate" importType="https://www.omg.org/spec/DMN/20230324/MODEL/"/>
                   <decision id="a" name="A"><literalExpression><text>1</text></literalExpression></decision>
                 </definitions>""", StandardCharsets.UTF_8);
         var definition = TableDefinition.dmn(file);
         Assertions.assertThatThrownBy(() -> compile(definition, Severity.ERROR))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("business knowledge model 'Rate'")
-                .hasMessageContaining("#118")
+                .hasMessageContaining("imports 'Rate'")
+                .hasMessageContaining("#119")
                 .hasCauseInstanceOf(UnsupportedFeatureException.class);
     }
 
@@ -314,7 +314,7 @@ class GraphCompilerTest {
         var file = out.resolve("later.dmn");
         Files.writeString(file, """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
-                  <businessKnowledgeModel id="bkm" name="Rate"/>
+                  <import name="Rate" namespace="https://example.com/rate" importType="https://www.omg.org/spec/DMN/20230324/MODEL/"/>
                   <decision id="tier" name="Tier"><decisionTable hitPolicy="FIRST">
                     <input><inputExpression typeRef="number"><text>age</text></inputExpression></input>
                     <output name="tier" typeRef="string"/>
@@ -329,8 +329,8 @@ class GraphCompilerTest {
         Assertions.assertThat(result.className()).isEqualTo("Tier");
         Assertions.assertThat(lines).singleElement().asString()
                 .startsWith(file + ": its decision table is compiled alone, without its decision requirements graph, "
-                        + "which needs Praecepta 0.10 (#118): ")
-                .contains("business knowledge model 'Rate'");
+                        + "which needs Praecepta 0.11 (#119): ")
+                .contains("imports 'Rate'");
 
         lines.clear();
         TableCompiler.compile(TableDefinition.dmn(table("chain.dmn")), options);
@@ -382,6 +382,27 @@ class GraphCompilerTest {
             Assertions.assertThat(invoke.invoke(doubler, List.of(new BigDecimal(2)), null)).asInstanceOf(InstanceOfAssertFactories.BIG_DECIMAL)
                     .isEqualByComparingTo("6");
             Assertions.assertThat(decision(loader, "Nothing").evaluate(new BigDecimal(3))).isNull();
+        }
+    }
+
+    @Test
+    void boxed_expressions_business_knowledge_models_and_the_tables_within_them_compile_and_give_what_the_graph_gives() throws Exception {
+        var result = compile(TableDefinition.dmn(table("people.dmn")), Severity.WARNING);
+        Assertions.assertThat(result.sources()).containsKeys("PersonSDescription", "Greeting");
+        var graph = graph("people.dmn");
+        var maps = decisions("people.dmn");
+        try (var loader = compileAndLoad(result)) {
+            var description = decision(loader, "PersonSDescription");
+            var greeting = decision(loader, "Greeting");
+            var person = loader.loadClass(PACKAGE + ".PeopleModel$Person").getDeclaredConstructors()[0];
+            for (var who : List.of(List.of("Bob", "Male"), List.of("Eve", "Female"))) {
+                var inputData = Map.<String, Object>of("Person", Map.of("Name", who.get(0), "Gender", who.get(1)));
+                var record = person.newInstance(who.get(0), who.get(1));
+                Assertions.assertThat(description.evaluate(record)).isEqualTo(graph.evaluate("Person's description", inputData));
+                Assertions.assertThat(greeting.evaluate(record)).isEqualTo(graph.evaluate("Greeting", inputData));
+                Assertions.assertThat(maps.evaluate("Greeting", Map.of("Person.Name", who.get(0), "Person.Gender", who.get(1))))
+                        .containsExactly(Map.of("Greeting", String.valueOf(graph.evaluate("Greeting", inputData))));
+            }
         }
     }
 

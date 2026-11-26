@@ -24,15 +24,16 @@ only on a regression: a node the baseline lists that no longer passes. Semantics
 and the TCK alone; where both leave a case open, what Praecepta does is recorded in
 [DMN conformance](../docs/DMN-CONFORMANCE.md).
 
-**The whole kit: 3,276 of 3,511 result nodes pass (93.3 %).** Of the 3,280 that Praecepta evaluates, 3,276 pass (99.9 %).
+**The whole kit: 3,409 of 3,511 result nodes pass (97.1 %).** Of the 3,420 that Praecepta evaluates, 3,409 pass (99.7 %).
 
-**Decision tables: 83 of 86 checks pass (96.5 %).**
+**Decision tables: 86 of 86 checks pass (100.0 %).**
 
 ## The whole kit
 
 Praecepta evaluates a decision through its model's decision requirement graph, which computes the
-decisions it requires, where `DmnReader.readModel` reads the model: decision tables and literal
-expressions, in the full FEEL language but its built-in functions. In another model it evaluates a
+decisions it requires, where `DmnReader.readModel` reads the model: decision tables, literal
+expressions and boxed expressions, in the full FEEL language with its built-in functions, and business
+knowledge models. In another model it evaluates a
 decision on its own, a decision table with `DmnReader` and the engine, and a literal expression with
 `FeelExpression`, from the test case's values of what it reads. Where FEEL's value is null with an
 error, and the kit expects one, the error counts. Everything else is not supported yet. A test file's
@@ -40,9 +41,9 @@ result nodes that are commented out are not counted.
 
 | Compliance level | Models | Result nodes | Passed | Failed | Not supported |
 |---|---:|---:|---:|---:|---:|
-| 2 | 28 | 126 | 121 | 2 | 3 |
-| 3 | 120 | 3,385 | 3,155 | 2 | 228 |
-| **Total** | **148** | **3,511** | **3,276** | **4** | **231** |
+| 2 | 28 | 126 | 122 | 4 | 0 |
+| 3 | 120 | 3,385 | 3,287 | 7 | 91 |
+| **Total** | **148** | **3,511** | **3,409** | **11** | **91** |
 
 ### By feature area
 
@@ -55,8 +56,8 @@ It does not change as Praecepta grows, so each row shows how far that layer is d
 | Single decision tables and arithmetic | 0.6 | 643 | 641 | 0 | 2 |
 | Decision requirement graphs | 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | 0 | 0 | 0 | 0 |
 | FEEL language | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1,289 | 1,289 | 0 | 0 |
-| Built-in functions | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1,071 | 1,066 | 2 | 3 |
-| Boxed expressions, business knowledge models and structured values | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 456 | 280 | 2 | 174 |
+| Built-in functions | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1,071 | 1,069 | 2 | 0 |
+| Boxed expressions, business knowledge models and structured values | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 456 | 410 | 9 | 37 |
 | Decision services, imports and the rest | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 52 | 0 | 0 | 52 |
 
 ### What each release unlocks
@@ -66,11 +67,11 @@ features, these nodes have all they need once it ships.
 
 | Release | Feature area | Not-supported nodes | Evaluated by then, of all nodes |
 |---|---|---:|---:|
-| 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | Decision requirement graphs | 0 | 3,280 (93.4 %) |
-| 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | FEEL language | 0 | 3,280 (93.4 %) |
-| 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | Built-in functions | 0 | 3,280 (93.4 %) |
-| 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | Boxed expressions, business knowledge models and structured values | 177 | 3,457 (98.5 %) |
-| 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | Decision services, imports and the rest | 54 | 3,511 (100.0 %) |
+| 0.7 ([#14](https://github.com/brunopacheco1/praecepta/issues/14)) | Decision requirement graphs | 0 | 3,420 (97.4 %) |
+| 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | FEEL language | 0 | 3,420 (97.4 %) |
+| 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | Built-in functions | 0 | 3,420 (97.4 %) |
+| 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | Boxed expressions, business knowledge models and structured values | 35 | 3,455 (98.4 %) |
+| 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | Decision services, imports and the rest | 56 | 3,511 (100.0 %) |
 
 ### Not supported, by feature
 
@@ -80,27 +81,18 @@ not-supported nodes); *alone* counts those that need nothing else.
 
 | Feature | Release | Needed by | Stops | Alone |
 |---|---|---:|---:|---:|
-| other FEEL syntax | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 6 | 0 | 0 |
 | contexts | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 3 | 0 | 0 |
-| lists | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 3 | 0 | 0 |
+| lists | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 2 | 0 | 0 |
 | boolean literals | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
 | comparisons | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
-| filters | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
 | if then else | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
 | null | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
-| ranges | 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)) | 1 | 0 | 0 |
 | sort() | 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)) | 1 | 1 | 0 |
-| boxed contexts | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 117 | 101 | 69 |
-| business knowledge models | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 76 | 35 | 25 |
-| invocations | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 33 | 32 | 0 |
-| boxed iterators (for, some, every) | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 12 | 12 | 12 |
+| business knowledge models | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 31 | 23 | 13 |
+| boxed contexts | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 25 | 25 | 3 |
 | function definitions and lambdas | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 7 | 2 | 2 |
-| relations | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 6 | 5 | 4 |
-| boxed filters | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 4 | 4 | 4 |
-| boxed conditionals | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 3 | 3 | 3 |
-| boxed lists | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 3 | 3 | 3 |
-| boxed expressions elsewhere in the model | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 1 | 1 | 1 |
-| decision services | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 29 | 26 | 24 |
+| invocations | 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)) | 6 | 6 | 0 |
+| decision services | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 31 | 28 | 26 |
 | external functions (Java, PMML) | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 17 | 0 | 0 |
 | imports | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 8 | 6 | 6 |
 | decisions without decision logic | 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)) | 1 | 0 | 0 |
@@ -117,7 +109,7 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-2/0006-simpletable-P1](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0006-simpletable-P1) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-2/0007-simpletable-P2](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0007-simpletable-P2) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-2/0008-LX-arithmetic](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0008-LX-arithmetic) | 3 | 1 | 2 | 0 |  |
-| [compliance-level-2/0009-invocation-arithmetic](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0009-invocation-arithmetic) | 3 | 0 | 0 | 3 | business knowledge models (0.10) |
+| [compliance-level-2/0009-invocation-arithmetic](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0009-invocation-arithmetic) | 3 | 1 | 2 | 0 |  |
 | [compliance-level-2/0010-multi-output-U](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0010-multi-output-U) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-2/0100-feel-constants](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0100-feel-constants) | 2 | 2 | 0 | 0 |  |
 | [compliance-level-2/0101-feel-constants](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0101-feel-constants) | 6 | 6 | 0 | 0 |  |
@@ -138,35 +130,35 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-2/0118-multi-priority-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0118-multi-priority-hitpolicy) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-2/0119-multi-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0119-multi-collect-hitpolicy) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-3/0001-filter](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0001-filter) | 1 | 1 | 0 | 0 |  |
-| [compliance-level-3/0002-string-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0002-string-functions) | 4 | 2 | 0 | 2 | boxed contexts (0.10) |
-| [compliance-level-3/0003-iteration](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0003-iteration) | 1 | 0 | 0 | 1 | business knowledge models (0.10) |
-| [compliance-level-3/0004-lending](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0004-lending) | 11 | 1 | 0 | 10 | business knowledge models (0.10); invocations (0.10); boxed contexts (0.10) |
-| [compliance-level-3/0005-literal-invocation](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0005-literal-invocation) | 3 | 0 | 0 | 3 | business knowledge models (0.10) |
+| [compliance-level-3/0002-string-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0002-string-functions) | 4 | 4 | 0 | 0 |  |
+| [compliance-level-3/0003-iteration](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0003-iteration) | 1 | 0 | 1 | 0 |  |
+| [compliance-level-3/0004-lending](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0004-lending) | 11 | 10 | 1 | 0 |  |
+| [compliance-level-3/0005-literal-invocation](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0005-literal-invocation) | 3 | 1 | 2 | 0 |  |
 | [compliance-level-3/0006-join](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0006-join) | 1 | 1 | 0 | 0 |  |
-| [compliance-level-3/0007-date-time](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0007-date-time) | 19 | 4 | 0 | 15 | boxed contexts (0.10); boxed expressions elsewhere in the model (0.10) |
+| [compliance-level-3/0007-date-time](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0007-date-time) | 19 | 19 | 0 | 0 |  |
 | [compliance-level-3/0008-listGen](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0008-listGen) | 10 | 10 | 0 | 0 |  |
 | [compliance-level-3/0009-append-flatten](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0009-append-flatten) | 10 | 10 | 0 | 0 |  |
 | [compliance-level-3/0010-concatenate](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0010-concatenate) | 6 | 6 | 0 | 0 |  |
 | [compliance-level-3/0011-insert-remove](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0011-insert-remove) | 6 | 6 | 0 | 0 |  |
 | [compliance-level-3/0012-list-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0012-list-functions) | 19 | 19 | 0 | 0 |  |
 | [compliance-level-3/0013-sort](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0013-sort) | 3 | 3 | 0 | 0 |  |
-| [compliance-level-3/0014-loan-comparison](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0014-loan-comparison) | 2 | 0 | 0 | 2 | relations (0.10); boxed contexts (0.10); business knowledge models (0.10) |
-| [compliance-level-3/0016-some-every](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0016-some-every) | 8 | 2 | 0 | 6 | relations (0.10); business knowledge models (0.10) |
+| [compliance-level-3/0014-loan-comparison](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0014-loan-comparison) | 2 | 1 | 1 | 0 |  |
+| [compliance-level-3/0016-some-every](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0016-some-every) | 8 | 8 | 0 | 0 |  |
 | [compliance-level-3/0017-tableTests](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0017-tableTests) | 4 | 4 | 0 | 0 |  |
 | [compliance-level-3/0020-vacation-days](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0020-vacation-days) | 7 | 7 | 0 | 0 |  |
 | [compliance-level-3/0021-singleton-list](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0021-singleton-list) | 5 | 5 | 0 | 0 |  |
-| [compliance-level-3/0030-user-defined-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0030-user-defined-functions) | 2 | 0 | 0 | 2 | boxed contexts (0.10) |
-| [compliance-level-3/0031-user-defined-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0031-user-defined-functions) | 3 | 0 | 0 | 3 | boxed contexts (0.10); business knowledge models (0.10) |
+| [compliance-level-3/0030-user-defined-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0030-user-defined-functions) | 2 | 2 | 0 | 0 |  |
+| [compliance-level-3/0031-user-defined-functions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0031-user-defined-functions) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-3/0032-conditionals](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0032-conditionals) | 6 | 6 | 0 | 0 |  |
-| [compliance-level-3/0033-for-loops](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0033-for-loops) | 4 | 3 | 0 | 1 | business knowledge models (0.10) |
-| [compliance-level-3/0034-drg-scopes](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0034-drg-scopes) | 12 | 0 | 0 | 12 | boxed contexts (0.10); other FEEL syntax (0.8); business knowledge models (0.10); … |
-| [compliance-level-3/0035-test-structure-output](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0035-test-structure-output) | 3 | 0 | 0 | 3 | boxed contexts (0.10); business knowledge models (0.10) |
+| [compliance-level-3/0033-for-loops](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0033-for-loops) | 4 | 4 | 0 | 0 |  |
+| [compliance-level-3/0034-drg-scopes](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0034-drg-scopes) | 12 | 12 | 0 | 0 |  |
+| [compliance-level-3/0035-test-structure-output](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0035-test-structure-output) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-3/0036-dt-variable-input](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0036-dt-variable-input) | 24 | 24 | 0 | 0 |  |
-| [compliance-level-3/0037-dt-on-bkm-implicit-params](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0037-dt-on-bkm-implicit-params) | 2 | 0 | 0 | 2 | business knowledge models (0.10); invocations (0.10) |
-| [compliance-level-3/0038-dt-on-bkm-explicit-params](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0038-dt-on-bkm-explicit-params) | 2 | 0 | 0 | 2 | boxed contexts (0.10); business knowledge models (0.10); invocations (0.10) |
+| [compliance-level-3/0037-dt-on-bkm-implicit-params](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0037-dt-on-bkm-implicit-params) | 2 | 2 | 0 | 0 |  |
+| [compliance-level-3/0038-dt-on-bkm-explicit-params](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0038-dt-on-bkm-explicit-params) | 2 | 2 | 0 | 0 |  |
 | [compliance-level-3/0039-dt-list-semantics](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0039-dt-list-semantics) | 2 | 2 | 0 | 0 |  |
-| [compliance-level-3/0040-singlenestedcontext](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0040-singlenestedcontext) | 3 | 0 | 0 | 3 | boxed contexts (0.10) |
-| [compliance-level-3/0041-multiple-nestedcontext](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0041-multiple-nestedcontext) | 3 | 0 | 0 | 3 | boxed contexts (0.10) |
+| [compliance-level-3/0040-singlenestedcontext](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0040-singlenestedcontext) | 3 | 3 | 0 | 0 |  |
+| [compliance-level-3/0041-multiple-nestedcontext](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0041-multiple-nestedcontext) | 3 | 3 | 0 | 0 |  |
 | [compliance-level-3/0050-feel-abs-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0050-feel-abs-function) | 17 | 17 | 0 | 0 |  |
 | [compliance-level-3/0051-feel-sqrt-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0051-feel-sqrt-function) | 15 | 15 | 0 | 0 |  |
 | [compliance-level-3/0052-feel-exp-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0052-feel-exp-function) | 15 | 15 | 0 | 0 |  |
@@ -191,7 +183,7 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-3/0071-feel-between](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0071-feel-between) | 38 | 38 | 0 | 0 |  |
 | [compliance-level-3/0072-feel-in](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0072-feel-in) | 327 | 327 | 0 | 0 |  |
 | [compliance-level-3/0073-feel-comments](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0073-feel-comments) | 3 | 3 | 0 | 0 |  |
-| [compliance-level-3/0074-feel-properties](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0074-feel-properties) | 53 | 43 | 0 | 10 | boxed contexts (0.10); filters (0.8); lists (0.8); … |
+| [compliance-level-3/0074-feel-properties](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0074-feel-properties) | 53 | 53 | 0 | 0 |  |
 | [compliance-level-3/0075-feel-exponent](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0075-feel-exponent) | 12 | 12 | 0 | 0 |  |
 | [compliance-level-3/0076-feel-external-java](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0076-feel-external-java) | 18 | 0 | 0 | 18 | boxed contexts (0.10); external functions (Java, PMML) (0.11) |
 | [compliance-level-3/0077-feel-nan](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0077-feel-nan) | 1 | 1 | 0 | 0 |  |
@@ -203,18 +195,18 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-3/0084-feel-for-loops](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0084-feel-for-loops) | 24 | 24 | 0 | 0 |  |
 | [compliance-level-3/0085-decision-services](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0085-decision-services) | 19 | 0 | 0 | 19 | decision services (0.11); boxed contexts (0.10) |
 | [compliance-level-3/0086-import](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0086-import) | 2 | 0 | 0 | 2 | boxed contexts (0.10); imports (0.11) |
-| [compliance-level-3/0087-chapter-11-example](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0087-chapter-11-example) | 9 | 0 | 0 | 9 | business knowledge models (0.10); invocations (0.10); boxed contexts (0.10) |
+| [compliance-level-3/0087-chapter-11-example](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0087-chapter-11-example) | 9 | 9 | 0 | 0 |  |
 | [compliance-level-3/0088-no-decision-logic](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0088-no-decision-logic) | 1 | 0 | 0 | 1 | decision services (0.11); decisions without decision logic (0.11) |
 | [compliance-level-3/0089-nested-inputdata-imports](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0089-nested-inputdata-imports) | 1 | 0 | 0 | 1 | imports (0.11) |
 | [compliance-level-3/0090-feel-paths](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0090-feel-paths) | 4 | 4 | 0 | 0 |  |
 | [compliance-level-3/0091-local-hrefs](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0091-local-hrefs) | 1 | 0 | 0 | 1 | imports (0.11) |
-| [compliance-level-3/0092-feel-lambda](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0092-feel-lambda) | 18 | 0 | 0 | 18 | business knowledge models (0.10); function definitions and lambdas (0.10); boolean literals (0.8); … |
+| [compliance-level-3/0092-feel-lambda](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0092-feel-lambda) | 18 | 0 | 0 | 18 | business knowledge models (0.10); function definitions and lambdas (0.10); decision services (0.11); … |
 | [compliance-level-3/0093-feel-at-literals](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0093-feel-at-literals) | 19 | 19 | 0 | 0 |  |
 | [compliance-level-3/0094-feel-product-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0094-feel-product-function) | 13 | 13 | 0 | 0 |  |
 | [compliance-level-3/0095-feel-day-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0095-feel-day-of-year-function) | 19 | 19 | 0 | 0 |  |
-| [compliance-level-3/0096-feel-day-of-week-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0096-feel-day-of-week-function) | 12 | 10 | 0 | 2 | boxed contexts (0.10) |
-| [compliance-level-3/0097-feel-month-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0097-feel-month-of-year-function) | 12 | 10 | 0 | 2 | boxed contexts (0.10) |
-| [compliance-level-3/0098-feel-week-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0098-feel-week-of-year-function) | 19 | 18 | 0 | 1 | boxed lists (0.10) |
+| [compliance-level-3/0096-feel-day-of-week-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0096-feel-day-of-week-function) | 12 | 12 | 0 | 0 |  |
+| [compliance-level-3/0097-feel-month-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0097-feel-month-of-year-function) | 12 | 12 | 0 | 0 |  |
+| [compliance-level-3/0098-feel-week-of-year-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0098-feel-week-of-year-function) | 19 | 19 | 0 | 0 |  |
 | [compliance-level-3/0099-arithmetic-negation](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0099-arithmetic-negation) | 14 | 14 | 0 | 0 |  |
 | [compliance-level-3/0100-arithmetic](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0100-arithmetic) | 1,087 | 1,087 | 0 | 0 |  |
 | [compliance-level-3/0103-feel-is-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0103-feel-is-function) | 50 | 49 | 1 | 0 |  |
@@ -235,7 +227,7 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-3/1117-feel-date-and-time-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1117-feel-date-and-time-function) | 88 | 88 | 0 | 0 |  |
 | [compliance-level-3/1120-feel-duration-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1120-feel-duration-function) | 50 | 50 | 0 | 0 |  |
 | [compliance-level-3/1121-feel-years-and-months-duration-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1121-feel-years-and-months-duration-function) | 36 | 36 | 0 | 0 |  |
-| [compliance-level-3/1130-feel-interval](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1130-feel-interval) | 14 | 0 | 0 | 14 | boxed contexts (0.10) |
+| [compliance-level-3/1130-feel-interval](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1130-feel-interval) | 14 | 14 | 0 | 0 |  |
 | [compliance-level-3/1131-feel-function-invocation](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1131-feel-function-invocation) | 8 | 7 | 0 | 1 | function definitions and lambdas (0.10) |
 | [compliance-level-3/1140-feel-string-join-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1140-feel-string-join-function) | 22 | 22 | 0 | 0 |  |
 | [compliance-level-3/1141-feel-round-up-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1141-feel-round-up-function) | 16 | 16 | 0 | 0 |  |
@@ -243,25 +235,32 @@ not-supported nodes); *alone* counts those that need nothing else.
 | [compliance-level-3/1143-feel-round-half-up-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1143-feel-round-half-up-function) | 16 | 16 | 0 | 0 |  |
 | [compliance-level-3/1144-feel-round-half-down-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1144-feel-round-half-down-function) | 16 | 16 | 0 | 0 |  |
 | [compliance-level-3/1145-feel-context-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1145-feel-context-function) | 18 | 18 | 0 | 0 |  |
-| [compliance-level-3/1146-feel-context-put-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1146-feel-context-put-function) | 30 | 24 | 0 | 6 | boxed contexts (0.10) |
+| [compliance-level-3/1146-feel-context-put-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1146-feel-context-put-function) | 30 | 30 | 0 | 0 |  |
 | [compliance-level-3/1147-feel-context-merge-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1147-feel-context-merge-function) | 14 | 14 | 0 | 0 |  |
 | [compliance-level-3/1148-feel-now-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1148-feel-now-function) | 2 | 2 | 0 | 0 |  |
 | [compliance-level-3/1149-feel-today-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1149-feel-today-function) | 2 | 2 | 0 | 0 |  |
-| [compliance-level-3/1150-boxed-conditional](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1150-boxed-conditional) | 3 | 0 | 0 | 3 | boxed conditionals (0.10) |
-| [compliance-level-3/1151-boxed-filter](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1151-boxed-filter) | 4 | 0 | 0 | 4 | boxed filters (0.10) |
-| [compliance-level-3/1152-boxed-for](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1152-boxed-for) | 2 | 0 | 0 | 2 | boxed iterators (for, some, every) (0.10) |
-| [compliance-level-3/1153-boxed-some](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1153-boxed-some) | 5 | 0 | 0 | 5 | boxed iterators (for, some, every) (0.10) |
-| [compliance-level-3/1154-boxed-every](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1154-boxed-every) | 5 | 0 | 0 | 5 | boxed iterators (for, some, every) (0.10) |
+| [compliance-level-3/1150-boxed-conditional](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1150-boxed-conditional) | 3 | 3 | 0 | 0 |  |
+| [compliance-level-3/1151-boxed-filter](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1151-boxed-filter) | 4 | 4 | 0 | 0 |  |
+| [compliance-level-3/1152-boxed-for](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1152-boxed-for) | 2 | 2 | 0 | 0 |  |
+| [compliance-level-3/1153-boxed-some](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1153-boxed-some) | 5 | 5 | 0 | 0 |  |
+| [compliance-level-3/1154-boxed-every](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1154-boxed-every) | 5 | 5 | 0 | 0 |  |
 | [compliance-level-3/1155-list-replace-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1155-list-replace-function) | 22 | 22 | 0 | 0 |  |
 | [compliance-level-3/1156-range-function](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1156-range-function) | 56 | 56 | 0 | 0 |  |
-| [compliance-level-3/1157-implicit-conversions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1157-implicit-conversions) | 12 | 4 | 0 | 8 | business knowledge models (0.10); decision services (0.11); boxed contexts (0.10); … |
+| [compliance-level-3/1157-implicit-conversions](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1157-implicit-conversions) | 12 | 6 | 0 | 6 | business knowledge models (0.10); decision services (0.11) |
 | [compliance-level-3/1160-multiple-imports](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1160-multiple-imports) | 4 | 0 | 0 | 4 | imports (0.11) |
-| [compliance-level-3/1161-boxed-list-expression](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1161-boxed-list-expression) | 2 | 0 | 0 | 2 | boxed lists (0.10) |
+| [compliance-level-3/1161-boxed-list-expression](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/1161-boxed-list-expression) | 2 | 2 | 0 | 0 |  |
 
 ### Failures
 
 - `compliance-level-2/0008-LX-arithmetic/0008-LX-arithmetic-test-01.xml #002 payment`: expected 562.707359373292, got 562.7073593732659271562143285576524
 - `compliance-level-2/0008-LX-arithmetic/0008-LX-arithmetic-test-01.xml #003 payment`: expected 2861.03377700389, got 2861.033777003901636716262779605767
+- `compliance-level-2/0009-invocation-arithmetic/0009-invocation-arithmetic-test-01.xml #002 MonthlyPayment`: expected 662.707359373292, got 662.7073593732659271562143285576524
+- `compliance-level-2/0009-invocation-arithmetic/0009-invocation-arithmetic-test-01.xml #003 MonthlyPayment`: expected 2961.03377700389, got 2961.033777003901636716262779605767
+- `compliance-level-3/0003-iteration/0003-iteration-test-01.xml #001 MonthlyPayment`: expected [966.396742204988, 376.509070632494], got [966.3967422049753602329651244861514, 376.5090706325024247283858289020703]
+- `compliance-level-3/0004-lending/0004-lending-test-01.xml #001 RequiredMonthlyInstallment`: expected 1680.880325608555, got 1680.880325608634796819003637073022
+- `compliance-level-3/0005-literal-invocation/0005-literal-invocation-test-01.xml #002 MonthlyPayment`: expected 662.707359373292, got 662.7073593732659271562143285576524
+- `compliance-level-3/0005-literal-invocation/0005-literal-invocation-test-01.xml #003 MonthlyPayment`: expected 2961.03377700389, got 2961.033777003901636716262779605767
+- `compliance-level-3/0014-loan-comparison/0014-loan-comparison-test-01.xml #001 RankedProducts`: expected {metricsTable: [{lenderName: "Oceans Capital", rate: .03500, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000, paymentAmt: 1481.847469769075, equity36moPct: 0.1229130806675829}, {lenderName: "eClick Lending", rate: .03200, points: 1.1, fee: 2700, loanAmt: 336330, downPmtAmt: 67266, paymentAmt: 1454.51580776472, equity36moPct: 0.1137029731874643}, {lenderName: "eClickLending", rate: .03375, points: 0.1, fee: 1200, loanAmt: 331530, downPmtAmt: 66306, paymentAmt: 1465.681565899816, equity36moPct: 0.1219807467513794}, {lenderName: "AimLoan", rate: .03000, points: 1.1, fee: 3966, loanAmt: 337596, downPmtAmt: 67519.2, paymentAmt: 1423.318353709273, equity36moPct: 0.1154298007315222}, {lenderName: "Home Loans Today", rate: .03125, points: 1.1, fee: 285, loanAmt: 333915, downPmtAmt: 66783, paymentAmt: 1430.409890005697, equity36moPct: 0.1219478687825963}, {lenderName: "Sebonic", rate: .03125, points: 0.1, fee: 4028, loanAmt: 334358, downPmtAmt: 66871.6, paymentAmt: 1432.307593257341, equity36moPct: 0.1207829702481527}, {lenderName: "AimLoan", rate: .03125, points: 0.1, fee: 4317, loanAmt: 334647, downPmtAmt: 66929.4, paymentAmt: 1433.545598313153, equity36moPct: 0.1200230251545745}, {lenderName: "eRates Mortgage", rate: .03125, points: 1.1, fee: 2518, loanAmt: 336148, downPmtAmt: 67229.6, paymentAmt: 1439.975513845245, equity36moPct: 0.1160760438900096}, {lenderName: "Home Loans Today", rate: .03250, points: 0.1, fee: 822, loanAmt: 331152, downPmtAmt: 66230.4, paymentAmt: 1441.194429734607, equity36moPct: 0.1261025270361139}, {lenderName: "AimLoan", rate: .03250, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399, paymentAmt: 1444.863219004387, equity36moPct: 0.1238778822515175}], rankByDownPmt: [{lenderName: "Oceans Capital", rate: .03500, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000, paymentAmt: 1481.847469769075, equity36moPct: 0.1229130806675829}, {lenderName: "Home Loans Today", rate: .03250, points: 0.1, fee: 822, loanAmt: 331152, downPmtAmt: 66230.4, paymentAmt: 1441.194429734607, equity36moPct: 0.1261025270361139}, {lenderName: "eClickLending", rate: .03375, points: 0.1, fee: 1200, loanAmt: 331530, downPmtAmt: 66306, paymentAmt: 1465.681565899816, equity36moPct: 0.1219807467513794}, {lenderName: "AimLoan", rate: .03250, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399, paymentAmt: 1444.863219004387, equity36moPct: 0.1238778822515175}, {lenderName: "Home Loans Today", rate: .03125, points: 1.1, fee: 285, loanAmt: 333915, downPmtAmt: 66783, paymentAmt: 1430.409890005697, equity36moPct: 0.1219478687825963}, {lenderName: "Sebonic", rate: .03125, points: 0.1, fee: 4028, loanAmt: 334358, downPmtAmt: 66871.6, paymentAmt: 1432.307593257341, equity36moPct: 0.1207829702481527}, {lenderName: "AimLoan", rate: .03125, points: 0.1, fee: 4317, loanAmt: 334647, downPmtAmt: 66929.4, paymentAmt: 1433.545598313153, equity36moPct: 0.1200230251545745}, {lenderName: "eRates Mortgage", rate: .03125, points: 1.1, fee: 2518, loanAmt: 336148, downPmtAmt: 67229.6, paymentAmt: 1439.975513845245, equity36moPct: 0.1160760438900096}, {lenderName: "eClick Lending", rate: .03200, points: 1.1, fee: 2700, loanAmt: 336330, downPmtAmt: 67266, paymentAmt: 1454.51580776472, equity36moPct: 0.1137029731874643}, {lenderName: "AimLoan", rate: .03000, points: 1.1, fee: 3966, loanAmt: 337596, downPmtAmt: 67519.2, paymentAmt: 1423.318353709273, equity36moPct: 0.1154298007315222}], rankByMonthlyPmt: [{lenderName: "AimLoan", rate: .03000, points: 1.1, fee: 3966, loanAmt: 337596, downPmtAmt: 67519.2, paymentAmt: 1423.318353709273, equity36moPct: 0.1154298007315222}, {lenderName: "Home Loans Today", rate: .03125, points: 1.1, fee: 285, loanAmt: 333915, downPmtAmt: 66783, paymentAmt: 1430.409890005697, equity36moPct: 0.1219478687825963}, {lenderName: "Sebonic", rate: .03125, points: 0.1, fee: 4028, loanAmt: 334358, downPmtAmt: 66871.6, paymentAmt: 1432.307593257341, equity36moPct: 0.1207829702481527}, {lenderName: "AimLoan", rate: .03125, points: 0.1, fee: 4317, loanAmt: 334647, downPmtAmt: 66929.4, paymentAmt: 1433.545598313153, equity36moPct: 0.1200230251545745}, {lenderName: "eRates Mortgage", rate: .03125, points: 1.1, fee: 2518, loanAmt: 336148, downPmtAmt: 67229.6, paymentAmt: 1439.975513845245, equity36moPct: 0.1160760438900096}, {lenderName: "Home Loans Today", rate: .03250, points: 0.1, fee: 822, loanAmt: 331152, downPmtAmt: 66230.4, paymentAmt: 1441.194429734607, equity36moPct: 0.1261025270361139}, {lenderName: "AimLoan", rate: .03250, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399, paymentAmt: 1444.863219004387, equity36moPct: 0.1238778822515175}, {lenderName: "eClick Lending", rate: .03200, points: 1.1, fee: 2700, loanAmt: 336330, downPmtAmt: 67266, paymentAmt: 1454.51580776472, equity36moPct: 0.1137029731874643}, {lenderName: "eClickLending", rate: .03375, points: 0.1, fee: 1200, loanAmt: 331530, downPmtAmt: 66306, paymentAmt: 1465.681565899816, equity36moPct: 0.1219807467513794}, {lenderName: "Oceans Capital", rate: .03500, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000, paymentAmt: 1481.847469769075, equity36moPct: 0.1229130806675829}], rankByEquityPct: [{lenderName: "Home Loans Today", rate: .03250, points: 0.1, fee: 822, loanAmt: 331152, downPmtAmt: 66230.4, paymentAmt: 1441.194429734607, equity36moPct: 0.1261025270361139}, {lenderName: "AimLoan", rate: .03250, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399, paymentAmt: 1444.863219004387, equity36moPct: 0.1238778822515175}, {lenderName: "Oceans Capital", rate: .03500, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000, paymentAmt: 1481.847469769075, equity36moPct: 0.1229130806675829}, {lenderName: "eClickLending", rate: .03375, points: 0.1, fee: 1200, loanAmt: 331530, downPmtAmt: 66306, paymentAmt: 1465.681565899816, equity36moPct: 0.1219807467513794}, {lenderName: "Home Loans Today", rate: .03125, points: 1.1, fee: 285, loanAmt: 333915, downPmtAmt: 66783, paymentAmt: 1430.409890005697, equity36moPct: 0.1219478687825963}, {lenderName: "Sebonic", rate: .03125, points: 0.1, fee: 4028, loanAmt: 334358, downPmtAmt: 66871.6, paymentAmt: 1432.307593257341, equity36moPct: 0.1207829702481527}, {lenderName: "AimLoan", rate: .03125, points: 0.1, fee: 4317, loanAmt: 334647, downPmtAmt: 66929.4, paymentAmt: 1433.545598313153, equity36moPct: 0.1200230251545745}, {lenderName: "eRates Mortgage", rate: .03125, points: 1.1, fee: 2518, loanAmt: 336148, downPmtAmt: 67229.6, paymentAmt: 1439.975513845245, equity36moPct: 0.1160760438900096}, {lenderName: "AimLoan", rate: .03000, points: 1.1, fee: 3966, loanAmt: 337596, downPmtAmt: 67519.2, paymentAmt: 1423.318353709273, equity36moPct: 0.1154298007315222}, {lenderName: "eClick Lending", rate: .03200, points: 1.1, fee: 2700, loanAmt: 336330, downPmtAmt: 67266, paymentAmt: 1454.51580776472, equity36moPct: 0.1137029731874643}]}, got {metricsTable: [{lenderName: "Oceans Capital", rate: 0.03500, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000.0, paymentAmt: 1481.847469769120902911415325410838, equity36moPct: 0.1229130806675864888391782030891032}, {lenderName: "eClick Lending", rate: 0.03200, points: 1.1, fee: 2700, loanAmt: 336330.000, downPmtAmt: 67266.0000, paymentAmt: 1454.515807764692215596585144120545, equity36moPct: 0.1137029731874587934446846162699216}, {lenderName: "eClickLending", rate: 0.03375, points: 0.1, fee: 1200, loanAmt: 331530.000, downPmtAmt: 66306.0000, paymentAmt: 1465.681565899863510819264705552193, equity36moPct: 0.1219807467513805938540322263850624}, {lenderName: "AimLoan", rate: 0.03000, points: 1.1, fee: 3966, loanAmt: 337596.000, downPmtAmt: 67519.2000, paymentAmt: 1423.318353709275504544890172906070, equity36moPct: 0.1154298007315239099518616327317256}, {lenderName: "Home Loans Today", rate: 0.03125, points: 1.1, fee: 285, loanAmt: 333915.000, downPmtAmt: 66783.0000, paymentAmt: 1430.409890005738806923767229688247, equity36moPct: 0.1219478687825970483711604225077008}, {lenderName: "Sebonic", rate: 0.03125, points: 0.1, fee: 4028, loanAmt: 334358.000, downPmtAmt: 66871.6000, paymentAmt: 1432.307593257382315875048929769861, equity36moPct: 0.1207829702481517269343529237944680}, {lenderName: "AimLoan", rate: 0.03125, points: 0.1, fee: 4317, loanAmt: 334647.000, downPmtAmt: 66929.4000, paymentAmt: 1433.545598313194898464034056911139, equity36moPct: 0.1200230251545745307825755713607792}, {lenderName: "eRates Mortgage", rate: 0.03125, points: 1.1, fee: 2518, loanAmt: 336148.000, downPmtAmt: 67229.6000, paymentAmt: 1439.975513845287239177067537323106, equity36moPct: 0.1160760438900092317382233014543176}, {lenderName: "Home Loans Today", rate: 0.03250, points: 0.1, fee: 822, loanAmt: 331152.000, downPmtAmt: 66230.4000, paymentAmt: 1441.194429734569798816940611550485, equity36moPct: 0.1261025270361081947340170865041632}, {lenderName: "AimLoan", rate: 0.03250, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399.0, paymentAmt: 1444.863219004349967260442933552276, equity36moPct: 0.1238778822515121156167560595555808}], rankByDownPmt: [{lenderName: "Oceans Capital", rate: 0.03500, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000.0, paymentAmt: 1481.847469769120902911415325410838, equity36moPct: 0.1229130806675864888391782030891032}, {lenderName: "Home Loans Today", rate: 0.03250, points: 0.1, fee: 822, loanAmt: 331152.000, downPmtAmt: 66230.4000, paymentAmt: 1441.194429734569798816940611550485, equity36moPct: 0.1261025270361081947340170865041632}, {lenderName: "eClickLending", rate: 0.03375, points: 0.1, fee: 1200, loanAmt: 331530.000, downPmtAmt: 66306.0000, paymentAmt: 1465.681565899863510819264705552193, equity36moPct: 0.1219807467513805938540322263850624}, {lenderName: "AimLoan", rate: 0.03250, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399.0, paymentAmt: 1444.863219004349967260442933552276, equity36moPct: 0.1238778822515121156167560595555808}, {lenderName: "Home Loans Today", rate: 0.03125, points: 1.1, fee: 285, loanAmt: 333915.000, downPmtAmt: 66783.0000, paymentAmt: 1430.409890005738806923767229688247, equity36moPct: 0.1219478687825970483711604225077008}, {lenderName: "Sebonic", rate: 0.03125, points: 0.1, fee: 4028, loanAmt: 334358.000, downPmtAmt: 66871.6000, paymentAmt: 1432.307593257382315875048929769861, equity36moPct: 0.1207829702481517269343529237944680}, {lenderName: "AimLoan", rate: 0.03125, points: 0.1, fee: 4317, loanAmt: 334647.000, downPmtAmt: 66929.4000, paymentAmt: 1433.545598313194898464034056911139, equity36moPct: 0.1200230251545745307825755713607792}, {lenderName: "eRates Mortgage", rate: 0.03125, points: 1.1, fee: 2518, loanAmt: 336148.000, downPmtAmt: 67229.6000, paymentAmt: 1439.975513845287239177067537323106, equity36moPct: 0.1160760438900092317382233014543176}, {lenderName: "eClick Lending", rate: 0.03200, points: 1.1, fee: 2700, loanAmt: 336330.000, downPmtAmt: 67266.0000, paymentAmt: 1454.515807764692215596585144120545, equity36moPct: 0.1137029731874587934446846162699216}, {lenderName: "AimLoan", rate: 0.03000, points: 1.1, fee: 3966, loanAmt: 337596.000, downPmtAmt: 67519.2000, paymentAmt: 1423.318353709275504544890172906070, equity36moPct: 0.1154298007315239099518616327317256}], rankByMonthlyPmt: [{lenderName: "AimLoan", rate: 0.03000, points: 1.1, fee: 3966, loanAmt: 337596.000, downPmtAmt: 67519.2000, paymentAmt: 1423.318353709275504544890172906070, equity36moPct: 0.1154298007315239099518616327317256}, {lenderName: "Home Loans Today", rate: 0.03125, points: 1.1, fee: 285, loanAmt: 333915.000, downPmtAmt: 66783.0000, paymentAmt: 1430.409890005738806923767229688247, equity36moPct: 0.1219478687825970483711604225077008}, {lenderName: "Sebonic", rate: 0.03125, points: 0.1, fee: 4028, loanAmt: 334358.000, downPmtAmt: 66871.6000, paymentAmt: 1432.307593257382315875048929769861, equity36moPct: 0.1207829702481517269343529237944680}, {lenderName: "AimLoan", rate: 0.03125, points: 0.1, fee: 4317, loanAmt: 334647.000, downPmtAmt: 66929.4000, paymentAmt: 1433.545598313194898464034056911139, equity36moPct: 0.1200230251545745307825755713607792}, {lenderName: "eRates Mortgage", rate: 0.03125, points: 1.1, fee: 2518, loanAmt: 336148.000, downPmtAmt: 67229.6000, paymentAmt: 1439.975513845287239177067537323106, equity36moPct: 0.1160760438900092317382233014543176}, {lenderName: "Home Loans Today", rate: 0.03250, points: 0.1, fee: 822, loanAmt: 331152.000, downPmtAmt: 66230.4000, paymentAmt: 1441.194429734569798816940611550485, equity36moPct: 0.1261025270361081947340170865041632}, {lenderName: "AimLoan", rate: 0.03250, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399.0, paymentAmt: 1444.863219004349967260442933552276, equity36moPct: 0.1238778822515121156167560595555808}, {lenderName: "eClick Lending", rate: 0.03200, points: 1.1, fee: 2700, loanAmt: 336330.000, downPmtAmt: 67266.0000, paymentAmt: 1454.515807764692215596585144120545, equity36moPct: 0.1137029731874587934446846162699216}, {lenderName: "eClickLending", rate: 0.03375, points: 0.1, fee: 1200, loanAmt: 331530.000, downPmtAmt: 66306.0000, paymentAmt: 1465.681565899863510819264705552193, equity36moPct: 0.1219807467513805938540322263850624}, {lenderName: "Oceans Capital", rate: 0.03500, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000.0, paymentAmt: 1481.847469769120902911415325410838, equity36moPct: 0.1229130806675864888391782030891032}], rankByEquityPct: [{lenderName: "Home Loans Today", rate: 0.03250, points: 0.1, fee: 822, loanAmt: 331152.000, downPmtAmt: 66230.4000, paymentAmt: 1441.194429734569798816940611550485, equity36moPct: 0.1261025270361081947340170865041632}, {lenderName: "AimLoan", rate: 0.03250, points: 0, fee: 1995, loanAmt: 331995, downPmtAmt: 66399.0, paymentAmt: 1444.863219004349967260442933552276, equity36moPct: 0.1238778822515121156167560595555808}, {lenderName: "Oceans Capital", rate: 0.03500, points: 0, fee: 0, loanAmt: 330000, downPmtAmt: 66000.0, paymentAmt: 1481.847469769120902911415325410838, equity36moPct: 0.1229130806675864888391782030891032}, {lenderName: "eClickLending", rate: 0.03375, points: 0.1, fee: 1200, loanAmt: 331530.000, downPmtAmt: 66306.0000, paymentAmt: 1465.681565899863510819264705552193, equity36moPct: 0.1219807467513805938540322263850624}, {lenderName: "Home Loans Today", rate: 0.03125, points: 1.1, fee: 285, loanAmt: 333915.000, downPmtAmt: 66783.0000, paymentAmt: 1430.409890005738806923767229688247, equity36moPct: 0.1219478687825970483711604225077008}, {lenderName: "Sebonic", rate: 0.03125, points: 0.1, fee: 4028, loanAmt: 334358.000, downPmtAmt: 66871.6000, paymentAmt: 1432.307593257382315875048929769861, equity36moPct: 0.1207829702481517269343529237944680}, {lenderName: "AimLoan", rate: 0.03125, points: 0.1, fee: 4317, loanAmt: 334647.000, downPmtAmt: 66929.4000, paymentAmt: 1433.545598313194898464034056911139, equity36moPct: 0.1200230251545745307825755713607792}, {lenderName: "eRates Mortgage", rate: 0.03125, points: 1.1, fee: 2518, loanAmt: 336148.000, downPmtAmt: 67229.6000, paymentAmt: 1439.975513845287239177067537323106, equity36moPct: 0.1160760438900092317382233014543176}, {lenderName: "AimLoan", rate: 0.03000, points: 1.1, fee: 3966, loanAmt: 337596.000, downPmtAmt: 67519.2000, paymentAmt: 1423.318353709275504544890172906070, equity36moPct: 0.1154298007315239099518616327317256}, {lenderName: "eClick Lending", rate: 0.03200, points: 1.1, fee: 2700, loanAmt: 336330.000, downPmtAmt: 67266.0000, paymentAmt: 1454.515807764692215596585144120545, equity36moPct: 0.1137029731874587934446846162699216}]}
 - `compliance-level-3/0103-feel-is-function/0103-feel-is-function-test-01.xml #time_007 time_007`: expected false, got true
 - `compliance-level-3/1116-feel-time-function/1116-feel-time-function-test-01.xml #028_eaea7a943c feel-time-function_028_eaea7a943c`: expected "00:01:00@Etc/UTC", got "00:01:00Z"
 
@@ -271,13 +270,13 @@ The checks counted since Praecepta's first release: the result nodes of decision
 decision table. A check is *not supported* when the table uses a feature Praecepta does not have (the
 DMN reader rejects it), or the inputs are of a kind it does not take.
 
-**83 of 86 checks pass (96.5 %).** Of the 83 checks Praecepta supports, 83 pass (100.0 %).
+**86 of 86 checks pass (100.0 %).** Of the 86 checks Praecepta supports, 86 pass (100.0 %).
 
 | Outcome | Checks |
 |---|---:|
-| Passed | 83 |
+| Passed | 86 |
 | Failed | 0 |
-| Not supported | 3 |
+| Not supported | 0 |
 
 ### By test case
 
@@ -300,17 +299,9 @@ DMN reader rejects it), or the inputs are of a kind it does not take.
 | [compliance-level-2/0117-multi-any-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0117-multi-any-hitpolicy) | 3 | 0 | 0 |  |
 | [compliance-level-2/0118-multi-priority-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0118-multi-priority-hitpolicy) | 3 | 0 | 0 |  |
 | [compliance-level-2/0119-multi-collect-hitpolicy](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-2/0119-multi-collect-hitpolicy) | 3 | 0 | 0 |  |
-| [compliance-level-3/0004-lending](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0004-lending) | 0 | 0 | 1 | invocations |
+| [compliance-level-3/0004-lending](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0004-lending) | 1 | 0 | 0 |  |
 | [compliance-level-3/0008-listGen](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0008-listGen) | 2 | 0 | 0 |  |
 | [compliance-level-3/0017-tableTests](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0017-tableTests) | 4 | 0 | 0 |  |
 | [compliance-level-3/0036-dt-variable-input](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0036-dt-variable-input) | 24 | 0 | 0 |  |
 | [compliance-level-3/0039-dt-list-semantics](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0039-dt-list-semantics) | 2 | 0 | 0 |  |
-| [compliance-level-3/0087-chapter-11-example](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0087-chapter-11-example) | 0 | 0 | 2 | invocations |
-
-### Decision tables not supported
-
-What the unsupported checks need, by number of checks:
-
-| Feature | Checks |
-|---|---:|
-| invocations | 3 |
+| [compliance-level-3/0087-chapter-11-example](https://github.com/dmn-tck/tck/tree/5cd912f281831bc535e710aba435e16de198028a/TestCases/compliance-level-3/0087-chapter-11-example) | 2 | 0 | 0 |  |

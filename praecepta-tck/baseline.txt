@@ -25,6 +25,7 @@ compliance-level-2/0007-simpletable-P2/0007-simpletable-P2-test-01.xml #001 Appr
 compliance-level-2/0007-simpletable-P2/0007-simpletable-P2-test-01.xml #002 Approval Status	graph
 compliance-level-2/0007-simpletable-P2/0007-simpletable-P2-test-01.xml #003 Approval Status	graph
 compliance-level-2/0008-LX-arithmetic/0008-LX-arithmetic-test-01.xml #001 payment	graph
+compliance-level-2/0009-invocation-arithmetic/0009-invocation-arithmetic-test-01.xml #001 MonthlyPayment	graph
 compliance-level-2/0010-multi-output-U/0010-multi-output-U-test-01.xml #001 Approval	graph
 compliance-level-2/0010-multi-output-U/0010-multi-output-U-test-01.xml #002 Approval	graph
 compliance-level-2/0010-multi-output-U/0010-multi-output-U-test-01.xml #003 Approval	graph
@@ -131,14 +132,41 @@ compliance-level-2/0119-multi-collect-hitpolicy/0119-multi-collect-hitpolicy-tes
 compliance-level-2/0119-multi-collect-hitpolicy/0119-multi-collect-hitpolicy-test-01.xml #002 Approval Status	graph
 compliance-level-2/0119-multi-collect-hitpolicy/0119-multi-collect-hitpolicy-test-01.xml #003 Approval Status	graph
 compliance-level-3/0001-filter/0001-filter-test-01.xml #001 filter01	graph
-compliance-level-3/0002-string-functions/0002-string-functions-test-01.xml #002 Matches
-compliance-level-3/0002-string-functions/0002-string-functions-test-01.xml #004 Constructor
-compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Adjudication
+compliance-level-3/0002-string-functions/0002-string-functions-test-01.xml #001 Basic	graph
+compliance-level-3/0002-string-functions/0002-string-functions-test-01.xml #002 Matches	graph
+compliance-level-3/0002-string-functions/0002-string-functions-test-01.xml #003 Replace	graph
+compliance-level-3/0002-string-functions/0002-string-functions-test-01.xml #004 Constructor	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Adjudication	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 ApplicationRiskScore	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 BureauCallType	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Eligibility	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Post-bureauAffordability	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Post-bureauRiskCategory	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Pre-bureauAffordability	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Pre-bureauRiskCategory	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Routing	graph
+compliance-level-3/0004-lending/0004-lending-test-01.xml #001 Strategy	graph
+compliance-level-3/0005-literal-invocation/0005-literal-invocation-test-01.xml #001 MonthlyPayment	graph
 compliance-level-3/0006-join/0006-join-test-01.xml #001 Join	graph
-compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 Date-Time
-compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 Time
-compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 Time3
-compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 dtDuration1
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 Date	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 Date-Time	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 Date-Time2	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 Time	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 Time2	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 Time3	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 cDay	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 cHour	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 cMinute	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 cMonth	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 cOffset	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 cSecond	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 cYear	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 dtDuration1	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 dtDuration2	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 seconds	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 sumDurations	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 years	graph
+compliance-level-3/0007-date-time/0007-date-time-test-01.xml #001 ymDuration2	graph
 compliance-level-3/0008-listGen/0008-listGen-test-01.xml #001 listGen1	graph
 compliance-level-3/0008-listGen/0008-listGen-test-01.xml #002 listGen2	graph
 compliance-level-3/0008-listGen/0008-listGen-test-01.xml #003 listGen3	graph
@@ -193,8 +221,15 @@ compliance-level-3/0012-list-functions/0012-list-functions-test-01.xml #019 flat
 compliance-level-3/0013-sort/0013-sort-test-01.xml #001 sort1	graph
 compliance-level-3/0013-sort/0013-sort-test-01.xml #001 sort2	graph
 compliance-level-3/0013-sort/0013-sort-test-01.xml #001 sort3	graph
-compliance-level-3/0016-some-every/0016-some-every-test-01.xml #001 everyGtTen2
-compliance-level-3/0016-some-every/0016-some-every-test-01.xml #001 someGtTen2
+compliance-level-3/0014-loan-comparison/0014-loan-comparison-test-01.xml #001 Bankrates	graph
+compliance-level-3/0016-some-every/0016-some-every-test-01.xml #001 everyGtTen1	graph
+compliance-level-3/0016-some-every/0016-some-every-test-01.xml #001 everyGtTen2	graph
+compliance-level-3/0016-some-every/0016-some-every-test-01.xml #001 everyGtTen3	graph
+compliance-level-3/0016-some-every/0016-some-every-test-01.xml #001 priceTable1	graph
+compliance-level-3/0016-some-every/0016-some-every-test-01.xml #001 someGtTen1	graph
+compliance-level-3/0016-some-every/0016-some-every-test-01.xml #001 someGtTen2	graph
+compliance-level-3/0016-some-every/0016-some-every-test-01.xml #decision_014 decision_014	graph
+compliance-level-3/0016-some-every/0016-some-every-test-01.xml #decision_014a decision_014a	graph
 compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #001 priceGt10	graph
 compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #002 priceInRange	graph
 compliance-level-3/0017-tableTests/0017-tableTests-test-01.xml #003 dateCompare1	graph
@@ -211,15 +246,36 @@ compliance-level-3/0021-singleton-list/0021-singleton-list-test-01.xml #001 deci
 compliance-level-3/0021-singleton-list/0021-singleton-list-test-01.xml #001 decision3	graph
 compliance-level-3/0021-singleton-list/0021-singleton-list-test-01.xml #001 decision4	graph
 compliance-level-3/0021-singleton-list/0021-singleton-list-test-01.xml #001 decision5	graph
+compliance-level-3/0030-user-defined-functions/0030-user-defined-functions-test-01.xml #001 named function invocation	graph
+compliance-level-3/0030-user-defined-functions/0030-user-defined-functions-test-01.xml #001 simple function invocation	graph
+compliance-level-3/0031-user-defined-functions/0031-user-defined-functions-test-01.xml #001 fn invocation positional parameters	graph
+compliance-level-3/0031-user-defined-functions/0031-user-defined-functions-test-01.xml #002 fn invocation named parameters	graph
+compliance-level-3/0031-user-defined-functions/0031-user-defined-functions-test-01.xml #003 fn invocation complex parameters	graph
 compliance-level-3/0032-conditionals/0032-conditionals-test-01.xml #001 simpleIf	graph
 compliance-level-3/0032-conditionals/0032-conditionals-test-01.xml #002 simpleIf	graph
 compliance-level-3/0032-conditionals/0032-conditionals-test-01.xml #003 simpleIf	graph
 compliance-level-3/0032-conditionals/0032-conditionals-test-01.xml #004 conditionWithFunctions	graph
 compliance-level-3/0032-conditionals/0032-conditionals-test-01.xml #005 conditionWithFunctions	graph
 compliance-level-3/0032-conditionals/0032-conditionals-test-01.xml #006 conditionWithFunctions	graph
-compliance-level-3/0033-for-loops/0033-for-loops-test-01.xml #001 increase1
-compliance-level-3/0033-for-loops/0033-for-loops-test-01.xml #002 areas
-compliance-level-3/0033-for-loops/0033-for-loops-test-01.xml #004 multiples
+compliance-level-3/0033-for-loops/0033-for-loops-test-01.xml #001 increase1	graph
+compliance-level-3/0033-for-loops/0033-for-loops-test-01.xml #002 areas	graph
+compliance-level-3/0033-for-loops/0033-for-loops-test-01.xml #003 check factors	graph
+compliance-level-3/0033-for-loops/0033-for-loops-test-01.xml #004 multiples	graph
+compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision A 1	graph
+compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision A 2.1	graph
+compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision A 2.2	graph
+compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision A 3	graph
+compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision B 1	graph
+compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision B 2.1	graph
+compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision B 2.2	graph
+compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision B 3	graph
+compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision C 1	graph
+compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision C 2	graph
+compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision C 3	graph
+compliance-level-3/0034-drg-scopes/0034-drg-scopes-test-01.xml #001 decision C 4	graph
+compliance-level-3/0035-test-structure-output/0035-test-structure-output-test-01.xml #001 Profile of Color	graph
+compliance-level-3/0035-test-structure-output/0035-test-structure-output-test-01.xml #002 Profile of Color	graph
+compliance-level-3/0035-test-structure-output/0035-test-structure-output-test-01.xml #003 Profile of Color	graph
 compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Boolean	graph
 compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Date	graph
 compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_20445ee0-744d-4488-a90e-136701510871 Compare Date and Time	graph
@@ -244,8 +300,18 @@ compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9
 compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare String	graph
 compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Time	graph
 compliance-level-3/0036-dt-variable-input/0036-dt-variable-input-test-01.xml #_9d09e1a1-d573-42f0-a026-da811bb73eeb Compare Years and Months Duration	graph
+compliance-level-3/0037-dt-on-bkm-implicit-params/0037-dt-on-bkm-implicit-params-test-01.xml #_0de87bf9-0269-40b1-b7ac-767ae9a99b89 Person's description	graph
+compliance-level-3/0037-dt-on-bkm-implicit-params/0037-dt-on-bkm-implicit-params-test-01.xml #_20d7e21f-f58f-4a78-8074-a70cbf13de83 Person's description	graph
+compliance-level-3/0038-dt-on-bkm-explicit-params/0038-dt-on-bkm-explicit-params-test-01.xml #_b224d5f5-006f-43bb-9ace-e6af924dc2b3 Person's description	graph
+compliance-level-3/0038-dt-on-bkm-explicit-params/0038-dt-on-bkm-explicit-params-test-01.xml #_bf27c25d-18f6-4891-8370-42d440709d90 Person's description	graph
 compliance-level-3/0039-dt-list-semantics/0039-dt-list-semantics-test-01.xml #_07726176-a1a0-4e9e-9de2-16dba51556e2 Symptom Analysis	graph
 compliance-level-3/0039-dt-list-semantics/0039-dt-list-semantics-test-01.xml #_a217c840-6ead-4cb7-a3e1-ad9df9c0c584 Symptom Analysis	graph
+compliance-level-3/0040-singlenestedcontext/0040-singlenestedcontext-test-01.xml #001 Boxed Context	graph
+compliance-level-3/0040-singlenestedcontext/0040-singlenestedcontext-test-01.xml #002 Boxed Context	graph
+compliance-level-3/0040-singlenestedcontext/0040-singlenestedcontext-test-01.xml #003 Boxed Context	graph
+compliance-level-3/0041-multiple-nestedcontext/0041-multiple-nestedcontext-test-01.xml #001 Boxed Context	graph
+compliance-level-3/0041-multiple-nestedcontext/0041-multiple-nestedcontext-test-01.xml #002 Boxed Context	graph
+compliance-level-3/0041-multiple-nestedcontext/0041-multiple-nestedcontext-test-01.xml #003 Boxed Context	graph
 compliance-level-3/0050-feel-abs-function/0050-feel-abs-function-test-01.xml #001 decision001	graph
 compliance-level-3/0050-feel-abs-function/0050-feel-abs-function-test-01.xml #002 decision002	graph
 compliance-level-3/0050-feel-abs-function/0050-feel-abs-function-test-01.xml #003 decision003	graph
@@ -1189,49 +1255,59 @@ compliance-level-3/0072-feel-in/0072-feel-in-test-01.xml #ym_duration_014_a ym_d
 compliance-level-3/0073-feel-comments/0073-feel-comments-test-01.xml #decision_001 decision_001	graph
 compliance-level-3/0073-feel-comments/0073-feel-comments-test-01.xml #decision_002 decision_002	graph
 compliance-level-3/0073-feel-comments/0073-feel-comments-test-01.xml #decision_003 decision_003	graph
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #context_001 context_001
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_001 dateTime_001
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_002 dateTime_002
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_003 dateTime_003
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_004 dateTime_004
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_005 dateTime_005
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_005_a dateTime_005_a
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_006 dateTime_006
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_006_a dateTime_006_a
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_007 dateTime_007
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_007_a dateTime_007_a
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_008 dateTime_008
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_008_a dateTime_008_a
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_009 dateTime_009
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_009_a dateTime_009_a
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #date_001 date_001
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #date_002 date_002
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #date_003 date_003
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #date_004 date_004
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_001 dt_duration_001
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_002 dt_duration_002
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_003 dt_duration_003
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_003_a dt_duration_003_a
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_004 dt_duration_004
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_004_a dt_duration_004_a
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_005 dt_duration_005
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_005_a dt_duration_005_a
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_006 dt_duration_006
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_006_a dt_duration_006_a
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #time_001 time_001
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #time_002 time_002
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #time_003 time_003
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #time_004 time_004
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #time_004_a time_004_a
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #time_005_a time_005_a
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_001 ym_duration_001
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_001_a ym_duration_001_a
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_002 ym_duration_002
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_002_a ym_duration_002_a
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_003 ym_duration_003
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_004 ym_duration_004
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_005 ym_duration_005
-compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_006 ym_duration_006
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #context_001 context_001	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_001 dateTime_001	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_002 dateTime_002	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_003 dateTime_003	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_004 dateTime_004	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_005 dateTime_005	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_005_a dateTime_005_a	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_006 dateTime_006	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_006_a dateTime_006_a	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_007 dateTime_007	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_007_a dateTime_007_a	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_008 dateTime_008	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_008_a dateTime_008_a	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_009 dateTime_009	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dateTime_009_a dateTime_009_a	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #date_001 date_001	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #date_002 date_002	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #date_003 date_003	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #date_004 date_004	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_001 dt_duration_001	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_002 dt_duration_002	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_003 dt_duration_003	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_003_a dt_duration_003_a	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_004 dt_duration_004	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_004_a dt_duration_004_a	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_005 dt_duration_005	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_005_a dt_duration_005_a	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_006 dt_duration_006	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #dt_duration_006_a dt_duration_006_a	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #range_001 range_001	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #range_002 range_002	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #range_003 range_003	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #range_004 range_004	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #range_005 range_005	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #range_006 range_006	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #range_007 range_007	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #range_009 range_009	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #range_010 range_010	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #range_011 range_011	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #time_001 time_001	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #time_002 time_002	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #time_003 time_003	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #time_004 time_004	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #time_004_a time_004_a	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #time_005_a time_005_a	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_001 ym_duration_001	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_001_a ym_duration_001_a	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_002 ym_duration_002	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_002_a ym_duration_002_a	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_003 ym_duration_003	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_004 ym_duration_004	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_005 ym_duration_005	graph
+compliance-level-3/0074-feel-properties/0074-feel-properties-test-01.xml #ym_duration_006 ym_duration_006	graph
 compliance-level-3/0075-feel-exponent/0075-feel-exponent-test-01.xml #decision_001 decision_001	graph
 compliance-level-3/0075-feel-exponent/0075-feel-exponent-test-01.xml #decision_001_a decision_001_a	graph
 compliance-level-3/0075-feel-exponent/0075-feel-exponent-test-01.xml #decision_002 decision_002	graph
@@ -1324,6 +1400,15 @@ compliance-level-3/0084-feel-for-loops/0084-feel-for-loops-test-01.xml #decision
 compliance-level-3/0084-feel-for-loops/0084-feel-for-loops-test-01.xml #decision_022 decision_022	graph
 compliance-level-3/0084-feel-for-loops/0084-feel-for-loops-test-01.xml #decision_022_a decision_022_a	graph
 compliance-level-3/0084-feel-for-loops/0084-feel-for-loops-test-01.xml #decision_025 decision_025	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #001 Strategy	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #002 Routing	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #003a Application risk score	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #003b Pre-bureau risk category	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #003c Bureau call type	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #003d Eligibility	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #003e Post-bureau affordability	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #004 Routing	graph
+compliance-level-3/0087-chapter-11-example/0087-chapter-11-example-test-01.xml #004 Strategy	graph
 compliance-level-3/0090-feel-paths/0090-feel-paths-test-01.xml #nested_list_001 nested_list_001	graph
 compliance-level-3/0090-feel-paths/0090-feel-paths-test-01.xml #nested_list_002 nested_list_002	graph
 compliance-level-3/0090-feel-paths/0090-feel-paths-test-01.xml #nested_list_003 nested_list_003	graph
@@ -1379,44 +1464,49 @@ compliance-level-3/0095-feel-day-of-year-function/0095-feel-day-of-year-function
 compliance-level-3/0095-feel-day-of-year-function/0095-feel-day-of-year-function-test-01.xml #null_006 null_006	graph
 compliance-level-3/0095-feel-day-of-year-function/0095-feel-day-of-year-function-test-01.xml #null_007 null_007	graph
 compliance-level-3/0095-feel-day-of-year-function/0095-feel-day-of-year-function-test-01.xml #null_008 null_008	graph
-compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #date_002 date_002
-compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #datetime_002 datetime_002
-compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_001 null_001
-compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_002 null_002
-compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_003 null_003
-compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_004 null_004
-compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_005 null_005
-compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_006 null_006
-compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_007 null_007
-compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_008 null_008
-compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #date_002 date_002
-compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #datetime_002 datetime_002
-compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_001 null_001
-compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_002 null_002
-compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_003 null_003
-compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_004 null_004
-compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_005 null_005
-compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_006 null_006
-compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_007 null_007
-compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_008 null_008
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_001 date_001
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_002 date_002
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_003 date_003
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_004 date_004
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_005 date_005
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_006 date_006
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_007 date_007
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #datetime_001 datetime_001
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #datetime_004 datetime_004
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #datetime_005 datetime_005
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_001 null_001
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_002 null_002
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_003 null_003
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_004 null_004
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_005 null_005
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_006 null_006
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_007 null_007
-compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_008 null_008
+compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #date_001 date_001	graph
+compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #date_002 date_002	graph
+compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #datetime_001 date_001	graph
+compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #datetime_002 datetime_002	graph
+compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_001 null_001	graph
+compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_002 null_002	graph
+compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_003 null_003	graph
+compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_004 null_004	graph
+compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_005 null_005	graph
+compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_006 null_006	graph
+compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_007 null_007	graph
+compliance-level-3/0096-feel-day-of-week-function/0096-feel-day-of-week-function-test-01.xml #null_008 null_008	graph
+compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #date_001 date_001	graph
+compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #date_002 date_002	graph
+compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #datetime_001 date_001	graph
+compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #datetime_002 datetime_002	graph
+compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_001 null_001	graph
+compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_002 null_002	graph
+compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_003 null_003	graph
+compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_004 null_004	graph
+compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_005 null_005	graph
+compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_006 null_006	graph
+compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_007 null_007	graph
+compliance-level-3/0097-feel-month-of-year-function/0097-feel-month-of-year-function-test-01.xml #null_008 null_008	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_001 date_001	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_002 date_002	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_003 date_003	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_004 date_004	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_005 date_005	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_006 date_006	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_007 date_007	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #date_008 date_008	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #datetime_001 datetime_001	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #datetime_004 datetime_004	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #datetime_005 datetime_005	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_001 null_001	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_002 null_002	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_003 null_003	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_004 null_004	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_005 null_005	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_006 null_006	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_007 null_007	graph
+compliance-level-3/0098-feel-week-of-year-function/0098-feel-week-of-year-function-test-01.xml #null_008 null_008	graph
 compliance-level-3/0099-arithmetic-negation/0099-arithmetic-negation-test-01.xml #decision_001 decision_001	graph
 compliance-level-3/0099-arithmetic-negation/0099-arithmetic-negation-test-01.xml #decision_002 decision_002	graph
 compliance-level-3/0099-arithmetic-negation/0099-arithmetic-negation-test-01.xml #decision_003 decision_003	graph
@@ -2964,56 +3054,56 @@ compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-func
 compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #086_12ca8ac1d3 feel-date-and-time-function_086_12ca8ac1d3	graph
 compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #087_e9fd32063a feel-date-and-time-function_087_e9fd32063a	graph
 compliance-level-3/1117-feel-date-and-time-function/1117-feel-date-and-time-function-test-01.xml #088_1db0287718 feel-date-and-time-function_088_1db0287718	graph
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #001_f2c6cd6866 feel-duration-function_ErrorCase_001_f2c6cd6866
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #002_ddca5756ca feel-duration-function_ErrorCase_002_ddca5756ca
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #003_951e1d1c31 feel-duration-function_003_951e1d1c31
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #004_6b31e7cde7 feel-duration-function_004_6b31e7cde7
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #005_202d863d07 feel-duration-function_005_202d863d07
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #006_a885f926d9 feel-duration-function_006_a885f926d9
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #007_2f0ad399f3 feel-duration-function_007_2f0ad399f3
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #008_747f56743d feel-duration-function_008_747f56743d
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #009_cef3c1ed26 feel-duration-function_009_cef3c1ed26
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #010_5b452a4975 feel-duration-function_010_5b452a4975
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #011_2169615b94 feel-duration-function_011_2169615b94
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #012_2affe6d169 feel-duration-function_012_2affe6d169
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #013_0e8e26513c feel-duration-function_013_0e8e26513c
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #014_598ba6fabd feel-duration-function_014_598ba6fabd
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #015_ce2cb09830 feel-duration-function_015_ce2cb09830
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #016_af3e37fdbd feel-duration-function_016_af3e37fdbd
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #017_4f4549fda4 feel-duration-function_017_4f4549fda4
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #018_f5ec776811 feel-duration-function_018_f5ec776811
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #019_2e6885755a feel-duration-function_019_2e6885755a
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #020_af58b3766e feel-duration-function_020_af58b3766e
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #021_e48e70ad4e feel-duration-function_021_e48e70ad4e
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #022_668f24bed7 feel-duration-function_022_668f24bed7
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #023_6fc32087db feel-duration-function_023_6fc32087db
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #024_fd7000d72f feel-duration-function_024_fd7000d72f
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #025_f8ffbd8658 feel-duration-function_025_f8ffbd8658
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #026_e6c47f0cae feel-duration-function_026_e6c47f0cae
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #027_33b7fb8704 feel-duration-function_027_33b7fb8704
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #028_971b94f16d feel-duration-function_028_971b94f16d
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #029_1a12a226cc feel-duration-function_029_1a12a226cc
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #030_afac0f2062 feel-duration-function_030_afac0f2062
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #031_1ddad718b9 feel-duration-function_031_1ddad718b9
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #032_72c46a9ec9 feel-duration-function_032_72c46a9ec9
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #033_5d1540abaf feel-duration-function_033_5d1540abaf
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #034_aa9cbb21a6 feel-duration-function_034_aa9cbb21a6
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #035_93eef01ae7 feel-duration-function_035_93eef01ae7
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #036_5f2775875e feel-duration-function_036_5f2775875e
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #037_8c9ea9c0e6 feel-duration-function_037_8c9ea9c0e6
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #038_67dc4c254c feel-duration-function_038_67dc4c254c
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #039_4aa0b67804 feel-duration-function_039_4aa0b67804
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #040_7d8eae461f feel-duration-function_040_7d8eae461f
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #041_264bc9d682 feel-duration-function_ErrorCase_041_264bc9d682
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #042_59a0000245 feel-duration-function_ErrorCase_042_59a0000245
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #043_253815dc6c feel-duration-function_ErrorCase_043_253815dc6c
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #044_f3b338d877 feel-duration-function_ErrorCase_044_f3b338d877
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #045_2ffcc37801 feel-duration-function_ErrorCase_045_2ffcc37801
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #046_eb637de5f6 feel-duration-function_ErrorCase_046_eb637de5f6
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #047_3210c46a5a feel-duration-function_ErrorCase_047_3210c46a5a
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #048_ab6244f767 feel-duration-function_ErrorCase_048_ab6244f767
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #049_2225b503a0 feel-duration-function_ErrorCase_049_2225b503a0
-compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #050_dd2ef33bbd feel-duration-function_ErrorCase_050_dd2ef33bbd
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #001_f2c6cd6866 feel-duration-function_ErrorCase_001_f2c6cd6866	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #002_ddca5756ca feel-duration-function_ErrorCase_002_ddca5756ca	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #003_951e1d1c31 feel-duration-function_003_951e1d1c31	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #004_6b31e7cde7 feel-duration-function_004_6b31e7cde7	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #005_202d863d07 feel-duration-function_005_202d863d07	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #006_a885f926d9 feel-duration-function_006_a885f926d9	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #007_2f0ad399f3 feel-duration-function_007_2f0ad399f3	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #008_747f56743d feel-duration-function_008_747f56743d	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #009_cef3c1ed26 feel-duration-function_009_cef3c1ed26	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #010_5b452a4975 feel-duration-function_010_5b452a4975	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #011_2169615b94 feel-duration-function_011_2169615b94	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #012_2affe6d169 feel-duration-function_012_2affe6d169	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #013_0e8e26513c feel-duration-function_013_0e8e26513c	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #014_598ba6fabd feel-duration-function_014_598ba6fabd	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #015_ce2cb09830 feel-duration-function_015_ce2cb09830	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #016_af3e37fdbd feel-duration-function_016_af3e37fdbd	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #017_4f4549fda4 feel-duration-function_017_4f4549fda4	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #018_f5ec776811 feel-duration-function_018_f5ec776811	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #019_2e6885755a feel-duration-function_019_2e6885755a	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #020_af58b3766e feel-duration-function_020_af58b3766e	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #021_e48e70ad4e feel-duration-function_021_e48e70ad4e	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #022_668f24bed7 feel-duration-function_022_668f24bed7	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #023_6fc32087db feel-duration-function_023_6fc32087db	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #024_fd7000d72f feel-duration-function_024_fd7000d72f	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #025_f8ffbd8658 feel-duration-function_025_f8ffbd8658	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #026_e6c47f0cae feel-duration-function_026_e6c47f0cae	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #027_33b7fb8704 feel-duration-function_027_33b7fb8704	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #028_971b94f16d feel-duration-function_028_971b94f16d	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #029_1a12a226cc feel-duration-function_029_1a12a226cc	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #030_afac0f2062 feel-duration-function_030_afac0f2062	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #031_1ddad718b9 feel-duration-function_031_1ddad718b9	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #032_72c46a9ec9 feel-duration-function_032_72c46a9ec9	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #033_5d1540abaf feel-duration-function_033_5d1540abaf	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #034_aa9cbb21a6 feel-duration-function_034_aa9cbb21a6	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #035_93eef01ae7 feel-duration-function_035_93eef01ae7	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #036_5f2775875e feel-duration-function_036_5f2775875e	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #037_8c9ea9c0e6 feel-duration-function_037_8c9ea9c0e6	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #038_67dc4c254c feel-duration-function_038_67dc4c254c	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #039_4aa0b67804 feel-duration-function_039_4aa0b67804	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #040_7d8eae461f feel-duration-function_040_7d8eae461f	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #041_264bc9d682 feel-duration-function_ErrorCase_041_264bc9d682	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #042_59a0000245 feel-duration-function_ErrorCase_042_59a0000245	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #043_253815dc6c feel-duration-function_ErrorCase_043_253815dc6c	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #044_f3b338d877 feel-duration-function_ErrorCase_044_f3b338d877	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #045_2ffcc37801 feel-duration-function_ErrorCase_045_2ffcc37801	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #046_eb637de5f6 feel-duration-function_ErrorCase_046_eb637de5f6	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #047_3210c46a5a feel-duration-function_ErrorCase_047_3210c46a5a	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #048_ab6244f767 feel-duration-function_ErrorCase_048_ab6244f767	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #049_2225b503a0 feel-duration-function_ErrorCase_049_2225b503a0	graph
+compliance-level-3/1120-feel-duration-function/1120-feel-duration-function-test-01.xml #050_dd2ef33bbd feel-duration-function_ErrorCase_050_dd2ef33bbd	graph
 compliance-level-3/1121-feel-years-and-months-duration-function/1121-feel-years-and-months-duration-function-test-01.xml #001_b24a0c91f2 feel-years-and-months-duration-function_ErrorCase_001_b24a0c91f2	graph
 compliance-level-3/1121-feel-years-and-months-duration-function/1121-feel-years-and-months-duration-function-test-01.xml #002_4e7651ae0e feel-years-and-months-duration-function_ErrorCase_002_4e7651ae0e	graph
 compliance-level-3/1121-feel-years-and-months-duration-function/1121-feel-years-and-months-duration-function-test-01.xml #003_0886738d31 feel-years-and-months-duration-function_ErrorCase_003_0886738d31	graph
@@ -3050,6 +3140,20 @@ compliance-level-3/1121-feel-years-and-months-duration-function/1121-feel-years-
 compliance-level-3/1121-feel-years-and-months-duration-function/1121-feel-years-and-months-duration-function-test-01.xml #034_c2cc06724c feel-years-and-months-duration-function_034_c2cc06724c	graph
 compliance-level-3/1121-feel-years-and-months-duration-function/1121-feel-years-and-months-duration-function-test-01.xml #035_dc05f9555d feel-years-and-months-duration-function_035_dc05f9555d	graph
 compliance-level-3/1121-feel-years-and-months-duration-function/1121-feel-years-and-months-duration-function-test-01.xml #036_f8c8b02ba3 feel-years-and-months-duration-function_036_f8c8b02ba3	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #after after	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #before before	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #coincides coincides	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #during during	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #finished by finished by	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #finishes finishes	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #includes includes	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #met by met by	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #mmets meets	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #overlaps after overlaps after	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #overlaps before overlaps before	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #overlaps overlaps	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #started by started by	graph
+compliance-level-3/1130-feel-interval/1130-feel-interval-test-01.xml #starts starts	graph
 compliance-level-3/1131-feel-function-invocation/1131-feel-function-invocation-test-01.xml #002 decision002	graph
 compliance-level-3/1131-feel-function-invocation/1131-feel-function-invocation-test-01.xml #003 decision003	graph
 compliance-level-3/1131-feel-function-invocation/1131-feel-function-invocation-test-01.xml #004 decision004	graph
@@ -3161,30 +3265,36 @@ compliance-level-3/1145-feel-context-function/1145-feel-context-function-test-01
 compliance-level-3/1145-feel-context-function/1145-feel-context-function-test-01.xml #015 decision015	graph
 compliance-level-3/1145-feel-context-function/1145-feel-context-function-test-01.xml #016 decision016	graph
 compliance-level-3/1145-feel-context-function/1145-feel-context-function-test-01.xml #017 decision017	graph
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #001 decision001
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #002 decision002
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #003 decision003
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #003_a decision003_a
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #004 decision004
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #005 decision005
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #006 decision006
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #007 decision007
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #008 decision008
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #009 decision009
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #010 decision010
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #011 decision011
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #012 decision012
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #013 decision013
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested001 nested001
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested001_a nested001_a
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested002 nested002
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested003 nested003
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested004 nested004
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested005 nested005
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested006 nested006
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested007 nested007
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested008 nested008
-compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested009 nested009
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #001 decision001	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #002 decision002	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #003 decision003	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #003_a decision003_a	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #004 decision004	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #005 decision005	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #006 decision006	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #007 decision007	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #008 decision008	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #009 decision009	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #010 decision010	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #011 decision011	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #012 decision012	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #013 decision013	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #014 decision014	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #015 decision015	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #016 decision016	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested001 nested001	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested001_a nested001_a	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested002 nested002	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested003 nested003	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested004 nested004	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested005 nested005	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested006 nested006	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested007 nested007	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested008 nested008	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested009 nested009	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested010 nested010	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested011 nested011	graph
+compliance-level-3/1146-feel-context-put-function/1146-feel-context-put-function-test-01.xml #nested012 nested012	graph
 compliance-level-3/1147-feel-context-merge-function/1147-feel-context-merge-function-test-01.xml #001 decision001	graph
 compliance-level-3/1147-feel-context-merge-function/1147-feel-context-merge-function-test-01.xml #001_a decision001_a	graph
 compliance-level-3/1147-feel-context-merge-function/1147-feel-context-merge-function-test-01.xml #002 decision002	graph
@@ -3203,6 +3313,25 @@ compliance-level-3/1148-feel-now-function/1148-feel-now-function-test-01.xml #00
 compliance-level-3/1148-feel-now-function/1148-feel-now-function-test-01.xml #002 decision002	graph
 compliance-level-3/1149-feel-today-function/1149-feel-today-function-test-01.xml #001 decision001	graph
 compliance-level-3/1149-feel-today-function/1149-feel-today-function-test-01.xml #002 decision002	graph
+compliance-level-3/1150-boxed-conditional/1150-boxed-conditional-test-01.xml #001 decision001	graph
+compliance-level-3/1150-boxed-conditional/1150-boxed-conditional-test-01.xml #002 decision002	graph
+compliance-level-3/1150-boxed-conditional/1150-boxed-conditional-test-01.xml #003 decision003	graph
+compliance-level-3/1151-boxed-filter/1151-boxed-filter-test-01.xml #001 decision001	graph
+compliance-level-3/1151-boxed-filter/1151-boxed-filter-test-01.xml #002 decision002	graph
+compliance-level-3/1151-boxed-filter/1151-boxed-filter-test-01.xml #004 decision004	graph
+compliance-level-3/1151-boxed-filter/1151-boxed-filter-test-01.xml #005 decision005	graph
+compliance-level-3/1152-boxed-for/1152-boxed-for-test-01.xml #001 decision001	graph
+compliance-level-3/1152-boxed-for/1152-boxed-for-test-01.xml #002 decision002	graph
+compliance-level-3/1153-boxed-some/1153-boxed-some-test-01.xml #001 decision001	graph
+compliance-level-3/1153-boxed-some/1153-boxed-some-test-01.xml #002 decision002	graph
+compliance-level-3/1153-boxed-some/1153-boxed-some-test-01.xml #005 decision005	graph
+compliance-level-3/1153-boxed-some/1153-boxed-some-test-01.xml #006 decision006	graph
+compliance-level-3/1153-boxed-some/1153-boxed-some-test-01.xml #007 decision007	graph
+compliance-level-3/1154-boxed-every/1154-boxed-every-test-01.xml #001 decision001	graph
+compliance-level-3/1154-boxed-every/1154-boxed-every-test-01.xml #002 decision002	graph
+compliance-level-3/1154-boxed-every/1154-boxed-every-test-01.xml #005 decision005	graph
+compliance-level-3/1154-boxed-every/1154-boxed-every-test-01.xml #006 decision006	graph
+compliance-level-3/1154-boxed-every/1154-boxed-every-test-01.xml #007 decision007	graph
 compliance-level-3/1155-list-replace-function/1155-list-replace-function-test-01.xml #001 decision001	graph
 compliance-level-3/1155-list-replace-function/1155-list-replace-function-test-01.xml #002 decision002	graph
 compliance-level-3/1155-list-replace-function/1155-list-replace-function-test-01.xml #003 decision003	graph
@@ -3281,7 +3410,11 @@ compliance-level-3/1156-range-function/1156-range-function-test-01.xml #024 deci
 compliance-level-3/1156-range-function/1156-range-function-test-01.xml #025 decision025	graph
 compliance-level-3/1156-range-function/1156-range-function-test-01.xml #026 decision026	graph
 compliance-level-3/1156-range-function/1156-range-function-test-01.xml #027 decision027	graph
-compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #001 To Singleton List
-compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #002 From Singleton List
-compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #002_a From Singleton List Error
-compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #003 From Date To Date and Time
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #001 To Singleton List	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #002 From Singleton List	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #002_a From Singleton List Error	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #003 From Date To Date and Time	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #010 Implicit Conversions CE	graph
+compliance-level-3/1157-implicit-conversions/1157-implicit-conversions-test-01.xml #011 Implicit Conversions FUNCT	graph
+compliance-level-3/1161-boxed-list-expression/1161-boxed-list-expression-test-01.xml #001 BList	graph
+compliance-level-3/1161-boxed-list-expression/1161-boxed-list-expression-test-01.xml #002 BList	graph

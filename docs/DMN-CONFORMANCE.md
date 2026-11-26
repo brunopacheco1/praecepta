@@ -57,6 +57,9 @@ release meant to remove it.
 | 31 | [`string()` of a list, a context, a range or a function](#31-string-of-a-list-a-context-a-range-or-a-function) | open |
 | 32 | [The zone of `now()` and the day of `today()`](#32-the-zone-of-now-and-the-day-of-today) | open |
 | 33 | [Real numbers the TCK states to some digits](#33-real-numbers-the-tck-states-to-some-digits) | open |
+| 34 | [A boxed condition that is not a boolean](#34-a-boxed-condition-that-is-not-a-boolean) | decided by the TCK for a value that is not a boolean; open for null |
+| 35 | [A business knowledge model that invokes itself](#35-a-business-knowledge-model-that-invokes-itself) | open |
+| 36 | [A decision service nothing invokes, and a decision without logic nothing requires](#36-a-decision-service-nothing-invokes-and-a-decision-without-logic-nothing-requires) | open |
 
 How Praecepta returns DMN's null result, which is a choice of representation rather than of semantics,
 is [at the end](#how-a-null-result-is-returned).
@@ -534,7 +537,45 @@ integrations alike.
   34 digits. `praecepta-tck` takes a number the kit writes to at least 8 significant digits as the real number it
   states: a result of more decimals that is less than one unit of its last digit away from it passes. A number of fewer
   digits, such as `0.33`, is compared exactly. The two payments of `0008-LX-arithmetic` that the kit states wrongly
-  fail.
+  fail, and so, since 0.10.0, do the payments of the same formula that a business knowledge model computes, which the
+  kit states as a double does (`0009-invocation-arithmetic`, `0003-iteration`, `0004-lending`,
+  `0005-literal-invocation`, `0014-loan-comparison`).
+
+## 34. A boxed condition that is not a boolean
+- **DMN 1.5.** A boxed conditional, filter and iterator (10.2.7 to 10.2.9) are FEEL's `if`, filter, `some` and `every`
+  in boxes. In FEEL text, `if` gives its `else` value for a condition that is not true, so `if "abc" then 1 else 2` is
+  `2`, and a filter or quantifier counts only `true`.
+- **TCK.** The boxed forms are stricter: a conditional whose `if` is `"abc"`, a filter whose `match` is a string for
+  some element, and `some` or `every` whose `satisfies` is a string for some element are null, with an error
+  (`1150-boxed-conditional` to `1154-boxed-every`), even where another element satisfies `some`. It has no boxed
+  condition that is null.
+- **Praecepta (since 0.10.0, [#118](https://github.com/brunopacheco1/praecepta/issues/118)).** A boxed condition that
+  is neither a boolean nor null makes its construct null, with an error; a null condition is not true and gives no
+  error, as in FEEL. A boxed filter's `match` that is a number is not a boolean either: the filter is null, with an
+  error, where a filter in FEEL text selects the element at that position (case 21). The FEEL forms are unchanged.
+
+## 35. A business knowledge model that invokes itself
+- **DMN 1.5.** A business knowledge model reads its parameters and the business knowledge models its knowledge
+  requirements name (6.3.10, 7.3.4); it does not say whether one may name itself, or whether such requirements may form
+  a cycle, as decisions' information requirements may not.
+- **TCK.** It has no such model.
+- **Praecepta (since 0.10.0, [#118](https://github.com/brunopacheco1/praecepta/issues/118)).** A business knowledge
+  model's own name is in scope in its logic, as an entry's is in a context it defines a function in (10.3.2.6), so it may
+  invoke itself, and business knowledge models that require one another in a cycle are not reported. Each is a
+  function made once, so a cycle only recurses when invoked, and an invocation that never ends is null, with an error,
+  beyond the evaluation's limits (case 23).
+
+## 36. A decision service nothing invokes, and a decision without logic nothing requires
+- **DMN 1.5.** A decision service (6.3.9) is an invocable that encapsulates decisions; a decision's logic is optional
+  (6.3.7), as for a decision a person makes.
+- **TCK.** `0087-chapter-11-example` has two decision services that nothing invokes, and a decision without logic
+  that no decision requires; its decision tables are evaluated from the test cases' input data alone.
+  `0088-no-decision-logic` gives the value of a decision without logic that others require.
+- **Praecepta (since 0.10.0).** A decision service that nothing in the model invokes changes no value, nor does a
+  decision without logic that no decision requires: `DmnReader.readModel` leaves both out of the model it reads, which
+  `DmnWriter` therefore does not write. A model that invokes a decision service, or requires a decision without
+  logic, is rejected, as decision services and such decisions are planned for 0.11
+  ([#119](https://github.com/brunopacheco1/praecepta/issues/119)).
 
 ## Known deviations
 Where DMN 1.5 or the TCK decides and Praecepta does otherwise. Each is reported or documented where it shows,
