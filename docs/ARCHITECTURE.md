@@ -128,12 +128,12 @@ table and `DecisionGraph` for a whole model. The packages form layers: the root 
 flowchart TB
     caller["<b>Application, compiler<br/>or integration</b>"]
     subgraph engine["praecepta-engine"]
-        tengine["<b>Table engine</b><br/>PraeceptaEngine, TableExpressions,<br/>InputStrategy, OutputStrategy"]
+        tengine["<b>Table engine</b><br/>PraeceptaEngine, TableColumns,<br/>DeferredCells, ComputedOutputs,<br/>HitPolicies, TableExpressions"]
         index["<b>Bitset index</b><br/>BitsetIndex, ColumnIndex, ListColumn,<br/>Masks, PrimitiveKeys, OpenIntervals"]
         analysis["<b>Table analysis</b><br/>TableAnalysis, ListAnalysis,<br/>Completeness, ValidationReport"]
-        dgraph["<b>Decision graph</b><br/>DecisionGraph, GraphAnalysis,<br/>GraphNodes, GraphValues, ImportedModels"]
+        dgraph["<b>Decision graph</b><br/>DecisionGraph, GraphAnalysis and its phases,<br/>GraphNodes, GraphValues, ImportedModels"]
         feel["<b>FEEL</b> (feel)<br/>CellParser, FeelUnaryTests, FeelExpression,<br/>FeelLexer, FeelParser, Node,<br/>BuiltInFunctions"]
-        dmn["<b>DMN XML</b> (dmn)<br/>DmnReader, DmnWriter"]
+        dmn["<b>DMN XML</b> (dmn)<br/>DmnReader, DmnWriter<br/>and their readers and writers"]
         model["<b>Model</b> (beans)<br/>DecisionTable, DecisionModel,<br/>DecisionLogic, Praeceptum"]
     end
     caller --> tengine
@@ -166,6 +166,20 @@ flowchart TB
 | FEEL | Parses cells into unary tests, and FEEL text into a tree of nodes that it types and evaluates. Holds the built-in functions. |
 | DMN XML | Reads DMN 1.1 to 1.5 into the model, and writes the model as DMN. Uses the JDK's XML parser with DTDs and external entities off. |
 | Model | Plain records with no behaviour: tables, rules, models, decisions and their logic. |
+
+Each entry point is a short class that delegates to package-private classes, one per concern. To find your
+way:
+
+| To learn how... | Start at | Then read |
+|---|---|---|
+| an engine is built from a table | `PraeceptaEngine`'s constructor | `TableColumns` (types, cells, order), `HitPolicies` (bit order, aggregation), `ComputedOutputs` |
+| an input is evaluated | `PraeceptaEngine.evaluate` | `BitsetIndex.match`, `ColumnIndex.maskFor`, `DeferredCells` |
+| a table is analysed | `TableAnalysis` | `ListAnalysis`, `Completeness` |
+| a graph is checked | `GraphAnalysis`'s constructor, which lists the phases | `GraphRequirements`, `GraphCycles`, `GraphTypes`, `TableReadChecks`, `GraphBlocking` |
+| a decision of a graph is evaluated | `DecisionGraph.evaluate` | `GraphNodes`, `GraphValues` |
+| a DMN file is read | `DmnReader` | `ModelReader`, `TableReader`, `RuleReader`, `ExpressionReader`, `ItemDefinitions`, `DmnXml` |
+| a model is written as DMN | `DmnWriter` | `TableWriter`, `ExpressionWriter`, `TypeWriter` |
+| FEEL text is parsed and evaluated | `FeelExpression` | `FeelLexer`, `FeelParser`, `Node`, `BuiltInFunctions` |
 
 ### praecepta-compiler and the build plugins
 
@@ -337,7 +351,7 @@ sequenceDiagram
     App->>R: readModel(dmn)
     R-->>App: DecisionModel
     App->>G: build
-    G->>A: resolve names, find cycles, order, type
+    G->>A: check requirements, find cycles, order, type
     A-->>G: slots, order, ValidationReport
     G->>N: one node per decision: a table engine or a FEEL expression
     App->>G: evaluate("Monthly Limit", inputData)
@@ -419,7 +433,7 @@ Three cases need more than one mask per value:
   both ways (DMN 1.5, Table 54).
 - **FEEL cells beyond literals, comparisons and intervals** (`> Limit * 2`) are invisible to the index,
   which treats them as "any value". The engine applies them afterwards, to the rules the index matched
-  (`TableExpressions`).
+  (`DeferredCells`).
 
 ## DMN features and where they live
 For what a feature means, follow the links to the specification and the TCK. The TCK test cases are in
@@ -435,7 +449,7 @@ For what a feature means, follow the links to the specification and the TCK. The
 | Boxed expressions | 10.2 | `0040-singlenestedcontext`, `1150-boxed-conditional`, `1151-boxed-filter` | `DecisionLogic`, `BoxedComposer` |
 | Business knowledge models | 6.3 | `0009-invocation-arithmetic`, `0038-dt-on-bkm-explicit-params` | `GraphNodes` |
 | Decision services | 6.3 | `0085-decision-services` | `DecisionGraph.evaluateService` |
-| Imports | 6.3.3 | `0086-import`, `1160-multiple-imports` | `DmnReader.readModel`, `ImportedModels` |
+| Imports | 6.3.3 | `0086-import`, `1160-multiple-imports` | `ModelReader`, `ImportedModels` |
 | External functions | 10.3.2.13.3 | `0076-feel-external-java` | Rejected by design |
 
 Where DMN 1.5 and the TCK leave a case open, [DMN-CONFORMANCE.md](DMN-CONFORMANCE.md) records what
