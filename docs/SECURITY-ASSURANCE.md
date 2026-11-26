@@ -93,8 +93,8 @@ tables to load and how strictly to check them.
   limits; the engine has no
   runtime dependencies.
 - **Fail-safe defaults:** unsupported DMN features, unknown cell syntax and undeclared values are
-  rejected, not ignored; the only elements left out are a decision service nothing invokes and a decision without
-  logic nothing requires (since 0.10), which change no value evaluated. XML features are off unless needed.
+  rejected, not ignored; the only element left out is a decision without logic nothing requires (since 0.10), which
+  changes no value evaluated. XML features are off unless needed.
 - **Complete mediation:** every table goes through the same parser and validation, whatever its
   source.
 - **Least privilege and least common mechanism:** no network, file (except reading the tables the

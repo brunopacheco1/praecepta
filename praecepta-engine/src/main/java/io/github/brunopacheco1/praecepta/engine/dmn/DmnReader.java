@@ -177,17 +177,19 @@ public final class DmnReader {
      * declares for it (the variable's for a single output, its component's of the output's name for several), else of
      * the type of its output entries and default, when they are all literals of one type ({@code 10} is a number, as
      * FEEL reads it); else they are strings, as {@link #read(InputStream, String)} reads them. A
-     * requirement names a decision, an input data or a business knowledge model of the model by its {@code href}
+     * requirement names a decision, an input data, a business knowledge model or a decision service of the model by its
+     * {@code href}
      * ({@code #id}); one that refers to
      * no element of the model is kept as the {@code id} it refers to, which {@code DecisionGraph} reports as a missing
      * requirement. Knowledge sources and authority requirements, which do not take part in evaluation, text annotations,
-     * groups and diagrams are ignored, and so are a decision service that nothing in the model invokes and a decision
-     * without logic that no decision requires, which change no value Praecepta evaluates. The model's item definitions are
+     * groups and diagrams are ignored, and so is a decision without logic that no decision requires, which changes no
+     * value Praecepta evaluates. Decision services are read with their output, encapsulated and input decisions and input
+     * data, by reference, and the function type their variable declares. The model's item definitions are
      * its {@linkplain DecisionModel#types() types}, by name, which a literal expression's {@code instance of} may name; a
      * function item among them is a function type, and one with neither a base type nor components is any type.
      *
-     * <p>What Praecepta does not evaluate yet is rejected, naming the element and the release that plans it: invoking a
-     * decision service, a decision without logic that another decision requires, imports and external functions (in
+     * <p>What Praecepta does not evaluate yet is rejected, naming the element and the release that plans it: a decision
+     * without logic that another decision requires, imports and external functions (in
      * FEEL, or a boxed function definition in Java or PMML), planned for 0.11 (#119).
      *
      * @throws InvalidDecisionTableException if the model cannot be read (a literal expression that is not FEEL among

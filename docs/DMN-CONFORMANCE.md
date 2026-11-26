@@ -59,7 +59,8 @@ release meant to remove it.
 | 33 | [Real numbers the TCK states to some digits](#33-real-numbers-the-tck-states-to-some-digits) | open |
 | 34 | [A boxed condition that is not a boolean](#34-a-boxed-condition-that-is-not-a-boolean) | decided by the TCK for a value that is not a boolean; open for null |
 | 35 | [A business knowledge model that invokes itself](#35-a-business-knowledge-model-that-invokes-itself) | open |
-| 36 | [A decision service nothing invokes, and a decision without logic nothing requires](#36-a-decision-service-nothing-invokes-and-a-decision-without-logic-nothing-requires) | open |
+| 36 | [A decision service nothing invokes, and a decision without logic nothing requires](#36-a-decision-service-nothing-invokes-and-a-decision-without-logic-nothing-requires) | open; decision services read since 0.11.0 |
+| 37 | [What a decision service evaluates, and in what order it takes its arguments](#37-what-a-decision-service-evaluates-and-in-what-order-it-takes-its-arguments) | decided by the TCK for the order; open for decisions it does not list |
 
 How Praecepta returns DMN's null result, which is a choice of representation rather than of semantics,
 is [at the end](#how-a-null-result-is-returned).
@@ -576,6 +577,26 @@ integrations alike.
   `DmnWriter` therefore does not write. A model that invokes a decision service, or requires a decision without
   logic, is rejected, as decision services and such decisions are planned for 0.11
   ([#119](https://github.com/brunopacheco1/praecepta/issues/119)).
+- **Praecepta (since 0.11.0).** Decision services are read, and evaluated when invoked (case 37), whether anything
+  invokes them or not. A decision without logic that no decision requires is still left out, and one that another
+  requires still rejected.
+
+## 37. What a decision service evaluates, and in what order it takes its arguments
+- **DMN 1.5.** A decision service (6.3.9) has output decisions, encapsulated decisions, input decisions and input
+  data; invoked, it evaluates its output decisions from its inputs, and its value is its one output decision's, or a
+  context of them.
+- **TCK.** `0085-decision-services` invokes services positionally with their input data first, then their input
+  decisions, whatever order the service lists them in (`decisionService_011("A", "B", "C", "D")`), and by parameter name;
+  an input decision is not evaluated, its argument taking its place ("I never get invoked"), and invoking a service
+  leaves the model's own decisions and input data as they are. An argument of another type than its parameter's makes
+  the invocation null, with an error (`decision_007_1`).
+- **Praecepta (since 0.11.0, [#119](https://github.com/brunopacheco1/praecepta/issues/119)).** As the TCK has it. A
+  service evaluates its output decisions and every decision they require, directly or not, but its input decisions,
+  whether it lists them as encapsulated or not: one it does not list is evaluated as an encapsulated decision would be.
+  One of those that requires input data the service does not take could only read null, and is reported
+  (`MISSING_REQUIREMENT`), so the service, and what invokes it, is not evaluated. Arguments are bound to their
+  parameters' types as a function's are (10.3.2.9.4), and the service's value to the output type of the function type
+  its variable declares, if any.
 
 ## Known deviations
 Where DMN 1.5 or the TCK decides and Praecepta does otherwise. Each is reported or documented where it shows,

@@ -74,7 +74,7 @@ public final class Decisions {
      * ({@code DmnReader.readModel}): if one of its decisions requires another decision or business knowledge, or is not
      * a decision table, its decisions are evaluated through its decision requirements graph ({@link GraphModel}), whose
      * validation report is checked too; otherwise each of its decision tables is a decision of its own, evaluated alone.
-     * A model that uses what Praecepta does not evaluate yet (invoked decision services, imports, external functions),
+     * A model that uses what Praecepta does not evaluate yet (imports, external functions),
      * or that is not a well-formed decision model (two elements of one
      * name, such as a table with a column of its own name as {@code DmnWriter} writes it, a decision without logic),
      * which a file of decision tables never had to be, has its decision tables read alone, as before

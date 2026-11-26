@@ -96,9 +96,11 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * evaluated. A literal expression is FEEL (DMN 1.5, chapter 10; {@link io.github.brunopacheco1.praecepta.engine.feel.FeelExpression}):
  * where FEEL defines no value it gives null, and {@link #evaluateWithErrors} gives the errors FEEL reported with the
  * value. A business knowledge model is a function made once, when the graph is built, which may invoke those it
- * requires, and itself. A graph is immutable and thread-safe.
+ * requires, and itself. A decision service (since 0.11) is a function made once too, of its input data and input
+ * decisions, whose invocation evaluates its output decisions from its arguments ({@link #evaluateService} invokes one
+ * from outside). A graph is immutable and thread-safe.
  *
- * <p>Decision services, imports and FEEL's external functions are planned for 0.11
+ * <p>Imports and FEEL's external functions are planned for 0.11
  * (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>); a model that uses them is rejected when it
  * is read.
  */

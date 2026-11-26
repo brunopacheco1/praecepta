@@ -11,6 +11,28 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+### Added
+- **Decision services** ([#119](https://github.com/brunopacheco1/praecepta/issues/119)):
+  `DecisionModel.decisionServices()` and `DecisionModel.DecisionService`, read by `DmnReader.readModel`, written back
+  by `DmnWriter.write`, and evaluated by a `DecisionGraph`. A decision service is a function of its input data, then its
+  input decisions, which decisions and business knowledge models requiring it invoke by name, positionally or by
+  parameter name; invoked, it evaluates its output decisions, and the decisions they require, from its arguments,
+  without evaluating its input decisions or touching the model's own values, and gives its one output's value, or a
+  context of them all, bound to the output type of the function type its variable declares.
+  `DecisionGraph.evaluateService` invokes one from outside, `decisionServices()` lists them and
+  `DecisionGraph.Builder.decisionService` adds one in code. The graph reports a service that evaluates a decision
+  reading input data it does not take ([DMN conformance](docs/DMN-CONFORMANCE.md), case 37).
+- **`FeelExpression.function`**: a function whose body FEEL does not evaluate itself, as a decision service's is.
+
+### Changed
+- **`DecisionModel` has a component more**, `decisionServices`, before `types`; the constructors without it remain.
+  **Upgrade note:** a record pattern over `DecisionModel` takes the new component.
+- **A model that invokes a decision service now loads**: `DmnReader.readModel`, `DecisionGraph`, the build plugins and
+  the framework integrations read and evaluate it, where they rejected it with an `UnsupportedFeatureException` naming
+  0.11, and a decision service that nothing invokes is read where it was left out. **Upgrade note:** such a file's
+  decisions are evaluated through its graph, where its decision tables were read alone.
+- **The DMN TCK**: 3,467 of its 3,511 result nodes pass (98.7 %, from 3,409); the 11 failures are those of 0.10.
+
 ## [0.10.0] - 2026-11-26
 
 Boxed expressions and business knowledge models, the fourth step of Praecepta's plan to grow from a decision-table

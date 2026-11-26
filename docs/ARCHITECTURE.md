@@ -220,10 +220,11 @@ component a path names), an output by the decision's variable (its component of 
 outputs), else by the one type its output entries give, as FEEL types them, and else not at all (`typed` false: each
 entry gives its own type). What later releases bring is rejected
 whole with an `UnsupportedFeatureException`, whose `release()` and `issue()` name the release that plans it, so that
-callers fall back by its type, never by its message: invoking a decision service, requiring a decision without logic,
-imports, external functions and references into other models (#119). Knowledge sources, authority requirements, annotations and diagrams take no part
-in evaluation and are ignored, and so are a decision service that nothing invokes and a decision without logic that no
-decision requires ([DMN conformance](DMN-CONFORMANCE.md), case 36). `DmnWriter.write(DecisionModel)` writes DMN 1.3
+callers fall back by its type, never by its message: requiring a decision without logic, imports, external functions
+and references into other models (#119). Knowledge sources, authority requirements, annotations and diagrams take no
+part in evaluation and are ignored, and so is a decision without logic that no decision requires
+([DMN conformance](DMN-CONFORMANCE.md), case 36). Decision services (since 0.11) are read with their output,
+encapsulated and input decisions and input data, by reference. `DmnWriter.write(DecisionModel)` writes DMN 1.3
 with ids by position (`input_data_0`, `decision_0`, and `decision_0_` before the ids of a decision's table, so the
 tables of a model never share an id), item definitions for list and context types, and literal expressions as
 written; a model it writes reads back as the same model, and writes the same again. `read(dmn)`, `read(dmn, decision)`

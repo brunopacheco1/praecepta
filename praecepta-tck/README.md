@@ -58,10 +58,13 @@ decision whose value the test case gives is input data instead, as the kit means
 decision replaced by an input data of its type. Input data of a simple type are given as text, as the integrations
 give them; a structured one as a map of its components, a list as a list; one of no declared type typed by the
 test file's `xsi:type`. It takes a node when the model as a whole is one `readModel` reads and the graph evaluates
-the decision: what is not supported is what the engine rejects. A model that invokes a decision service, imports
-another model, defines an external function or requires a decision without logic is not read, and a decision the
+the decision: what is not supported is what the engine rejects. A model that imports another model, defines an
+external function or requires a decision without logic is not read, and a decision the
 graph's validation report blocks is not evaluated. Boxed expressions, business knowledge models and the decision tables
-within them are read and evaluated since 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)). Literal expressions, and decision tables' input expressions, input entries and output entries, are the
+within them are read and evaluated since 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)), and
+decision services since 0.11 ([#119](https://github.com/brunopacheco1/praecepta/issues/119)): a test case that invokes a
+service (`type="decisionService"`), or a result node named after one, is the service invoked with the test case's
+values as its arguments (`DecisionGraph.evaluateService`). Literal expressions, and decision tables' input expressions, input entries and output entries, are the
 full FEEL language since 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)), with its built-in
 functions since 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)). Where a decision's value is null and its own logic
 reported an error (`DecisionGraph.evaluateWithErrors`), the node counts as an error where the kit expects one
@@ -155,10 +158,10 @@ expressions as literal expression decisions (see *How a model is evaluated*), wh
 ## Decision requirement graphs
 `DecisionGraph` (0.7, [#14](https://github.com/brunopacheco1/praecepta/issues/14)) evaluates whole models whose
 decisions are decision tables and literal expressions, in the full FEEL language since 0.8, and boxed expressions
-and business knowledge models since 0.10, and `GraphEvaluator` scores it. Of the pinned commit's 156 model files of
-compliance levels 2 and 3, `DmnReader.readModel` reads 142; the rest are rejected for what 0.11 brings (#119): imports
-and references into other models (9 files), invoking a decision service (3), an external function (1) and a decision
-without logic that another requires (1). Models it does not read are evaluated decision by decision.
+and business knowledge models since 0.10, decision services since 0.11, and `GraphEvaluator` scores it. Of the pinned
+commit's 156 model files of compliance levels 2 and 3, `DmnReader.readModel` reads 145; the rest are rejected for what
+0.11 still has to bring (#119): imports and references into other models (9 files), an external function (1) and a
+decision without logic that another requires (1). Models it does not read are evaluated decision by decision.
 
 ## The TCK files
 `src/test/resources/tck` holds every test directory of compliance levels 2 and 3 (their DMN models and test
