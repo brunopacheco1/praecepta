@@ -97,10 +97,8 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
         </ul>
         <p class="note">
           JMH on an Apple M2 Pro, every engine reading the same DMN file and checked to give the same
-          answers. Every log and raw result is
-          <a href="https://github.com/brunopacheco1/praecepta/tree/main/praecepta-benchmarks/results">published</a>,
-          including where Praecepta 0.1.0 was slower: building large FIRST and PRIORITY tables
-          (<a href="https://github.com/brunopacheco1/praecepta/issues/29">#29</a>, fixed in 0.2).
+          answers. Measured in November 2026 with Praecepta 0.2, on decision tables. Every log and raw result is
+          <a href="https://github.com/brunopacheco1/praecepta/tree/main/praecepta-benchmarks/results">published</a>.
         </p>
       </div>
     </section>
@@ -218,13 +216,13 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
             stops the application from starting, or Quarkus from building it.</p>
           <ul class="plain">
             <li>Spring Boot 4: <code>praecepta-spring-boot-starter</code>, inject with
-              <code>@Qualifier("Discount")</code> (<a href="https://github.com/brunopacheco1/praecepta#praecepta-spring-boot-starter">guide</a>)</li>
+              <code>@Qualifier("Discount")</code> (<a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#spring-boot">guide</a>)</li>
             <li>Quarkus 3.40+: <code>praecepta-quarkus</code>, inject with <code>@Identifier("Discount")</code>
-              (<a href="https://github.com/brunopacheco1/praecepta#praecepta-quarkus-extension">guide</a>)</li>
+              (<a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#quarkus">guide</a>)</li>
             <li>Micronaut 4: <code>praecepta-micronaut</code>, inject with <code>@Named("Discount")</code>
-              (<a href="https://github.com/brunopacheco1/praecepta#praecepta-micronaut">guide</a>)</li>
+              (<a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#micronaut">guide</a>)</li>
             <li>Another framework, or none: <code>praecepta-integration</code>
-              (<a href="https://github.com/brunopacheco1/praecepta#praecepta-integration">guide</a>)</li>
+              (<a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#without-a-framework">guide</a>)</li>
           </ul>
           <figure class="code">
 <pre><code>PraeceptaEngine&lt;Map&lt;String, String&gt;, Map&lt;String, String&gt;&gt; discount; // injected
@@ -232,9 +230,10 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
           </figure>
         </li>
       </ol>
-      <p class="more">The <a href="https://github.com/brunopacheco1/praecepta#readme">README</a> covers cells,
-        typed columns, DMN support, every plugin option, each integration and
-        <a href="https://github.com/brunopacheco1/praecepta#native-images">native images</a>. The API documentation covers the
+      <p class="more">The <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/GUIDE.md">user guide</a> covers cells,
+        typed columns, DMN files and decision graphs. The
+        <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md">integrations guide</a> covers every plugin option, each
+        framework and <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#native-images">native images</a>. The API documentation covers the
         <a href="api/engine/">engine</a>, the <a href="api/loader/">loader</a>, the
         <a href="api/gradle-plugin/">Gradle plugin</a>, the <a href="api/spring-boot-starter/">Spring Boot starter</a>,
         the <a href="api/micronaut/">Micronaut module</a>, the <a href="api/quarkus/">Quarkus extension</a>, and
@@ -249,8 +248,7 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
         <svg class="c4 c4-tall" viewBox="0 0 360 640" role="img" aria-labelledby="c4-tall-title c4-tall-desc"><title id="c4-tall-title">System context: who and what Praecepta works with</title><desc id="c4-tall-desc">A rule author writes decision tables in a DMN modeller, Excel or CSV. Praecepta, a Java library, reads those files. A Java developer configures the Maven or Gradle build, which runs the Praecepta plugin to validate tables and generate classes. The developer's Java application, plain or on Spring Boot, Quarkus or Micronaut, evaluates decisions with Praecepta, in-process.</desc><defs><marker id="c4-arrow-tall" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="c4-arrowhead" d="M0 0 L10 5 L0 10z"/></marker></defs><g class="c4-person"><circle cx="92" cy="23" r="16"/><rect x="12" y="42" width="160" height="54" rx="18"/><text class="c4-name" x="92" y="64">Rule author</text><text class="c4-kind" x="92" y="82">[Person]</text></g><g class="c4-person"><circle cx="268" cy="23" r="16"/><rect x="188" y="42" width="160" height="54" rx="18"/><text class="c4-name" x="268" y="64">Java developer</text><text class="c4-kind" x="268" y="82">[Person]</text></g><g class="c4-ext"><rect x="8" y="150" width="168" height="96" rx="5"/><text class="c4-name" x="92.0" y="176">Table editors</text><text class="c4-kind" x="92.0" y="193">[External system]</text><text class="c4-desc" x="92.0" y="214">DMN modeller,</text><text class="c4-desc" x="92" y="231">Excel or CSV</text></g><g class="c4-ext"><rect x="184" y="150" width="168" height="96" rx="5"/><text class="c4-name" x="268.0" y="176">Build tool</text><text class="c4-kind" x="268.0" y="193">[External system]</text><text class="c4-desc" x="268.0" y="214">Maven or Gradle,</text><text class="c4-desc" x="268" y="231">with the plugin</text></g><g class="c4-focus"><rect x="50" y="330" width="260" height="116" rx="5"/><text class="c4-name" x="180.0" y="356">Praecepta</text><text class="c4-kind" x="180.0" y="373">[Java library]</text><text class="c4-desc" x="180.0" y="394">Validates and evaluates</text><text class="c4-desc" x="180.0" y="411">DMN decision tables</text></g><g class="c4-ext"><rect x="50" y="540" width="260" height="84" rx="5"/><text class="c4-name" x="180.0" y="566">Your Java application</text><text class="c4-kind" x="180.0" y="583">[External system]</text><text class="c4-desc" x="180.0" y="604">embeds the engine</text></g><path class="c4-edge" d="M92 98 L92 146" marker-end="url(#c4-arrow-tall)"/><text class="c4-label" text-anchor="start" x="100" y="126">Writes tables in</text><path class="c4-edge" d="M268 98 L268 146" marker-end="url(#c4-arrow-tall)"/><text class="c4-label" text-anchor="start" x="276" y="126">Configures</text><path class="c4-edge" d="M92 246 L120 326" marker-end="url(#c4-arrow-tall)"/><text class="c4-label" text-anchor="end" x="88" y="292">Files</text><path class="c4-edge" d="M268 246 L240 326" marker-end="url(#c4-arrow-tall)"/><text class="c4-label" text-anchor="start" x="272" y="284">Validates,</text><text class="c4-label" text-anchor="start" x="272" y="300">generates</text><path class="c4-edge" d="M180 536 L180 450" marker-end="url(#c4-arrow-tall)"/><text class="c4-label" text-anchor="start" x="190" y="488">Evaluates decisions,</text><text class="c4-label" text-anchor="start" x="190" y="504">in-process</text></svg>
         <figcaption>System context, in the <a href="https://c4model.com">C4 model</a>: who and what Praecepta works
           with. The <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/ARCHITECTURE.md">architecture</a>
-          document goes inside: modules, the bitset index, DMN, the build plugins and the framework
-          integrations.</figcaption>
+          document goes inside, level by level: containers, components, code and the main flows.</figcaption>
       </figure>
       <div class="how-grid">
         <div>
@@ -283,17 +281,17 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
 
     <section class="wrap section" aria-labelledby="not-title">
       <h2 id="not-title">What it is not</h2>
-      <p>Praecepta has grown into a DMN 1.5 engine one layer per release
-        (<a href="https://github.com/brunopacheco1/praecepta/issues/120">#120</a>). Today it evaluates decision tables and the
-        graphs of tables, literal and boxed expressions, business knowledge models, decision services and imported
-        models around them, in the full FEEL language with its built-in functions: the whole DMN conformance kit but
-        external functions. It does not have these; when you need one, use Camunda or Drools:</p>
+      <p>Praecepta is a DMN 1.5 engine: decision tables and the graphs of tables, literal and boxed
+        expressions, business knowledge models, decision services and imported models around them, in the full
+        FEEL language with its built-in functions. It passes 3,482 of the 3,511 checks of the
+        <a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">DMN conformance kit</a>. It does not have these:</p>
       <ul class="plain">
-        <li><strong>A claim of DMN 1.5 conformance</strong>, planned for 1.0
+        <li><strong>External functions</strong> (Java and PMML): it runs no code from outside the model, by
+          design. If you need them, use Camunda or Drools.</li>
+        <li><strong>A formal claim of DMN 1.5 conformance</strong>: planned for 1.0
           (<a href="https://github.com/brunopacheco1/praecepta/issues/120">#120</a>).</li>
-        <li><strong>External functions</strong> (Java and PMML), never: it runs no code from outside the model, by design.</li>
       </ul>
-      <p>Nor will it be a process engine, a modeller or a server around the decisions: it is a library your
+      <p>It is not a process engine, a modeller or a server around the decisions either: it is a library your
         application calls.</p>
     </section>
 
@@ -466,57 +464,21 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
       <h2 id="roadmap-title">Roadmap</h2>
       <ol class="timeline">
         <li>
-          <h3>0.7 · released</h3>
+          <h3>Today</h3>
           <ul class="plain">
-            <li>Decision requirement graphs: decisions that require other decisions, each a table or a literal
-              expression, in the engine, the build plugins and the framework integrations (<a href="https://github.com/brunopacheco1/praecepta/issues/14">#14</a>)</li>
-            <li>The whole DMN conformance kit, scored: 454 of 3,511 result nodes pass, 454 of the 458 Praecepta
-              evaluates; decision tables still pass 83 of 86 (<a href="https://github.com/brunopacheco1/praecepta/issues/115">#115</a>,
-              <a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
-            <li>Rules reached only by a time with a zone id no longer reported unreachable (<a href="https://github.com/brunopacheco1/praecepta/issues/114">#114</a>)</li>
-          </ul>
-        </li>
-        <li>
-          <h3>0.8 · released</h3>
-          <ul class="plain">
-            <li>The full FEEL language: in literal expressions, and in decision tables' cells, input expressions
-              and output entries, which keep their analysis and generated code (<a href="https://github.com/brunopacheco1/praecepta/issues/116">#116</a>)</li>
-            <li>The DMN conformance kit: 2,275 of 3,511 result nodes pass, 2,275 of the 2,279 Praecepta evaluates;
-              decision tables still pass 83 of 86 (<a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
-          </ul>
-        </li>
-        <li>
-          <h3>0.9 · released</h3>
-          <ul class="plain">
-            <li>FEEL's built-in functions, all of DMN 1.5's, in literal expressions and decision tables alike
-              (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>)</li>
-            <li>The DMN conformance kit: 3,276 of 3,511 result nodes pass, 3,276 of the 3,280 Praecepta evaluates;
-              decision tables still pass 83 of 86 (<a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
-          </ul>
-        </li>
-        <li>
-          <h3>0.10 · released</h3>
-          <ul class="plain">
-            <li>Boxed expressions and business knowledge models, with decision tables within them, which keep
-              their analysis (<a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>)</li>
-            <li>The DMN conformance kit: 3,409 of 3,511 result nodes pass, 3,409 of the 3,420 Praecepta evaluates;
-              decision tables pass 86 of 86 (<a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
-          </ul>
-        </li>
-        <li>
-          <h3>0.11 · released</h3>
-          <ul class="plain">
-            <li>Decision services, imports and the rest of DMN 1.5, but external functions, which it rejects by design
-              (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>)</li>
-            <li>The DMN conformance kit: 3,482 of 3,511 result nodes pass, 3,482 of the 3,493 Praecepta evaluates;
-              the 18 others are all external functions (<a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
+            <li>All of DMN 1.5 but external functions, which Praecepta rejects by design</li>
+            <li>3,482 of the 3,511 result nodes of the DMN conformance kit pass; the 18 it does not evaluate
+              are all external functions
+              (<a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
           </ul>
         </li>
         <li>
           <h3>Next: 1.0</h3>
           <ul class="plain">
-            <li>A DMN 1.5 conformance claim and a stable API</li>
-            <li>A second maintainer, so every change is reviewed by someone other than its author</li>
+            <li>A DMN 1.5 conformance claim (<a href="https://github.com/brunopacheco1/praecepta/issues/120">#120</a>) and a listing on the
+              <a href="https://dmn-tck.github.io/tck/">DMN TCK results site</a></li>
+            <li>A stable API</li>
+            <li>A second maintainer, so someone other than its author reviews every change</li>
           </ul>
         </li>
         <li>
@@ -534,9 +496,9 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
           </ul>
         </li>
       </ol>
-      <p class="more">The plan to a full DMN 1.5 engine is tracked in <a href="https://github.com/brunopacheco1/praecepta/issues/120">#120</a>. These are
-        intentions, not promises: the
-        <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/ROADMAP.md">roadmap</a> follows what people ask for.</p>
+      <p class="more">These are intentions, not promises: the
+        <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/ROADMAP.md">roadmap</a> follows what people ask for. The
+        <a href="https://github.com/brunopacheco1/praecepta/blob/main/CHANGELOG.md">changelog</a> lists what each release brought.</p>
     </section>
 
     <section class="wrap section contribute" aria-labelledby="help-title">

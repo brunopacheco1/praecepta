@@ -24,16 +24,13 @@ be invited; the maintainer adds them to CODEOWNERS, gives them write access, and
 ## Decisions
 - **Day to day:** in issues and pull requests, in the open. The maintainer decides when there is no
   agreement, and says why.
-- **Larger decisions** (semantics, Java baseline, licence, dependencies, public API) are recorded with
-  their reasons in [docs/MODERNISATION.md](docs/MODERNISATION.md), and new ones are proposed as an
-  issue first.
+- **Larger decisions** (semantics, Java baseline, licence, dependencies, public API) start as an issue.
+  The [architecture document](docs/ARCHITECTURE.md#design-decisions) records them with their reasons.
 - **Compatibility:** versions follow [Semantic Versioning](https://semver.org/). Until 1.0, minor
   versions may change the API; every change is listed in [CHANGELOG.md](CHANGELOG.md).
-- **Scope:** DMN 1.5, judged by its specification and the DMN TCK alone. Since 0.7 the project grows
-  from a decision-table engine into a full DMN 1.5 engine, one layer per release
-  ([#120](https://github.com/brunopacheco1/praecepta/issues/120), [docs/ROADMAP.md](docs/ROADMAP.md)),
-  keeping decision tables' validation and typed generated code. What it will not do: become a process
-  engine, a modeller or a server around the decisions (see the README, "What Praecepta is not").
+- **Scope:** a DMN 1.5 engine, judged by the specification and the DMN TCK alone. Praecepta is a
+  library: it will not become a process engine, a modeller or a server around the decisions (see the
+  README, "What Praecepta is not"). [docs/ROADMAP.md](docs/ROADMAP.md) has what comes next.
 
 ## Releases
 The maintainer releases by pushing a signed `v*` tag; CI builds, signs and publishes to Maven

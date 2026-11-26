@@ -9,8 +9,8 @@ SPDX-License-Identifier: Apache-2.0
 Thanks for helping. Bug reports, questions and pull requests are all welcome.
 
 ## Before you start
-How the project is run, and how to become a maintainer, is in [GOVERNANCE.md](GOVERNANCE.md); the
-design is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+[GOVERNANCE.md](GOVERNANCE.md) explains how the project is run and how to become a maintainer.
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains the design.
 
 - For anything larger than a small fix, open an issue first so we can agree on the approach.
 - Security problems: do **not** open a public issue; see [SECURITY.md](SECURITY.md).
@@ -133,9 +133,10 @@ A new integration or other module needs these, and nothing else:
    is built from) change, always on main and weekly, and cancels superseded runs, as
    `maven-versions.yml` does. The required checks need no change.
 7. **Files:** SPDX headers, Checkstyle and `-Werror`, as for every module (see *Pull requests*).
-8. **Documentation:** a section in the README after the Maven plugin's, a row in the modules table of
-   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and in [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) for an
-   integration, a line under `## [Unreleased]` in `CHANGELOG.md`, and Javadoc on public types.
+8. **Documentation:** a row in the README's installation table, a row in the modules table of
+   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), a section in
+   [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) for an integration, a line under `## [Unreleased]` in
+   `CHANGELOG.md`, and Javadoc on public types.
 
 ## Pull requests
 1. Fork the repository and create a branch from `main`.

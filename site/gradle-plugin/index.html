@@ -204,16 +204,14 @@ PraeceptaEngine&lt;DiscountInput, DiscountOutput&gt; engine = Discount.engine();
           values name zone ids is the engine's <code>ZonedTime</code>. A string column with a value list is an
           enum, and a list column a <code>java.util.List</code>.</li>
         <li>The DMN resource is written next to the classes, so the table ships in your jar as DMN.</li>
-        <li>From 0.7.0, a DMN file whose decisions require other decisions (a decision requirement graph of
-          decision tables and literal expressions) compiles to a class named after the model, which holds the
-          graph, and a class per decision with an input record of the input data it needs; the graph's cycles,
-          missing requirements and type mismatches fail the build at <code>failOn</code>
-          (<a href="https://github.com/brunopacheco1/praecepta#decision-requirement-graphs-in-generated-code">details</a>).
-          From 0.8.0, its tables and literal expressions may use the full FEEL language, from 0.9.0 its built-in functions,
-          from 0.10.0 its decisions may be boxed expressions and invoke business knowledge models, and from 0.11.0
-          they may invoke decision services and import other models, found beside the file.
-          A file that uses what Praecepta does not evaluate, such as an external function, compiles its decision
-          table alone, as before, and the task says so in one lifecycle line per file, naming what it uses.</li>
+        <li>A DMN file whose decisions require one another, or are not decision tables, compiles as a
+          decision requirement graph: a class named after the model, which holds the graph, and a class per
+          decision with an input record of the input data it needs. The graph's cycles, missing requirements
+          and type mismatches fail the build at <code>failOn</code>
+          (<a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#decision-graphs-in-generated-code">details</a>).
+          The plugin finds imported models beside the file.</li>
+        <li>A file that defines an external function, which Praecepta does not evaluate, compiles its decision
+          table alone, and the task says so in one lifecycle line per file.</li>
       </ul>
     </section>
 
@@ -235,13 +233,13 @@ PraeceptaEngine&lt;DiscountInput, DiscountOutput&gt; engine = Discount.engine();
       <h2 id="more-title">More</h2>
       <ul class="plain">
         <li><a href="../api/gradle-plugin/">API documentation</a> of the plugin's extension, tables and columns.</li>
-        <li>The <a href="https://github.com/brunopacheco1/praecepta#praecepta-gradle-plugin">README's Gradle
-          section</a>, and the <a href="https://github.com/brunopacheco1/praecepta#readme">README</a> for the
-          cell syntax, typed columns and DMN support.</li>
+        <li>The <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#gradle-plugin">integrations guide</a>, and the
+          <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/GUIDE.md">user guide</a> for the cell syntax, typed columns and DMN
+          support.</li>
         <li>The same tables at runtime, without generated code: the
-          <a href="https://github.com/brunopacheco1/praecepta#praecepta-spring-boot-starter">Spring Boot</a>,
-          <a href="https://github.com/brunopacheco1/praecepta#praecepta-quarkus-extension">Quarkus</a> and
-          <a href="https://github.com/brunopacheco1/praecepta#praecepta-micronaut">Micronaut</a> integrations.</li>
+          <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#spring-boot">Spring Boot</a>,
+          <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#quarkus">Quarkus</a> and
+          <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#micronaut">Micronaut</a> integrations.</li>
         <li><a href="https://github.com/brunopacheco1/praecepta/issues">Issues and questions</a> ·
           <a href="https://github.com/brunopacheco1/praecepta/blob/main/CHANGELOG.md">Changelog</a> ·
           Apache-2.0.</li>
