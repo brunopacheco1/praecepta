@@ -201,13 +201,6 @@ public final class FeelExpression {
     }
 
     /**
-     * Names and the types a model defines, in scope for parsing expressions ({@link #parse(String, Scope)}): indexed once,
-     * so that each expression parsed against many names costs no more than one parsed against few.
-     *
-     * @param names the names in scope
-     * @param types the types the model defines, by name
-     */
-    /**
      * Composes a boxed expression (DMN 1.5, 10.2), {@link DecisionLogic} other than a decision table, into the FEEL
      * expression it boxes, as {@link #parse(String, Scope)} parses a text: its literal expressions are parsed with the
      * names of {@code scope} in scope and those its own constructs bind, and its {@link #names()} are the names it reads
@@ -237,6 +230,13 @@ public final class FeelExpression {
         return new FeelExpression(BoxedComposer.describe(logic), BoxedComposer.compose(logic, scope, tables));
     }
 
+    /**
+     * Names and the types a model defines, in scope for parsing expressions ({@link #parse(String, Scope)}): indexed once,
+     * so that each expression parsed against many names costs no more than one parsed against few.
+     *
+     * @param names the names in scope
+     * @param types the types the model defines, by name
+     */
     public static Scope scope(Collection<String> names, Map<String, FeelType> types) {
         return new Scope(List.copyOf(names), Map.copyOf(types));
     }
