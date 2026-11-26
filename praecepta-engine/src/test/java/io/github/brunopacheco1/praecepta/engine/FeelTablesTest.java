@@ -435,7 +435,7 @@ class FeelTablesTest {
         var model = DmnReader.readModel(stream(PRICES.formatted("", entry, "null")));
         var table = ((io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic.Table) model.decisions().getFirst().logic()).table();
         var text = mapEngine(table).evaluate(Map.of("Base", "1", "Rate", "1")).getFirst().get("value");
-        Assertions.assertThat(text).startsWith("[[[[").endsWith("...").hasSizeLessThanOrEqualTo(PraeceptaEngine.MAX_TEXT_LENGTH + 3);
+        Assertions.assertThat(text).startsWith("[[[[").endsWith("...").hasSizeLessThanOrEqualTo(OutputText.MAX_TEXT_LENGTH + 3);
     }
 
     /** A name the table's FEEL reads that is neither a column nor a value given to it cannot be read: it is rejected. */
@@ -446,9 +446,9 @@ class FeelTablesTest {
         var order = List.of("y");
         var given = List.of("z");
         var computed = Map.<String, FeelExpression>of();
-        Assertions.assertThatThrownBy(() -> PraeceptaEngine.nameReads(expressions, order, given, computed))
+        Assertions.assertThatThrownBy(() -> TableColumns.nameReads(expressions, order, given, computed))
                 .isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("'x'");
-        Assertions.assertThat(PraeceptaEngine.nameReads(expressions, List.of("y"), List.of("z", "x"), Map.of())).containsEntry("x", -2);
+        Assertions.assertThat(TableColumns.nameReads(expressions, List.of("y"), List.of("z", "x"), Map.of())).containsEntry("x", -2);
     }
 
     /**
