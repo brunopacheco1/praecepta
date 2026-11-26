@@ -169,7 +169,7 @@ An engine is **immutable** once built: any number of threads may share it withou
   from none: with several outputs, defaults that are all `null` still make a default output, of nulls.
   It uses the JDK's own XML parser (`DocumentBuilderFactory.newDefaultInstance()`, never one JAXP finds
   on the class path) with DTDs and external entities disabled. Anything it does not
-  support (an external function, 0.11) is rejected
+  support (an external function, rejected by design: [DMN conformance](DMN-CONFORMANCE.md#known-deviations)) is rejected
   with an error naming the decision, rule and column. Output entries may be any FEEL expression
   (`FeelExpression`): they are kept as written, parsed and typed when the engine is built, and evaluated only
   for matching rules, like outputs that name an input; `DmnWriter` writes them back unchanged, and so a cell
@@ -238,7 +238,7 @@ input data and decision gets a *slot*: input data first, then decisions, in the 
    that decision's requirements: the requirement so named, else the one named by its longest part before a dot, the
    rest being a path into its value (`Pricing.discount` in a table column), as `DecisionModel.elementOf` resolves
    names for every part of Praecepta; a name no requirement provides is a `MISSING_REQUIREMENT` (7.3.4), an
-   external function a literal expression defines an `UNSUPPORTED_FEATURE` (0.11, #119), and a literal expression that
+   external function a literal expression defines an `UNSUPPORTED_FEATURE` (by design), and a literal expression that
    is not FEEL an `INVALID_EXPRESSION`;
 3. finds cycles among required decisions (Tarjan's algorithm with an explicit stack), reported with the cycle's
    path (`DECISION_CYCLE`), and orders the other decisions so each comes after those it requires (Kahn's algorithm);

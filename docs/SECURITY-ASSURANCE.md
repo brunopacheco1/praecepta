@@ -87,7 +87,8 @@ tables to load and how strictly to check them.
   the only functions they invoke are those the model defines (function definitions and, since 0.10, business
   knowledge models, evaluated by the same interpreter and limits) and FEEL's built-in functions (since 0.9), which
   compute values from their arguments, none reading or writing anything but `now()` and `today()`, which read the
-  clock; external Java functions (0.11) are rejected. So evaluating a table or a graph cannot run arbitrary code,
+  clock; external Java and PMML functions are rejected, by design and for good
+  ([DMN conformance](DMN-CONFORMANCE.md#known-deviations)). So evaluating a table or a graph cannot run arbitrary code,
   and each built-in function's work, a regular expression's matching included, counts against the evaluation's
   limits; the engine has no
   runtime dependencies.

@@ -58,9 +58,10 @@ decision whose value the test case gives is input data instead, as the kit means
 decision replaced by an input data of its type. Input data of a simple type are given as text, as the integrations
 give them; a structured one as a map of its components, a list as a list; one of no declared type typed by the
 test file's `xsi:type`. It takes a node when the model as a whole is one `readModel` reads and the graph evaluates
-the decision: what is not supported is what the engine rejects. A model with a business knowledge model, a decision
-service, an import or an external function is not read, and a decision the graph's validation report blocks is not
-evaluated. Literal expressions, and decision tables' input expressions, input entries and output entries, are the
+the decision: what is not supported is what the engine rejects. A model that invokes a decision service, imports
+another model, defines an external function or requires a decision without logic is not read, and a decision the
+graph's validation report blocks is not evaluated. Boxed expressions, business knowledge models and the decision tables
+within them are read and evaluated since 0.10 ([#118](https://github.com/brunopacheco1/praecepta/issues/118)). Literal expressions, and decision tables' input expressions, input entries and output entries, are the
 full FEEL language since 0.8 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)), with its built-in
 functions since 0.9 ([#117](https://github.com/brunopacheco1/praecepta/issues/117)). Where a decision's value is null and its own logic
 reported an error (`DecisionGraph.evaluateWithErrors`), the node counts as an error where the kit expects one
@@ -75,8 +76,8 @@ The nodes it does not take go to `SingleDecisionEvaluator`, which evaluates one 
   decision's declared type (10.3.2.9.4), and FEEL's errors count as `GraphEvaluator` counts them. A decision it
   reads whose value the test case does not give needs graphs.
 
-Everything else is not supported: other boxed expressions, business knowledge models, decision services, imports,
-and a decision that needs the value of another decision in a model the graph does not take. Where neither
+Everything else is not supported: boxed expressions and business knowledge models in a model the graph does not take,
+decision services, imports, and a decision that needs the value of another decision in a model the graph does not take. Where neither
 evaluator supports a node, the reasons are the single evaluator's, without *inputs computed by other decisions*,
 which the graph has (`SingleDecisionEvaluator.needsBesideGraphs`); a node that needs nothing but another decision
 computed, in a model `readModel` rejects for what another decision uses, needs that first. A later release that
@@ -117,6 +118,9 @@ feature; 0.8 retired their parser, so the kit's expressions it read are listed, 
   last ([DMN conformance](../docs/DMN-CONFORMANCE.md), case 33). The first payment, which the kit states rightly to
   its 15 digits, passes, as does a power that is not whole in `0100-arithmetic`, since 0.9 (see *How results are
   compared*).
+- The same payment, computed by a business knowledge model since 0.10: `0009-invocation-arithmetic` and
+  `0005-literal-invocation` (two each), `0003-iteration`, `0004-lending` and `0014-loan-comparison`. The kit states
+  these as a double computes them, which differs from FEEL's 34 digits beyond the digits it states (case 33).
 - `1116-feel-time-function`, `string(time("00:01:00@Etc/UTC"))`, and `0103-feel-is-function`,
   `is(@"23:00:50@Etc/GMT", @"23:00:50Z")`: a time in a zone with one fixed offset is read as the time at that offset,
   as Table 72's example has it equal, so its zone id is not kept apart from the offset, a known deviation
@@ -150,11 +154,11 @@ expressions as literal expression decisions (see *How a model is evaluated*), wh
 
 ## Decision requirement graphs
 `DecisionGraph` (0.7, [#14](https://github.com/brunopacheco1/praecepta/issues/14)) evaluates whole models whose
-decisions are decision tables and literal expressions, in the full FEEL language since 0.8, and `GraphEvaluator`
-scores it. Of the pinned commit's 156 model files of compliance levels 2 and 3, `DmnReader.readModel` reads 109; the
-rest are rejected for what later releases bring: business knowledge models and boxed expressions (#118, 35 files),
-decision services, imports and external functions (#119, 11), and one item definition without a base type. Models it
-does not read are evaluated decision by decision.
+decisions are decision tables and literal expressions, in the full FEEL language since 0.8, and boxed expressions
+and business knowledge models since 0.10, and `GraphEvaluator` scores it. Of the pinned commit's 156 model files of
+compliance levels 2 and 3, `DmnReader.readModel` reads 142; the rest are rejected for what 0.11 brings (#119): imports
+and references into other models (9 files), invoking a decision service (3), an external function (1) and a decision
+without logic that another requires (1). Models it does not read are evaluated decision by decision.
 
 ## The TCK files
 `src/test/resources/tck` holds every test directory of compliance levels 2 and 3 (their DMN models and test

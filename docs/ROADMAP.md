@@ -65,19 +65,32 @@ Released in November 2026 (see the [changelog](../CHANGELOG.md)):
   supported yet need boxed expressions and business knowledge models. The decision-table checks still
   pass 83 of 86.
 
-## Next: 0.10
+## 0.10
+Released in November 2026 (see the [changelog](../CHANGELOG.md)):
 - **Boxed expressions and business knowledge models**
-  ([#118](https://github.com/brunopacheco1/praecepta/issues/118)): invocations, function
-  definitions, boxed contexts, relations, lists, conditionals, iterators and filters, and
-  structured inputs typed by item definitions. With them the decision tables of the TCK reach 86
-  of 86.
+  ([#118](https://github.com/brunopacheco1/praecepta/issues/118)): contexts, invocations, function
+  definitions, relations, lists, conditionals, iterators and filters, as decision logic and as parts
+  of one another, each evaluated as the FEEL it boxes; and business knowledge models, functions that
+  decisions invoke by name or through a boxed invocation, and that may invoke those they require,
+  and themselves.
+- **Decision tables within them**: a business knowledge model's body, a context entry or any other
+  part of a boxed expression may be a decision table, which keeps its bitset index and its validation
+  report.
+- **The DMN TCK**: 3,409 of its 3,511 result nodes pass (97.1 %, from 3,276), and 3,409 of the 3,420
+  that Praecepta evaluates. The decision-table checks pass 86 of 86. Nearly all of the 91 nodes not
+  supported yet are in models that use decision services, imports or external functions.
 
-## 0.11 and 1.0
+## Next: 0.11
 - **Decision services, imports and the rest of DMN 1.5**
-  ([#119](https://github.com/brunopacheco1/praecepta/issues/119)), then 1.0: a claim of DMN 1.5
-  conformance, scored against the whole TCK, and a stable API, once the project has a second
-  maintainer (see [GOVERNANCE.md](../GOVERNANCE.md)). After 1.0, breaking changes wait for a major
-  version.
+  ([#119](https://github.com/brunopacheco1/praecepta/issues/119)): decision services, imports and
+  decisions without decision logic. With them Praecepta evaluates the whole TCK but for external functions (Java and
+  PMML), which it rejects by design, as it runs no code from outside the model
+  ([DMN conformance](DMN-CONFORMANCE.md#known-deviations)).
+
+## 1.0
+- **A claim of DMN 1.5 conformance**, scored against the whole TCK, and a stable API, once the
+  project has a second maintainer (see [GOVERNANCE.md](../GOVERNANCE.md)). After 1.0, breaking
+  changes wait for a major version.
 
 ## After 1.0
 - **An online playground** ([#21](https://github.com/brunopacheco1/praecepta/issues/21)): paste a
