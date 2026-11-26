@@ -283,14 +283,14 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
 
     <section class="wrap section" aria-labelledby="not-title">
       <h2 id="not-title">What it is not</h2>
-      <p>Praecepta is on its way to a full DMN 1.5 engine, one layer per release
-        (<a href="https://github.com/brunopacheco1/praecepta/issues/120">#120</a>), but it is not one yet. Today it evaluates decision tables and the
-        graphs of tables, literal and boxed expressions and business knowledge models around them, in the full
-        FEEL language with its built-in functions. It does not have these yet; when you need one before its
-        release, use Camunda or Drools:</p>
+      <p>Praecepta has grown into a DMN 1.5 engine one layer per release
+        (<a href="https://github.com/brunopacheco1/praecepta/issues/120">#120</a>). Today it evaluates decision tables and the
+        graphs of tables, literal and boxed expressions, business knowledge models, decision services and imported
+        models around them, in the full FEEL language with its built-in functions: the whole DMN conformance kit but
+        external functions. It does not have these; when you need one, use Camunda or Drools:</p>
       <ul class="plain">
-        <li><strong>Imports and decisions without logic</strong> (0.11,
-          <a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>).</li>
+        <li><strong>A claim of DMN 1.5 conformance</strong>, planned for 1.0
+          (<a href="https://github.com/brunopacheco1/praecepta/issues/120">#120</a>).</li>
         <li><strong>External functions</strong> (Java and PMML), never: it runs no code from outside the model, by design.</li>
       </ul>
       <p>Nor will it be a process engine, a modeller or a server around the decisions: it is a library your
@@ -504,14 +504,16 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
           </ul>
         </li>
         <li>
-          <h3>Next: 0.11</h3>
+          <h3>0.11 · released</h3>
           <ul class="plain">
             <li>Decision services, imports and the rest of DMN 1.5, but external functions, which it rejects by design
               (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>)</li>
+            <li>The DMN conformance kit: 3,482 of 3,511 result nodes pass, 3,482 of the 3,493 Praecepta evaluates;
+              the 18 others are all external functions (<a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
           </ul>
         </li>
         <li>
-          <h3>1.0</h3>
+          <h3>Next: 1.0</h3>
           <ul class="plain">
             <li>A DMN 1.5 conformance claim and a stable API</li>
             <li>A second maintainer, so every change is reviewed by someone other than its author</li>
