@@ -385,6 +385,27 @@ class GraphCompilerTest {
         }
     }
 
+    @Test
+    void boxed_expressions_business_knowledge_models_and_the_tables_within_them_compile_and_give_what_the_graph_gives() throws Exception {
+        var result = compile(TableDefinition.dmn(table("people.dmn")), Severity.WARNING);
+        Assertions.assertThat(result.sources()).containsKeys("PersonSDescription", "Greeting");
+        var graph = graph("people.dmn");
+        var maps = decisions("people.dmn");
+        try (var loader = compileAndLoad(result)) {
+            var description = decision(loader, "PersonSDescription");
+            var greeting = decision(loader, "Greeting");
+            var person = loader.loadClass(PACKAGE + ".PeopleModel$Person").getDeclaredConstructors()[0];
+            for (var who : List.of(List.of("Bob", "Male"), List.of("Eve", "Female"))) {
+                var inputData = Map.<String, Object>of("Person", Map.of("Name", who.get(0), "Gender", who.get(1)));
+                var record = person.newInstance(who.get(0), who.get(1));
+                Assertions.assertThat(description.evaluate(record)).isEqualTo(graph.evaluate("Person's description", inputData));
+                Assertions.assertThat(greeting.evaluate(record)).isEqualTo(graph.evaluate("Greeting", inputData));
+                Assertions.assertThat(maps.evaluate("Greeting", Map.of("Person.Name", who.get(0), "Person.Gender", who.get(1))))
+                        .containsExactly(Map.of("Greeting", String.valueOf(graph.evaluate("Greeting", inputData))));
+            }
+        }
+    }
+
     private static DecisionGraph graph(Path file) {
         try (var dmn = Files.newInputStream(file)) {
             return DecisionGraph.read(dmn);

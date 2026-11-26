@@ -41,9 +41,10 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
 /**
  * A decision requirements graph, evaluated: the decisions of a decision model (DMN 1.5, chapter 6), each a
- * {@linkplain DecisionLogic.Table decision table} or a {@linkplain DecisionLogic.LiteralExpression literal expression},
- * evaluated in dependency order from the model's input data, each decision's value given to the decisions that require
- * it under the decision's name.
+ * {@linkplain DecisionLogic.Table decision table}, a {@linkplain DecisionLogic.LiteralExpression literal expression} or
+ * a boxed expression (a context, an invocation, a relation...; {@link DecisionLogic}), evaluated in dependency order
+ * from the model's input data, each decision's value given to the decisions that require it under the decision's name,
+ * and its business knowledge models, functions that the decisions requiring them invoke by name.
  *
  * <pre>{@code
  * DecisionGraph graph;
@@ -57,8 +58,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * by name ({@code Map<String, Object>}, in output order), whose components a decision reads by path
  * ({@code Pricing.discount}); under a hit policy with several results (RULE ORDER, OUTPUT ORDER, COLLECT without an
  * aggregation), a list of those, which a decision table input of lists takes; null when no rule matches and the table
- * declares no default output (DMN 1.5, 10.3.2.10). A literal expression gives the value of its expression. Either is
- * bound to the type its decision's variable declares, as DMN 1.5 binds it (10.3.2.9.4): a single value to a list as a
+ * declares no default output (DMN 1.5, 10.3.2.10). A literal expression gives the value of its expression, and a boxed
+ * expression that of the FEEL it boxes ({@link FeelExpression#compose}), its parts bound to the types the model declares
+ * for them. Each is bound to the type its decision's variable declares, as DMN 1.5 binds it (10.3.2.9.4): a single value to a list as a
  * list of one, a list of one to a single value as its element, a date to a date and time at UTC midnight, and a value
  * that does not conform to the declared type as null. Values are
  * FEEL's, as {@link FeelType} lists them: {@code String}, {@code BigDecimal}, {@code Boolean}, {@code LocalDate},
@@ -73,25 +75,26 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * a decision that requires a decision or input data the model does not have, or whose logic reads a name none of its
  * information requirements provides ({@link ValidationReport.Kind#MISSING_REQUIREMENT}), decisions that require one
  * another in a cycle ({@link ValidationReport.Kind#DECISION_CYCLE}), and a value that cannot fit where it goes, such as
- * a string into a number column ({@link ValidationReport.Kind#TYPE_MISMATCH}), are ERRORs of
+ * a string into a number column ({@link ValidationReport.Kind#TYPE_MISMATCH}), and a business knowledge model that reads
+ * a name that is neither its parameter nor one it requires, are ERRORs of
  * {@link #validationReport()}, and so is logic Praecepta does not evaluate yet, naming the release that plans it
  * ({@link ValidationReport.Kind#UNSUPPORTED_FEATURE}). Such a decision, and every decision that requires it, cannot be
  * evaluated; the others can. A decision whose value DMN 1.5 defines as null whatever its inputs (operands FEEL's
  * arithmetic does not combine, a value that does not conform to the declared type) is a WARNING
  * ({@link ValidationReport.Kind#ALWAYS_NULL}), and is evaluated. Each decision table keeps its own analysis
  * ({@link #validationReport(String)}), exactly as a {@link PraeceptaEngine} built from it alone, with map-based inputs,
- * reports it.
+ * reports it; so does each decision table within a boxed expression, a business knowledge model's body or a context
+ * entry, under its decision's or business knowledge model's name.
  *
  * <p><b>Evaluating.</b> {@link #evaluate(String, Map)} evaluates a decision and the decisions it requires, directly or
  * indirectly, each once, in dependency order, and nothing else; every table, expression and name was parsed and
  * resolved when the graph was built, and only a computed output entry's value is converted from its text when it is
  * evaluated. A literal expression is FEEL (DMN 1.5, chapter 10; {@link io.github.brunopacheco1.praecepta.engine.feel.FeelExpression}):
  * where FEEL defines no value it gives null, and {@link #evaluateWithErrors} gives the errors FEEL reported with the
- * value. A graph is immutable and thread-safe.
+ * value. A business knowledge model is a function made once, when the graph is built, which may invoke those it
+ * requires, and itself. A graph is immutable and thread-safe.
  *
- * <p>Business knowledge models, invocations and boxed expressions are planned for 0.10
- * (<a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>), decision services, imports and FEEL's
- * external functions for 0.11
+ * <p>Decision services, imports and FEEL's external functions are planned for 0.11
  * (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>); a model that uses them is rejected when it
  * is read.
  */
@@ -477,10 +480,11 @@ public final class DecisionGraph {
     }
 
     /**
-     * The validation report of a decision's table, as {@link PraeceptaEngine#validationReport()} gives it; empty for a
-     * literal expression.
+     * The validation report of a decision's table, as {@link PraeceptaEngine#validationReport()} gives it, or of the
+     * decision tables within its boxed expression, one after the other; or of those within a business knowledge model's
+     * logic, given its name. Empty for logic without a decision table.
      *
-     * @throws NoSuchElementException if the graph has no decision of that name
+     * @throws NoSuchElementException if the graph has no decision or business knowledge model of that name
      */
     public ValidationReport validationReport(String decision) {
         var knowledgeReport = knowledgeReports.get(decision);

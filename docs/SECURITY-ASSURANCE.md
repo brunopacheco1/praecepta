@@ -63,7 +63,7 @@ tables to load and how strictly to check them.
 | Asset | Threat | Countered by |
 |---|---|---|
 | The host application's files and network | A crafted DMN document using XXE or a DTD to read files or make requests | DTDs disallowed, external entities off, secure processing on, always with the JDK's own parser (`DmnReader`) |
-| The host application's availability | Documents, models or cells crafted to crash the parser or exhaust memory | Fuzzing of the cell parser, FEEL expressions, FEEL unary tests (cells beyond the simple ones) and the DMN reader, decision models and their graphs included; JDK XML limits; FEEL expressions and unary tests (literal expressions, and tables' input expressions, cells and output entries) that nest at most 300 levels, or are a syntax error, and evaluations of at most 1,000,000 steps and 800 levels of nested invocations that make no string longer than 10,000,000 characters, beyond which the value is null; item definitions nested at most 32 deep, so parsing and evaluation depth is bounded on a 512 KiB stack; no walk over a decision requirement graph recurses, so a long chain of decisions or a cycle cannot overflow the stack (cycles are reported, not followed) |
+| The host application's availability | Documents, models or cells crafted to crash the parser or exhaust memory | Fuzzing of the cell parser, FEEL expressions, FEEL unary tests (cells beyond the simple ones) and the DMN reader, decision models and their graphs included; JDK XML limits; FEEL expressions and unary tests (literal expressions, and tables' input expressions, cells and output entries) that nest at most 300 levels, or are a syntax error, and evaluations of at most 1,000,000 steps and 800 levels of nested invocations that make no string longer than 10,000,000 characters, beyond which the value is null, an evaluation started within another (a decision table within a boxed expression or a business knowledge model, since 0.10) counting against the same limits; item definitions nested at most 32 deep, so parsing and evaluation depth is bounded on a 512 KiB stack; no walk over a decision requirement graph recurses, so a long chain of decisions or a cycle cannot overflow the stack (cycles are reported, not followed) |
 | Correct decisions | Ambiguous or overlapping rules giving different answers than intended | Strict DMN hit policies; validation of overlaps, unreachable rules and gaps; the engine is tested against a reference implementation with property-based tests |
 | A build using the Maven or Gradle plugin | Table content injected into generated Java code | `JavaNames` sanitises identifiers (reserved words included); string literals are escaped; comments escape unicode escapes and comment terminators |
 | Users' supply chain | A tampered release or dependency | Signed releases with provenance; pinned CI actions; Dependabot, dependency review and OSV scans; a signed-commit, pull-request-only `main` |
@@ -83,15 +83,17 @@ tables to load and how strictly to check them.
 
 ## Secure design principles applied
 - **Economy of mechanism:** FEEL is an expression language without side effects, input or output: the cells,
-  output entries and literal expressions of DMN files read the values they are given and compute values, and
-  the only functions they invoke are those they define themselves and FEEL's built-in functions (since 0.9), which
+  output entries, literal and boxed expressions of DMN files read the values they are given and compute values, and
+  the only functions they invoke are those the model defines (function definitions and, since 0.10, business
+  knowledge models, evaluated by the same interpreter and limits) and FEEL's built-in functions (since 0.9), which
   compute values from their arguments, none reading or writing anything but `now()` and `today()`, which read the
   clock; external Java functions (0.11) are rejected. So evaluating a table or a graph cannot run arbitrary code,
   and each built-in function's work, a regular expression's matching included, counts against the evaluation's
   limits; the engine has no
   runtime dependencies.
 - **Fail-safe defaults:** unsupported DMN features, unknown cell syntax and undeclared values are
-  rejected, not ignored; XML features are off unless needed.
+  rejected, not ignored; the only elements left out are a decision service nothing invokes and a decision without
+  logic nothing requires (since 0.10), which change no value evaluated. XML features are off unless needed.
 - **Complete mediation:** every table goes through the same parser and validation, whatever its
   source.
 - **Least privilege and least common mechanism:** no network, file (except reading the tables the

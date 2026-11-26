@@ -107,8 +107,9 @@ final class TckResults {
                 ## The whole kit
 
                 Praecepta evaluates a decision through its model's decision requirement graph, which computes the
-                decisions it requires, where `DmnReader.readModel` reads the model: decision tables and literal
-                expressions, in the full FEEL language but its built-in functions. In another model it evaluates a
+                decisions it requires, where `DmnReader.readModel` reads the model: decision tables, literal
+                expressions and boxed expressions, in the full FEEL language with its built-in functions, and business
+                knowledge models. In another model it evaluates a
                 decision on its own, a decision table with `DmnReader` and the engine, and a literal expression with
                 `FeelExpression`, from the test case's values of what it reads. Where FEEL's value is null with an
                 error, and the kit expects one, the error counts. Everything else is not supported yet. A test file's

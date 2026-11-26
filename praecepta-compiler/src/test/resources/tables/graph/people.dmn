@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A business knowledge model whose body is a decision table, as the DMN TCK's 0037-dt-on-bkm-implicit-params has it, and a boxed
+     context with a decision table in an entry: what the build plugins compile through the graph (#118). -->
+<definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="nested" name="People" namespace="https://example.com/nested">
+  <itemDefinition name="tPerson">
+    <itemComponent name="Name"><typeRef>string</typeRef></itemComponent>
+    <itemComponent name="Gender"><typeRef>string</typeRef></itemComponent>
+  </itemDefinition>
+  <inputData id="person" name="Person"><variable name="Person" typeRef="tPerson"/></inputData>
+  <decision id="description" name="Person's description">
+    <variable name="Person's description" typeRef="string"/>
+    <informationRequirement><requiredInput href="#person"/></informationRequirement>
+    <knowledgeRequirement><requiredKnowledge href="#bkm"/></knowledgeRequirement>
+    <invocation>
+      <literalExpression><text>Description</text></literalExpression>
+      <binding><parameter name="Person.Gender"/><literalExpression><text>Person.Gender</text></literalExpression></binding>
+      <binding><parameter name="Person.Name"/><literalExpression><text>Person.Name</text></literalExpression></binding>
+    </invocation>
+  </decision>
+  <decision id="greeting" name="Greeting">
+    <variable name="Greeting" typeRef="string"/>
+    <informationRequirement><requiredInput href="#person"/></informationRequirement>
+    <context>
+      <contextEntry>
+        <variable name="gender" typeRef="string"/>
+        <literalExpression><text>Person.Gender</text></literalExpression>
+      </contextEntry>
+      <contextEntry>
+        <variable name="salutation" typeRef="string"/>
+        <decisionTable hitPolicy="UNIQUE">
+          <input><inputExpression typeRef="string"><text>gender</text></inputExpression></input>
+          <output/>
+          <rule><inputEntry><text>"Male"</text></inputEntry><outputEntry><text>"Mr"</text></outputEntry></rule>
+          <rule><inputEntry><text>"Female"</text></inputEntry><outputEntry><text>"Ms"</text></outputEntry></rule>
+        </decisionTable>
+      </contextEntry>
+      <contextEntry>
+        <literalExpression><text>salutation + " " + Person.Name</text></literalExpression>
+      </contextEntry>
+    </context>
+  </decision>
+  <businessKnowledgeModel id="bkm" name="Description">
+    <variable name="Description"/>
+    <encapsulatedLogic>
+      <formalParameter name="Person.Gender" typeRef="string"/>
+      <formalParameter name="Person.Name" typeRef="string"/>
+      <decisionTable hitPolicy="UNIQUE">
+        <input><inputExpression typeRef="string"><text>Person.Gender</text></inputExpression></input>
+        <input><inputExpression typeRef="string"><text>Person.Name</text></inputExpression></input>
+        <output/>
+        <rule>
+          <inputEntry><text>"Male"</text></inputEntry><inputEntry><text>-</text></inputEntry>
+          <outputEntry><text>Person.Name + " is a man"</text></outputEntry>
+        </rule>
+        <rule>
+          <inputEntry><text>"Female"</text></inputEntry><inputEntry><text>-</text></inputEntry>
+          <outputEntry><text>Person.Name + " is a woman"</text></outputEntry>
+        </rule>
+      </decisionTable>
+    </encapsulatedLogic>
+  </businessKnowledgeModel>
+</definitions>

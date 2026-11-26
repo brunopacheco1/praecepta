@@ -151,4 +151,44 @@ class KnowledgeModelsTest {
         assertThat(graph.evaluate("Eligibility", Map.of("Pre-bureauRiskCategory", "HIGH"))).isEqualTo("INELIGIBLE");
         assertThat(graph.evaluate("Eligibility", Map.of("Pre-bureauRiskCategory", "LOW"))).isEqualTo("ELIGIBLE");
     }
+
+    @Test
+    void a_business_knowledge_model_whose_table_invokes_it_without_end_is_null_with_an_error_on_a_small_stack() throws Exception {
+        // each table evaluates its FEEL afresh: the evaluation's limits still count every level, so the stack holds
+        var graph = graph(DmnReader.readModel(new ByteArrayInputStream("""
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="m" name="M" namespace="https://example.com/m">
+                  <inputData id="n" name="N"><variable name="N" typeRef="number"/></inputData>
+                  <decision id="d" name="D">
+                    <informationRequirement><requiredInput href="#n"/></informationRequirement>
+                    <knowledgeRequirement><requiredKnowledge href="#loop"/></knowledgeRequirement>
+                    <literalExpression><text>loop(N)</text></literalExpression>
+                  </decision>
+                  <businessKnowledgeModel id="loop" name="loop">
+                    <variable name="loop"/>
+                    <encapsulatedLogic>
+                      <formalParameter name="n" typeRef="number"/>
+                      <decisionTable>
+                        <input><inputExpression typeRef="number"><text>n</text></inputExpression></input>
+                        <output/>
+                        <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>loop(n + 1)</text></outputEntry></rule>
+                      </decisionTable>
+                    </encapsulatedLogic>
+                  </businessKnowledgeModel>
+                </definitions>""".getBytes(StandardCharsets.UTF_8))));
+        var outcome = new java.util.concurrent.atomic.AtomicReference<Object>();
+        var thread = new Thread(null, () -> {
+            try {
+                outcome.set(graph.evaluateWithErrors("D", Map.of("N", 1)));
+            } catch (Throwable e) {
+                outcome.set(e);
+            }
+        }, "small stack", 512 * 1024);
+        thread.start();
+        thread.join();
+
+        assertThat(outcome.get()).isInstanceOfSatisfying(DecisionGraph.Outcome.class, result -> {
+            assertThat(result.value()).isNull();
+            assertThat(result.errors().get("D")).anyMatch(error -> error.contains("more deeply than Praecepta evaluates"));
+        });
+    }
 }

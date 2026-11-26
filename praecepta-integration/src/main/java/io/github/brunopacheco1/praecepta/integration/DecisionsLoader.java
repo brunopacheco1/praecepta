@@ -59,7 +59,7 @@ public final class DecisionsLoader {
          * One line: {@code Loaded 2 decision(s) from 1 DMN file(s): Discount, Fee}, or that none were found; then one
          * line per DMN file whose decision tables are loaded alone because its model uses what a later release plans:
          * {@code rules/fees.dmn: its decision tables are loaded alone, without its decision requirements graph, which
-         * needs Praecepta 0.10 (#118): ...}.
+         * needs Praecepta 0.11 (#119): ...}.
          */
         void info(String message);
 

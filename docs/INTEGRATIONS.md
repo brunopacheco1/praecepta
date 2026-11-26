@@ -82,19 +82,21 @@ integrations find their tables at runtime, so their engines take maps instead:
   or not, so gaps are looked for among both kinds, and a time column's among times with a zone id too, whether its
   cells name one or not (a time in a zone no cell names matches only the cells that accept any value).
 - **Decision requirement graphs** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)). A file in
-  which a decision requires another decision, or is a literal expression, is read as a decision model
+  which a decision requires another decision or business knowledge, or is not a decision table (a literal expression,
+  or since 0.10 a boxed expression, [#118](https://github.com/brunopacheco1/praecepta/issues/118)), is read as a decision model
   (`DmnReader.readModel`) and built into a `DecisionGraph` (`GraphModel` in `praecepta-integration`). Every
-  decision of the file is then a decision of `Decisions`, literal expressions included, and
+  decision of the file is then a decision of `Decisions`, literal and boxed expressions included, and
   `decisions.evaluate(name, inputData)` evaluates it from the model's **input data**, by name, as text, each
   decision it requires once: `"30"`, `["PT", "BR"]` for a list, and a structured input data by its components'
   paths (`Loan.principal`), as a column of that name reads it, as is an input data without a type that a decision
   reads by path (`Applicant.age`, each component typed by the column that reads it); a list of structured values
   cannot be given as text. Blank text is missing, as for a table's inputs, except for a `string` input data, for
   which it is the empty string, as the engine's `DecisionGraph` has it. Its value comes as the maps a table's engine gives: one map with a table's outputs, a context's
-  components, or a literal expression's value under the decision's name; one map per element of a list (RULE
+  components, or any other logic's value under the decision's name; one map per element of a list (RULE
   ORDER, OUTPUT ORDER, COLLECT); none for null. Each decision table is still an engine bean, which evaluates the
-  table alone from its columns, the values of the decisions it requires included, as 0.6 did; a literal
-  expression has no engine bean. The graph's report (`DECISION_CYCLE`, `MISSING_REQUIREMENT`, `TYPE_MISMATCH`,
+  table alone from its columns, the values of the decisions it requires included, as 0.6 did; other logic has no
+  engine bean, and a decision table within a boxed expression or a business knowledge model is checked as part of the
+  graph, under its decision's or business knowledge model's name. The graph's report (`DECISION_CYCLE`, `MISSING_REQUIREMENT`, `TYPE_MISMATCH`,
   `UNSUPPORTED_FEATURE` and `INVALID_EXPRESSION`, ERRORs, and `ALWAYS_NULL`, a WARNING) fails loading at `fail-on` like a table's; below it,
   a decision an ERROR concerns throws `InvalidDecisionTableException` when evaluated, and the others evaluate. A
   decision table of the graph is checked against its analysis as the graph evaluates it
@@ -102,9 +104,9 @@ integrations find their tables at runtime, so their engines take maps instead:
   file fails at the same `fail-on` in both. Whether a file is no graph Praecepta evaluates yet is told by the
   `UnsupportedFeatureException` `DmnReader.readModel` throws, not by its message. A file without such decisions loads
   exactly as before, its decision tables read alone. So does a file that is no graph Praecepta evaluates yet:
-  one that uses what later releases bring (business knowledge models, boxed expressions, decision services,
-  imports, external functions), or that is not a well-formed decision model (two elements of one
-  name, as `DmnWriter` writes a table with a column of its own name, a decision without logic), which a file of
+  one that uses what later releases bring (invoked decision services, imports, external functions), or that is not a
+  well-formed decision model (two elements of one name, as `DmnWriter` writes a table with a column of its own name,
+  a decision without logic that another requires), which a file of
   tables never had to be. Its decision tables load alone, as in 0.6, and nothing else of it is evaluated; a file
   with no decision table fails, naming the feature and its issue. A file whose tables load alone because it uses
   what a later release plans is logged, one line at INFO per file through the framework's logging (the same
@@ -112,7 +114,7 @@ integrations find their tables at runtime, so their engines take maps instead:
   `System.Logger`, `io.github.brunopacheco1.praecepta.integration.Decisions`, unless told not to log), naming the
   file, what it uses and the release and issue that plan it, so that the graph left out is seen:
   `rules/fees.dmn: its decision tables are loaded alone, without its decision requirements graph, which needs
-  Praecepta 0.10 (#118): DMN model has the business knowledge model 'Rate', ...`. The build plugins compile such a
+  Praecepta 0.11 (#119): DMN model imports 'Rate', ...`. The build plugins compile such a
   file's table the same way, and log it likewise at info level (Maven's info, Gradle's lifecycle, the Quarkus build
   step's INFO), once per file, through the compiler's `CompilerOptions.log`: `.../fees.dmn: its decision table is
   compiled alone, ...`.
@@ -247,7 +249,7 @@ What the Maven and Gradle plugins do, and another tool should too:
 - Two tables that generate the same class (any of `classNames()`) are rejected: `Two tables generate the class
   <X>; set <name> on one`, with the tool's spelling of `name`.
 - A DMN source whose decision (`decision`), or, without one, one of whose decisions, requires another decision or
-  is a literal expression compiles as a decision requirements graph: a model class named after the model, or
+  business knowledge, or is not a decision table, compiles as a decision requirements graph: a model class named after the model, or
   `name`, with `Model` appended (`CreditModel`), holding the `DecisionGraph`, and per decision an input record of
   the input data it needs and a class whose `evaluate` evaluates it through the graph. Every other source compiles
   as before, byte for byte.

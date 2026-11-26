@@ -490,6 +490,16 @@ graph.validationReport("Credit Limit");                    // that table's own a
   positional or named arguments; a function given arguments it does not take is null, with an error. A function's
   work counts against the evaluation's limits, so a regular expression that backtracks without end, or a sort of a
   million items, stops with an error. `FeelExpression` parses and evaluates FEEL on its own.
+- **Boxed expressions** (since 0.10, [#118](https://github.com/brunopacheco1/praecepta/issues/118); DMN 1.5, 10.2)
+  are decisions too, and parts of one another: contexts, whose entries read those before them and whose last entry
+  may be their result, invocations of a function by parameter name, function definitions, relations, lists,
+  conditionals, iterators (`for`, `some`, `every`) and filters. Each is evaluated as the FEEL it boxes, a part bound
+  to the type its model declares for it; a boxed condition that is not a boolean makes its construct null, with an
+  error, as the TCK has it.
+- **Business knowledge models** (since 0.10) are functions a decision invokes by name (`PMT(Principal, Rate, 12)`) or
+  through a boxed invocation, once it requires them (`knowledgeRequirement`); they may invoke the ones they require,
+  and themselves. A business knowledge model's body, or a context entry, may be a decision table, which keeps its
+  bitset index and its own analysis: `graph.validationReport("Description")` gives a business knowledge model's.
 - **Values.** A table with one output gives its value, with several a context (a `Map` of its outputs), whose
   components a decision reads by path (`Pricing.discount`), and under RULE ORDER, OUTPUT ORDER or COLLECT
   without an aggregation a list of those, which a list column downstream takes (`Checks.code` is the list of
@@ -507,27 +517,28 @@ graph.validationReport("Credit Limit");                    // that table's own a
 - **Checked when the graph is built**, as ERRORs of its validation report: decisions that require one another in
   a cycle (`DECISION_CYCLE`), a requirement the model does not have or a name no requirement provides
   (`MISSING_REQUIREMENT`), a value that does not fit where it goes, such as a string into a number column or
-  a list into a column of single values (`TYPE_MISMATCH`), and what Praecepta does not evaluate yet, such as a
-  built-in function, naming the release that plans it (`UNSUPPORTED_FEATURE`), and a literal expression that is not
+  a list into a column of single values (`TYPE_MISMATCH`), and what Praecepta does not evaluate yet, such as an
+  external function, naming the release that plans it (`UNSUPPORTED_FEATURE`), and a literal expression that is not
   FEEL (`INVALID_EXPRESSION`). Such a decision, and every decision
   that requires it, cannot be evaluated; the others can. A decision whose value DMN 1.5 defines as null whatever
   its inputs (operands FEEL does not combine, a path to a component its type does not have, a value that does
   not conform to the declared type) is a WARNING
   (`ALWAYS_NULL`), and evaluates to null. `DecisionGraph.builder().failOn(Severity.ERROR)` rejects the graph
   instead. Each table keeps its own analysis.
-- **In code**, `DecisionGraph.builder()` assembles a graph from input data, `DecisionTable`s and literal
-  expressions, each decision requiring what it reads; `graph.model()` is the `DecisionModel`, which
+- **In code**, `DecisionGraph.builder()` assembles a graph from input data, `DecisionTable`s, literal
+  expressions, decisions of any `DecisionLogic` and business knowledge models, each decision built from a table or a
+  literal expression requiring what it reads; `graph.model()` is the `DecisionModel`, which
   `DmnReader.readModel` reads and `DmnWriter.write(model)` writes back.
 - **The build plugins** generate a typed class per decision of such a file, which evaluates it through the
   graph ([Maven plugin](#decision-requirement-graphs-in-generated-code)), and **the framework integrations**
   evaluate its decisions from the input data through the same `Decisions` bean as tables
   ([Spring Boot](#decision-requirement-graphs-in-the-framework-integrations)).
 
-Business knowledge models, invocations and boxed expressions (0.10,
-[#118](https://github.com/brunopacheco1/praecepta/issues/118)), decision services, imports and FEEL's external
-functions (0.11, [#119](https://github.com/brunopacheco1/praecepta/issues/119)) come later: a model that uses them is rejected
-when it is read with an `UnsupportedFeatureException`, whose message, `release()` and `issue()` name the feature's
-release and issue. What DMN 1.5 decides and Praecepta does not do yet is listed in
+Decision services, imports and FEEL's external functions (0.11,
+[#119](https://github.com/brunopacheco1/praecepta/issues/119)) come later: a model that uses them is rejected when it is
+read with an `UnsupportedFeatureException`, whose message, `release()` and `issue()` name the feature's release and
+issue. A decision service that nothing in the model invokes, and a decision without logic that no decision requires,
+are left out, as they change no value Praecepta evaluates. What DMN 1.5 decides and Praecepta does not do yet is listed in
 [docs/DMN-CONFORMANCE.md](docs/DMN-CONFORMANCE.md#known-deviations).
 
 ## Praecepta Loader
@@ -617,7 +628,7 @@ Generated code belongs to your project, so it carries no Praecepta licence heade
 `Discount.validationReport()` gives the build-time findings, and `Discount.engine()` the engine.
 
 ### Decision requirement graphs in generated code
-A DMN file whose decisions require other decisions, or are literal expressions
+A DMN file whose decisions require other decisions or business knowledge, or are literal or boxed expressions
 ([decision requirement graphs](#decision-requirement-graphs), #14), compiles to a class per decision that
 evaluates it through the model's `DecisionGraph`, from typed input data:
 
@@ -655,12 +666,11 @@ DecisionGraph graph = CreditModel.graph();     // the whole graph, e.g. to evalu
   class (`<name>Model`). See the [changelog](CHANGELOG.md).
 - The graph's issues fail the build at `<failOn>` (its ERRORs, and at `WARNING` its WARNINGs too, such as a
   decision that is always null); below it they are logged, and a decision that cannot be evaluated gets no
-  classes. A file with business knowledge models, boxed expressions, decision
-  services, imports or literal expressions that invoke built-in functions is no graph Praecepta evaluates yet: its decision table
-  compiles alone, as before, and the build logs one line at info level per such file, naming it, what it uses and
-  the release that plans it (`.../fees.dmn: its decision table is compiled alone, without its decision requirements
-  graph, which needs Praecepta 0.10 (#118): ...`); without one the build fails, naming the release that plans what
-  it uses.
+  classes. A file that invokes decision services, imports another model or defines external functions is no graph
+  Praecepta evaluates yet: its decision table compiles alone, as before, and the build logs one line at info level per
+  such file, naming it, what it uses and the release that plans it (`.../fees.dmn: its decision table is compiled
+  alone, without its decision requirements graph, which needs Praecepta 0.11 (#119): ...`); without one the build
+  fails, naming the release that plans what it uses.
 
 ## Praecepta Gradle Plugin
 Does for Gradle what the Maven plugin does, with the same settings and the same generated files.
@@ -783,7 +793,7 @@ covers their package, such as `classpath*:com/acme/pricing/*.dmn`. Their generat
 need no bean.
 
 ### Decision requirement graphs in the framework integrations
-In a DMN file whose decisions require other decisions, or are literal expressions
+In a DMN file whose decisions require other decisions or business knowledge, or are literal or boxed expressions
 ([decision requirement graphs](#decision-requirement-graphs), #14), every decision is one of the `Decisions`
 bean, in Spring Boot, Micronaut and Quarkus alike, and `decisions.evaluate` evaluates it from the model's
 **input data**, by name, as text, each decision it requires evaluated once:
@@ -795,12 +805,12 @@ decisions.evaluate("Payment", Map.of("Loan.principal", "600000", "Loan.rate", "0
 ```
 
 A decision's value comes as the maps a table gives: one map with the outputs of a table, a context's
-components, or the value under the decision's name for a literal expression; one map per element of a list
+components, or the value under the decision's name for any other logic; one map per element of a list
 (RULE ORDER, COLLECT); none for null. A structured input data is given by its components' paths
 (`Loan.principal`), and so is one without a type that a decision reads by path (`Applicant.age`). Blank text is
 missing, except for a `string` input data, for which it is the empty string, as FEEL and the engine have it. Each
 decision table is still an engine bean, which evaluates the table alone, from its columns (the values of the
-decisions it requires included); a literal expression has none. The graph's issues (a cycle, a missing
+decisions it requires included); other logic has none. The graph's issues (a cycle, a missing
 requirement, a type mismatch, what Praecepta does not evaluate yet: ERRORs; a decision always null: a WARNING),
 and each table's analysis as the graph evaluates it, stop the startup at `praecepta.fail-on`, as they fail the
 build plugins, or are logged as `Decision model Credit: ERROR ...`; the endpoint lists each model under `models`, with its input data

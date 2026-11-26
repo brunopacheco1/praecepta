@@ -790,7 +790,7 @@ sealed interface Node {
         @Override
         public Object evaluate(Env env) {
             Consumer<String> errors = env.reporting() ? env::error : null;
-            return expression.evaluate(env::lookup, errors);
+            return env.embedding(() -> expression.evaluate(env::lookup, errors));
         }
 
         @Override

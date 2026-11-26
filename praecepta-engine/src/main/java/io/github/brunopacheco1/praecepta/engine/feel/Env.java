@@ -72,19 +72,38 @@ final class Env implements FeelValues.Budget {
         }
     }
 
-    /** What every scope of one evaluation shares. */
-    private static final class Shared {
-        private final Consumer<String> errors;
+    /**
+     * What one evaluation counts against its limits: steps, nesting and characters. An evaluation that an embedded
+     * expression starts, as a decision table within a boxed expression evaluates its FEEL from within the FEEL around
+     * it, counts against the one that embeds it, so that a business knowledge model whose table invokes it again stops
+     * at the limits rather than overflow the thread's stack.
+     */
+    private static final class Budget {
         private int steps;
         private int nesting;
         private long characters;
+    }
+
+    /** What every scope of one evaluation shares: where its errors go, and the budget it counts against. */
+    private static final class Shared {
+        private final Consumer<String> errors;
+        private final Budget budget;
+        /** The nesting this evaluation started with, given back when it finishes. */
+        private int depth;
         private int reported;
         private int dropped;
 
-        Shared(Consumer<String> errors) {
+        Shared(Consumer<String> errors, Budget budget) {
             this.errors = errors;
+            this.budget = budget == null ? new Budget() : budget;
         }
     }
+
+    /**
+     * The budget of the evaluation that is evaluating an embedded expression on each thread ({@link #embedding}), which
+     * an evaluation the embedded expression starts counts against; set only for the time of that call.
+     */
+    private static final ThreadLocal<Budget> EMBEDDING = new ThreadLocal<>();
 
     private static final Scope EMPTY = new Scope(Map.of(), null, name -> null);
 
@@ -107,14 +126,41 @@ final class Env implements FeelValues.Budget {
      * @param depth  the depth of the expression's tree, the nesting its evaluation starts with
      */
     static Env root(Function<String, Object> names, Consumer<String> errors, int depth) {
-        var shared = new Shared(errors);
-        shared.nesting = depth;
-        return new Env(new Scope(Map.of(), null, names), shared, false);
+        return new Env(new Scope(Map.of(), null, names), start(errors, depth), false);
     }
 
-    /** An evaluation of its own with no names in scope, as a function invoked from Java is. */
+    /**
+     * An evaluation of its own with no names in scope, as a function invoked from Java is; one an embedded expression
+     * starts counts against the limits of the evaluation that embeds it.
+     */
     static Env detached(Consumer<String> errors) {
-        return new Env(EMPTY, new Shared(errors), false);
+        return new Env(EMPTY, start(errors, 0), false);
+    }
+
+    /** Starts an evaluation, counting against that of the embedded expression being evaluated on this thread, if any. */
+    private static Shared start(Consumer<String> errors, int depth) {
+        var shared = new Shared(errors, EMBEDDING.get());
+        shared.depth = depth;
+        shared.budget.nesting += depth;
+        return shared;
+    }
+
+    /**
+     * Evaluates an embedded expression ({@link FeelExpression.Embedded}, a decision table within a boxed expression) in
+     * this evaluation: the evaluations it starts on this thread count against this one's limits.
+     */
+    Object embedding(Supplier<Object> evaluation) {
+        var previous = EMBEDDING.get();
+        EMBEDDING.set(shared.budget);
+        try {
+            return evaluation.get();
+        } finally {
+            if (previous == null) {
+                EMBEDDING.remove();
+            } else {
+                EMBEDDING.set(previous);
+            }
+        }
     }
 
     /** A scope inside this one, binding the names of {@code frame}, which it reads as it is when a name is looked up. */
@@ -176,12 +222,17 @@ final class Env implements FeelValues.Budget {
         return null;
     }
 
-    /** Ends the evaluation: reports how many errors were beyond {@link #MAX_ERRORS}, if any were. */
+    /**
+     * Ends the evaluation: reports how many errors were beyond {@link #MAX_ERRORS}, if any were, and gives back the
+     * nesting it started with to the evaluation it counted against.
+     */
     void finish() {
         if (shared.dropped > 0 && shared.errors != null) {
             shared.errors.accept("and %d more errors".formatted(shared.dropped));
             shared.dropped = 0;
         }
+        shared.budget.nesting -= shared.depth;
+        shared.depth = 0;
     }
 
     /** Counts a step; false once there have been more than {@link #MAX_STEPS} in this evaluation, with an error reported. */
@@ -191,8 +242,8 @@ final class Env implements FeelValues.Budget {
 
     /** Counts that many steps, as {@link #step()} does. */
     boolean step(long count) {
-        if (!stopped() && count <= MAX_STEPS - (long) shared.steps) {
-            shared.steps += (int) count;
+        if (!stopped() && count <= MAX_STEPS - (long) shared.budget.steps) {
+            shared.budget.steps += (int) count;
             return true;
         }
         stop("the evaluation takes more than " + MAX_STEPS + " steps");
@@ -205,7 +256,7 @@ final class Env implements FeelValues.Budget {
      */
     private void stop(String message) {
         if (!stopped()) {
-            shared.steps = MAX_STEPS + 1;
+            shared.budget.steps = MAX_STEPS + 1;
             new Env(scope, shared, false).error(message);
         }
     }
@@ -215,7 +266,7 @@ final class Env implements FeelValues.Budget {
      * its value is null.
      */
     boolean stopped() {
-        return shared.steps > MAX_STEPS;
+        return shared.budget.steps > MAX_STEPS;
     }
 
     /** The evaluation's value: its root's, or null if it stopped on the way, beyond its limits. */
@@ -233,8 +284,8 @@ final class Env implements FeelValues.Budget {
      * than {@link #MAX_CHARACTERS} in this evaluation.
      */
     boolean characters(long count) {
-        if (!stopped() && count <= MAX_CHARACTERS - shared.characters) {
-            shared.characters += count;
+        if (!stopped() && count <= MAX_CHARACTERS - shared.budget.characters) {
+            shared.budget.characters += count;
             return true;
         }
         stop("the strings + makes would hold more than %d characters".formatted(MAX_CHARACTERS));
@@ -243,15 +294,15 @@ final class Env implements FeelValues.Budget {
 
     /** Enters a function body of that depth; false, entering nothing, if that is more nesting than {@link #MAX_NESTING}. */
     boolean enter(int depth) {
-        if (shared.nesting + depth > MAX_NESTING) {
+        if (shared.budget.nesting + depth > MAX_NESTING) {
             return false;
         }
-        shared.nesting += depth;
+        shared.budget.nesting += depth;
         return true;
     }
 
     /** Leaves a function body of that depth. */
     void leave(int depth) {
-        shared.nesting -= depth;
+        shared.budget.nesting -= depth;
     }
 }

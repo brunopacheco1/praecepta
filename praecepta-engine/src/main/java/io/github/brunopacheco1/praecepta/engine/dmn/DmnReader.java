@@ -97,8 +97,8 @@ import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
  * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered
  * from 1 in table order.
  *
- * <p>{@link #readModel} reads a whole decision model instead, with its input data, its decisions (decision tables and
- * literal expressions) and their information requirements, for {@code DecisionGraph}.
+ * <p>{@link #readModel} reads a whole decision model instead, with its input data, its decisions (decision tables, literal
+ * expressions and boxed expressions), its business knowledge models and their requirements, for {@code DecisionGraph}.
  */
 public final class DmnReader {
 
@@ -156,9 +156,17 @@ public final class DmnReader {
     // ---- the decision model ----------------------------------------------------------------------
 
     /**
-     * Reads a whole decision model, for {@code DecisionGraph}: its input data, with their types, and its decisions, with
-     * their information requirements and their logic, a decision table (read as {@link #read(InputStream, String)} reads
-     * it) or a literal expression in FEEL ({@link DecisionLogic.LiteralExpression}), whose syntax is checked. An input
+     * Reads a whole decision model, for {@code DecisionGraph}: its input data, with their types, its decisions, with
+     * their information and knowledge requirements and their logic, and its business knowledge models, with their
+     * knowledge requirements and their logic, a function definition. Logic is a decision table (read as
+     * {@link #read(InputStream, String)} reads it), a literal expression in FEEL ({@link DecisionLogic.LiteralExpression}),
+     * or a boxed expression (DMN 1.5, 10.2: a context, an invocation, a function definition in FEEL, a relation, a list, a
+     * conditional, an iterator {@code for}, {@code some} or {@code every}, a filter), whose parts are in turn any of these,
+     * a decision table among them (named after the context entry, or the business knowledge model, that holds it, else
+     * its decision). Each part is of the type it, or the variable of the context entry or binding that holds it,
+     * declares. Every literal expression is checked to be FEEL with the names it may read in scope: its decision's
+     * requirements, or its business knowledge model's knowledge requirements and own name, and those its enclosing
+     * constructs bind ({@code decision A 2.1} reads as one name where it is one). An input
      * data's type is its variable's {@code typeRef}: a built-in type, or an item definition, which may be a collection or
      * have components (a context), nested up to {@value #MAX_TYPE_DEPTH} levels; none if it has no {@code typeRef}. A
      * literal expression's type is the decision variable's {@code typeRef} (or the literal expression's own, where the
@@ -168,20 +176,22 @@ public final class DmnReader {
      * declares for it (the variable's for a single output, its component's of the output's name for several), else of
      * the type of its output entries and default, when they are all literals of one type ({@code 10} is a number, as
      * FEEL reads it); else they are strings, as {@link #read(InputStream, String)} reads them. A
-     * requirement names a decision or an input data of the model by its {@code href} ({@code #id}); one that refers to
+     * requirement names a decision, an input data or a business knowledge model of the model by its {@code href}
+     * ({@code #id}); one that refers to
      * no element of the model is kept as the {@code id} it refers to, which {@code DecisionGraph} reports as a missing
      * requirement. Knowledge sources and authority requirements, which do not take part in evaluation, text annotations,
-     * groups and diagrams are ignored. The model's item definitions are its {@linkplain DecisionModel#types() types}, by name,
-     * which a literal expression's {@code instance of} may name; a function item among them is a function type.
+     * groups and diagrams are ignored, and so are a decision service that nothing in the model invokes and a decision
+     * without logic that no decision requires, which change no value Praecepta evaluates. The model's item definitions are
+     * its {@linkplain DecisionModel#types() types}, by name, which a literal expression's {@code instance of} may name; a
+     * function item among them is a function type, and one with neither a base type nor components is any type.
      *
-     * <p>What Praecepta does not evaluate yet is rejected, naming the element and the release that plans it: business
-     * knowledge models, knowledge requirements and invocations, and decision logic that is a boxed expression (a context,
-     * an invocation, a function definition, a relation, a list, a conditional, an iteration, a quantified expression, a
-     * filter), planned for 0.10 (#118); decision services, imports and external functions, for 0.11 (#119).
+     * <p>What Praecepta does not evaluate yet is rejected, naming the element and the release that plans it: invoking a
+     * decision service, imports and external functions (in FEEL, or a boxed function definition in Java or PMML),
+     * planned for 0.11 (#119).
      *
      * @throws InvalidDecisionTableException if the model cannot be read (a literal expression that is not FEEL among
      *                                       other things), uses what Praecepta does not support yet, or names two of its
-     *                                       decisions and input data alike
+     *                                       decisions, input data and business knowledge models alike
      */
     public static DecisionModel readModel(InputStream dmn) {
         var root = parseModel(dmn);

@@ -110,13 +110,19 @@ public final class DmnWriter {
     /**
      * The DMN XML of a decision model, as DMN 1.3, which {@link DmnReader#readModel} reads back as the same model: an
      * {@code inputData} per input data, typed by its type (an item definition for a list or a context, and no
-     * {@code typeRef} for {@link FeelType#ANY any type}), and a {@code decision} per decision, with an
-     * {@code informationRequirement} per requirement and its logic: a decision table, written as {@link #write(DecisionTable)}
-     * writes it, or a {@code literalExpression}, as written; the type the decision declares is its variable's; and an item
-     * definition per type the model names ({@link DecisionModel#types()}), under its name. Elements are
-     * identified by their position ({@code input_data_0}, {@code decision_0}), so that any names may be told apart.
+     * {@code typeRef} for {@link FeelType#ANY any type}), a {@code decision} per decision, with an
+     * {@code informationRequirement} per information requirement, a {@code knowledgeRequirement} per business knowledge
+     * model it requires, and its logic: a decision table, written as {@link #write(DecisionTable)} writes it, a
+     * {@code literalExpression}, as written, or a boxed expression, part by part, each typed by its type (a context
+     * entry's, or a binding's, on its variable or parameter); the type the decision declares is its variable's; a
+     * {@code businessKnowledgeModel} per business knowledge model, its logic its {@code encapsulatedLogic}; and an item
+     * definition per type the model names ({@link DecisionModel#types()}), under its name, and per other type of a part
+     * that is no simple type ({@code boxed_type_0}). A model with a conditional, an iterator or a filter, which DMN 1.3
+     * does not have, is written in DMN 1.5's namespace. Elements are identified by their position
+     * ({@code input_data_0}, {@code decision_0}, {@code knowledge_model_0}), so that any names may be told apart.
      *
-     * @throws InvalidDecisionTableException if a decision requires a decision or an input data the model does not have,
+     * @throws InvalidDecisionTableException if an element requires a decision, an input data or a business knowledge
+     *                                       model the model does not have,
      *                                       which DMN cannot refer to; if a type is a list of lists, which an item
      *                                       definition cannot hold; or if a table's cell is not valid for its column type
      */
