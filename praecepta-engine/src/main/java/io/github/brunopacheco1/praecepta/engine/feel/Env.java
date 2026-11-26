@@ -38,6 +38,12 @@ final class Env implements FeelValues.Budget {
      * overflow the thread's stack (a 512 KiB stack holds it, with room).
      */
     static final int MAX_NESTING = 800;
+    /**
+     * The nesting an embedded expression takes ({@link #embedding}): a decision table evaluated by its engine takes many
+     * more of the thread's stack frames than a level of FEEL's tree, so that a business knowledge model whose table
+     * invokes it again stops within {@link #MAX_NESTING} with room on a 512 KiB stack, whatever the JDK's frame sizes.
+     */
+    static final int EMBEDDED_WEIGHT = 16;
     /** At most this many errors one evaluation reports; those beyond are counted, and reported as one more at its end. */
     static final int MAX_ERRORS = 100;
 
@@ -150,11 +156,15 @@ final class Env implements FeelValues.Budget {
      * this evaluation: the evaluations it starts on this thread count against this one's limits.
      */
     Object embedding(Supplier<Object> evaluation) {
+        if (!enter(EMBEDDED_WEIGHT)) {
+            return error("functions invoke one another more deeply than Praecepta evaluates (" + MAX_NESTING + " levels)");
+        }
         var previous = EMBEDDING.get();
         EMBEDDING.set(shared.budget);
         try {
             return evaluation.get();
         } finally {
+            leave(EMBEDDED_WEIGHT);
             if (previous == null) {
                 EMBEDDING.remove();
             } else {
