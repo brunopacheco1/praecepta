@@ -198,7 +198,7 @@ COUNT included (it does not give 0). The engine, the generated classes and the f
   (cases 4, 5 and 9):
   - by instant when both have an offset;
   - by local time when one has no offset, or both have a zone id in one zone;
-  - to null for a time with a zone id and any time not in its zone. A zone with one fixed offset is the
+  - and give null for a time with a zone id and any time not in its zone. A zone with one fixed offset is the
     exception: a time in it is the time at that offset (case 9).
 
   By instant, two times are taken on one day, so times at offsets far apart can be more than a day apart:
@@ -259,8 +259,8 @@ COUNT included (it does not give 0). The engine, the generated classes and the f
     WARNING (`ALWAYS_NULL`). For an output entry, the WARNING is in the table's report.
   - **Untyped outputs.** An output that declares no type takes the one type its entries give, as FEEL types them
     (10.3.2.10, step 3c): the entry `10` is the number 10, and `Base * 2` is a number. Where the entries give
-    several types, a list or a context, the output gives each entry's own value. An output with an output value list or
-    a default output keeps a type, a string where nothing else gives one, as both are written as text.
+    several types, a list or a context, the output gives each entry's own value. An output with an output value
+    list or a default output keeps a type, a string where nothing else gives one, as both are written as text.
   - **A table read alone** (`DmnReader.read`) types what reads a name as a string: untyped outputs, and untyped
     input expressions that name what they read, even where the input data they read declares a type. An input
     expression that computes its value (`Age * 12`) is typed as FEEL types it from the file's input data, read
@@ -436,10 +436,10 @@ COUNT included (it does not give 0). The engine, the generated classes and the f
   uses `?`, as `{? : e1, r : e2}.r` likewise.
 - **TCK.** Its boolean columns (`0004-simpletable-U` to `0007-simpletable-P2` among the decision tables, and
   `0072-feel-in` for `in`) hold `true` and `false`, which match only those values, as (a) has them.
-- **Praecepta.** As DMN 1.5 has it: such a
-  test is a value, compared with the input (`true in [true]`), so `Income > 2 * Rent` in a boolean column holds when
-  the column's value equals it. A test that names `?` is a test (`? > 5 and ? < 10`); one whose value is a function is
-  applied to the input (`function(x) x > 3`); and `= e` and `!= e` compare the input with `e` (`= null` holds for a
+- **Praecepta.** As DMN 1.5 has it: such a test is a value, compared with the input (`true in [true]`). So
+  `Income > 2 * Rent` in a boolean column holds when the column's value equals it. A test that names `?` is a test
+  (`? > 5 and ? < 10`). One whose value is a function is applied to the input (`function(x) x > 3`). And `= e` and
+  `!= e` compare the input with `e` (`= null` holds for a
   missing value, as `null` does).
 
 ## 25. Names a table read alone does not have
@@ -499,8 +499,7 @@ COUNT included (it does not give 0). The engine, the generated classes and the f
 - **TCK.** `substring("foobar",3,3.8)` is `"oba"` (`1103-feel-substring-function`), `decimal(1/3, 2.5)` is `0.33`
   (`1100-feel-decimal-function`), and `list replace([1,2,3], 2.5, 4)` and `list replace([1,2,3], -1.5, 4)` are
   `[1, 4, 3]` and `[1, 2, 4]` (`1155-list-replace-function`): the number's whole part.
-- **Praecepta.** Every position, length
-  and scale is its number's whole part, toward zero, as the TCK has them.
+- **Praecepta.** Every position, length and scale is its number's whole part, toward zero, as the TCK has them.
 
 ## 30. The regular expressions of `matches`, `replace` and `split`
 - **DMN 1.5.** `matches` and `replace` are XQuery 1.0 and XPath 2.0 Functions and Operators' `fn:matches` and
@@ -525,18 +524,21 @@ COUNT included (it does not give 0). The engine, the generated classes and the f
   FEEL's other values are written by their literals elsewhere, but what `string()` gives for a list, a context, a range
   or a function is not said.
 - **TCK.** Its cases convert simple values: numbers, strings, dates, times, date-times and durations.
-- **Praecepta.** A simple value is written
-  as its text (`1.5`, `2025-01-31T08:30:00@Europe/Paris`, `P1DT2H`), a string as it is; a list as `[1, "a", null]` and
-  a context as `{a: 1}`, the strings in them quoted, each element written as it would be on its own; a range as FEEL
-  writes it (`[1..10)`); a built-in function by its name. `string(null)` is null.
+- **Praecepta.** `string()` writes:
+  - a simple value as its text (`1.5`, `2025-01-31T08:30:00@Europe/Paris`, `P1DT2H`), and a string as it is;
+  - a list as `[1, "a", null]` and a context as `{a: 1}`, with the strings in them quoted, and each element as it
+    would be written on its own;
+  - a range as FEEL writes it (`[1..10)`);
+  - a built-in function by its name.
+
+  `string(null)` is null.
 
 ## 32. The zone of `now()` and the day of `today()`
 - **DMN 1.5.** `now()` is "the current date and time" and `today()` "the current date" (10.3.4.11), whose zone is not
   said.
 - **TCK.** `1148-feel-now-function` and `1149-feel-today-function` check their types alone.
-- **Praecepta.** `now()` is the date and
-  time in the JVM's default zone, with its zone id, to the millisecond; `today()` the date there. Each invocation reads
-  the clock, so two in one expression may differ.
+- **Praecepta.** `now()` is the date and time in the JVM's default zone, with its zone id, to the millisecond;
+  `today()` is the date there. Each invocation reads the clock, so two in one expression may differ.
 
 ## 33. Real numbers the TCK states to some digits
 - **DMN 1.5.** A number is a decimal128 (10.3.2.3.1): 34 significant digits. `exp`, `log`, `sqrt` and `stddev` give
@@ -547,13 +549,13 @@ COUNT included (it does not give 0). The engine, the generated classes and the f
   `0008-LX-arithmetic`, the monthly payment of a loan, are off in their last digits: for a principal of 30,000 at 4.75 %
   over 60 months it states `562.707359373292`, where the payment is `562.7073593732659271562143285576...` (and a double
   gives `562.7073593732719`).
-- **Praecepta.** FEEL's values have their
-  34 digits. `praecepta-tck` takes a number the kit writes to at least 8 significant digits as the real number it
-  states: a result of more decimals that is less than one unit of its last digit away from it passes. A number of fewer
-  digits, such as `0.33`, is compared exactly. The two payments of `0008-LX-arithmetic` that the kit states wrongly
-  fail. So do the seven payments of the same formula that a business knowledge model computes, which the kit states
-  as a double computes them (`0009-invocation-arithmetic`, `0003-iteration`, `0004-lending`,
-  `0005-literal-invocation`, `0014-loan-comparison`).
+- **Praecepta.** FEEL's values have their 34 digits. `praecepta-tck` takes a number the kit writes to at least 8
+  significant digits as the real number it states: a result of more decimals passes when it is less than one unit
+  of the kit's last digit away from it. `praecepta-tck` compares a number of fewer digits, such as `0.33`, exactly.
+  The two payments of `0008-LX-arithmetic` that the kit states wrongly fail. So do the seven payments of the same
+  formula that a business knowledge model computes, which the kit states as a double computes them
+  (`0009-invocation-arithmetic`, `0003-iteration`, `0004-lending`, `0005-literal-invocation`,
+  `0014-loan-comparison`).
 
 ## 34. A boxed condition that is not a boolean
 - **DMN 1.5.** A boxed conditional, filter and iterator (10.2.7 to 10.2.9) are FEEL's `if`, filter, `some` and `every`
@@ -563,21 +565,20 @@ COUNT included (it does not give 0). The engine, the generated classes and the f
   some element, and `some` or `every` whose `satisfies` is a string for some element are null, with an error
   (`1150-boxed-conditional` to `1154-boxed-every`), even where another element satisfies `some`. It has no boxed
   condition that is null.
-- **Praecepta.** A boxed condition that
-  is neither a boolean nor null makes its construct null, with an error; a null condition is not true and gives no
-  error, as in FEEL. A boxed filter's `match` that is a number is not a boolean either: the filter is null, with an
-  error, where a filter in FEEL text selects the element at that position (case 21). The FEEL forms are unchanged.
+- **Praecepta.** A boxed condition that is neither a boolean nor null makes its construct null, with an error. A
+  null condition is not true and gives no error, as in FEEL. A boxed filter's `match` that is a number is not a
+  boolean either: the filter is null, with an error, where a filter in FEEL text selects the element at that
+  position (case 21). The forms in FEEL text keep FEEL's semantics.
 
 ## 35. A business knowledge model that invokes itself
 - **DMN 1.5.** A business knowledge model reads its parameters and the business knowledge models its knowledge
   requirements name (6.3.10, 7.3.4); it does not say whether one may name itself, or whether such requirements may form
   a cycle, as decisions' information requirements may not.
 - **TCK.** It has no such model.
-- **Praecepta.** A business knowledge
-  model's own name is in scope in its logic, as an entry's is in a context it defines a function in (10.3.2.6), so it may
-  invoke itself, and business knowledge models that require one another in a cycle are not reported. Each is a
-  function made once, so a cycle only recurses when invoked, and an invocation that never ends is null, with an error,
-  beyond the evaluation's limits (case 23).
+- **Praecepta.** A business knowledge model's own name is in scope in its logic, as an entry's is in a context it
+  defines a function in (10.3.2.6), so it may invoke itself. Praecepta does not report business knowledge models
+  that require one another in a cycle. Each is a function made once, so a cycle only recurses when invoked. An
+  invocation that never ends is null, with an error, beyond the evaluation's limits (case 23).
 
 ## 36. A decision service nothing invokes, and a decision without logic nothing requires
 - **DMN 1.5.** A decision service (6.3.9) is an invocable that encapsulates decisions; a decision's logic is optional

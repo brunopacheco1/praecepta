@@ -23,11 +23,11 @@ tables to load and how strictly to check them.
   external entities, so a DMN file cannot read local files or make network requests (XXE). It always
   parses with the JDK's own XML parser, for which these settings are written, whatever other parser is on
   the class path.
-- **Bad input fails cleanly:** any malformed table, cell, DMN document or decision model is rejected
-  with a documented exception (`InvalidDecisionTableException`, `CellSyntaxException`) naming where the
+- **Bad input fails cleanly:** Praecepta rejects any malformed table, cell, DMN document or decision model
+  with a documented exception (`InvalidDecisionTableException`, `CellSyntaxException`) that names where the
   problem is, never with an unexpected exception or a half-built engine.
-- **Input values are checked:** when a column declares its input values (a DMN value list), values
-  outside it are rejected rather than silently matched.
+- **Input values are checked:** when a column declares its input values (a DMN value list), the engine
+  rejects values outside it; it does not silently match them.
 - **No surprises at runtime:** an engine is immutable and thread-safe; evaluation has no side
   effects and allocates little.
 - **Code the Maven and Gradle plugins generate is safe to compile:** table, column and value names
@@ -45,14 +45,14 @@ tables to load and how strictly to check them.
 - **Protection from a malicious table's logic.** A table decides what the application does with
   its answer; who may change tables is the application's responsibility.
 - **Bounded build time for crafted FIRST or PRIORITY tables.** The unreachable-rule check is exact,
-  so a table built to defeat it can still be slow to validate. Since 0.2, large realistic tables
-  build in under a second (1,000 rules and 9 columns: 0.7 s, against 65 s in 0.1.0;
+  so a table built to defeat it can still be slow to validate. Large realistic tables build in under a
+  second (1,000 rules and 9 columns: 0.7 s;
   [#29](https://github.com/brunopacheco1/praecepta/issues/29)). Applications that build engines
   from untrusted tables should limit the table size, or build them off the request path.
 - **Limits on the size of input documents** beyond the JDK's XML processing limits
   (`FEATURE_SECURE_PROCESSING`); applications should cap upload sizes.
-- **Spreadsheet safety beyond Apache POI's.** Excel files are parsed by Apache POI, kept up to date
-  by Dependabot.
+- **Spreadsheet safety beyond Apache POI's.** Apache POI parses Excel files; Dependabot keeps it up to
+  date.
 - **Confidential rules behind the report endpoints.** The Spring Boot Actuator endpoint and the
   Micronaut management endpoint `praecepta` describe every table, its columns and the rules' conditions.
   They only read, and nothing is evaluated through them; Actuator exposes the endpoint only when the
@@ -63,17 +63,17 @@ tables to load and how strictly to check them.
 | Asset | Threat | Countered by |
 |---|---|---|
 | The host application's files and network | A crafted DMN document using XXE or a DTD to read files or make requests | DTDs disallowed, external entities off, secure processing on, always with the JDK's own parser (`DmnReader`) |
-| The host application's availability | Documents, models or cells crafted to crash the parser or exhaust memory | Fuzzing of the cell parser, FEEL expressions, FEEL unary tests (cells beyond the simple ones) and the DMN reader, decision models and their graphs included; JDK XML limits; FEEL expressions and unary tests (literal expressions, and tables' input expressions, cells and output entries) that nest at most 300 levels, or are a syntax error, and evaluations of at most 1,000,000 steps and 800 levels of nested invocations that make no string longer than 10,000,000 characters, beyond which the value is null, an evaluation started within another (a decision table within a boxed expression or a business knowledge model, since 0.10) counting against the same limits; item definitions nested at most 32 deep, so parsing and evaluation depth is bounded on a 512 KiB stack; no walk over a decision requirement graph recurses, so a long chain of decisions or a cycle cannot overflow the stack (cycles are reported, not followed) |
-| Correct decisions | Ambiguous or overlapping rules giving different answers than intended | Strict DMN hit policies; validation of overlaps, unreachable rules and gaps; the engine is tested against a reference implementation with property-based tests |
+| The host application's availability | Documents, models or cells crafted to crash the parser or exhaust memory | Fuzzing of the cell parser, FEEL expressions, FEEL unary tests (cells beyond the simple ones) and the DMN reader, decision models and their graphs included. JDK XML limits. FEEL expressions and unary tests (literal expressions, and tables' input expressions, cells and output entries) nest at most 300 levels, or are a syntax error. An evaluation takes at most 1,000,000 steps and 800 levels of nested invocations, and its strings hold at most 10,000,000 characters in all; beyond these limits its value is null ([DMN conformance, case 23](DMN-CONFORMANCE.md#23-limits-of-one-evaluation)). An evaluation started within another (a decision table within a boxed expression or a business knowledge model) counts against the same limits. Item definitions nest at most 32 deep, so parsing and evaluation depth is bounded on a 512 KiB stack. No walk over a decision requirement graph recurses, so a long chain of decisions or a cycle cannot overflow the stack (Praecepta reports cycles and does not follow them) |
+| Correct decisions | Ambiguous or overlapping rules giving different answers than intended | Strict DMN hit policies; validation of overlaps, unreachable rules and gaps; property-based tests that compare the engine with a naive reference implementation |
 | A build using the Maven or Gradle plugin | Table content injected into generated Java code | `JavaNames` sanitises identifiers (reserved words included); string literals are escaped; comments escape unicode escapes and comment terminators |
 | Users' supply chain | A tampered release or dependency | Signed releases with provenance; pinned CI actions; Dependabot, dependency review and OSV scans; a signed-commit, pull-request-only `main` |
 
 ## Trust boundaries
 1. **Table sources** (DMN, Excel and CSV files, and rule lists built in code) cross into the engine
-   through `DmnReader`, the loaders, `CellParser` and the builder. Everything is validated there;
+   through `DmnReader`, the loaders, `CellParser` and the builder. These validate everything;
    nothing after that point trusts the table to be well formed.
-2. **Input values** cross through the getters the application binds; they are matched, never
-   evaluated as code.
+2. **Input values** cross through the getters the application binds; the engine matches them, and never
+   evaluates them as code.
 3. **The Maven and Gradle plugins** (and the Quarkus extension, for spreadsheets it compiles) turn
    tables into source code or DMN at build time; the output is the boundary that matters, and names are
    sanitised before they are written.
@@ -82,26 +82,25 @@ tables to load and how strictly to check them.
    framework's own rules for endpoints allow it.
 
 ## Secure design principles applied
-- **Economy of mechanism:** FEEL is an expression language without side effects, input or output: the cells,
-  output entries, literal and boxed expressions of DMN files read the values they are given and compute values, and
-  the only functions they invoke are those the model defines (function definitions and, since 0.10, business
-  knowledge models, evaluated by the same interpreter and limits) and FEEL's built-in functions (since 0.9), which
-  compute values from their arguments, none reading or writing anything but `now()` and `today()`, which read the
-  clock; external Java and PMML functions are rejected, by design and for good
-  ([DMN conformance](DMN-CONFORMANCE.md#known-deviations)). So evaluating a table or a graph cannot run arbitrary code,
-  and each built-in function's work, a regular expression's matching included, counts against the evaluation's
-  limits; the engine has no
-  runtime dependencies.
-- **Fail-safe defaults:** unsupported DMN features, unknown cell syntax and undeclared values are
-  rejected, not ignored; a decision without logic is read but not evaluated, as its value is a person's to give
-  (since 0.11). XML features are off unless needed.
+- **Economy of mechanism:** FEEL is an expression language without side effects, input or output. The cells,
+  output entries, literal and boxed expressions of DMN files read the values they are given and compute values.
+  They invoke only the functions the model defines (function definitions and business knowledge models, which
+  the same interpreter evaluates within the same limits) and FEEL's built-in functions. The built-in functions
+  compute values from their arguments, and none reads or writes anything, except `now()` and `today()`, which
+  read the clock. Praecepta rejects external Java and PMML functions, by design
+  ([DMN conformance](DMN-CONFORMANCE.md#known-deviations)). So evaluating a table or a graph cannot run arbitrary
+  code, and each built-in function's work, a regular expression's matching included, counts against the
+  evaluation's limits. The engine has no runtime dependencies.
+- **Fail-safe defaults:** Praecepta rejects unsupported DMN features, unknown cell syntax and undeclared
+  values; it does not ignore them. It reads a decision without logic but does not evaluate it, as its value is a
+  person's to give. XML features are off unless needed.
 - **Complete mediation:** every table goes through the same parser and validation, whatever its
   source.
 - **Least privilege and least common mechanism:** no network, file (except reading the tables the
   caller or the application's settings name), process or reflection access at runtime, in the engine and
-  in the integrations alike; no shared mutable state. A model's imports (since 0.11) are found among the files the
-  integrations load, or, at build time, in the model's own directory, never outside it, whatever its `locationURI`
-  says; the engine reads only what the caller's `ImportResolver` gives it.
+  in the integrations alike; no shared mutable state. Praecepta looks for a model's imports among the files
+  the integrations load, or, at build time, in the model's own directory, never outside it, whatever its
+  `locationURI` says; the engine reads only what the caller's `ImportResolver` gives it.
 - **Open design:** everything, including the threat model and the fuzzing, is public.
 - **Psychological acceptability:** validation errors name the decision, rule and column, so the safe
   path is also the easy one.
@@ -113,15 +112,16 @@ tables to load and how strictly to check them.
 | CWE-776, entity expansion | DTDs disallowed; JDK secure-processing limits |
 | CWE-20, improper input validation | Cells parsed against a grammar; value lists enforced; DMN elements checked |
 | CWE-94, code injection (build plugins) | Identifiers sanitised; string literals and comment text escaped |
-| CWE-400, resource exhaustion | Fuzzed parsers; JDK limits; FIRST and PRIORITY validation fast on large tables since 0.2 (#29), but a crafted table can still be slow |
+| CWE-400, resource exhaustion | Fuzzed parsers; JDK limits; FIRST and PRIORITY validation is fast on large realistic tables, but a crafted table can still be slow |
 | CWE-362, race conditions | Immutable engines, no shared mutable state |
 | CWE-1104, unmaintained components | One third-party dependency Praecepta ships (Apache POI, in the loader and the build-time modules only; frameworks are the application's own), monitored by Dependabot and OSV |
 
 ## Evidence
 - **Tests:** 91.9% line coverage; property-based tests compare the engine with a naive reference
   implementation; tests run on Java 21, 25 and 27 on every pull request.
-- **Fuzzing:** Jazzer targets for the cell parser and the DMN reader (single tables, and whole
-  decision models built into graphs and evaluated) run on every pull request that touches the engine (ClusterFuzzLite), weekly for longer, and their saved inputs replay in every build.
+- **Fuzzing:** Jazzer targets for the cell parser, FEEL expressions, FEEL unary tests and the DMN reader
+  (single tables, and whole decision models built into graphs and evaluated) run on every pull request that
+  touches the engine (ClusterFuzzLite) and weekly for longer. Every build replays their saved inputs.
 - **Static analysis:** CodeQL and SonarCloud on every pull request, with SonarCloud as a required
   quality gate; compiler warnings fail the build; Checkstyle enforces the code style.
 - **Supply chain:** signed commits and releases, build provenance, CycloneDX SBOMs, reproducible
