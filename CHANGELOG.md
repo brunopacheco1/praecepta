@@ -11,6 +11,8 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-26
+
 Boxed expressions and business knowledge models, the fourth step of Praecepta's plan to grow from a decision-table
 engine into a full DMN 1.5 engine, one layer per release ([#120](https://github.com/brunopacheco1/praecepta/issues/120)):
 a decision's logic may be any boxed expression of DMN 1.5, chapter 10, and a model's business knowledge models are
@@ -1553,7 +1555,8 @@ Code written against the prototype needs the changes listed under *Changed*.
 - **`MissingOutputException`** (no match now yields an empty result), **`InvalidPraeceptaException`**
   and the trie visitor API.
 
-[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/brunopacheco1/praecepta/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/brunopacheco1/praecepta/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/brunopacheco1/praecepta/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/brunopacheco1/praecepta/compare/v0.6.0...v0.7.0

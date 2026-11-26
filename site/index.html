@@ -128,10 +128,10 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
         </article>
         <article>
           <h3>Decision requirement graphs</h3>
-          <p>Decisions that require other decisions and input data, each a table or a literal expression in
-            the full FEEL language, such as <code>if Score &gt; 700 then Limit / 12 else 0</code>, evaluated in
-            dependency order, with cycles, missing requirements and type mismatches reported when the graph is
-            built.</p>
+          <p>Decisions that require other decisions and input data, each a table, a literal expression or a
+            boxed expression, with the business knowledge models they invoke, in the full FEEL language, such
+            as <code>if Score &gt; 700 then Limit / 12 else 0</code>, evaluated in dependency order, with cycles,
+            missing requirements and type mismatches reported when the graph is built.</p>
         </article>
         <article>
           <h3>DMN in, DMN out</h3>
@@ -285,11 +285,11 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
       <h2 id="not-title">What it is not</h2>
       <p>Praecepta is on its way to a full DMN 1.5 engine, one layer per release
         (<a href="https://github.com/brunopacheco1/praecepta/issues/120">#120</a>), but it is not one yet. Today it evaluates decision tables and the
-        graphs of tables and literal expressions around them, in the full FEEL language with its built-in
-        functions. It does not have these yet; when you need one before its release, use Camunda or Drools:</p>
+        graphs of tables, literal and boxed expressions and business knowledge models around them, in the full
+        FEEL language with its built-in functions. It does not have these yet; when you need one before its
+        release, use Camunda or Drools:</p>
       <ul class="plain">
-        <li><strong>Business knowledge models and boxed expressions</strong> (0.10,
-          <a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>), and <strong>decision services and imports</strong> (0.11,
+        <li><strong>Decision services, imports and external functions</strong> (0.11,
           <a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>).</li>
       </ul>
       <p>Nor will it be a process engine, a modeller or a server around the decisions: it is a library your
@@ -494,17 +494,25 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
           </ul>
         </li>
         <li>
-          <h3>Next: 0.10</h3>
+          <h3>0.10 · released</h3>
           <ul class="plain">
-            <li>Boxed expressions and business knowledge models; decision tables reach 86 of 86 in the
-              conformance kit (<a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>)</li>
+            <li>Boxed expressions and business knowledge models, with decision tables within them, which keep
+              their analysis (<a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>)</li>
+            <li>The DMN conformance kit: 3,409 of 3,511 result nodes pass, 3,409 of the 3,420 Praecepta evaluates;
+              decision tables pass 86 of 86 (<a href="https://github.com/brunopacheco1/praecepta/blob/main/praecepta-tck/RESULTS.md">results</a>)</li>
           </ul>
         </li>
         <li>
-          <h3>0.11 and 1.0</h3>
+          <h3>Next: 0.11</h3>
           <ul class="plain">
-            <li>Decision services, imports and the rest of DMN 1.5, then a DMN 1.5 conformance claim and a
-              stable API (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>)</li>
+            <li>Decision services, imports, external functions and the rest of DMN 1.5
+              (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>)</li>
+          </ul>
+        </li>
+        <li>
+          <h3>1.0</h3>
+          <ul class="plain">
+            <li>A DMN 1.5 conformance claim and a stable API</li>
             <li>A second maintainer, so every change is reviewed by someone other than its author</li>
           </ul>
         </li>
