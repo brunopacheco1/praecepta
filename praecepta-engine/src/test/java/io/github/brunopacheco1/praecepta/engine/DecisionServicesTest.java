@@ -28,7 +28,7 @@ import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
-/** Decision services (DMN 1.5, 6.3.9), invoked by the decisions that require them and from outside the model (#119). */
+/** Decision services (DMN 1.5, 6.3.9), invoked by the decisions that require them and from outside the model. */
 class DecisionServicesTest {
 
     private static final FeelType NUMBER = FeelType.of(ColumnType.NUMBER);

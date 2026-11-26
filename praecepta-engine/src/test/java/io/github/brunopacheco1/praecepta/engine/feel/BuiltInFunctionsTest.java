@@ -23,7 +23,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 
 /**
- * FEEL's built-in functions (DMN 1.5, 10.3.4), since 0.9 (#117): each family's values, named arguments and the
+ * FEEL's built-in functions (DMN 1.5, 10.3.4): each family's values, named arguments and the
  * signatures they pick, the implicit conversions to and from a list of one, the errors that make an invocation null, and
  * the evaluation's limits, which a function's work counts against.
  */

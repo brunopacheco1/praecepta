@@ -63,7 +63,7 @@ class GenerateMojoTest {
                 .contains(basedir.resolve("target/generated-resources/praecepta").toString());
     }
 
-    /** A DMN model whose decisions require one another (#14): a model class, and an input record and a class per decision. */
+    /** A DMN model whose decisions require one another: a model class, and an input record and a class per decision. */
     @Test
     void a_decision_requirements_graph_generates_a_class_per_decision() throws Exception {
         var credit = new TableConfig(new File("src/main/rules/credit.dmn"), null, null, null, null, List.of(), List.of());
@@ -85,12 +85,11 @@ class GenerateMojoTest {
     }
 
     /**
-     * A DMN file whose model uses what a later release plans compiles its decision table alone, as in 0.6, and the
-     * build says so at info level, once per file however many tables read it, naming the file, the feature and the
-     * release and issue that plan it.
+     * A DMN file whose model uses what Praecepta does not evaluate compiles its decision table alone, and the
+     * build says so at info level, once per file however many tables read it, naming the file and the feature.
      */
     @Test
-    void a_table_compiled_alone_for_what_a_later_release_plans_is_logged_once_per_file() throws Exception {
+    void a_table_compiled_alone_for_what_praecepta_does_not_evaluate_is_logged_once_per_file() throws Exception {
         Files.writeString(basedir.resolve("src/main/rules/later.dmn"), """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
                   <decision id="rate" name="Rate"><literalExpression>
@@ -123,7 +122,7 @@ class GenerateMojoTest {
     }
 
     /**
-     * A source the engine rejects, or that uses what a later release plans with no table to compile alone, fails the
+     * A source the engine rejects, or that uses what Praecepta does not evaluate with no table to compile alone, fails the
      * build as a MojoFailureException, with the engine's message and exception as its cause.
      */
     @Test

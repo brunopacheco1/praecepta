@@ -44,7 +44,7 @@ import io.github.brunopacheco1.praecepta.tck.TckSuite.Check;
 import io.github.brunopacheco1.praecepta.tck.TckSuite.Invocable;
 
 /**
- * Evaluates a decision through its model's decision requirements graph, as Praecepta does since 0.7 (#14): the model
+ * Evaluates a decision through its model's decision requirements graph, as Praecepta does: the model
  * is read with {@link DmnReader#readModel} and built into a {@link DecisionGraph}, which evaluates the decision from the
  * test case's input data and computes the decisions it requires. A decision whose value the test case gives is input
  * data instead, as the kit means it: the graph is built with that decision replaced by an input data of its type.
@@ -52,7 +52,7 @@ import io.github.brunopacheco1.praecepta.tck.TckSuite.Invocable;
  * <p>It takes a node when the model as a whole is one {@link DmnReader#readModel} reads (a model with a business
  * knowledge model, a decision service or an import, even one the node does not use, is not) and the graph evaluates the
  * decision: what is not supported is what the engine rejects, a decision its validation report does not let it
- * evaluate (one that invokes a built-in function, planned for 0.9, say). The nodes it does not take go to the next
+ * evaluate (one that reads a name none of its requirements provides, say). The nodes it does not take go to the next
  * evaluator ({@link ModelEvaluator#orElse}), {@link SingleDecisionEvaluator}, which evaluates a decision on its own and
  * names what the node needs.
  *
@@ -411,33 +411,17 @@ final class GraphEvaluator implements ModelEvaluator {
 
     /**
      * What {@link DmnReader#readModel} rejected in a model: what the node does not use itself, since its own needs were
-     * none. A feature a later release plans is told by the issue its {@link UnsupportedFeatureException} names, and the
-     * kind of element the reader names at the start of its message; anything else is a model Praecepta does not read.
+     * none. An {@link UnsupportedFeatureException} is an import, as the reader's message says, or else an external
+     * function, which Praecepta does not evaluate by design; anything else is a model Praecepta does not read.
      */
     static Feature rejected(InvalidDecisionTableException rejection) {
         var message = String.valueOf(rejection.getMessage());
-        if (!(rejection instanceof UnsupportedFeatureException unsupported)) {
+        if (!(rejection instanceof UnsupportedFeatureException)) {
             return Feature.decisionTable(message.contains("item definition")
                     ? "item definitions Praecepta does not read, elsewhere in the model"
                     : "models Praecepta does not read as a whole");
         }
-        if (unsupported.release() == null) {
-            return Feature.EXTERNAL_FUNCTIONS; // what Praecepta does not evaluate by design
-        }
-        return switch (unsupported.issue()) {
-            case 119 -> {
-                if (message.contains("decision service")) {
-                    yield Feature.DECISION_SERVICES;
-                }
-                if (message.contains("has no decision logic")) {
-                    yield Feature.NO_LOGIC;
-                }
-                yield message.contains("defines a function in") || message.contains("external function") ? Feature.EXTERNAL_FUNCTIONS
-                        : Feature.IMPORTS;
-            }
-            case 118 -> message.startsWith("DMN model has the business knowledge model") || message.contains("requires business knowledge")
-                    ? Feature.KNOWLEDGE_MODELS : Feature.boxed("boxed expressions elsewhere in the model");
-            default -> Feature.feel("FEEL Praecepta does not read elsewhere in the model");
-        };
+        var imports = message.startsWith("DMN model imports") || message.contains("its literal expression imports values");
+        return imports ? Feature.IMPORTS : Feature.EXTERNAL_FUNCTIONS;
     }
 }

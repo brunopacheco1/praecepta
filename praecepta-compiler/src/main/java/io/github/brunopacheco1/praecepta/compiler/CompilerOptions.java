@@ -28,9 +28,8 @@ import io.github.brunopacheco1.praecepta.engine.ValidationReport.Severity;
  *                     pom, {@link #QUOTED} by default
  * @param log          where the compiler sends a line the build tool should log at its informational level (Maven's
  *                     info, Gradle's lifecycle): one per DMN source whose decision table is compiled alone because
- *                     {@code DmnReader.readModel} rejects its model with what a later release plans, naming the file,
- *                     the feature and the release and issue that plan it, so that the graph left out is seen; none by
- *                     default
+ *                     {@code DmnReader.readModel} rejects its model with what Praecepta does not evaluate, naming the
+ *                     file and the feature, so that the graph left out is seen; none by default
  */
 public record CompilerOptions(String packageName, Severity failOn, String fileHeader, String generator,
         UnaryOperator<String> settingNames, Consumer<String> log) {

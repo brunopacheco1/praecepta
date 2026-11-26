@@ -54,8 +54,8 @@ final class DeclaredTables {
      *
      * @param key              the table's key under {@code quarkus.praecepta.tables}
      * @param projectDirectory what relative sources are resolved against
-     * @param log              where the compiler's informational lines go ({@code CompilerOptions.log}): a DMN
-     *                         source compiled as its decision table alone, as its model uses what a later release plans
+     * @param log              where the compiler's informational lines go ({@code CompilerOptions.log}): a DMN source
+     *                         compiled as its decision table alone, as its model uses what Praecepta does not evaluate
      * @throws IllegalArgumentException naming the table's key, for any configuration or table mistake
      */
     static Table compile(String key, TableConfig config, Path projectDirectory, Consumer<String> log) {

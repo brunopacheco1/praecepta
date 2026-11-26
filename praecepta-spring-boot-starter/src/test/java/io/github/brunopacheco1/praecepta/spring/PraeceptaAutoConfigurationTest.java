@@ -209,7 +209,7 @@ class PraeceptaAutoConfigurationTest {
     }
 
     /**
-     * A file whose decisions require other decisions (#14): every decision evaluated from the model's input data
+     * A file whose decisions require other decisions: every decision evaluated from the model's input data
      * through the Decisions bean, an engine bean per decision table, and the graph described by the endpoint.
      */
     @Test
@@ -240,7 +240,7 @@ class PraeceptaAutoConfigurationTest {
     }
 
     /**
-     * A decision table in the full FEEL language (0.8, #116): a column computed by its input expression, cells beyond the
+     * A decision table in the full FEEL language: a column computed by its input expression, cells beyond the
      * simple unary tests and output entries of several types, read by a literal expression, loads with no issue.
      */
     @Test

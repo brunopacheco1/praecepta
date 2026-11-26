@@ -57,9 +57,9 @@ public final class DecisionsLoader {
 
         /**
          * One line: {@code Loaded 2 decision(s) from 1 DMN file(s): Discount, Fee}, or that none were found; then one
-         * line per DMN file whose decision tables are loaded alone because its model uses what a later release plans:
-         * {@code rules/fees.dmn: its decision tables are loaded alone, without its decision requirements graph, which
-         * needs Praecepta 0.11 (#119): ...}.
+         * line per DMN file whose decision tables are loaded alone because its model uses what Praecepta does not
+         * evaluate: {@code rules/fees.dmn: its decision tables are loaded alone, without its decision requirements
+         * graph, which uses what Praecepta does not evaluate: ...}.
          */
         void info(String message);
 
@@ -108,8 +108,8 @@ public final class DecisionsLoader {
 
     /**
      * Finds and loads the tables, then logs how many decisions were loaded, each DMN file whose decision tables are
-     * loaded alone because its model uses what a later release plans (one line at INFO naming the file, the feature and
-     * the release and issue that plan it), and every validation issue below {@code fail-on} as a warning, once: the
+     * loaded alone because its model uses what Praecepta does not evaluate (one line at INFO naming the file and the
+     * feature), and every validation issue below {@code fail-on} as a warning, once: the
      * engines do not log their reports themselves ({@link Decisions#load(java.util.Collection, Severity, boolean)}).
      *
      * @throws DecisionsException listing every problem with the settings, the locations or the tables

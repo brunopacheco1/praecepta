@@ -13,7 +13,7 @@ import io.github.brunopacheco1.praecepta.tck.TckSuite.Check;
  * returns the node's value, an error, a failure, or the features it lacks. {@link TckRunner} does the rest:
  * comparing with the expected result, scoring, the baseline and RESULTS.md.
  *
- * <p>{@link #praecepta()} is what Praecepta has now: decision requirement graphs (#14) in front of single decisions,
+ * <p>{@link #praecepta()} is what Praecepta has now: decision requirement graphs in front of single decisions,
  * {@code graphs.orElse(single)}. A release that adds a way to evaluate models puts its evaluator in front the same
  * way, so the nodes it cannot take still get the reasons the others give.
  */

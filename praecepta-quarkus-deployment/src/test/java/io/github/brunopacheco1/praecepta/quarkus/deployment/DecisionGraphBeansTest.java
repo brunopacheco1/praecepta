@@ -22,7 +22,7 @@ import io.quarkus.test.QuarkusExtensionTest;
 import io.smallrye.common.annotation.Identifier;
 
 /**
- * A DMN file whose decisions require other decisions (#14), validated while Quarkus builds the application and rebuilt
+ * A DMN file whose decisions require other decisions, validated while Quarkus builds the application and rebuilt
  * from the DMN the build wrote: every decision is evaluated from the model's input data through the {@code Decisions}
  * bean, beside a declared spreadsheet table, and each decision table is also an engine bean, which evaluates it alone.
  */

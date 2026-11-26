@@ -17,7 +17,7 @@ import io.github.brunopacheco1.praecepta.integration.Decisions;
 import io.quarkus.test.QuarkusExtensionTest;
 
 /**
- * A decision table in the full FEEL language (0.8, #116), validated while Quarkus builds the application: a column
+ * A decision table in the full FEEL language, validated while Quarkus builds the application: a column
  * computed by its input expression, cells beyond the simple unary tests and output entries of several types, read by a
  * literal expression.
  */

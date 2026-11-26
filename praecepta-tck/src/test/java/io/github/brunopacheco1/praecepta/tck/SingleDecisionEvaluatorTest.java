@@ -40,7 +40,7 @@ class SingleDecisionEvaluatorTest {
 
     @Test
     void a_decision_on_other_decisions_needs_graphs_and_what_its_own_logic_needs() {
-        // its literal expression invokes max(), which 0.9 evaluates: alone, it needs only the decisions it requires
+        // its literal expression invokes max(), which Praecepta evaluates: alone, it needs only the decisions it requires
         var check = KIT.get("compliance-level-3/0020-vacation-days/0020-vacation-days-test-01.xml #001 Total Vacation Days");
         assertThat(evaluator.evaluate(check)).isEqualTo(new Evaluation.Unsupported(List.of(Feature.REQUIRED_DECISIONS)));
         // the tables it requires are read, so a graph evaluator needs nothing more

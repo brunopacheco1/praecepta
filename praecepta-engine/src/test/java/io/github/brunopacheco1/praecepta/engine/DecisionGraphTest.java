@@ -544,7 +544,7 @@ class DecisionGraphTest {
 
     @Test
     void a_time_with_a_zone_id_another_decision_gives_reaches_the_rules_that_accept_any_time() {
-        // #114 in a graph: a table's time column reads another decision's value, which may be a time with a zone id its
+        // in a graph, a table's time column reads another decision's value, which may be a time with a zone id its
         // cells do not name; such a time compares with none of them (FEEL's null, docs/DMN-CONFORMANCE.md case 9)
         var graph = DecisionGraph.builder()
                 .logValidationReport(false)
@@ -734,7 +734,7 @@ class DecisionGraphTest {
 
     @Test
     void a_literal_expression_that_invokes_a_built_in_function_is_typed_and_evaluated() {
-        // FEEL's built-in functions since 0.9 (#117); an external function is reported, as Praecepta does not evaluate it by design
+        // Praecepta evaluates FEEL's built-in functions; an external function is reported, as it does not evaluate one by design
         var graph = DecisionGraph.builder().logValidationReport(false).inputData("Name", ColumnType.STRING)
                 .literalDecision("Upper", "upper case(Name)").literalDecision("Greeting", "\"Hello \" + Upper")
                 .literalDecision("External", "(function(a) external {java: {class: \"C\"}})(Name)").build();

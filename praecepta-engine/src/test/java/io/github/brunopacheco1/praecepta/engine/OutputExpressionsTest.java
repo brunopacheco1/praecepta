@@ -197,7 +197,7 @@ class OutputExpressionsTest {
         Assertions.assertThatThrownBy(() -> byColumn(HitPolicy.FIRST, unknown))
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessage("The table's expressions read 'tax', which has no input binding");
-        // FEEL's built-in functions since 0.9 (#117); external functions Praecepta does not evaluate, by design
+        // Praecepta evaluates FEEL's built-in functions; external functions it does not, by design
         var call = byColumn(HitPolicy.FIRST, List.of(rule(1, Map.of(), Map.of(), Map.of("x", "abs(price)"))));
         Assertions.assertThat(call.evaluate(new Order("PT", new BigDecimal("-2.5"), null, null))).containsExactly(values("x", "2.5"));
         var external = List.of(rule(1, Map.of(), Map.of(), Map.of("x", "(function(a) external {java: {class: \"C\"}})(price)")));

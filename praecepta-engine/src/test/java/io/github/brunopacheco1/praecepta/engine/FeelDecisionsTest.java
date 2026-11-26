@@ -155,7 +155,6 @@ class FeelDecisionsTest {
 
     @Test
     void a_literal_expression_that_invokes_a_built_in_function_is_evaluated() {
-        // FEEL's built-in functions since 0.9 (#117)
         var model = read("""
                 <decision id="d" name="D"><literalExpression><text>upper case("a") + "!"</text></literalExpression></decision>
                 """);
@@ -181,7 +180,6 @@ class FeelDecisionsTest {
         assertThatThrownBy(() -> read("""
                 <decision id="d" name="D"><literalExpression><text>function(a) external {java: {class: "C"}}</text></literalExpression></decision>
                 """)).isInstanceOf(UnsupportedFeatureException.class)
-                .hasMessageContaining("uses an external function (Java or PMML), which Praecepta does not evaluate, by design")
-                .satisfies(e -> assertThat(((UnsupportedFeatureException) e).release()).isNull());
+                .hasMessageContaining("uses an external function (Java or PMML), which Praecepta does not evaluate, by design");
     }
 }

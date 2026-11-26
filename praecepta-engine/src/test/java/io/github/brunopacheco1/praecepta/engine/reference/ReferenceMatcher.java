@@ -93,7 +93,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
  * @param zoneIdColumns  the time columns whose inputs have a zone id ({@code 10:30@Europe/Paris}), which compare by
  *                       local time with times in the same zone, and with no other (FEEL's null); with
  *                       {@code bothKinds}, the static analysis visits such times in every time column, whether its
- *                       cells name one or not (#114)
+ *                       cells name one or not
  */
 public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<String, List<String>> outputPriority,
         Map<String, ColumnType> types, Map<String, String> allowedValues, boolean feelCells, Set<String> zonedColumns,
@@ -709,7 +709,7 @@ public record ReferenceMatcher(List<Praeceptum> rules, HitPolicy hitPolicy, Map<
     /**
      * The representative single values of a column, of both kinds of time if {@code eitherKind}; a time column whose
      * inputs may have a zone id (map-based inputs, a getter of such times, a list's elements) also takes one in a zone
-     * no cell names, which compares with no time a cell names (#114).
+     * no cell names, which compares with no time a cell names.
      */
     private List<Object> representativeElements(String column, boolean withMissing, boolean eitherKind) {
         var type = type(column);

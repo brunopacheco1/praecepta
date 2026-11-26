@@ -45,11 +45,11 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelTemporals;
  * rule matches, the list holds the table's default output values, if it declares any, or is empty, whatever
  * the hit policy or aggregation (DMN 1.5, 10.3.2.10, step 2): a COUNT is then empty, not zero.
  *
- * <p><b>A decision of a decision requirements graph</b> (#14): when its file holds decisions that require other
+ * <p><b>A decision of a decision requirements graph</b>: when its file holds decisions that require other
  * decisions, or literal expressions, every decision of the file belongs to its {@link GraphModel}, and
  * {@link #evaluate(Map)} evaluates it from the model's <em>input data</em>, by name, through the decisions it requires,
  * each once, giving its value as maps of text ({@link GraphModel#evaluate}). Its {@link #engine()} still evaluates its
- * table alone, from its columns, the values of the decisions it requires included, as in 0.6; a literal expression
+ * table alone, from its columns, the values of the decisions it requires included; a literal expression
  * has neither table nor engine.
  *
  * @param name     the decision's name: the DMN decision's {@code name} (or {@code id}); engines are named and
@@ -86,7 +86,7 @@ public record Decision(String name, String location, DecisionTable table, Praece
         }
     }
 
-    /** A decision table read alone, as in 0.6: evaluated by its engine, from its columns. */
+    /** A decision table read alone: evaluated by its engine, from its columns. */
     public Decision(String name, String location, DecisionTable table, PraeceptaEngine<Map<String, String>, Map<String, String>> engine,
             ValidationReport report) {
         this(name, location, Objects.requireNonNull(table, "table"), Objects.requireNonNull(engine, "engine"), report, null);

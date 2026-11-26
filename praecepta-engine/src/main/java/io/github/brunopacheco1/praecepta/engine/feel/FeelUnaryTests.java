@@ -42,10 +42,8 @@ import java.util.function.Function;
  *
  * <p>The limits of {@link FeelExpression} apply to each application of the tests, which is an evaluation of its own:
  * the tests nest as deeply as an expression may, and one application takes at most a million steps; beyond them, the
- * tests are not satisfied. The tests may invoke FEEL's built-in functions (since 0.9,
- * <a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>); external functions are planned for 0.11
- * (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>): {@link #unsupported()} names one a test
- * defines. Immutable and thread-safe.
+ * tests are not satisfied. The tests may invoke FEEL's built-in functions; Praecepta does not evaluate external
+ * functions, by design: {@link #unsupported()} names one a test defines. Immutable and thread-safe.
  */
 public final class FeelUnaryTests {
 
@@ -117,8 +115,8 @@ public final class FeelUnaryTests {
     }
 
     /**
-     * What the tests use that DMN 1.5 defines but Praecepta does not evaluate yet, each naming the release that plans it,
-     * as {@link FeelExpression#unsupported()} names it; empty if they use none.
+     * What the tests use that DMN 1.5 defines but Praecepta does not evaluate, as {@link FeelExpression#unsupported()}
+     * names it; empty if they use none.
      */
     public List<FeelExpression.Unsupported> unsupported() {
         return unsupported;

@@ -149,13 +149,13 @@ class DecisionModelDmnTest {
     @ParameterizedTest
     @ValueSource(strings = {
         "<import namespace=\"https://example.com/other\" name=\"other\" importType=\"https://www.omg.org/spec/DMN/20230324/MODEL/\"/>"
-                + "|imports 'other'|#119",
+                + "|imports 'other'|reads only with the models it imports",
         "<decision id=\"d\" name=\"D\"><functionDefinition kind=\"Java\"><literalExpression><text>1</text></literalExpression>"
                 + "</functionDefinition></decision>|defines a function in Java|by design",
         "<decision id=\"d\" name=\"D\"><informationRequirement><requiredDecision href=\"other.dmn#x\"/></informationRequirement>"
                 + "<literalExpression><text>1</text></literalExpression></decision>|an element of a model it does not import|Decision 'D'",
     })
-    void what_praecepta_does_not_evaluate_yet_is_rejected_naming_the_issue_that_plans_it(String row) {
+    void what_praecepta_does_not_evaluate_or_read_is_rejected_naming_it(String row) {
         var parts = row.split("\\|");
         var xml = dmn(parts[0]);
 

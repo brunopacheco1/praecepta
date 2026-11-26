@@ -20,9 +20,8 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 
 /**
  * FEEL's arithmetic as decision tables' output entries compute it (DMN 1.5, 10.3.2.3.1 and Tables 57 to 62): decimals of
- * 34 digits, the precedence of its operators, its null for what it does not define. Output entries were a subset of
- * FEEL in 0.6 and 0.7 ({@code OutputExpression}); since 0.8 they are full FEEL, so these are the same cases, evaluated by
- * {@link FeelExpression}.
+ * 34 digits, the precedence of its operators, its null for what it does not define. Output entries are FEEL
+ * expressions, so {@link FeelExpression} evaluates these cases.
  */
 class FeelArithmeticTest {
 

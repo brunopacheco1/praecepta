@@ -28,13 +28,11 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * @param name            the model's name (the {@code definitions} element's)
  * @param inputData       the input data, in the model's order
  * @param decisions       the decisions, in the model's order
- * @param knowledgeModels  the business knowledge models, in the model's order (since 0.10,
- *                         <a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>)
- * @param decisionServices the decision services, in the model's order (since 0.11,
- *                         <a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>)
+ * @param knowledgeModels  the business knowledge models, in the model's order
+ * @param decisionServices the decision services, in the model's order
  * @param namespace        the model's namespace (the {@code definitions} element's), by which other models import it;
  *                         empty if it has none
- * @param imports          the models it imports (DMN 1.5, 6.3.3; since 0.11), whose elements its own read by qualified
+ * @param imports          the models it imports (DMN 1.5, 6.3.3), whose elements its own read by qualified
  *                         names ({@code importName.elementName}), or by their own names for an import without a name
  * @param types           the types the model defines (its item definitions, DMN 1.5, 7.3.2), by name, which a literal
  *                  expression's {@code instance of} and function parameters may name (10.3.2.9); empty if it defines

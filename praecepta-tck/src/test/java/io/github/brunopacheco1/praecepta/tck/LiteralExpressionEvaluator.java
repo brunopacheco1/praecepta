@@ -129,7 +129,7 @@ final class LiteralExpressionEvaluator {
 
     /**
      * What a name that is neither an input data nor a decision of the model needs: an imported model's, if the model
-     * imports one (0.11's imports, DMN 1.5, 6.3.3), else what the text uses that Praecepta does not, else names beyond the
+     * imports one (DMN 1.5, 6.3.3), else what the text uses that Praecepta does not, else names beyond the
      * decision's inputs.
      */
     static List<Feature> unknownName(String text, DmnModel model) {
@@ -205,7 +205,7 @@ final class LiteralExpressionEvaluator {
         return text.toString();
     }
 
-    /** Whether Praecepta evaluates the text: it is FEEL, and uses nothing Praecepta does not evaluate yet. */
+    /** Whether Praecepta evaluates the text: it is FEEL, and uses nothing Praecepta does not evaluate. */
     static boolean evaluates(String text) {
         try {
             return FeelExpression.parse(text).unsupported().isEmpty();

@@ -453,14 +453,14 @@ class FeelExpressionTest {
     }
 
     @Test
-    void a_built_in_function_is_evaluated_and_what_is_not_yet_is_named() {
-        // FEEL's built-in functions since 0.9 (#117); its external functions it does not evaluate, by design
+    void a_built_in_function_is_evaluated_and_an_external_function_is_named() {
+        // Praecepta evaluates FEEL's built-in functions; its external functions it does not, by design
         var expression = FeelExpression.parse("string length(Name) + count([1])", List.of("Name"));
         assertThat(expression.names()).containsExactly("Name");
         assertThat(expression.unsupported()).isEmpty();
         assertThat(expression.evaluate(name -> "abc")).isEqualTo(BigDecimal.valueOf(4));
         var external = FeelExpression.parse("function(a) external {java: {class: \"x\"}}");
-        assertThat(external.unsupported()).containsExactly(new FeelExpression.Unsupported("an external function (Java or PMML)", null, 0));
+        assertThat(external.unsupported()).containsExactly(new FeelExpression.Unsupported("an external function (Java or PMML)"));
         assertThat(external.unsupported().getFirst())
                 .hasToString("an external function (Java or PMML), which Praecepta does not evaluate, by design");
     }

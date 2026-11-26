@@ -51,7 +51,7 @@ final class GraphAnalysis {
      * A name a decision's logic reads, resolved: the slot of the requirement that provides it, the path into that
      * requirement's value, and the type of the value there ({@link FeelType#ANY} when unknown); {@code error} says why
      * the path does not exist in the requirement's type, else it is null, and {@code unsupported} whether the path
-     * exists in FEEL but a decision table's column does not read it yet (a property of a date, {@code Birth.year}).
+     * exists in FEEL but a decision table's column does not read it (a property of a date, {@code Birth.year}).
      */
     record Resolution(int slot, String[] path, FeelType type, String error, boolean unsupported) {
 
@@ -695,7 +695,7 @@ final class GraphAnalysis {
     /**
      * Parses a decision's literal expression, or composes its boxed expression ({@link FeelExpression#compose}), with the
      * names of its requirements in scope (DMN 1.5, 7.3.4 and 10.3.2.11), and the types the model defines; reports what it
-     * uses that Praecepta does not evaluate yet (an external function, planned for 0.11), and an expression that is not
+     * uses that Praecepta does not evaluate (an external function), and an expression that is not
      * FEEL, or names a type that neither FEEL nor the model defines ({@link Kind#INVALID_EXPRESSION}).
      */
     private void parseExpression(int d, DecisionLogic logic, Set<String> scope) {

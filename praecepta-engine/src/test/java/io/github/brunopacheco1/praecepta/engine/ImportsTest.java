@@ -24,7 +24,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableE
 import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
-/** Models that import others (DMN 1.5, 6.3.3), read with the models they import and evaluated as one graph (#119). */
+/** Models that import others (DMN 1.5, 6.3.3), read with the models they import and evaluated as one graph. */
 class ImportsTest {
 
     private static InputStream resource(String name) {

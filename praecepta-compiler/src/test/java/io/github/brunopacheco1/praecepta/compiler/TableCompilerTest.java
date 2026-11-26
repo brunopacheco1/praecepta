@@ -147,7 +147,7 @@ class TableCompilerTest {
     }
 
     /**
-     * A table in the full FEEL language (#116), compiled on its own: its column computed from the input it reads is no
+     * A table in the full FEEL language, compiled on its own: its column computed from the input it reads is no
      * component, which that input is, and so is the input its cells and output entries read beside it.
      */
     @Test
@@ -384,7 +384,7 @@ class TableCompilerTest {
     }
 
     /**
-     * The 0.6 features together in generated code, as in the map-based engine: output expressions over a date (#85),
+     * Features together in generated code, as in the map-based engine: output expressions over a date (#85),
      * one of which has no result on 31 January, a {@code null} default output (#92), and cells with an at-literal and
      * comments (#81). The generated code aggregates numbers only, so the MIN of such dates (#90) is checked in the
      * map-based engine's tests.

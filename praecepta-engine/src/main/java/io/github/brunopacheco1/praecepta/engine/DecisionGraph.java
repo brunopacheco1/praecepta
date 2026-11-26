@@ -81,7 +81,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * another in a cycle ({@link ValidationReport.Kind#DECISION_CYCLE}), and a value that cannot fit where it goes, such as
  * a string into a number column ({@link ValidationReport.Kind#TYPE_MISMATCH}), and a business knowledge model that reads
  * a name that is neither its parameter nor one it requires, are ERRORs of
- * {@link #validationReport()}, and so is logic Praecepta does not evaluate yet, naming the release that plans it
+ * {@link #validationReport()}, and so is logic Praecepta does not evaluate
  * ({@link ValidationReport.Kind#UNSUPPORTED_FEATURE}). Such a decision, and every decision that requires it, cannot be
  * evaluated; the others can. A decision whose value DMN 1.5 defines as null whatever its inputs (operands FEEL's
  * arithmetic does not combine, a value that does not conform to the declared type) is a WARNING
@@ -96,13 +96,14 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * evaluated. A literal expression is FEEL (DMN 1.5, chapter 10; {@link io.github.brunopacheco1.praecepta.engine.feel.FeelExpression}):
  * where FEEL defines no value it gives null, and {@link #evaluateWithErrors} gives the errors FEEL reported with the
  * value. A business knowledge model is a function made once, when the graph is built, which may invoke those it
- * requires, and itself. A decision service (since 0.11) is a function made once too, of its input data and input
+ * requires, and itself. A decision service is a function made once too, of its input data and input
  * decisions, whose invocation evaluates its output decisions from its arguments ({@link #evaluateService} invokes one
  * from outside). A graph is immutable and thread-safe.
  *
- * <p>Imports and FEEL's external functions are planned for 0.11
- * (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>); a model that uses them is rejected when it
- * is read.
+ * <p>A model that imports others is read with them ({@link DmnReader#readModel(InputStream, DmnReader.ImportResolver)})
+ * and evaluated as one graph; {@link #read} reads a model alone, and rejects one that imports another. Praecepta does
+ * not evaluate external functions (Java or PMML), by design, as it runs no code from outside the model: a model that
+ * defines one is rejected when it is read.
  */
 public final class DecisionGraph {
 
@@ -421,7 +422,7 @@ public final class DecisionGraph {
      * report, if it has issues, as one warning (logger {@code io.github.brunopacheco1.praecepta.engine.DecisionGraph}),
      * and each decision table its own, as {@link PraeceptaEngine} does.
      *
-     * @throws InvalidDecisionTableException if the model cannot be read, uses what Praecepta does not support yet, or
+     * @throws InvalidDecisionTableException if the model cannot be read, uses what Praecepta does not evaluate or read, or
      *                                       has a decision table that cannot be built into an engine
      */
     public static DecisionGraph read(InputStream dmn) {
@@ -694,8 +695,8 @@ public final class DecisionGraph {
     }
 
     /**
-     * The graph's validation report: missing requirements, cycles, type mismatches and what Praecepta does not evaluate
-     * yet, all ERRORs, and decisions whose value is always null, WARNINGs, each naming its decision. Each decision table's
+     * The graph's validation report: missing requirements, cycles, type mismatches and what Praecepta does not evaluate,
+     * all ERRORs, and decisions whose value is always null, WARNINGs, each naming its decision. Each decision table's
      * own analysis is in {@link #validationReport(String)}.
      */
     public ValidationReport validationReport() {
@@ -851,7 +852,7 @@ public final class DecisionGraph {
          */
         public Builder literalDecision(String name, FeelType type, String expression) {
             var literal = new DecisionLogic.LiteralExpression(expression, type);
-            literal.expression(); // checked here, where the names it may read are not all known yet, as before 0.10
+            literal.expression(); // checked here, where the names it may read are not all known yet
             return inferred(new Decision(name, List.of(), List.of(), literal));
         }
 

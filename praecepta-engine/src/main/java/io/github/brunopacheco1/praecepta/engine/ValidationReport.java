@@ -23,10 +23,10 @@ import java.util.stream.Collectors;
  *
  * <p>A {@link DecisionGraph} reports what is wrong with its decision model the same way: cycles of required decisions,
  * missing requirements and type mismatches ({@link Kind#DECISION_CYCLE}, {@link Kind#MISSING_REQUIREMENT},
- * {@link Kind#TYPE_MISMATCH}), what it does not evaluate yet ({@link Kind#UNSUPPORTED_FEATURE}), literal expressions
- * that are not valid FEEL ({@link Kind#INVALID_EXPRESSION}, since 0.8) and decisions whose
- * value is always null ({@link Kind#ALWAYS_NULL}), beside each of its tables' own reports. Later releases add kinds, as
- * each layer of DMN brings its own issues: a {@code switch} over {@link Kind} should keep a {@code default} branch.
+ * {@link Kind#TYPE_MISMATCH}), what it does not evaluate ({@link Kind#UNSUPPORTED_FEATURE}), literal expressions
+ * that are not valid FEEL ({@link Kind#INVALID_EXPRESSION}) and decisions whose
+ * value is always null ({@link Kind#ALWAYS_NULL}), beside each of its tables' own reports. A release may add kinds, so a
+ * {@code switch} over {@link Kind} should keep a {@code default} branch.
  *
  * @param issues findings, most severe first
  */
@@ -107,10 +107,10 @@ public record ValidationReport(List<Issue> issues) {
          */
         TYPE_MISMATCH(Severity.ERROR),
         /**
-         * Logic of a decision model that DMN 1.5 defines but Praecepta does not evaluate yet, such as an external
-         * function a literal expression defines (DMN 1.5, 10.3.2.13.3, planned for 0.11), or a path a decision table's column
+         * Logic of a decision model that DMN 1.5 defines but Praecepta does not evaluate, such as an external
+         * function a literal expression defines (DMN 1.5, 10.3.2.13.3), or a path a decision table's column
          * reads to a property of a date, time or duration ({@code Birth.year}, Table 65). The model is not wrong: the
-         * detail names the decision, what it uses and the release that plans it.
+         * detail names the decision and what it uses.
          * The decision cannot be evaluated, nor can any decision that requires it.
          */
         UNSUPPORTED_FEATURE(Severity.ERROR),
@@ -119,8 +119,7 @@ public record ValidationReport(List<Issue> issues) {
          * or a type its {@code instance of} or a function's parameters name that neither FEEL nor the model's item
          * definitions define. A decision table with such an entry is rejected when the graph is built
          * ({@code InvalidDecisionTableException}), as one read alone is. The decision cannot be evaluated, nor can any
-         * decision that requires it; the detail names the decision and the error. Since 0.8, before which it was reported
-         * as a {@link #MISSING_REQUIREMENT}.
+         * decision that requires it; the detail names the decision and the error.
          */
         INVALID_EXPRESSION(Severity.ERROR),
         /**

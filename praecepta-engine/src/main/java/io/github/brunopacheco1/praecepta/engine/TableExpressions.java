@@ -95,7 +95,7 @@ final class TableExpressions {
      *
      * @param rule     the rule's index in rule order
      * @param rejected why the subset rejected it, which stands if it is made only of what the subset reads
-     * @throws InvalidDecisionTableException if it is not FEEL, or uses what Praecepta does not evaluate yet
+     * @throws InvalidDecisionTableException if it is not FEEL, or uses what Praecepta does not evaluate
      */
     void cell(Praeceptum rule, int ruleIndex, String column, ColumnType type, CellSyntaxException rejected) {
         var where = "Rule %s, column '%s'".formatted(rule.priority(), column);
@@ -116,7 +116,7 @@ final class TableExpressions {
     /**
      * A column whose input expression is an expression, not a name: its value is computed from the inputs it reads.
      *
-     * @throws InvalidDecisionTableException if it is not FEEL, or uses what Praecepta does not evaluate yet
+     * @throws InvalidDecisionTableException if it is not FEEL, or uses what Praecepta does not evaluate
      */
     void column(String column, ColumnType type) {
         var where = "Input expression '%s'".formatted(column);
@@ -129,7 +129,7 @@ final class TableExpressions {
      * The output entries of a rule that compute their value ({@code PraeceptaOutput#expressions}), each of an output of
      * the type given (a string for one the engine does not know).
      *
-     * @throws InvalidDecisionTableException if one is not FEEL, or uses what Praecepta does not evaluate yet
+     * @throws InvalidDecisionTableException if one is not FEEL, or uses what Praecepta does not evaluate
      */
     void outputs(Praeceptum rule, int ruleIndex, Map<String, ColumnType> outputTypes) {
         rule.output().expressions().forEach((output, text) -> {
@@ -152,12 +152,10 @@ final class TableExpressions {
         return expression;
     }
 
-    /** Rejects what an expression uses that Praecepta does not evaluate yet, naming the release that plans it. */
+    /** Rejects what an expression uses that Praecepta does not evaluate: an external function. */
     static void rejectUnsupported(String where, List<FeelExpression.Unsupported> unsupported) {
         if (!unsupported.isEmpty()) {
-            var message = "%s uses %s".formatted(where, FeelExpression.Unsupported.describe(unsupported));
-            var first = unsupported.getFirst();
-            throw new UnsupportedFeatureException(message, first.release(), first.issue());
+            throw new UnsupportedFeatureException("%s uses %s".formatted(where, FeelExpression.Unsupported.describe(unsupported)));
         }
     }
 

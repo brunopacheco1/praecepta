@@ -34,9 +34,9 @@ import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 import io.github.brunopacheco1.praecepta.engine.feel.UnaryTests;
 
 /**
- * The 0.4 features together: lists of times with a time zone (#25, #70), compact masks under list
- * columns (#17, #25), and output expressions next to list and zoned columns (#71). And the 0.6 ones: missing list
- * elements (#84) next to the new literal forms, {@code !=} and comments (#81), as DMN files hold them.
+ * Features together: lists of times with a time zone (#25, #70), compact masks under list
+ * columns (#17, #25), and output expressions next to list and zoned columns (#71); and missing list
+ * elements (#84) next to at-literals, {@code !=} and comments (#81), as DMN files hold them.
  */
 class FeatureInteractionsTest {
 
@@ -191,7 +191,7 @@ class FeatureInteractionsTest {
     }
 
     /**
-     * A DMN table over a list of dates whose cells use the 0.6 forms: an at-literal and a comment (#81), a call of
+     * A DMN table over a list of dates whose cells use these forms: an at-literal and a comment (#81), a call of
      * {@code date} with numbers and {@code !=} (#81), and {@code list contains(?, null)} (#84).
      */
     private static final String DUE_DATES = """

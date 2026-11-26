@@ -93,9 +93,9 @@ import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
  * values), or any other FEEL expression (DMN 1.5, chapter 10), kept as written in
  * {@link PraeceptaOutput#expressions()}, which the engine parses, types and evaluates; every hit policy; SUM, MIN, MAX
  * and COUNT aggregation. An entry or input expression that defines an external function is rejected with an
- * {@link UnsupportedFeatureException}, as they are planned for 0.11 (#119); anything else Praecepta does not read with an
- * {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are numbered
- * from 1 in table order.
+ * {@link UnsupportedFeatureException}, as Praecepta runs no code from outside the model, by design; anything else
+ * Praecepta does not read with an {@link InvalidDecisionTableException} naming the decision, rule and column. Rules are
+ * numbered from 1 in table order.
  *
  * <p>{@link #readModel} reads a whole decision model instead, with its input data, its decisions (decision tables, literal
  * expressions and boxed expressions), its business knowledge models and their requirements, for {@code DecisionGraph}.
@@ -188,13 +188,15 @@ public final class DmnReader {
      * its {@linkplain DecisionModel#types() types}, by name, which a literal expression's {@code instance of} may name; a
      * function item among them is a function type, and one with neither a base type nor components is any type.
      *
-     * <p>What Praecepta does not evaluate yet is rejected, naming the element and the release that plans it: a decision
-     * without logic that another decision requires, imports and external functions (in
-     * FEEL, or a boxed function definition in Java or PMML), planned for 0.11 (#119).
+     * <p>What Praecepta does not evaluate or read is rejected with an {@link UnsupportedFeatureException} that names the
+     * element: an external function (in FEEL, or a boxed function definition in Java or PMML), by design, as Praecepta
+     * runs no code from outside the model; the values a literal expression imports ({@code importedValues}); and an
+     * import, as this method reads a model alone ({@link #readModel(InputStream, ImportResolver)} reads it with the
+     * models it imports).
      *
      * @throws InvalidDecisionTableException if the model cannot be read (a literal expression that is not FEEL among
-     *                                       other things), uses what Praecepta does not support yet, or names two of its
-     *                                       decisions, input data and business knowledge models alike
+     *                                       other things), uses what Praecepta does not evaluate or read, or names two
+     *                                       of its decisions, input data and business knowledge models alike
      */
     public static DecisionModel readModel(InputStream dmn) {
         return readModel(dmn, null);
@@ -265,8 +267,8 @@ public final class DmnReader {
             var importedTypes = new LinkedHashMap<String, ItemDefinitions>();
             var imports = children(root, "import");
             if (!imports.isEmpty() && resolver == null) {
-                throw IMPORTS.exception(("DMN model imports '%s', which Praecepta reads only with the models it imports "
-                        + "(DmnReader.readModel(dmn, imports), #119)").formatted(nameOr(imports.getFirst(), "namespace")));
+                throw new UnsupportedFeatureException(("DMN model imports '%s', which Praecepta reads only with the models it imports "
+                        + "(DmnReader.readModel(dmn, imports))").formatted(nameOr(imports.getFirst(), "namespace")));
             }
             var namespace = root.getAttribute("namespace").strip();
             reading.add(namespace);
@@ -276,8 +278,9 @@ public final class DmnReader {
                     var importedNamespace = element.getAttribute("namespace").strip();
                     var importType = element.getAttribute("importType").strip();
                     if (!importType.contains("/DMN/") || !importType.endsWith("/MODEL/")) {
-                        throw IMPORTS.exception("DMN model imports '%s' of type '%s', which Praecepta does not read: it imports DMN models"
-                                .formatted(nameOr(element, "namespace"), importType));
+                        throw new UnsupportedFeatureException(
+                                "DMN model imports '%s' of type '%s', which Praecepta does not read: it imports DMN models"
+                                        .formatted(nameOr(element, "namespace"), importType));
                     }
                     var model = model(importedNamespace, element.getAttribute("locationURI").strip());
                     imported.add(new DecisionModel.Import(name, model.model()));
@@ -473,18 +476,6 @@ public final class DmnReader {
         return new DecisionModel.DecisionService(name, lists.get(0), lists.get(1), lists.get(2), lists.get(3),
                 types.feelType(variableTypeRef(service), where));
     }
-
-    /** The releases that plan what Praecepta does not evaluate yet, as {@link UnsupportedFeatureException} names them. */
-    private record Planned(String release, int issue) {
-
-        UnsupportedFeatureException exception(String message) {
-            return new UnsupportedFeatureException(message, release, issue);
-        }
-    }
-
-    private static final Planned IMPORTS = new Planned("0.11", 119);
-    /** What Praecepta does not evaluate by design: an external function (docs/DMN-CONFORMANCE.md, known deviations). */
-    private static final Planned NOT_PLANNED = new Planned(null, 0);
 
     /** The name of an input data or a decision of a model, or its id if it has none; one with neither is rejected. */
     private static String elementName(Element element, String kind) {
@@ -786,12 +777,16 @@ public final class DmnReader {
         return new DecisionLogic.Invocation(name, bindings, type);
     }
 
-    /** A boxed function definition in FEEL: its formal parameters, of their declared types, and its body. */
+    /**
+     * A boxed function definition in FEEL: its formal parameters, of their declared types, and its body. One in Java or
+     * PMML is an external function, which Praecepta does not evaluate, by design (docs/DMN-CONFORMANCE.md, known
+     * deviations).
+     */
     private static DecisionLogic functionDefinition(Element function, Site site, FeelType type, String where) {
         var kind = function.getAttribute("kind").strip();
         if (!kind.isEmpty() && !kind.equals("FEEL")) {
-            throw NOT_PLANNED.exception(("%s defines a function in %s, an external function, which Praecepta does not evaluate, by "
-                    + "design: it runs no code from outside the model").formatted(where, kind));
+            throw new UnsupportedFeatureException(("%s defines a function in %s, an external function, which Praecepta does not "
+                    + "evaluate, by design: it runs no code from outside the model").formatted(where, kind));
         }
         var parameters = new ArrayList<DecisionLogic.Parameter>();
         for (var parameter : children(function, "formalParameter")) {
@@ -861,8 +856,8 @@ public final class DmnReader {
             throw new InvalidDecisionTableException("%s: its literal expression is in '%s'; Praecepta reads FEEL".formatted(where, language));
         }
         if (child(literal, "importedValues") != null) {
-            throw IMPORTS.exception(("%s: its literal expression imports values, which Praecepta does not support yet: "
-                    + "imports are planned for 0.11 (#119)").formatted(where));
+            throw new UnsupportedFeatureException(
+                    "%s: its literal expression imports values (importedValues), which Praecepta does not read".formatted(where));
         }
     }
 
@@ -889,8 +884,8 @@ public final class DmnReader {
      * {@code decision A 2.1} reads as one only where it is in scope (the DMN TCK's {@code 0034-drg-scopes}). Type names
      * the model does not define are left to the graph, which reports them.
      *
-     * @throws InvalidDecisionTableException if it is not FEEL, or uses what Praecepta does not support yet (an external
-     *                                       function, 0.11)
+     * @throws InvalidDecisionTableException if it is not FEEL, or uses what Praecepta does not evaluate (an external
+     *                                       function)
      */
     private static void checkExpressions(DecisionLogic logic, Collection<String> names, String where) {
         if (logic instanceof DecisionLogic.Table || logic instanceof DecisionLogic.NoLogic) {
@@ -905,8 +900,7 @@ public final class DmnReader {
         }
         var unsupported = expression.unsupported();
         if (!unsupported.isEmpty()) {
-            var planned = new Planned(unsupported.getFirst().release(), unsupported.getFirst().issue());
-            throw planned.exception("%s: its %s uses %s".formatted(where,
+            throw new UnsupportedFeatureException("%s: its %s uses %s".formatted(where,
                     logic instanceof DecisionLogic.LiteralExpression ? "literal expression" : "logic",
                     FeelExpression.Unsupported.describe(unsupported)));
         }
@@ -1424,8 +1418,8 @@ public final class DmnReader {
 
     /**
      * The type of a column whose input expression declares none: in a model, that of what it reads, or of its expression
-     * as FEEL types it; in a table read alone, which keeps 0.6's typing of the columns that name what they read, that of
-     * an expression, typed from the file's input data and decisions as in a model; empty where nothing gives one.
+     * as FEEL types it; in a table read alone, that of an expression, typed from the file's input data and decisions as
+     * in a model, and none for a column that names what it reads; empty where nothing gives one.
      *
      * @param computed its input expression, if it is an expression rather than a name; else null
      */
@@ -1441,7 +1435,7 @@ public final class DmnReader {
     /**
      * An input expression that is not a name: a FEEL expression, checked.
      *
-     * @throws UnsupportedFeatureException  if it defines an external function (0.11, #119)
+     * @throws UnsupportedFeatureException  if it defines an external function
      * @throws InvalidDecisionTableException if it is not FEEL
      */
     private static FeelExpression inputExpression(String text, FeelExpression.Scope scope, String where) {
@@ -1456,11 +1450,10 @@ public final class DmnReader {
         return expression;
     }
 
-    /** Rejects an expression that uses what Praecepta does not evaluate yet, naming the release that plans it. */
+    /** Rejects an expression that uses what Praecepta does not evaluate: an external function. */
     private static void rejectUnsupported(String where, List<FeelExpression.Unsupported> unsupported) {
         if (!unsupported.isEmpty()) {
-            var planned = new Planned(unsupported.getFirst().release(), unsupported.getFirst().issue());
-            throw planned.exception("%s uses %s".formatted(where, FeelExpression.Unsupported.describe(unsupported)));
+            throw new UnsupportedFeatureException("%s uses %s".formatted(where, FeelExpression.Unsupported.describe(unsupported)));
         }
     }
 
@@ -1700,7 +1693,7 @@ public final class DmnReader {
      * {@code list contains}), which the bitset index evaluates; else null, once it is checked to be FEEL unary tests
      * ({@link FeelUnaryTests}), which the engine applies to the rules the index matches.
      *
-     * @throws UnsupportedFeatureException  if it defines an external function (0.11, #119)
+     * @throws UnsupportedFeatureException  if it defines an external function
      * @throws InvalidDecisionTableException if it is neither
      */
     private static UnaryTests ruleCell(String text, ColumnType type, boolean list, TableScope scope, String where) {
@@ -1844,7 +1837,7 @@ public final class DmnReader {
      * Checks an output entry that computes its value: a FEEL expression (DMN 1.5, chapter 10), which the engine parses,
      * types and evaluates; one whose value is null whatever its inputs is a WARNING of its validation report.
      *
-     * @throws UnsupportedFeatureException  if it defines an external function (0.11, #119)
+     * @throws UnsupportedFeatureException  if it defines an external function
      * @throws InvalidDecisionTableException if it is not FEEL
      */
     private static void parseExpression(String text, FeelExpression.Scope scope, String where) {

@@ -21,7 +21,7 @@ import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
 /**
- * Generates the classes of a decision model compiled as a decision requirements graph (#14), for a model
+ * Generates the classes of a decision model compiled as a decision requirements graph, for a model
  * {@code Credit} whose decisions are {@code Risk Category} and {@code Monthly Limit}:
  * <ul>
  * <li>{@code CreditModel}: loads {@code CreditModel.dmn} from the classpath once into a {@link DecisionGraph}, and holds

@@ -89,9 +89,9 @@ class FeelUnaryTestsTest {
     }
 
     @Test
-    void what_is_not_evaluated_yet_is_named() {
+    void what_is_not_evaluated_is_named() {
         assertThat(parse("> (function(a) external {java: {class: \"x\"}})(Limit)").unsupported())
-                .containsExactly(new FeelExpression.Unsupported("an external function (Java or PMML)", null, 0));
+                .containsExactly(new FeelExpression.Unsupported("an external function (Java or PMML)"));
         assertThat(parse("> count(Limit)").unsupported()).isEmpty();
         assertThat(parse("> Limit").unsupported()).isEmpty();
     }

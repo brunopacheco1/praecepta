@@ -39,7 +39,7 @@ import io.github.brunopacheco1.praecepta.loader.excel.ExcelLoader;
  * {@link CompiledTable} where their build expects it.
  *
  * <p>A DMN source whose decision requires other decisions, or is a literal expression, compiles as a decision
- * requirements graph (#14) instead: the decision named by {@link TableDefinition#decision()}, or, when it names none,
+ * requirements graph instead: the decision named by {@link TableDefinition#decision()}, or, when it names none,
  * every decision of the model, each with an input record of the input data it needs and a class whose
  * {@code evaluate} evaluates it through the model's {@code DecisionGraph}, held by a model class ({@code CreditModel}).
  * Any other source compiles as before.
@@ -69,8 +69,8 @@ public final class TableCompiler {
      *                                  table is invalid, or if validation finds issues at least as severe as
      *                                  {@link CompilerOptions#failOn()}; one whose cause is the
      *                                  {@code InvalidDecisionTableException} (or {@code UnsupportedFeatureException},
-     *                                  which names the release that plans what the source uses) that the engine
-     *                                  rejected the source with
+     *                                  which names what the source uses that Praecepta does not evaluate) that the
+     *                                  engine rejected the source with
      */
     public static CompiledTable compile(TableDefinition definition, CompilerOptions options) {
         if (definition.source() == null) {

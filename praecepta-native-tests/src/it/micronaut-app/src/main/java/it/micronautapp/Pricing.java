@@ -46,10 +46,10 @@ public class Pricing {
         check("Discount, no rule", () -> discount.evaluate(Map.of("country", "FR", "customer.age", "30")), List.of());
         // FIRST, an unnamed output named after its decision
         check("Carrier", () -> carrier.evaluate(Map.of("weight", "1.5")), List.of(Map.of("Carrier", "post")));
-        // rules/graph/credit.dmn, a decision requirements graph (#14): Monthly Limit = Credit Limit / 12, from the input data
+        // rules/graph/credit.dmn, a decision requirements graph: Monthly Limit = Credit Limit / 12, from the input data
         check("Monthly Limit, through the graph", () -> decisions.evaluate("Monthly Limit", Map.of("Applicant Age", "30", "Income", "1200")),
                 List.of(Map.of("Monthly Limit", "200")));
-        // rules/graph/feel.dmn, a decision table in the full FEEL language (0.8, #116): a computed column, FEEL cells and outputs
+        // rules/graph/feel.dmn, a decision table in the full FEEL language: a computed column, FEEL cells and outputs
         check("Band, through the graph", () -> decisions.evaluate("Band", Map.of("Age", "30", "Limit", "100")), List.of(Map.of("Band", "360")));
         check("Band, over the limit", () -> decisions.evaluate("Band", Map.of("Age", "30", "Limit", "20")),
                 List.of(Map.of("Band", "over the limit")));

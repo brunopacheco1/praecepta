@@ -41,10 +41,9 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic;
  * {@code for} (with {@code partial} and iteration ranges {@code 1..3}), {@code some} and {@code every}, paths
  * ({@code a.b.c}, over lists as projections, and the properties of dates, times, durations and ranges), filters
  * ({@code xs[item > 3]}, {@code xs[1]}, {@code xs[-1]}), function definitions ({@code function(a, b) a + b}, which close
- * over their scope) and their invocation with positional or named arguments, FEEL's built-in functions (10.3.4, since
- * 0.9, <a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>), and comments. External functions
- * (Java or PMML) are planned for 0.11 (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>): an
- * expression that defines one parses, and {@link #unsupported()} names it.
+ * over their scope) and their invocation with positional or named arguments, FEEL's built-in functions (10.3.4), and
+ * comments. Praecepta does not evaluate external functions (Java or PMML), by design, as it runs no code from outside
+ * the model: an expression that defines one parses, and {@link #unsupported()} names it.
  *
  * <p><b>Values given.</b> A name's value is a FEEL value, null for a name with none; a {@link Number} that is not a
  * {@code BigDecimal} ({@code Integer}, {@code Long}, {@code Double}...) is taken as the {@code BigDecimal} of its
@@ -76,40 +75,25 @@ import io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic;
 public final class FeelExpression {
 
     /**
-     * What DMN 1.5 defines but Praecepta does not evaluate ({@link #unsupported()}), and the release that plans it, if any.
+     * What DMN 1.5 defines but Praecepta does not evaluate ({@link #unsupported()}): an external function, by design, as
+     * Praecepta runs no code from outside the model.
      *
      * @param feature what it is: {@code an external function (Java or PMML)}
-     * @param release the release that plans it; null for what Praecepta does not evaluate by design, as an external
-     *                function, since it runs no code from outside the model
-     * @param issue   the GitHub issue that plans it; 0 for what no release plans
      */
-    public record Unsupported(String feature, String release, int issue) {
+    public record Unsupported(String feature) {
         public Unsupported {
             java.util.Objects.requireNonNull(feature, "feature");
         }
 
-        /** Whether a release plans it; one with no release Praecepta does not evaluate by design. */
-        public boolean planned() {
-            return release != null;
-        }
-
-        /**
-         * As messages name it: {@code a feature, planned for 0.12 (#121)}, or, for what Praecepta does not evaluate by
-         * design, {@code an external function (Java or PMML), which Praecepta does not evaluate, by design}.
-         */
+        /** As messages name it: {@code an external function (Java or PMML), which Praecepta does not evaluate, by design}. */
         @Override
         public String toString() {
-            return planned() ? "%s, planned for %s (#%d)".formatted(feature, release, issue)
-                    : "%s, which Praecepta does not evaluate, by design".formatted(feature);
+            return "%s, which Praecepta does not evaluate, by design".formatted(feature);
         }
 
-        /**
-         * What an expression uses, as a message says it: each feature as {@link #toString()} names it, and, where a
-         * release plans one, that Praecepta does not evaluate it yet.
-         */
+        /** What an expression uses, as a message says it: each feature as {@link #toString()} names it. */
         public static String describe(List<Unsupported> unsupported) {
-            var what = String.join(" and ", unsupported.stream().map(Object::toString).toList());
-            return unsupported.stream().anyMatch(Unsupported::planned) ? what + ", which Praecepta does not evaluate yet" : what;
+            return String.join(" and ", unsupported.stream().map(Object::toString).toList());
         }
     }
 
@@ -362,9 +346,9 @@ public final class FeelExpression {
     }
 
     /**
-     * What the expression uses that DMN 1.5 defines but Praecepta does not evaluate yet, each with the release that
-     * plans it: an external function ({@code an external function (Java or PMML), planned for 0.11 (#119)}). Empty if it
-     * uses none; where it uses one, its value there is null, with an error.
+     * What the expression uses that DMN 1.5 defines but Praecepta does not evaluate: an external function
+     * ({@code an external function (Java or PMML)}). Empty if it uses none; where it uses one, its value there is null,
+     * with an error.
      */
     public List<Unsupported> unsupported() {
         return unsupported;

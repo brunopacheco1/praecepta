@@ -112,8 +112,8 @@ class ValidationLoggingTest {
     }
 
     /**
-     * Loading on its own, a file whose decision tables load alone because its model uses what a later release plans is
-     * logged once at INFO by {@link Decisions}' own logger; without logging, it is not.
+     * Loading on its own, a file whose decision tables load alone because its model uses what Praecepta does not
+     * evaluate is logged once at INFO by {@link Decisions}' own logger; without logging, it is not.
      */
     @Test
     void loading_on_its_own_logs_each_file_whose_tables_load_alone() {

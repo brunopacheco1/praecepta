@@ -39,7 +39,7 @@ import io.github.brunopacheco1.praecepta.integration.Decisions;
 import io.github.brunopacheco1.praecepta.integration.TableSource;
 
 /**
- * DMN models whose decisions require other decisions (#14) compile to a model class and, per decision, an input record
+ * DMN models whose decisions require other decisions compile to a model class and, per decision, an input record
  * and a class that evaluates it through the graph; compiled against the engine jar only and run, they give what the
  * engine's {@link DecisionGraph} and the framework integrations' map engine give.
  */
@@ -227,7 +227,7 @@ class GraphCompilerTest {
             Assertions.assertThat(decision(loader, "Monthly").evaluate(new BigDecimal(30), new BigDecimal(1200))).isEqualTo(new BigDecimal(200));
         }
 
-        // Risk Category requires input data only: a table, as 0.6 compiled it
+        // Risk Category requires input data only: a table, compiled alone
         var risk = compile(new TableDefinition(table("chain.dmn"), null, "Risk Category", null, null, List.of(), List.of()), Severity.ERROR);
         Assertions.assertThat(risk.table()).isNotNull();
         Assertions.assertThat(risk.model()).isNull();
@@ -237,7 +237,7 @@ class GraphCompilerTest {
     }
 
     /**
-     * Decision tables in the full FEEL language (#116): a column computed from the input data it reads, cells beyond the
+     * Decision tables in the full FEEL language: a column computed from the input data it reads, cells beyond the
      * simple unary tests, and output entries whose values are of several types, which the generated class gives as an
      * {@code Object}, each entry its own type (DMN 1.5, 10.3.2.10, step 3c).
      */
@@ -289,7 +289,7 @@ class GraphCompilerTest {
     }
 
     @Test
-    void what_later_releases_bring_is_rejected_naming_its_issue() throws IOException {
+    void what_praecepta_does_not_evaluate_is_rejected_naming_it() throws IOException {
         var file = out.resolve("bkm.dmn");
         Files.writeString(file, """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">
@@ -307,12 +307,12 @@ class GraphCompilerTest {
     }
 
     /**
-     * A file whose model uses what a later release plans compiles its decision table alone, as in 0.6, and the compiler
-     * says so in one line for the build tool to log, naming the file, the feature and the release and issue that plan
-     * it; a file it compiles as before, or as a graph, logs nothing.
+     * A file whose model uses what Praecepta does not evaluate compiles its decision table alone, and the compiler
+     * says so in one line for the build tool to log, naming the file and the feature; a file whose table it compiles
+     * alone for no such reason, or as a graph, logs nothing.
      */
     @Test
-    void a_table_compiled_alone_for_what_a_later_release_plans_is_logged_once() throws IOException {
+    void a_table_compiled_alone_for_what_praecepta_does_not_evaluate_is_logged_once() throws IOException {
         var file = out.resolve("later.dmn");
         Files.writeString(file, """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="d" name="d" namespace="n">

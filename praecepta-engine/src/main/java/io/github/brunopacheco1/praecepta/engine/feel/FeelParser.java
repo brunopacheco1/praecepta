@@ -1031,7 +1031,7 @@ final class FeelParser {
     }
 
     /**
-     * {@code function(a, b: number) body}; an external function (grammar rule 57) is not evaluated yet. A parameter of a
+     * {@code function(a, b: number) body}; an external function (grammar rule 57) is not evaluated. A parameter of a
      * type that is neither FEEL's nor the model's makes the definition null, with an error, as {@code instance of} such a
      * type is (Table 61).
      */
@@ -1061,7 +1061,7 @@ final class FeelParser {
                 next();
                 var mapping = expression();
                 // Praecepta runs no code from outside the model, by design (docs/DMN-CONFORMANCE.md, known deviations)
-                var what = new FeelExpression.Unsupported("an external function (Java or PMML)", null, 0);
+                var what = new FeelExpression.Unsupported("an external function (Java or PMML)");
                 unsupported.add(what);
                 return new Node.Unsupported(what, List.of(mapping));
             }

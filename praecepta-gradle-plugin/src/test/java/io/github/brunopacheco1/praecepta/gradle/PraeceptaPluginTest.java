@@ -160,7 +160,7 @@ class PraeceptaPluginTest {
         Assertions.assertThat(projectDir.resolve("build/generated/resources/praecepta/main/com/acme/rules/Discount.dmn")).exists();
     }
 
-    /** A DMN model whose decisions require one another (#14): a model class, and an input record and a class per decision. */
+    /** A DMN model whose decisions require one another: a model class, and an input record and a class per decision. */
     @Test
     void a_decision_requirements_graph_generates_a_class_per_decision() {
         extension.getTables().register("credit", table -> table.getSource().set(projectDir.resolve("src/main/rules/credit.dmn").toFile()));
@@ -203,7 +203,7 @@ class PraeceptaPluginTest {
     }
 
     /**
-     * A source the engine rejects, or that uses what a later release plans with no table to compile alone, fails the
+     * A source the engine rejects, or that uses what Praecepta does not evaluate with no table to compile alone, fails the
      * build as a GradleException, with the engine's message and exception as its cause.
      */
     @Test

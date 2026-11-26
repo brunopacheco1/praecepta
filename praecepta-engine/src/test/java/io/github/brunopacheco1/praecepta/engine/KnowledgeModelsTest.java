@@ -30,7 +30,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
 /**
  * Business knowledge models (DMN 1.5, 6.3.10) and their invocations, and decision tables within boxed expressions, as a decision
- * requirements graph evaluates them (#118).
+ * requirements graph evaluates them.
  */
 class KnowledgeModelsTest {
 
