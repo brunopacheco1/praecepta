@@ -39,6 +39,12 @@ you call `UnsupportedFeatureException.release()` or `issue()`, or construct `Fee
   [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) is the one guide to the build plugins, the framework integrations and
   native images. [docs/ROADMAP.md](docs/ROADMAP.md) lists only what comes next.
 
+### Fixed
+- **A DMN model with an item definition without a name no longer hangs `DmnReader.readModel`.** The reader looped
+  for ever looking for that empty name in the model's expressions. A file can no longer stop a thread this way.
+- **Several decision tables in one boxed list or relation row are each read as themselves.** The reader read every
+  one of them as the first.
+
 ### Removed
 - **`docs/MODERNISATION.md`.** The modernisation is finished. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#design-decisions)
   keeps its design decisions.

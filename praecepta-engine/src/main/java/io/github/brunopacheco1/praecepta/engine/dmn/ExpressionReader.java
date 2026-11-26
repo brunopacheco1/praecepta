@@ -116,8 +116,8 @@ final class ExpressionReader {
         if (kind.equals(DECISION_TABLE)) {
             // the table is named after what holds it: a context entry, a business knowledge model, else its decision
             var holder = (Element) element.getParentNode();
-            var table = TableReader.decisionTable(holder, site.name(), where, site.types(), site.model().with(site.locals()),
-                    site.locals().keySet());
+            var table = TableReader.decisionTable(holder, element, site.name(), where, site.types(),
+                    site.model().with(site.locals()), site.locals().keySet());
             return new DecisionLogic.Table(table, type);
         }
         return boxed(element, site, type, where);

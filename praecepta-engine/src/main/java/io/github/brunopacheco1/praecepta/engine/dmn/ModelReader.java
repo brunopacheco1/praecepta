@@ -438,6 +438,9 @@ final class ModelReader {
 
     /** Whether a text holds a name, neither preceded nor followed by a letter, a digit or an underscore. */
     private static boolean holdsName(String text, String name) {
+        if (name.isEmpty()) {
+            return false; // an item definition without a name, which no text can name (and indexOf would find for ever)
+        }
         for (int at = text.indexOf(name); at >= 0; at = text.indexOf(name, at + 1)) {
             int end = at + name.length();
             if ((at == 0 || !isNamePart(text.charAt(at - 1))) && (end == text.length() || !isNamePart(text.charAt(end)))) {

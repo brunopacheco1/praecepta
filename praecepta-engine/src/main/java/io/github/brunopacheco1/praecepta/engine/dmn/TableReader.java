@@ -100,21 +100,21 @@ final class TableReader {
      */
     static DecisionTable decisionTable(Element decision, ItemDefinitions types, ModelTypes model) {
         var name = nameOr(decision, "id");
-        return decisionTable(decision, name, decisionWhere(name), types, model, Set.of());
+        return decisionTable(decision, child(decision, DECISION_TABLE), name, decisionWhere(name), types, model, Set.of());
     }
 
     /**
-     * A decision table, the child of {@code decision}: a decision, or what holds a table within a boxed expression (a
-     * context entry, whose variable types it as a decision's does, or a function definition).
+     * A decision table, a child of {@code decision}: a decision, or what holds a table within a boxed expression (a
+     * context entry, whose variable types it as a decision's does, a function definition, or a list or relation, which
+     * may hold several tables).
      *
+     * @param table  the table to read: its holder may hold others
      * @param name   the table's name, its single unnamed output's
      * @param locals the names the enclosing constructs of a boxed expression bind, which its FEEL may read beside the
      *               model's input data and decisions
      */
-    static DecisionTable decisionTable(Element decision, String name, String where, ItemDefinitions types, ModelTypes model,
-            Set<String> locals) {
-        var table = child(decision, DECISION_TABLE);
-
+    static DecisionTable decisionTable(Element decision, Element table, String name, String where, ItemDefinitions types,
+            ModelTypes model, Set<String> locals) {
         var hitPolicy = hitPolicy(table.getAttribute("hitPolicy"), where);
         var aggregation = aggregation(table.getAttribute(AGGREGATION), where);
 
