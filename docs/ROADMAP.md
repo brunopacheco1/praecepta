@@ -82,9 +82,10 @@ Released in November 2026 (see the [changelog](../CHANGELOG.md)):
 
 ## Next: 0.11
 - **Decision services, imports and the rest of DMN 1.5**
-  ([#119](https://github.com/brunopacheco1/praecepta/issues/119)): decision services, imports,
-  external functions (Java and PMML) and decisions without decision logic. With them Praecepta
-  evaluates the whole TCK.
+  ([#119](https://github.com/brunopacheco1/praecepta/issues/119)): decision services, imports and
+  decisions without decision logic. With them Praecepta evaluates the whole TCK but for external functions (Java and
+  PMML), which it rejects by design, as it runs no code from outside the model
+  ([DMN conformance](DMN-CONFORMANCE.md#known-deviations)).
 
 ## 1.0
 - **A claim of DMN 1.5 conformance**, scored against the whole TCK, and a stable API, once the

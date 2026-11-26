@@ -289,8 +289,9 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
         FEEL language with its built-in functions. It does not have these yet; when you need one before its
         release, use Camunda or Drools:</p>
       <ul class="plain">
-        <li><strong>Decision services, imports and external functions</strong> (0.11,
+        <li><strong>Decision services, imports and decisions without logic</strong> (0.11,
           <a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>).</li>
+        <li><strong>External functions</strong> (Java and PMML), never: it runs no code from outside the model, by design.</li>
       </ul>
       <p>Nor will it be a process engine, a modeller or a server around the decisions: it is a library your
         application calls.</p>
@@ -505,7 +506,7 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
         <li>
           <h3>Next: 0.11</h3>
           <ul class="plain">
-            <li>Decision services, imports, external functions and the rest of DMN 1.5
+            <li>Decision services, imports and the rest of DMN 1.5, but external functions, which it rejects by design
               (<a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>)</li>
           </ul>
         </li>

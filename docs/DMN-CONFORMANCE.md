@@ -579,12 +579,23 @@ integrations alike.
 
 ## Known deviations
 Where DMN 1.5 or the TCK decides and Praecepta does otherwise. Each is reported or documented where it shows,
-and is meant to go with the release named. Three were closed in 0.8.0
+and is meant to go with the release named, but external functions, which Praecepta rejects for good, by design. Three were closed in 0.8.0
 ([#116](https://github.com/brunopacheco1/praecepta/issues/116)), when decision tables adopted the full FEEL language:
 the default output of a table with several results bound to a decision of no declared type, which is now the single
 value (case 14); output entries whose operands FEEL does not combine, now null, where they were rejected (case 13);
 and untyped outputs whose entries are not literals of one type, which now give each entry its own type (case 13).
 
+- **External functions are not evaluated, by design.** DMN 1.5 lets a model define a function in Java or PMML, in
+  FEEL (`function(d1, d2) external {java: {class: "java.lang.Math", method signature: "max(double,double)"}}`, 10.3.2.13.3)
+  or as a boxed function definition of kind `Java` or `PMML` (10.2.3), and the TCK's `0076-feel-external-java` invokes
+  static methods of `java.lang` classes so (18 result nodes, all Java, none PMML). Praecepta runs no code from outside
+  the model it evaluates: evaluating a DMN file must not reach the class path, the file system or anything else of the
+  application around it, whatever the file says ([security assurance](SECURITY-ASSURANCE.md)), and a list of classes
+  deemed safe would be a judgement each application would have to trust. A model that defines an external function is
+  therefore rejected when it is read (an `UnsupportedFeatureException`), or, for a literal expression of a graph built
+  in code, reported (`UNSUPPORTED_FEATURE`), and the TCK's 18 nodes are not supported. This is a permanent choice, not
+  a gap a release is planned to close: Praecepta's claim of DMN 1.5 conformance, planned for 1.0, will name it as its
+  one deliberate exception, for security.
 - **A time in a zone with one fixed offset keeps no zone id.** `time("00:01:00@Etc/UTC")` is the time at that zone's
   offset, `00:01:00Z`, as Table 72's example of `time(from)` has it equal (case 9); but the TCK also has
   `string(time("00:01:00@Etc/UTC"))` be `"00:01:00@Etc/UTC"` (`1116-feel-time-function`) and
