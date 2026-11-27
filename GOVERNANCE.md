@@ -41,7 +41,7 @@ Praecepta promises its own API. It does not promise every version of the framewo
   for Java 21, so that it stays reproducible, and tested on Java 21. The baseline does not change before
   1.0. After 1.0 it changes only in a major version.
 - **Frameworks.** Each framework module supports one major line of its framework: Spring Boot 4,
-  Micronaut 4 and Quarkus 3 today. From 0.13 the module's name says which ([#163](https://github.com/brunopacheco1/praecepta/issues/163)). CI tests the
+  Micronaut 4 and Quarkus 3 today. The module's name says which (`praecepta-quarkus3`). CI tests the
   module at the oldest version of the line it supports and at the latest ([#165](https://github.com/brunopacheco1/praecepta/issues/165)), on the higher
   of Java 21 and the framework's own baseline.
 - **The oldest framework version supported may rise in a minor release**, past versions the framework's

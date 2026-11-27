@@ -215,11 +215,11 @@ engine.validationReport();  // overlaps, unreachable rules, gaps</code></pre>
             <code>Decisions</code> bean evaluates every decision, a graph's too, by name; an invalid table
             stops the application from starting, or Quarkus from building it.</p>
           <ul class="plain">
-            <li>Spring Boot 4: <code>praecepta-spring-boot-starter</code>, inject with
+            <li>Spring Boot 4: <code>praecepta-spring-boot4-starter</code>, inject with
               <code>@Qualifier("Discount")</code> (<a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#spring-boot">guide</a>)</li>
-            <li>Quarkus 3.40+: <code>praecepta-quarkus</code>, inject with <code>@Identifier("Discount")</code>
+            <li>Quarkus 3.40+: <code>praecepta-quarkus3</code>, inject with <code>@Identifier("Discount")</code>
               (<a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#quarkus">guide</a>)</li>
-            <li>Micronaut 4: <code>praecepta-micronaut</code>, inject with <code>@Named("Discount")</code>
+            <li>Micronaut 4: <code>praecepta-micronaut4</code>, inject with <code>@Named("Discount")</code>
               (<a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#micronaut">guide</a>)</li>
             <li>Another framework, or none: <code>praecepta-integration</code>
               (<a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#without-a-framework">guide</a>)</li>
@@ -235,8 +235,8 @@ discount.evaluate(Map.of("country", "PT", "age", "30"));   // [{tier=gold}]</cod
         <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md">integrations guide</a> covers every plugin option, each
         framework and <a href="https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#native-images">native images</a>. The API documentation covers the
         <a href="api/engine/">engine</a>, the <a href="api/loader/">loader</a>, the
-        <a href="api/gradle-plugin/">Gradle plugin</a>, the <a href="api/spring-boot-starter/">Spring Boot starter</a>,
-        the <a href="api/micronaut/">Micronaut module</a>, the <a href="api/quarkus/">Quarkus extension</a>, and
+        <a href="api/gradle-plugin/">Gradle plugin</a>, the <a href="api/spring-boot4-starter/">Spring Boot starter</a>,
+        the <a href="api/micronaut4/">Micronaut module</a>, the <a href="api/quarkus3/">Quarkus extension</a>, and
         their cores, <a href="api/compiler/">praecepta-compiler</a> and
         <a href="api/integration/">praecepta-integration</a>.</p>
     </section>

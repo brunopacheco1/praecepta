@@ -28,7 +28,7 @@ import io.github.brunopacheco1.praecepta.quarkus.deployment.PraeceptaTablesBuild
 final class DeclaredTables {
 
     /** The tool named in the compiler's output. */
-    static final String GENERATOR = "praecepta-quarkus";
+    static final String GENERATOR = "praecepta-quarkus3";
 
     /** The configuration's spelling of the compiler's settings (the Maven plugin's names, in kebab-case). */
     private static final Map<String, String> SETTINGS = Map.of(

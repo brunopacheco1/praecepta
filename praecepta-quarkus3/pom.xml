@@ -13,9 +13,9 @@
         <artifactId>praecepta</artifactId>
         <version>0.12.0-SNAPSHOT</version>
     </parent>
-    <artifactId>praecepta-quarkus</artifactId>
+    <artifactId>praecepta-quarkus3</artifactId>
     <packaging>jar</packaging>
-    <name>praecepta-quarkus</name>
+    <name>praecepta-quarkus3</name>
     <description>
         Quarkus extension (runtime): DMN decision tables, found and validated while Quarkus builds the
         application, as CDI beans: the application's Decisions and one map-based engine per decision,

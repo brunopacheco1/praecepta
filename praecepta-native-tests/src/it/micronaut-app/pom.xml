@@ -42,7 +42,7 @@
         </dependency>
         <dependency>
             <groupId>io.github.brunopacheco1</groupId>
-            <artifactId>praecepta-micronaut</artifactId>
+            <artifactId>praecepta-micronaut4</artifactId>
             <version>@project.version@</version>
         </dependency>
         <dependency>

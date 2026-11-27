@@ -10,7 +10,7 @@ metadata:
     - "dmn"
     - "decision-table"
     - "rules"
-  guide: "https://github.com/brunopacheco1/praecepta#praecepta-quarkus-extension"
+  guide: "https://github.com/brunopacheco1/praecepta/blob/main/docs/INTEGRATIONS.md#quarkus"
   categories:
     - "business-automation"
   status: "preview"

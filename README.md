@@ -72,9 +72,9 @@ Or let your build or framework do it:
 |---|---|---|
 | Maven | [`praecepta-maven-plugin`](docs/INTEGRATIONS.md#maven-plugin) | Validates tables at build time and generates typed classes. Your application ships only the engine. |
 | Gradle | [plugin `io.github.brunopacheco1.praecepta`](docs/INTEGRATIONS.md#gradle-plugin) | The same, for Gradle 8.5 and later. |
-| Spring Boot 4 | [`praecepta-spring-boot-starter`](docs/INTEGRATIONS.md#spring-boot) | Loads the DMN files under `rules/` at startup and injects one engine per decision. |
-| Micronaut 4 | [`praecepta-micronaut`](docs/INTEGRATIONS.md#micronaut) | The same, for Micronaut. |
-| Quarkus 3.40+ | [`praecepta-quarkus`](docs/INTEGRATIONS.md#quarkus) | Validates the tables while Quarkus builds the application, and injects one engine per decision. |
+| Spring Boot 4 | [`praecepta-spring-boot4-starter`](docs/INTEGRATIONS.md#spring-boot) | Loads the DMN files under `rules/` at startup and injects one engine per decision. |
+| Micronaut 4 | [`praecepta-micronaut4`](docs/INTEGRATIONS.md#micronaut) | The same, for Micronaut. |
+| Quarkus 3.40+ | [`praecepta-quarkus3`](docs/INTEGRATIONS.md#quarkus) | Validates the tables while Quarkus builds the application, and injects one engine per decision. |
 | Another framework, or none | [`praecepta-integration`](docs/INTEGRATIONS.md#without-a-framework) | Loads DMN files into named engines. |
 
 Every module is on Maven Central under the same version. Every release is signed and has an SBOM, SLSA

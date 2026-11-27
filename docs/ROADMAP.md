@@ -25,9 +25,9 @@ today.
 - The DMN TCK updated to its latest test cases ([#148](https://github.com/brunopacheco1/praecepta/issues/148)).
 - CI that does not fail when a download does ([#161](https://github.com/brunopacheco1/praecepta/issues/161)), and that tests on the baseline JDK
   ([#164](https://github.com/brunopacheco1/praecepta/issues/164)).
-- Framework modules named after the framework major they support ([#163](https://github.com/brunopacheco1/praecepta/issues/163)), as the
-  [support policy](../GOVERNANCE.md#what-is-supported) says, and with them modules for Micronaut 5
-  ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25 on its own, and Quarkus 4 ([#167](https://github.com/brunopacheco1/praecepta/issues/167)).
+- Modules for Micronaut 5 ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25 on its own, and Quarkus 4
+  ([#167](https://github.com/brunopacheco1/praecepta/issues/167)), beside the ones for Micronaut 4 and Quarkus 3, as the
+  [support policy](../GOVERNANCE.md#what-is-supported) says.
 
 **[0.14](https://github.com/brunopacheco1/praecepta/milestone/13): quality, speed and the TCK site**
 - A listing on the [DMN TCK results site](https://dmn-tck.github.io/tck/) ([#149](https://github.com/brunopacheco1/praecepta/issues/149);
