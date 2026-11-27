@@ -24,6 +24,11 @@ you call `UnsupportedFeatureException.release()` or `issue()`, or construct `Fee
   Praecepta, Camunda and Drools. [praecepta-benchmarks/README.md](praecepta-benchmarks/README.md) describes every
   benchmark.
 
+- **Mutation testing, on demand.** The Maven profile `mutation` of `praecepta-engine` runs [PIT](https://pitest.org)
+  on the classes you name ([CONTRIBUTING.md](CONTRIBUTING.md#mutation-testing)). Its first runs on the table engine
+  and the decision graph led to about 60 new tests.
+- **A test of the engine's package layers** (`LayeringTest`, with ArchUnit): `feel`, `beans` and `dmn` do not depend
+  on the root package.
 - **An export for the DMN TCK results site.** `mvn -pl praecepta-tck -am test -Dtck.results=<dir>` writes
   `tck_results.csv` and `tck_results.properties` in the format the [site](https://dmn-tck.github.io/tck/) reads
   ([how to publish](praecepta-tck/README.md#publishing-results-on-the-dmn-tck-site)).
@@ -42,11 +47,18 @@ you call `UnsupportedFeatureException.release()` or `issue()`, or construct `Fee
   `... imports values (importedValues), which Praecepta does not read`. A model that imports another, read without
   it, no longer cites an issue number. The line the framework integrations and the build plugins log for a file
   whose tables they load alone always ends `which uses what Praecepta does not evaluate: ...`.
+- **The engine's largest classes are split by concern**, with no change in behaviour or public API:
+  `PraeceptaEngine`, `GraphAnalysis`, `DmnReader` and `DmnWriter` now delegate to package-private classes
+  ([where to start reading](docs/ARCHITECTURE.md#praecepta-engine)). Evaluation is as fast as before.
 - **The documentation is shorter and has one place per fact.** The README is an overview.
   [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) is the one guide to the build plugins, the framework integrations and
   native images. [docs/ROADMAP.md](docs/ROADMAP.md) lists only what comes next.
 
 ### Fixed
+- **A long chain of business knowledge models no longer overflows the stack when a graph is built.** A model of
+  1,000 business knowledge models, each invoking the next, threw `StackOverflowError`.
+- **A business knowledge model that requires a decision service which cannot be evaluated says so.** Its message
+  named the service as a business knowledge model.
 - **A DMN model with an item definition without a name no longer hangs `DmnReader.readModel`.** The reader looped
   for ever looking for that empty name in the model's expressions. A file can no longer stop a thread this way.
 - **Several decision tables in one boxed list or relation row are each read as themselves.** The reader read every

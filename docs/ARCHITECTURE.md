@@ -482,5 +482,7 @@ What keeps the architecture honest:
 - **Golden files** pin the code the build plugins generate (`GeneratedSourcesGoldenTest`).
 - **Fuzzing** of everything that reads untrusted text: `CellParser`, `FeelExpression`, `DmnReader`.
 - **Mutation testing** of the engine with PIT, on demand ([CONTRIBUTING.md](../CONTRIBUTING.md#mutation-testing)).
+- **A layering test** (`LayeringTest`, with ArchUnit) fails when `feel`, `beans` or `dmn` starts to depend on the
+  root package.
 - **Native images**: CI builds and runs a native application of each kind.
 - **Benchmarks** against Camunda and Drools ([praecepta-benchmarks](../praecepta-benchmarks/README.md)).

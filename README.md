@@ -206,7 +206,9 @@ checks that all engines give the same answers.
 | First decision in a fresh JVM | 76 ms | 469 ms | 379 ms |
 
 These numbers come from the [run of 2026-11-07](praecepta-benchmarks/results/2026-11-07-apple-m2-pro-full/summary.md),
-on Praecepta 0.2, and cover decision tables with literal cells.
+on Praecepta 0.2, and cover decision tables with literal cells. A quick run of the current code on another
+machine gives the same ratios. For one decision of a decision requirement graph (`GraphBenchmark`), that quick
+run puts Praecepta about ten times ahead of both engines.
 
 [praecepta-benchmarks/README.md](praecepta-benchmarks/README.md) explains the tables, the benchmarks and
 how to run them. Every published run is kept whole under
