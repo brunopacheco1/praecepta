@@ -20,15 +20,16 @@ permissions:
 
 jobs:
   build:
-    # One job per supported JDK: the code targets Java 21 (--release 21) and must build and pass
-    # on the oldest and newest JDKs. Licences, SBOMs and SonarCloud run once, on the LTS (25);
-    # "Build & test (Java 25)" is the required check in the main branch ruleset.
+    # As the support policy says (GOVERNANCE.md, "What is supported"): built as the release is, with the
+    # latest long-term-support JDK (25), which also runs the strict TCK check, the licences, the SBOMs and
+    # SonarCloud; and tested on Java 21, the baseline the code targets (--release 21). A JDK nobody
+    # targets is not tested (#164). "Build & test (Java 25)" is a required check in the main branch ruleset.
     name: Build & test (Java ${{ matrix.java }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        java: ['21', '25', '27']
+        java: ['21', '25']
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       PRIMARY: ${{ matrix.java == '25' }}
@@ -40,12 +41,14 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
-          cache: maven
+      - id: maven-cache
+        uses: ./.github/actions/maven-cache
       - name: Build & test
         # also checks SPDX headers (license-maven-plugin), runs the plugin's integration tests and
         # writes SBOMs (target/bom.json); on the LTS, the TCK fails when RESULTS.md or its baseline is
-        # out of date, so a pull request that changes what passes regenerates them (tck.strict)
-        run: mvn -B verify -Dtck.strict=${{ env.PRIMARY }}
+        # out of date, so a pull request that changes what passes regenerates them (tck.strict).
+        # retry_downloads.py runs the build once more if it failed on a download only.
+        run: python3 .github/scripts/retry_downloads.py mvn -B verify -Dtck.strict=${{ env.PRIMARY }}
       - name: Test the workflow scripts
         if: ${{ env.PRIMARY == 'true' }}
         # their release-only paths (published_modules.py jars) would otherwise first run on a release tag
@@ -76,6 +79,7 @@ jobs:
         # `verify` in the same invocation lets the scanner resolve the reactor modules; tests and
         # coverage data come from the previous step.
         run: >
+          python3 .github/scripts/retry_downloads.py
           mvn -B verify -DskipTests -Dinvoker.skip
           org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar
           -Dsonar.qualitygate.wait=true
@@ -83,6 +87,14 @@ jobs:
       - name: SonarCloud skipped (pull request from a fork)
         if: ${{ env.PRIMARY == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
         run: echo "::warning title=SonarCloud not run::Pull requests from forks get no secrets; a maintainer must analyse this change before merging."
+      - name: Save the Maven cache
+        # from main only, and from one job: both JDKs resolve the same artifacts
+        if: ${{ env.PRIMARY == 'true' }}
+        uses: ./.github/actions/maven-cache
+        with:
+          save: true
+          key: ${{ steps.maven-cache.outputs.key }}
+          restored-key: ${{ steps.maven-cache.outputs.restored-key }}
 
   reuse:
     name: REUSE compliance

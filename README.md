@@ -48,7 +48,7 @@ Spring Boot, Quarkus or Micronaut.
 - **[GraalVM native images](docs/INTEGRATIONS.md#native-images)** with no configuration for Praecepta.
 
 # Installation
-Praecepta needs Java 21 or later. CI tests it on Java 21, 25 and 27.
+Praecepta needs Java 21 or later. CI tests it on Java 21 and on Java 25, the latest long-term-support release.
 
 ```xml
 <!-- the engine: no dependencies, a JPMS module (io.github.brunopacheco1.praecepta.engine) -->

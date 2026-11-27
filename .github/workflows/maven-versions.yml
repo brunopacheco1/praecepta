@@ -20,6 +20,8 @@ on:
       - '**/pom.xml'
       - '.mvn/**'
       - '.github/workflows/maven-versions.yml'
+      - '.github/actions/maven-cache/**'
+      - '.github/scripts/retry_downloads.py'
   schedule:
     - cron: '29 3 * * 1'
   workflow_dispatch:
@@ -52,10 +54,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
+      - uses: ./.github/actions/maven-cache # restores the main build's cache; only main's builds save one
       - name: Install Maven ${{ matrix.maven }} (wrapper)
         run: mvn -B -N org.apache.maven.plugins:maven-wrapper-plugin:3.3.4:wrapper -Dmaven=${{ matrix.maven }}
       - name: Build the plugin and run its integration tests
         run: |
           ./mvnw -B --version
-          ./mvnw -B -pl praecepta-maven-plugin -am verify
+          python3 .github/scripts/retry_downloads.py ./mvnw -B -pl praecepta-maven-plugin -am verify

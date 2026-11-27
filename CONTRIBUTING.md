@@ -57,14 +57,35 @@ framework (Quarkus with `QuarkusExtensionTest` and `QuarkusDevModeTest`, dev mod
 [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) has what every integration must do alike.
 
 The code targets **Java 21** (`--release 21`): newer language features or APIs fail to compile.
-CI builds and tests on Java 21, 25 and 27, runs the Maven plugin's integration tests on Maven 3.9,
+CI builds and tests with the latest long-term-support JDK (25), as the release is built, and tests on
+Java 21, the baseline ([support policy](GOVERNANCE.md#what-is-supported)). It runs the Maven plugin's integration tests on Maven 3.9,
 3.10 and 4.0 (on pull requests only when the plugin, the engine or a POM changes), and the Gradle
 plugin's functional tests on Gradle 8.5, 8.14 and 9 and a check that the Plugin Portal build publishes
 Maven's files unchanged (on pull requests only when that plugin, the compiler, loader or engine changes),
-the native-image test project with GraalVM for JDK 21 and 25 (on pull requests only when what goes into
-the executable changes), and the framework applications natively (weekly, and on pull requests only when
-a framework module, the integration core or the applications change). A newer push to a pull request
-cancels the checks still running for the previous one.
+the native-image test project with GraalVM for JDK 21 (on pull requests only when what goes into
+the executable changes), and the framework applications natively, each once, on GraalVM for the higher of
+Java 21 and its framework's baseline (weekly, and on pull requests only when a framework module, the
+integration core or the applications change). A newer push to a pull request cancels the checks still
+running for the previous one.
+
+### Dependency downloads
+A build downloads its dependencies from Maven Central, and so do the test projects the invoker builds, each
+into a repository of its own (`target/it-repo`). To keep a failed download from failing a build:
+- **Retries:** `.mvn/maven.config` makes Maven retry a request that fails on the network or gets 429, 500,
+  502, 503 or 504, up to five times, in every build, local ones included (both property names: the
+  resolver of Maven 3.10 reads `aether.transport.http.*`, that of Maven 3.9 `aether.connector.http.*`).
+- **Once more, on a 404:** Maven Central sometimes answers 404 for a few seconds for artifacts it has, and
+  Maven neither retries a 404 nor asks again later. In CI, `.github/scripts/retry_downloads.py` runs a build
+  that failed on an unresolved artifact once more, after deleting the resolver's records of failed
+  downloads. A build that fails for any other reason is not run again.
+- **Cache:** the workflows restore the Maven repositories, the invoker's included, with
+  `.github/actions/maven-cache`, so a build downloads only what the cache lacks. A pull request that changes
+  a POM restores the newest cache and downloads only what is new. Caches are saved from main only, so a
+  pull request cannot put anything in one, and main starts them afresh each month, so versions no longer
+  used do not pile up. Neither cache holds Praecepta's own artifacts. The release builds without a cache:
+  it resolves everything from Maven Central ([docs/RELEASING.md](docs/RELEASING.md)).
+
+To work without the network once the dependencies are downloaded, build offline: `./mvnw -o verify`.
 
 ## Code style
 The code follows standard Java conventions; the build enforces them, so a pull request that breaks
@@ -159,7 +180,7 @@ A new integration or other module needs these, and nothing else:
 5. **API documentation:** the website publishes every published module's Javadoc at
    `api/<directory without "praecepta-">` (`api/spring-boot-starter`, `api/quarkus`) with no change to
    `pages.yml`; link it from `site/index.html` when the module is released.
-6. **CI load:** the default `mvn verify` (every pull request, on Java 21, 25 and 27) runs a module's fast
+6. **CI load:** the default `mvn verify` (every pull request, on Java 21 and 25) runs a module's fast
    tests only, seconds rather than minutes. Slow checks (other Gradle or framework versions, native
    images) get a workflow of their own that runs on pull requests only when the module's paths (or what it
    is built from) change, always on main and weekly, and cancels superseded runs, as

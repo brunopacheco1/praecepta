@@ -35,6 +35,10 @@ on:
       # the framework versions
       - 'pom.xml'
       - '.github/workflows/native-frameworks.yml'
+      # how the build resolves and caches its dependencies
+      - '.mvn/maven.config'
+      - '.github/actions/maven-cache/**'
+      - '.github/scripts/retry_downloads.py'
   schedule:
     - cron: '17 4 * * 1'
   workflow_dispatch:
@@ -49,8 +53,8 @@ concurrency:
 
 jobs:
   native:
-    # GraalVM for the current LTS, and for Java 21 where the framework supports it: Spring Boot 4 and
-    # Quarkus 3.40 need GraalVM for JDK 25
+    # Each application once (#164), on GraalVM for the higher of Java 21 and its framework's own baseline
+    # (GOVERNANCE.md, "What is supported"): Micronaut 4 on 21; Spring Boot 4 and Quarkus 3.40 need 25
     name: ${{ matrix.app }} (GraalVM for JDK ${{ matrix.java }})
     runs-on: ubuntu-latest
     strategy:
@@ -61,8 +65,6 @@ jobs:
             java: '25'
           - app: micronaut-app
             java: '21'
-          - app: micronaut-app
-            java: '25'
           - app: quarkus-app
             java: '25'
     steps:
@@ -71,10 +73,22 @@ jobs:
         with:
           distribution: graalvm-community
           java-version: ${{ matrix.java }}
-          cache: maven
+      - id: maven-cache
+        # one cache per application: each resolves its framework into the invoker's repository
+        uses: ./.github/actions/maven-cache
+        with:
+          name: native-${{ matrix.app }}
       - name: Build the native executable and run it
         # the native-frameworks profile adds praecepta-native-tests to the reactor; its invoker builds the
         # application natively and runs it. The unit tests already ran in the Java CI workflow.
         run: |
           native-image --version
-          mvn -B -P native-frameworks -pl praecepta-native-tests -am verify -DskipTests -Dinvoker.test=${{ matrix.app }}
+          python3 .github/scripts/retry_downloads.py \
+            mvn -B -P native-frameworks -pl praecepta-native-tests -am verify -DskipTests -Dinvoker.test=${{ matrix.app }}
+      - name: Save the Maven cache
+        uses: ./.github/actions/maven-cache
+        with:
+          name: native-${{ matrix.app }}
+          save: true
+          key: ${{ steps.maven-cache.outputs.key }}
+          restored-key: ${{ steps.maven-cache.outputs.restored-key }}

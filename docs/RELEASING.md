@@ -148,6 +148,9 @@ rebuild covers every published module, the Gradle plugin marker included. To reb
 directory directly under the root (the Gradle plugin marker too, though its groupId differs), so the
 version rewrite below (`pom.xml */pom.xml`) reaches all of them.
 
+The release workflow restores no Maven cache: it resolves every dependency and plugin from Maven Central, as
+a rebuild does. The retries in `.mvn/maven.config` apply to it, and change nothing in what it builds.
+
 The release workflow builds with the Maven Wrapper (`./mvnw`), which pins the Maven version, checked by
 its SHA-256, in `.mvn/wrapper/maven-wrapper.properties`. A tag holds the wrapper its release was built
 with, so the rebuild above uses the same Maven. Releases before 0.4.0 have no wrapper: they used the

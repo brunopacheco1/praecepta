@@ -12,3 +12,6 @@ target
 .gradle
 .kotlin
 praecepta-gradle-plugin/portal/build
+
+# Python bytecode of the workflow scripts, written when their tests run
+__pycache__

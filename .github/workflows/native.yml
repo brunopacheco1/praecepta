@@ -22,6 +22,10 @@ on:
       - 'praecepta-maven-plugin/src/it/native-app/**'
       - '**/pom.xml'
       - '.github/workflows/native.yml'
+      # how the build resolves and caches its dependencies
+      - '.mvn/maven.config'
+      - '.github/actions/maven-cache/**'
+      - '.github/scripts/retry_downloads.py'
   schedule:
     - cron: '47 3 * * 1'
   workflow_dispatch:
@@ -36,23 +40,29 @@ concurrency:
 
 jobs:
   native:
-    # GraalVM for the oldest Java Praecepta supports, and for the current LTS
-    name: Native image (GraalVM for JDK ${{ matrix.java }})
+    # GraalVM for Java 21, the baseline, once (#164): the application has no framework that needs a later one
+    name: Native image (GraalVM for JDK 21)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        java: ['21', '25']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: graalvm/setup-graalvm@60e76998d25690099182b796e99b8804da582d90 # v1.6.10
         with:
           distribution: graalvm-community
-          java-version: ${{ matrix.java }}
-          cache: maven
+          java-version: '21'
+      - id: maven-cache
+        uses: ./.github/actions/maven-cache
+        with:
+          name: native
       - name: Build the native executable and run it
         # -Pnative: the plugin's invoker builds src/it/native-app with native-image and runs the executable;
         # the unit tests already ran in the Java CI workflow
         run: |
           native-image --version
-          mvn -B -pl praecepta-maven-plugin -am verify -Pnative -DskipTests
+          python3 .github/scripts/retry_downloads.py mvn -B -pl praecepta-maven-plugin -am verify -Pnative -DskipTests
+      - name: Save the Maven cache
+        uses: ./.github/actions/maven-cache
+        with:
+          name: native
+          save: true
+          key: ${{ steps.maven-cache.outputs.key }}
+          restored-key: ${{ steps.maven-cache.outputs.restored-key }}

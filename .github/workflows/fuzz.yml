@@ -28,7 +28,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
+      - uses: ./.github/actions/maven-cache # restores the main build's cache; only main's builds save one
       - name: Fuzz for 5 minutes
         env:
           JAZZER_FUZZ: 1
