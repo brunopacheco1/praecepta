@@ -28,10 +28,10 @@ import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 
 /**
- * The TCK models that declare default output values ({@code defaultOutputEntry}, #79). Their test cases
- * leave a rule matching in every check {@link TckTest} runs, except through decisions Praecepta does not
- * evaluate, so these tests evaluate the tables where no rule matches: DMN 1.5, 10.3.2.10, "if no rules
- * match, if a default output value d is specified, DTI=FEEL(d)".
+ * The TCK models that declare default output values ({@code defaultOutputEntry}), each table evaluated on its own
+ * with {@link PraeceptaEngine} where no rule matches: DMN 1.5, 10.3.2.10, "if no rules match, if a default output
+ * value d is specified, DTI=FEEL(d)". The kit's test cases for the four approval models leave a rule matching in
+ * every check {@link TckTest} runs, so these tests give the inputs that match none.
  */
 class DefaultOutputsTest {
 
@@ -51,9 +51,9 @@ class DefaultOutputsTest {
         Assertions.assertThat(mapEngine(table).evaluate(Map.of("RiskCategory", "Low", "isAffordable", "true"))).containsExactly(expected);
     }
 
-    /** The example of #79: 0108-first-hitpolicy with an input none of its rules match. */
+    /** 0108-first-hitpolicy with an input none of its rules match. */
     @Test
-    void the_first_hit_policy_example_of_the_issue_gives_the_defaults() throws IOException {
+    void the_first_hit_policy_model_gives_the_defaults_when_no_rule_matches() throws IOException {
         var engine = mapEngine(table("compliance-level-2/0108-first-hitpolicy", null));
         Assertions.assertThat(engine.evaluate(Map.of("Age", "30", "RiskCategory", "High", "isAffordable", "true")))
                 .containsExactly(Map.of("Status", "Declined", "Rate", "Standard"));
@@ -65,7 +65,7 @@ class DefaultOutputsTest {
     /**
      * 0020-vacation-days computes "Total Vacation Days" as {@code Base Vacation Days + max(Extra days case 1,
      * Extra days case 3) + Extra days case 2}, from three COLLECT MAX tables whose default is 0, and a base of
-     * 22. Praecepta evaluates only the tables; the sum is done here, so the TCK's expected totals (its test
+     * 22. This test evaluates only the tables and does the sum itself, so the TCK's expected totals (its test
      * file, test cases 001 to 007) check them, those where no rule of a table matches included (002 matches
      * none at all: without the defaults, the total would be null).
      */
@@ -85,13 +85,6 @@ class DefaultOutputsTest {
     void the_vacation_days_tables_read_their_defaults() throws IOException {
         Assertions.assertThat(table("compliance-level-3/0020-vacation-days", "Extra days case 2").defaultOutput())
                 .contains(new PraeceptaOutput(Map.of("Extra days", "0"))); // the output is named by its label
-    }
-
-    @Test
-    void a_rejected_default_output_is_reported_as_its_own_feature() {
-        Assertions.assertThat(DecisionTableEvaluator.unsupportedFeature(
-                "Decision 'Fee', output 'Fee': default output 'score + 1' is not supported; a default output must be a literal number"))
-                .isEqualTo(Feature.decisionTable("default outputs that are not literals"));
     }
 
     private static DecisionTable table(String testCase, String decision) throws IOException {

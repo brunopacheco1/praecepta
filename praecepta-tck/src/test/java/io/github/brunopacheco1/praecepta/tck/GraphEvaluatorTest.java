@@ -20,35 +20,33 @@ import io.github.brunopacheco1.praecepta.tck.TckRunner.Status;
 import io.github.brunopacheco1.praecepta.tck.TckSuite.Check;
 import io.github.brunopacheco1.praecepta.tck.TckSuite.Invocable;
 
-/** How the run evaluates a decision through its model's decision requirements graph, and what it leaves to the others. */
+/** How the run evaluates a result node through its model's decision requirements graph, and what it does not evaluate. */
 class GraphEvaluatorTest {
 
     private static final Map<String, Check> KIT = TckSuite.load().values().stream().flatMap(List::stream)
             .collect(Collectors.toMap(Check::key, Function.identity()));
-    private static final DmnModel OFFERS = new DmnModel(resource("/graphs/offers.dmn"));
-    private static final DmnModel EXTERNAL = new DmnModel(resource("/graphs/external.dmn"));
+    private static final Path OFFERS = resource("/graphs/offers.dmn");
+    private static final Path EXTERNAL = resource("/graphs/external.dmn");
 
-    private final SingleDecisionEvaluator single = new SingleDecisionEvaluator();
-    private final GraphEvaluator graphs = new GraphEvaluator(single);
+    private final GraphEvaluator graphs = new GraphEvaluator();
+    private final TckRunner runner = new TckRunner();
 
     @Test
     void a_decision_is_evaluated_through_the_graph_computing_the_decisions_it_requires() {
-        var check = offers(Map.of("Score", new TckValue.Simple("decimal", "750")), "Offer: Gold");
+        var check = offers("Offer Text", Map.of("Score", new TckValue.Simple("decimal", "750")), "Offer: Gold");
 
         assertThat(graphs.evaluate(check)).isEqualTo(new Evaluation.Value(new TckValue.Simple("string", "Offer: Gold"), true));
-        assertThat(new TckRunner(ModelEvaluator.praecepta()).run(check).status()).isEqualTo(Status.PASSED);
-        // evaluated on its own, it would need Offer computed
-        assertThat(((Evaluation.Unsupported) single.evaluate(check)).needs()).contains(Feature.REQUIRED_DECISIONS);
+        assertThat(runner.run(check).status()).isEqualTo(Status.PASSED);
     }
 
     @Test
     void a_decision_whose_value_the_test_case_gives_is_input_data_and_is_not_computed() {
         // Score 750 computes Band "A" and Eligible true, so Gold; the test case gives Band "C" instead
-        var check = offers(Map.of("Score", new TckValue.Simple("decimal", "750"), "Band", new TckValue.Simple("string", "C")),
+        var check = offers("Offer Text", Map.of("Score", new TckValue.Simple("decimal", "750"), "Band", new TckValue.Simple("string", "C")),
                 "Offer: Silver");
 
-        assertThat(new TckRunner(graphs).run(check).status()).isEqualTo(Status.PASSED);
-        assertThat(new TckRunner(graphs).run(offers(Map.of("Score", new TckValue.Simple("decimal", "750")), "Offer: Gold")).status())
+        assertThat(runner.run(check).status()).isEqualTo(Status.PASSED);
+        assertThat(runner.run(offers("Offer Text", Map.of("Score", new TckValue.Simple("decimal", "750")), "Offer: Gold")).status())
                 .as("the graph without the given decision is still the model's").isEqualTo(Status.PASSED);
     }
 
@@ -56,7 +54,7 @@ class GraphEvaluatorTest {
     void the_components_of_a_structured_input_data_are_read_through_the_graph() {
         var check = KIT.get("compliance-level-2/0008-LX-arithmetic/0008-LX-arithmetic-test-01.xml #001 payment");
 
-        // FEEL's 34 digits (DMN 1.5, 10.3.2.3.1), where the kit gives 15: a known failure
+        // FEEL's 34 digits (DMN 1.5, 10.3.2.3.1), where the kit states 15
         assertThat(graphs.evaluate(check))
                 .isEqualTo(new Evaluation.Value(new TckValue.Simple("decimal", "2778.693549432766768088520383236299"), true));
     }
@@ -67,48 +65,42 @@ class GraphEvaluatorTest {
         var check = KIT.get("compliance-level-3/0068-feel-equality/0068-feel-equality-test-01.xml #boolean_008 boolean_008");
 
         assertThat(graphs.evaluate(check)).isInstanceOf(Evaluation.Error.class);
-        assertThat(new TckRunner(graphs).run(check).status()).isEqualTo(Status.PASSED);
+        assertThat(runner.run(check).status()).isEqualTo(Status.PASSED);
     }
 
     @Test
-    void the_full_feel_language_is_evaluated_through_the_graph() {
-        var check = KIT.get("compliance-level-2/0106-feel-ternary-logic/0106-feel-ternary-logic-test-01.xml #001 DecisionAnd");
+    void a_model_with_an_external_function_is_not_supported_whatever_the_node_and_the_reason_is_the_readers() {
+        // Max is an external function, so readModel rejects the model; Band and Label do not use it
+        for (var decision : List.of("Band", "Label", "Max")) {
+            var outcome = runner.run(check(EXTERNAL, decision, Map.of("Score", new TckValue.Simple("decimal", "750")), "A"));
 
-        assertThat(new TckRunner(graphs).run(check).status()).isEqualTo(Status.PASSED);
+            assertThat(outcome.status()).as(decision).isEqualTo(Status.UNSUPPORTED);
+            assertThat(outcome.detail()).as(decision).contains("'Max'", "an external function", "which Praecepta does not evaluate, by design");
+        }
     }
 
     @Test
-    void a_node_needs_what_its_decisions_need_but_no_longer_graphs() {
-        // the model defines an external function, so readModel rejects it; Label alone needs Band computed
-        var check = external("Label", Map.of("Score", new TckValue.Simple("decimal", "750")), "Band A");
+    void a_result_node_that_names_no_decision_or_decision_service_of_the_model_fails() {
+        var outcome = runner.run(offers("Discount", Map.of("Score", new TckValue.Simple("decimal", "750")), "10"));
 
-        var needs = ((Evaluation.Unsupported) ModelEvaluator.praecepta().evaluate(check)).needs();
-        assertThat(needs).contains(Feature.EXTERNAL_FUNCTIONS).doesNotContain(Feature.REQUIRED_DECISIONS);
+        assertThat(outcome.status()).isEqualTo(Status.FAILED);
+        assertThat(outcome.detail()).isEqualTo("the model has no decision or decision service named 'Discount'");
     }
 
     @Test
-    void a_node_on_decisions_that_invoke_built_in_functions_is_evaluated_through_the_graph() {
-        var check = KIT.get("compliance-level-3/0020-vacation-days/0020-vacation-days-test-01.xml #001 Total Vacation Days");
+    void an_evaluation_that_throws_fails_the_node_and_not_the_run() {
+        var outcome = runner.run(check(OFFERS.resolveSibling("no-such-model.dmn"), "Offer", Map.of(), "Gold"));
 
-        assertThat(new TckRunner(graphs).run(check).status()).isEqualTo(Status.PASSED);
+        assertThat(outcome.status()).isEqualTo(Status.FAILED);
+        assertThat(outcome.detail()).startsWith("evaluation threw ").contains("no-such-model.dmn");
     }
 
-    @Test
-    void a_model_read_only_in_part_is_left_to_single_decisions() {
-        // the model defines an external function, so readModel rejects it, and each decision is evaluated alone
-        var check = external("Band", Map.of("Score", new TckValue.Simple("decimal", "750")), "A");
-
-        assertThat(graphs.evaluate(check)).isEqualTo(new Evaluation.Unsupported(Feature.EXTERNAL_FUNCTIONS));
-        assertThat(new TckRunner(ModelEvaluator.praecepta()).run(check).status()).isEqualTo(Status.PASSED);
+    private static Check offers(String decision, Map<String, TckValue> inputs, String expected) {
+        return check(OFFERS, decision, inputs, expected);
     }
 
-    private static Check external(String decision, Map<String, TckValue> inputs, String expected) {
-        return new Check("graphs/external", "external-test-01.xml", "001", Invocable.DECISION, "", decision, EXTERNAL, inputs,
-                new TckValue.Simple("string", expected), false);
-    }
-
-    private static Check offers(Map<String, TckValue> inputs, String expected) {
-        return new Check("graphs/offers", "offers-test-01.xml", "001", Invocable.DECISION, "", "Offer Text", OFFERS, inputs,
+    private static Check check(Path model, String decision, Map<String, TckValue> inputs, String expected) {
+        return new Check("graphs", "graphs-test-01.xml", "001", Invocable.DECISION, "", decision, model, inputs,
                 new TckValue.Simple("string", expected), false);
     }
 

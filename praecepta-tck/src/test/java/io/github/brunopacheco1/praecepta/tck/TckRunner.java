@@ -5,13 +5,11 @@
  */
 package io.github.brunopacheco1.praecepta.tck;
 
-import java.util.List;
-
 import io.github.brunopacheco1.praecepta.tck.TckSuite.Check;
 
 /**
- * Scores one result node: evaluates it with a {@link ModelEvaluator} and compares what it gives with the node's
- * expected result.
+ * Scores one result node: evaluates it through its model's decision requirements graph ({@link GraphEvaluator}) and
+ * compares what that gives with the node's expected result.
  *
  * <p>A node flagged {@code errorResult} passes when evaluation reports an error, and fails when it gives a value;
  * a node that is not fails when evaluation reports one.
@@ -24,24 +22,18 @@ final class TckRunner {
         UNSUPPORTED,
     }
 
-    /**
-     * @param detail for UNSUPPORTED, the feature that stopped evaluation; for FAILED, what differed; else empty
-     * @param needs  for UNSUPPORTED, every feature the node needs, the one that stopped evaluation first; else empty
-     */
-    record Outcome(Status status, String detail, List<Feature> needs) {
-        static final Outcome PASSED = new Outcome(Status.PASSED, "", List.of());
+    /** @param detail for FAILED, what differed; for UNSUPPORTED, what the model uses that Praecepta rejects; else empty */
+    record Outcome(Status status, String detail) {
+        static final Outcome PASSED = new Outcome(Status.PASSED, "");
 
         static Outcome failed(String detail) {
-            return new Outcome(Status.FAILED, detail, List.of());
+            return new Outcome(Status.FAILED, detail);
         }
     }
 
-    private final ModelEvaluator evaluator;
+    private final GraphEvaluator evaluator = new GraphEvaluator();
 
-    TckRunner(ModelEvaluator evaluator) {
-        this.evaluator = evaluator;
-    }
-
+    /** Evaluates a node and scores it; an evaluation that throws fails the node, not the run. */
     Outcome run(Check check) {
         Evaluation evaluation;
         try {
@@ -49,8 +41,13 @@ final class TckRunner {
         } catch (RuntimeException e) {
             evaluation = new Evaluation.Failure("evaluation threw " + e);
         }
+        return score(check, evaluation);
+    }
+
+    /** What an evaluation is worth against the node's expected result. */
+    static Outcome score(Check check, Evaluation evaluation) {
         return switch (evaluation) {
-            case Evaluation.Unsupported unsupported -> new Outcome(Status.UNSUPPORTED, unsupported.first().name(), unsupported.needs());
+            case Evaluation.Unsupported(var reason) -> new Outcome(Status.UNSUPPORTED, reason);
             case Evaluation.Failure(var message) -> Outcome.failed(message);
             case Evaluation.Error(var message) -> check.expectsError() ? Outcome.PASSED
                     : Outcome.failed("expected %s, but evaluation threw: %s".formatted(check.expected(), message));

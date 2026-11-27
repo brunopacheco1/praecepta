@@ -19,7 +19,7 @@
     <description>
         Runs every model of compliance levels 2 and 3 of the DMN Technology Compatibility Kit against Praecepta,
         scores each result node, fails the build on a regression from the committed baseline, and writes the
-        published results (RESULTS.md). Not published.
+        published results (RESULTS.md) and, on request, the results in the kit's own format. Not published.
     </description>
 
     <properties>
@@ -58,4 +58,19 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <!-- the version tck_results.properties states, where -Dtck.results exports the results -->
+                        <tck.product.version>${project.version}</tck.product.version>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

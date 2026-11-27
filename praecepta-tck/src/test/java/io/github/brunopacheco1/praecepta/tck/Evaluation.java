@@ -5,12 +5,7 @@
  */
 package io.github.brunopacheco1.praecepta.tck;
 
-import java.util.List;
-
-/**
- * What a {@link ModelEvaluator} gives for one result node; {@link TckRunner} compares it with the node's expected
- * result.
- */
+/** What {@link GraphEvaluator} gives for one result node; {@link TckRunner} compares it with the node's expected result. */
 sealed interface Evaluation {
 
     /**
@@ -23,35 +18,20 @@ sealed interface Evaluation {
 
     /**
      * Evaluation reported an error, which DMN gives as a null result the test case flags {@code errorResult}: a hit
-     * policy violation, an input outside its value list.
+     * policy violation, an input outside its value list, a null value FEEL reported an error for.
      */
     record Error(String message) implements Evaluation {
     }
 
-    /** Praecepta could not evaluate the node: the model is one it should take, but building or evaluating it failed. */
+    /** Praecepta could not evaluate the node, though it should: reading the model, or building or evaluating its graph, failed. */
     record Failure(String message) implements Evaluation {
     }
 
     /**
-     * The node needs features Praecepta does not have.
+     * The node's model uses what Praecepta rejects by design.
      *
-     * @param needs the missing features, the one that stopped evaluation first; never empty
+     * @param reason what the model uses, as the DMN reader says it
      */
-    record Unsupported(List<Feature> needs) implements Evaluation {
-        public Unsupported {
-            if (needs.isEmpty()) {
-                throw new IllegalArgumentException("an unsupported node needs a feature");
-            }
-            needs = List.copyOf(needs);
-        }
-
-        Unsupported(Feature feature) {
-            this(List.of(feature));
-        }
-
-        /** The feature that stopped evaluation. */
-        Feature first() {
-            return needs.getFirst();
-        }
+    record Unsupported(String reason) implements Evaluation {
     }
 }

@@ -21,11 +21,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.SequencedSet;
 import java.util.TreeSet;
 
 import io.github.brunopacheco1.praecepta.engine.DecisionGraph;
+import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
 import io.github.brunopacheco1.praecepta.engine.beans.HitPolicy;
@@ -41,77 +43,56 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
 import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 import io.github.brunopacheco1.praecepta.tck.TckSuite.Check;
-import io.github.brunopacheco1.praecepta.tck.TckSuite.Invocable;
 
 /**
- * Evaluates a decision through its model's decision requirements graph, as Praecepta does: the model
- * is read with {@link DmnReader#readModel} and built into a {@link DecisionGraph}, which evaluates the decision from the
- * test case's input data and computes the decisions it requires. A decision whose value the test case gives is input
- * data instead, as the kit means it: the graph is built with that decision replaced by an input data of its type.
+ * Evaluates a result node through its model's decision requirements graph, as Praecepta does: {@link DmnReader#readModel}
+ * reads the model, with the models it imports, and a {@link DecisionGraph} of it evaluates the decision from the test
+ * case's input data, computing the decisions it requires. A decision whose value the test case gives is input data
+ * instead, as the kit means it: the graph is built with that decision replaced by an input data of its type. A test
+ * case that invokes a decision service or a business knowledge model, and a result node named after a decision service,
+ * is that service or model invoked with the test case's values as its arguments.
  *
- * <p>It takes a node when the model as a whole is one {@link DmnReader#readModel} reads (a model with a business
- * knowledge model, a decision service or an import, even one the node does not use, is not) and the graph evaluates the
- * decision: what is not supported is what the engine rejects, a decision its validation report does not let it
- * evaluate (one that reads a name none of its requirements provides, say). The nodes it does not take go to the next
- * evaluator ({@link ModelEvaluator#orElse}), {@link SingleDecisionEvaluator}, which evaluates a decision on its own and
- * names what the node needs.
+ * <p>A node is {@link Evaluation.Unsupported} only where the reader rejects its model for what Praecepta does not
+ * evaluate by design ({@link UnsupportedFeatureException}: an external function), with the reader's message. Any other
+ * model it does not read, graph it does not build or decision it does not evaluate is an {@link Evaluation.Failure}.
  *
- * <p>As {@link DecisionTableEvaluator} does, it reports a hit policy violation or an input outside its value list as an
- * {@link Evaluation.Error}; a null value where FEEL reported an error is an {@link Evaluation.Error} too, where the kit
- * expects one ({@link #evaluation}).
+ * <p>A hit policy violation and an input outside its value list are an {@link Evaluation.Error}; so is a null value
+ * FEEL reported an error for, where the kit expects one ({@link #evaluation}).
  */
-final class GraphEvaluator implements ModelEvaluator {
+final class GraphEvaluator {
 
-    /** A decision the graph cannot evaluate, as its validation report says (a type mismatch, say). */
-    static final Feature REPORTED = Feature.feel("decisions the decision requirements graph reports and does not evaluate");
-
-    /** What reading a model gives: the model, or the feature {@link DmnReader#readModel} rejected. */
-    private record Read(DecisionModel model, DecisionGraph graph, Feature rejected) {
+    /** What reading a model gives: the model and its graph, or what its nodes are instead, where the reader rejects it. */
+    private record Read(DecisionModel model, DecisionGraph graph, Evaluation rejected) {
     }
 
-    private final SingleDecisionEvaluator single;
     /** Models read, by file. */
-    private final Map<String, Read> models = new HashMap<>();
+    private final Map<Path, Read> models = new HashMap<>();
     /** Graphs built, by file and the decisions whose values the test case gives. */
     private final Map<String, DecisionGraph> graphs = new HashMap<>();
 
-    GraphEvaluator(SingleDecisionEvaluator single) {
-        this.single = single;
-    }
-
-    @Override
-    public Evaluation evaluate(Check check) {
-        if (check.kind() == Invocable.DECISION_SERVICE) {
-            return service(check, check.invocable(), check.decision());
-        }
-        if (check.kind() == Invocable.KNOWLEDGE_MODEL) {
-            return knowledgeModel(check, check.invocable());
-        }
-        if (check.kind() == Invocable.DECISION && check.model().decision(check.decision()) == null) {
-            // a result node named after a decision service, without the test case's type, is the service's value
-            var read = read(check.model());
-            if (read.graph() != null && read.graph().decisionServices().contains(check.decision())) {
-                return service(check, check.decision(), null);
-            }
-        }
-        if (check.kind() != Invocable.DECISION || check.model().decision(check.decision()) == null) {
-            return new Evaluation.Unsupported(single.needsBesideGraphs(check, List.of()));
-        }
+    /** Evaluates one result node. */
+    Evaluation evaluate(Check check) {
         var read = read(check.model());
         if (read.rejected() != null) {
-            if (single.needsBesideGraphs(check, List.of()).isEmpty()) {
-                return notTaken(check, read.rejected());
-            }
-            var needs = besideGraphs(check);
-            if (read.rejected().area() == Feature.Area.NOT_PLANNED && !needs.contains(read.rejected())) {
-                // what Praecepta does not evaluate by design, elsewhere in the model, keeps it from the graph for good
-                var all = new ArrayList<Feature>();
-                all.add(read.rejected());
-                all.addAll(needs);
-                needs = all;
-            }
-            return new Evaluation.Unsupported(needs);
+            return read.rejected();
         }
+        var name = check.decision();
+        return switch (check.kind()) {
+            case DECISION_SERVICE -> service(check, read.graph(), check.invocable(), name);
+            case KNOWLEDGE_MODEL -> knowledgeModel(check, read.graph(), check.invocable());
+            case DECISION -> {
+                if (read.model().decision(name).isPresent()) {
+                    yield decision(check, read);
+                }
+                // a result node named after a decision service, without the test case's type, is the service's value
+                yield read.graph().decisionServices().contains(name) ? service(check, read.graph(), name, null)
+                        : new Evaluation.Failure("the model has no decision or decision service named '" + name + "'");
+            }
+        };
+    }
+
+    /** A decision evaluated from the test case's input data, and from the decisions whose values it gives. */
+    private Evaluation decision(Check check, Read read) {
         DecisionGraph graph;
         try {
             graph = graph(check, read);
@@ -120,7 +101,8 @@ final class GraphEvaluator implements ModelEvaluator {
         }
         var decision = check.decision();
         if (!graph.canEvaluate(decision)) {
-            return notTaken(check, REPORTED);
+            return new Evaluation.Failure("the decision requirements graph reports the decision and does not evaluate it: "
+                    + graph.validationReport());
         }
         DecisionGraph.Outcome outcome;
         try {
@@ -138,12 +120,7 @@ final class GraphEvaluator implements ModelEvaluator {
      * decision the node names, or, for {@code output} null, the service's value, its one output decision's or a context
      * of them all.
      */
-    private Evaluation service(Check check, String service, String output) {
-        var read = read(check.model());
-        if (read.rejected() != null) {
-            return new Evaluation.Unsupported(single.needsBesideGraphs(check, List.of()));
-        }
-        var graph = read.graph();
+    private Evaluation service(Check check, DecisionGraph graph, String service, String output) {
         var model = graph.model().decisionService(service).orElse(null);
         if (model == null) {
             return new Evaluation.Failure("the model has no decision service named '" + service + "'");
@@ -160,7 +137,7 @@ final class GraphEvaluator implements ModelEvaluator {
         try {
             outcome = graph.evaluateService(service, arguments);
         } catch (InvalidDecisionTableException e) {
-            return notTaken(check, REPORTED);
+            return new Evaluation.Failure("the decision service is not evaluated: " + e.getMessage());
         } catch (HitPolicyViolationException | InvalidInputException e) {
             return new Evaluation.Error(e.getMessage());
         }
@@ -177,12 +154,7 @@ final class GraphEvaluator implements ModelEvaluator {
     }
 
     /** A business knowledge model invoked with the test case's inputs as its arguments, by parameter name (DMN 1.5, 6.3.10). */
-    private Evaluation knowledgeModel(Check check, String knowledgeModel) {
-        var read = read(check.model());
-        if (read.rejected() != null) {
-            return new Evaluation.Unsupported(single.needsBesideGraphs(check, List.of()));
-        }
-        var graph = read.graph();
+    private Evaluation knowledgeModel(Check check, DecisionGraph graph, String knowledgeModel) {
         if (!graph.knowledgeModels().contains(knowledgeModel)) {
             return new Evaluation.Failure("the model has no business knowledge model named '" + knowledgeModel + "'");
         }
@@ -192,7 +164,7 @@ final class GraphEvaluator implements ModelEvaluator {
         try {
             outcome = graph.invokeKnowledgeModel(knowledgeModel, arguments);
         } catch (InvalidDecisionTableException e) {
-            return notTaken(check, REPORTED);
+            return new Evaluation.Failure("the business knowledge model is not invoked: " + e.getMessage());
         }
         var errors = new ArrayList<String>();
         outcome.errors().values().forEach(errors::addAll);
@@ -204,7 +176,7 @@ final class GraphEvaluator implements ModelEvaluator {
      * reported one and the kit expects an error (DMN 1.5, 10.3.2.15: the value is null, and the error is reported);
      * otherwise the value.
      */
-    static Evaluation evaluation(Check check, DecisionGraph.Outcome outcome, boolean ordered) {
+    private static Evaluation evaluation(Check check, DecisionGraph.Outcome outcome, boolean ordered) {
         var errors = outcome.errorsOf(check.decision());
         if (outcome.value() == null && check.expectsError() && !errors.isEmpty()) {
             return new Evaluation.Error(String.join("; ", errors));
@@ -212,14 +184,17 @@ final class GraphEvaluator implements ModelEvaluator {
         return new Evaluation.Value(value(outcome.value()), ordered);
     }
 
-    /** The model of a file, read once, and its graph. */
-    private Read read(DmnModel model) {
-        return models.computeIfAbsent(model.file().toString(), file -> {
-            try (InputStream dmn = Files.newInputStream(model.file())) {
-                var decisionModel = DmnReader.readModel(dmn, imports(model.file().getParent()));
+    /** The model of a file, read once with the models it imports, and its graph. */
+    private Read read(Path file) {
+        return models.computeIfAbsent(file, model -> {
+            try (InputStream dmn = Files.newInputStream(model)) {
+                var decisionModel = DmnReader.readModel(dmn, imports(model.getParent()));
                 return new Read(decisionModel, build(decisionModel), null);
+            } catch (UnsupportedFeatureException e) {
+                // what Praecepta rejects by design; the reader's message names it
+                return new Read(null, null, new Evaluation.Unsupported(e.getMessage()));
             } catch (InvalidDecisionTableException e) {
-                return new Read(null, null, rejected(e));
+                return new Read(null, null, new Evaluation.Failure("Praecepta does not read the model: " + e.getMessage()));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -235,7 +210,7 @@ final class GraphEvaluator implements ModelEvaluator {
         if (given.isEmpty()) {
             return read.graph();
         }
-        return graphs.computeIfAbsent(check.model().file() + "#" + given, key -> build(given(read, given)));
+        return graphs.computeIfAbsent(check.model() + "#" + given, key -> build(given(read, given)));
     }
 
     private static DecisionGraph build(DecisionModel model) {
@@ -310,7 +285,11 @@ final class GraphEvaluator implements ModelEvaluator {
         };
     }
 
-    static Object input(TckValue given, FeelType type) {
+    /**
+     * A test case's value as the graph takes it for an input of this type: a value of a simple type as text, one of no
+     * declared type typed by its {@code xsi:type}, a structure as a map of its components, a list as a list.
+     */
+    private static Object input(TckValue given, FeelType type) {
         return switch (given) {
             case TckValue.Nil nil -> null;
             case TckValue.Simple simple when type instanceof FeelType.Any -> typed(simple);
@@ -330,20 +309,39 @@ final class GraphEvaluator implements ModelEvaluator {
         };
     }
 
-    /** A simple value of no declared type, typed by its {@code xsi:type}; its text if it has none Praecepta knows. */
+    /** A simple value of no declared type, typed by its {@code xsi:type}; its text if that names no type Praecepta has. */
     private static Object typed(TckValue.Simple simple) {
-        if (ItemType.builtIn(simple.type()) instanceof ItemType.Simple(var type) && !simple.type().isEmpty()) {
-            try {
-                return FeelLiterals.value(simple.text(), type);
-            } catch (IllegalArgumentException e) {
-                return simple.text();
-            }
+        var type = columnType(simple.type());
+        if (type == null) {
+            return simple.text();
         }
-        return simple.text();
+        try {
+            return FeelLiterals.value(simple.text(), type);
+        } catch (IllegalArgumentException e) {
+            return simple.text();
+        }
+    }
+
+    /**
+     * The type an XML Schema type names, or null: for no type, and for {@code duration}, which does not say which of
+     * FEEL's two durations it is.
+     */
+    private static ColumnType columnType(String xsiType) {
+        return switch (xsiType.toLowerCase(Locale.ROOT)) {
+            case "string" -> ColumnType.STRING;
+            case "number", "decimal", "integer", "int", "long", "double", "float" -> ColumnType.NUMBER;
+            case "boolean" -> ColumnType.BOOLEAN;
+            case "date" -> ColumnType.DATE;
+            case "time" -> ColumnType.TIME;
+            case "datetime" -> ColumnType.DATE_TIME;
+            case "daytimeduration" -> ColumnType.DAY_TIME_DURATION;
+            case "yearmonthduration" -> ColumnType.YEAR_MONTH_DURATION;
+            default -> null;
+        };
     }
 
     /** A graph's value as the kit compares it. */
-    static TckValue value(Object value) {
+    private static TckValue value(Object value) {
         return switch (value) {
             case null -> TckValue.NIL;
             case Map<?, ?> context -> {
@@ -367,61 +365,5 @@ final class GraphEvaluator implements ModelEvaluator {
             case FeelFunction function -> new TckValue.Simple("", function.toString());
             default -> new TckValue.Simple("", FeelLiterals.text(value));
         };
-    }
-
-    // ---- reasons ----------------------------------------------------------------------------------
-
-    /**
-     * What a node needs that Praecepta cannot read, beside graphs: the reasons {@link SingleDecisionEvaluator} gives,
-     * the more precise about the decision's own logic, without {@link Feature#REQUIRED_DECISIONS}, which this evaluator
-     * has.
-     */
-    private List<Feature> besideGraphs(Check check) {
-        if (single.evaluate(check) instanceof Evaluation.Unsupported alone) {
-            var needs = withoutGraphs(alone.needs());
-            if (!needs.isEmpty()) {
-                return needs;
-            }
-        }
-        return single.needsBesideGraphs(check, List.of());
-    }
-
-    /**
-     * A node that needs nothing Praecepta cannot read, but which the graph does not take for {@code reason}: the model
-     * as a whole is one Praecepta does not read, or the graph reports the decision. A decision that needs no other
-     * decision computed is left to {@link SingleDecisionEvaluator}, with its reasons where that does not take it either;
-     * one that needs them waits for {@code reason}.
-     */
-    private Evaluation notTaken(Check check, Feature reason) {
-        if (single.evaluate(check) instanceof Evaluation.Unsupported alone) {
-            if (!alone.needs().contains(Feature.REQUIRED_DECISIONS)) {
-                return alone;
-            }
-            var needs = new ArrayList<Feature>();
-            needs.add(reason);
-            needs.addAll(withoutGraphs(alone.needs()));
-            return new Evaluation.Unsupported(needs);
-        }
-        return new Evaluation.Unsupported(reason);
-    }
-
-    private static List<Feature> withoutGraphs(List<Feature> needs) {
-        return needs.stream().filter(need -> !need.equals(Feature.REQUIRED_DECISIONS)).toList();
-    }
-
-    /**
-     * What {@link DmnReader#readModel} rejected in a model: what the node does not use itself, since its own needs were
-     * none. An {@link UnsupportedFeatureException} is an import, as the reader's message says, or else an external
-     * function, which Praecepta does not evaluate by design; anything else is a model Praecepta does not read.
-     */
-    static Feature rejected(InvalidDecisionTableException rejection) {
-        var message = String.valueOf(rejection.getMessage());
-        if (!(rejection instanceof UnsupportedFeatureException)) {
-            return Feature.decisionTable(message.contains("item definition")
-                    ? "item definitions Praecepta does not read, elsewhere in the model"
-                    : "models Praecepta does not read as a whole");
-        }
-        var imports = message.startsWith("DMN model imports") || message.contains("its literal expression imports values");
-        return imports ? Feature.IMPORTS : Feature.EXTERNAL_FUNCTIONS;
     }
 }

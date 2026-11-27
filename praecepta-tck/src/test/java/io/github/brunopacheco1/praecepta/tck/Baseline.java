@@ -11,17 +11,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
+import java.util.SortedSet;
 import java.util.TreeSet;
 
 /**
  * The committed baseline (baseline.txt): the key of every result node that passed when it was last regenerated, one
- * per line, sorted, followed by a tab and {@code graph} when the node passed through the decision requirements graph
- * ({@link GraphEvaluator}) itself. A node it lists that no longer passes, or that no longer passes through the graph
- * though it did, is a regression, which fails the build; regenerating it with {@code -Dtck.update=true} records what
- * passes now, and its diff shows what changed.
+ * per line, sorted. A node it lists that no longer passes is a regression, which fails the build; regenerating it with
+ * {@code -Dtck.update=true} records what passes now, and its diff shows what changed.
  */
 final class Baseline {
 
@@ -30,22 +27,14 @@ final class Baseline {
 
     static final Path FILE = MODULE.resolve("baseline.txt");
 
-    /** The tag of a node that passes through the graph. */
-    static final String GRAPH = "graph";
-
-    /** How to mend a baseline that cannot be read. */
-    private static final String FIX = "fix it, or regenerate it with -Dtck.update=true";
-
     private static final String HEADER = """
             # SPDX-FileCopyrightText: Bruno Pacheco
             #
             # SPDX-License-Identifier: Apache-2.0
             #
             # The DMN TCK result nodes that passed when this file was last regenerated, one per line: the test case
-            # directory, the test file, the test case id and the result node's name, then, after a tab, "graph" if the
-            # node passed through the decision requirements graph. TckTest fails the build when one of them no longer
-            # passes, or no longer passes through the graph. Regenerate it, with RESULTS.md, only to record a deliberate
-            # change:
+            # directory, the test file, the test case id and the result node's name. TckTest fails the build when one
+            # of them no longer passes. Regenerate it, with RESULTS.md, only to record a deliberate change:
             #
             #     mvn -pl praecepta-tck -am test -Dtck.update=true
             """;
@@ -62,24 +51,22 @@ final class Baseline {
     }
 
     /**
-     * The keys the baseline lists, each with its tag ({@link #GRAPH}, or empty).
+     * The keys the baseline lists.
      *
-     * @throws IllegalStateException if there is no baseline, or it lists no node, or lists one twice, or tags one with
-     *                               anything but {@link #GRAPH}, unless {@code update} is set: a missing baseline would
-     *                               let every regression pass, a node listed twice could hide a change of its tag, and a
-     *                               mistyped tag ({@code graph } with a space) would drop its check through the graph
+     * @throws IllegalStateException if there is no baseline, or it lists no node, unless {@code update} is set: a
+     *                               missing baseline would let every regression pass
      */
-    static Map<String, String> read(Path file, boolean update) {
+    static SortedSet<String> read(Path file, boolean update) {
         if (!Files.exists(file)) {
             if (update) {
-                return Map.of();
+                return new TreeSet<>();
             }
             throw new IllegalStateException(file.toAbsolutePath() + " does not exist; without it no regression is caught. "
                     + "Run the TCK from praecepta-tck, or regenerate it with -Dtck.update=true");
         }
-        var keys = new TreeMap<String, String>();
+        var keys = new TreeSet<String>();
         try (var lines = Files.lines(file)) {
-            lines.filter(line -> !line.isBlank() && !line.startsWith("#")).forEach(line -> add(keys, line, file, update));
+            lines.filter(line -> !line.isBlank() && !line.startsWith("#")).forEach(keys::add);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -89,44 +76,17 @@ final class Baseline {
         return keys;
     }
 
-    /** Adds a line's key and tag; a key listed already, or a tag other than {@link #GRAPH}, fails, unless updating. */
-    private static void add(Map<String, String> keys, String line, Path file, boolean update) {
-        int tab = line.indexOf('\t');
-        var key = tab < 0 ? line : line.substring(0, tab);
-        var tag = tab < 0 ? "" : line.substring(tab + 1);
-        if (!update && !tag.isEmpty() && !tag.equals(GRAPH)) {
-            throw new IllegalStateException("%s tags '%s' with '%s', which is not '%s'; %s"
-                    .formatted(file.toAbsolutePath(), key, tag, GRAPH, FIX));
-        }
-        if (keys.put(key, tag) != null && !update) {
-            throw new IllegalStateException("%s lists '%s' twice; %s".formatted(file.toAbsolutePath(), key, FIX));
-        }
-    }
-
-    /**
-     * The baseline's text for these passing keys: the header, then the keys sorted, each line ending in {@code \n},
-     * those that pass through the graph tagged.
-     */
-    static String render(Collection<String> passing, Set<String> throughGraph) {
+    /** The baseline's text for these passing keys: the header, then the keys sorted, each line ending in {@code \n}. */
+    static String render(Collection<String> passing) {
         var text = new StringBuilder(HEADER);
-        new TreeSet<>(passing).forEach(key -> text.append(key).append(throughGraph.contains(key) ? "\t" + GRAPH : "").append('\n'));
+        new TreeSet<>(passing).forEach(key -> text.append(key).append('\n'));
         return text.toString();
     }
 
-    /**
-     * The keys of the baseline that are not among the passing ones, and those it tags as passing through the graph that
-     * no longer do (named so), sorted.
-     */
-    static List<String> regressions(Map<String, String> baseline, Collection<String> passing, Set<String> throughGraph) {
-        var passed = Set.copyOf(passing);
-        var lost = new TreeSet<String>();
-        baseline.forEach((key, tag) -> {
-            if (!passed.contains(key)) {
-                lost.add(key);
-            } else if (tag.equals(GRAPH) && !throughGraph.contains(key)) {
-                lost.add(key + " (no longer through the decision requirements graph)");
-            }
-        });
+    /** The keys of the baseline that are not among the passing ones, sorted. */
+    static List<String> regressions(Set<String> baseline, Collection<String> passing) {
+        var lost = new TreeSet<>(baseline);
+        lost.removeAll(Set.copyOf(passing));
         return List.copyOf(lost);
     }
 }

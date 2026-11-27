@@ -11,7 +11,6 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,11 +18,7 @@ import java.util.stream.Stream;
 
 import org.w3c.dom.Element;
 
-/**
- * The vendored TCK (src/test/resources/tck): every result node of every test file of compliance levels 2 and 3,
- * whatever it needs. {@link Check#isDecisionTable()} picks the ones RESULTS.md has counted since 0.1, a decision
- * whose logic is a decision table.
- */
+/** The vendored TCK (src/test/resources/tck): every result node of every test file of compliance levels 2 and 3. */
 final class TckSuite {
 
     /** The dmn-tck/tck commit the files were copied from. */
@@ -49,11 +44,14 @@ final class TckSuite {
      * {@link Invocable}, that decision service or knowledge model invoked with them).
      *
      * @param testCase  the TCK test case directory, {@code compliance-level-3/0004-lending}
+     * @param testFile  the test file's name, {@code 0004-lending-test-01.xml}
+     * @param id        the id of the test case in its file
      * @param kind      what the test case invokes
      * @param invocable the decision service or knowledge model the test case invokes; empty for a decision
      * @param decision  the result node's name: a decision, or what the test case invokes
+     * @param model     the DMN file the test file names
      */
-    record Check(String testCase, String testFile, String id, Invocable kind, String invocable, String decision, DmnModel model,
+    record Check(String testCase, String testFile, String id, Invocable kind, String invocable, String decision, Path model,
                  Map<String, TckValue> inputs, TckValue expected, boolean expectsError) {
 
         String label() {
@@ -68,11 +66,6 @@ final class TckSuite {
         /** The compliance level, 2 or 3. */
         int level() {
             return testCase.startsWith("compliance-level-2/") ? 2 : 3;
-        }
-
-        /** Whether the node is a decision whose logic is a decision table: the checks RESULTS.md has always counted. */
-        boolean isDecisionTable() {
-            return kind == Invocable.DECISION && model.tables().contains(decision);
         }
     }
 
@@ -96,12 +89,11 @@ final class TckSuite {
     static Map<String, List<Check>> load() {
         var root = root();
         var byCase = new LinkedHashMap<String, List<Check>>();
-        var models = new HashMap<Path, DmnModel>();
         try (Stream<Path> files = Files.walk(root)) {
             for (var file : files.filter(f -> f.getFileName().toString().matches(".*-test-\\d+\\.xml")).sorted().toList()) {
                 var testCase = root.relativize(file.getParent()).toString().replace('\\', '/');
                 var checks = byCase.computeIfAbsent(testCase, c -> new ArrayList<>());
-                read(file, testCase, models, checks);
+                read(file, testCase, checks);
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -110,10 +102,9 @@ final class TckSuite {
         return byCase;
     }
 
-    private static void read(Path file, String testCase, Map<Path, DmnModel> models, List<Check> checks) {
+    private static void read(Path file, String testCase, List<Check> checks) {
         var root = TckXml.parse(file);
-        var modelName = TckXml.children(root, "modelName").getFirst().getTextContent().strip();
-        var model = models.computeIfAbsent(file.resolveSibling(modelName), DmnModel::new);
+        var model = file.resolveSibling(TckXml.children(root, "modelName").getFirst().getTextContent().strip());
         var testFile = file.getFileName().toString();
         for (var test : TckXml.children(root, "testCase")) {
             var kind = Invocable.of(test.getAttribute("type"));
@@ -130,7 +121,7 @@ final class TckSuite {
         }
     }
 
-    private static Check check(String testCase, String testFile, Element test, Invocable kind, Element result, DmnModel model,
+    private static Check check(String testCase, String testFile, Element test, Invocable kind, Element result, Path model,
                                Map<String, TckValue> inputs) {
         var expected = TckXml.children(result, "expected");
         return new Check(testCase, testFile, test.getAttribute("id"), kind, test.getAttribute("invocableName"),
