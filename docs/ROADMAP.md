@@ -15,8 +15,9 @@ Praecepta evaluates all of DMN 1.5 except external functions, which it rejects b
 3,482 of the 3,511 checks of the DMN TCK ([results](../praecepta-tck/RESULTS.md)).
 
 ## Before 1.0
-Everything planned comes before 1.0, in three releases, except what needs a baseline change. The
-milestones list every issue.
+Everything planned comes before 1.0, in three releases. The milestones list every issue. The project's
+baselines do not change before 1.0: Java 21, and the oldest framework and build-tool versions supported
+today.
 
 **[0.13](https://github.com/brunopacheco1/praecepta/milestone/11): fixes and firmer builds**
 - The smaller defects the 0.12 review found ([#153](https://github.com/brunopacheco1/praecepta/issues/153), [#154](https://github.com/brunopacheco1/praecepta/issues/154), [#155](https://github.com/brunopacheco1/praecepta/issues/155),
@@ -25,7 +26,8 @@ milestones list every issue.
 - CI that does not fail when a download does ([#161](https://github.com/brunopacheco1/praecepta/issues/161)), and that tests on the baseline JDK
   ([#164](https://github.com/brunopacheco1/praecepta/issues/164)).
 - Framework modules named after the framework major they support ([#163](https://github.com/brunopacheco1/praecepta/issues/163)), as the
-  [support policy](../GOVERNANCE.md#what-is-supported) says.
+  [support policy](../GOVERNANCE.md#what-is-supported) says, and with them modules for Micronaut 5
+  ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25 on its own, and Quarkus 4 ([#167](https://github.com/brunopacheco1/praecepta/issues/167)).
 
 **[0.14](https://github.com/brunopacheco1/praecepta/milestone/13): quality, speed and the TCK site**
 - A listing on the [DMN TCK results site](https://dmn-tck.github.io/tck/) ([#149](https://github.com/brunopacheco1/praecepta/issues/149);
@@ -50,12 +52,6 @@ finds fixed first. Nothing else waits for 1.0.
 
 With 1.0 come the claim of DMN 1.5 conformance, with external functions as its one deliberate exception,
 and a stable API: after 1.0, breaking changes wait for a major version.
-
-## After 1.0
-No baseline changes before 1.0: the oldest Java, framework and build-tool versions Praecepta supports stay
-as they are until then.
-
-- **Micronaut 5** ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25.
 
 ## The project itself
 - Find a second maintainer, so that someone other than its author reviews every change.

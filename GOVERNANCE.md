@@ -46,7 +46,8 @@ Praecepta promises its own API. It does not promise every version of the framewo
   of Java 21 and the framework's own baseline.
 - **The oldest framework version supported may rise in a minor release**, past versions the framework's
   vendor no longer supports. The changelog says so in an upgrade note.
-- **A new framework major gets a module of its own**, in the same release as the others. The module for a
+- **A new framework major gets a module of its own**, in the same release as the others. Where the
+  framework needs a newer Java than the baseline, only that module requires it. The module for a
   major that its vendor no longer supports is deprecated, then removed in a minor release at least six
   months later. This is the one exception to semantic versioning.
 - **There is always a way without a framework module.** `praecepta-integration` works with any version of
