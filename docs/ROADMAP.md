@@ -14,32 +14,41 @@ project decides. The [changelog](../CHANGELOG.md) lists what each release brough
 Praecepta evaluates all of DMN 1.5 except external functions, which it rejects by design. It passes
 3,482 of the 3,511 checks of the DMN TCK ([results](../praecepta-tck/RESULTS.md)).
 
-## Next: 1.0
-1.0 is released only once Praecepta has been tested with a real use case.
+## Before 1.0
+Everything planned comes before 1.0, in three releases. The milestones list every issue.
 
-- **A test with a real use case** ([#162](https://github.com/brunopacheco1/praecepta/issues/162)): real tables or models that an application depends on, run
-  on a release candidate as a user would, with every problem it finds fixed first.
-- **A claim of DMN 1.5 conformance**, scored against the whole TCK, with external functions as its one
-  deliberate exception ([#120](https://github.com/brunopacheco1/praecepta/issues/120)).
-- **A listing on the [DMN TCK results site](https://dmn-tck.github.io/tck/)**
-  ([#149](https://github.com/brunopacheco1/praecepta/issues/149), after updating the kit, [#148](https://github.com/brunopacheco1/praecepta/issues/148);
+**[0.13](https://github.com/brunopacheco1/praecepta/milestone/11): fixes and firmer builds**
+- The smaller defects the 0.12 review found ([#153](https://github.com/brunopacheco1/praecepta/issues/153), [#154](https://github.com/brunopacheco1/praecepta/issues/154), [#155](https://github.com/brunopacheco1/praecepta/issues/155),
+  [#156](https://github.com/brunopacheco1/praecepta/issues/156)).
+- The DMN TCK updated to its latest test cases ([#148](https://github.com/brunopacheco1/praecepta/issues/148)).
+- CI that does not fail when a download does ([#161](https://github.com/brunopacheco1/praecepta/issues/161)).
+
+**[0.14](https://github.com/brunopacheco1/praecepta/milestone/13): quality, speed and the TCK site**
+- A listing on the [DMN TCK results site](https://dmn-tck.github.io/tck/) ([#149](https://github.com/brunopacheco1/praecepta/issues/149);
   [how](../praecepta-tck/README.md#publishing-results-on-the-dmn-tck-site)).
-- **Fresh benchmark numbers** from the current code ([#147](https://github.com/brunopacheco1/praecepta/issues/147)).
-- **A stable API**, which the build checks ([#159](https://github.com/brunopacheco1/praecepta/issues/159)). After 1.0, breaking changes wait for a major
-  version.
-- **Micronaut 5** ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25.
-- **Simpler code where it is still dense** ([#152](https://github.com/brunopacheco1/praecepta/issues/152)).
-- **A second maintainer**, so that someone other than its author reviews every change.
+- Fresh benchmark numbers from the current code ([#147](https://github.com/brunopacheco1/praecepta/issues/147)), after reducing what a decision graph
+  allocates ([#157](https://github.com/brunopacheco1/praecepta/issues/157)).
+- More mutation testing and tests where coverage is thin ([#150](https://github.com/brunopacheco1/praecepta/issues/150), [#151](https://github.com/brunopacheco1/praecepta/issues/151)).
+- An API compatibility check in the build ([#159](https://github.com/brunopacheco1/praecepta/issues/159)).
+- Micronaut 5 ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25.
+- Simpler code where it is still dense ([#152](https://github.com/brunopacheco1/praecepta/issues/152)).
 
-## After 1.0
-- **An online playground** ([#21](https://github.com/brunopacheco1/praecepta/issues/21)): paste a table,
-  see its validation report and evaluate inputs, without installing anything.
-- **Praecepta for Kotlin**: a null-safe API through [JSpecify](https://jspecify.dev)
-  ([#104](https://github.com/brunopacheco1/praecepta/issues/104)), Kotlin code from the build plugins
-  ([#105](https://github.com/brunopacheco1/praecepta/issues/105)) and a Kotlin DSL
-  ([#106](https://github.com/brunopacheco1/praecepta/issues/106)).
+**[0.15](https://github.com/brunopacheco1/praecepta/milestone/14): the playground and Kotlin**
+- An online playground ([#21](https://github.com/brunopacheco1/praecepta/issues/21)): paste a table, see its validation report and evaluate inputs,
+  without installing anything.
+- Praecepta for Kotlin: a null-safe API through [JSpecify](https://jspecify.dev) ([#104](https://github.com/brunopacheco1/praecepta/issues/104)), Kotlin
+  code from the build plugins ([#105](https://github.com/brunopacheco1/praecepta/issues/105)) and a Kotlin DSL ([#106](https://github.com/brunopacheco1/praecepta/issues/106)).
+
+## 1.0
+1.0 is released only once Praecepta has been tested with a real use case ([#162](https://github.com/brunopacheco1/praecepta/issues/162)): real tables or
+models that an application depends on, run on a release candidate as a user would, with every problem it
+finds fixed first. Nothing else waits for 1.0.
+
+With 1.0 come the claim of DMN 1.5 conformance, with external functions as its one deliberate exception,
+and a stable API: after 1.0, breaking changes wait for a major version.
 
 ## The project itself
+- Find a second maintainer, so that someone other than its author reviews every change.
 - Keep the OpenSSF Best Practices silver badge current, and work towards gold, which needs a second
   maintainer.
 - Keep the security work current: fuzzing, dependency updates and the
