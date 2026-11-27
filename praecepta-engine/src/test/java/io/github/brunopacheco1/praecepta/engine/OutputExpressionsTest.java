@@ -136,6 +136,57 @@ class OutputExpressionsTest {
     }
 
     @Test
+    void any_compares_an_output_as_a_number_where_a_rule_names_a_number_input_or_computes_a_number_and_else_as_text() {
+        var literal = rule(1, Map.of(), Map.of("total", "1.50"), Map.of());
+        var price = new Order("1.5", new BigDecimal("1.5"), null, null);
+
+        // an output that names a number input is a number, though no rule computes one
+        var namesNumber = byColumn(HitPolicy.ANY, List.of(literal,
+                new Praeceptum(2, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of(), Map.of("total", "price")))));
+        Assertions.assertThat(namesNumber.evaluate(price)).containsExactly(values("total", "1.50"));
+        // an output that a rule computes as a number is one
+        var computesNumber = byColumn(HitPolicy.ANY, List.of(literal, rule(2, Map.of(), Map.of(), Map.of("total", "price * 1"))));
+        Assertions.assertThat(computesNumber.evaluate(price)).containsExactly(values("total", "1.50"));
+        // an output that names a string input, or computes a string, is text: 1.50 is not 1.5
+        var namesString = byColumn(HitPolicy.ANY, List.of(literal,
+                new Praeceptum(2, new PraeceptaInput(Map.of()), new PraeceptaOutput(Map.of(), Map.of("total", "country")))));
+        Assertions.assertThatThrownBy(() -> namesString.evaluate(price)).isInstanceOf(HitPolicyViolationException.class);
+        var computesString = byColumn(HitPolicy.ANY, List.of(literal, rule(2, Map.of(), Map.of(), Map.of("total", "country + \"\""))));
+        Assertions.assertThatThrownBy(() -> computesString.evaluate(price)).isInstanceOf(HitPolicyViolationException.class);
+        Assertions.assertThat(computesString.evaluate(new Order("1.50", null, null, null))).containsExactly(values("total", "1.50"));
+    }
+
+    @Test
+    void any_compares_a_string_output_as_text_though_a_rule_computes_a_number_for_it() {
+        // a string output takes a computed number as its text, 1.5, which is not the text 1.50
+        var asText = engine(Tables.table("t", "ANY", List.of("price:number"), List.of("total:string"),
+                List.of(List.of("-", "\"1.50\""), List.of("-", "price * 1"))));
+        Assertions.assertThatThrownBy(() -> asText.evaluate(Map.of("price", "1.50"))).isInstanceOf(HitPolicyViolationException.class);
+        // a number output takes both as the number
+        var asNumber = engine(Tables.table("t", "ANY", List.of("price:number"), List.of("total:number"),
+                List.of(List.of("-", "1.50"), List.of("-", "price * 1"))));
+        Assertions.assertThat(asNumber.evaluate(Map.of("price", "1.50"))).hasSize(1);
+    }
+
+    @Test
+    void blank_text_of_a_map_based_input_is_a_missing_value_to_an_expression() {
+        var engine = PraeceptaEngine.<Map<String, String>, Map<String, String>>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .inputs(PraeceptaInput::new)
+                .columnType("price", ColumnType.NUMBER)
+                .columnType("country", ColumnType.STRING)
+                .output(PraeceptaOutput::values)
+                .rules(List.of(rule(1, Map.of(), Map.of(), Map.of("total", "price * 3", "text", "country + \"!\"",
+                        "given", "if price = null and country = null then \"neither\" else \"some\""))))
+                .build();
+
+        Assertions.assertThat(engine.evaluate(Map.of("price", "  ", "country", " ")))
+                .containsExactly(values("total", null, "text", null, "given", "neither"));
+        Assertions.assertThat(engine.evaluate(Map.of("price", " 0.50 ", "country", "PT")))
+                .as("spaces around a number are not part of it").containsExactly(values("total", "1.5", "text", "PT!", "given", "some"));
+    }
+
+    @Test
     void an_aggregation_gets_a_computed_output_that_is_missing_as_null() {
         // FEEL's sum is null for a list that holds null (DMN 1.5, 10.3.4.4): the engine gives the missing output itself
         var engine = PraeceptaEngine.<Order, Optional<BigDecimal>>builder()

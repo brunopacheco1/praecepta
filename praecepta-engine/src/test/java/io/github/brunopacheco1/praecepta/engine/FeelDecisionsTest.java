@@ -182,4 +182,24 @@ class FeelDecisionsTest {
                 """)).isInstanceOf(UnsupportedFeatureException.class)
                 .hasMessageContaining("uses an external function (Java or PMML), which Praecepta does not evaluate, by design");
     }
+
+    @Test
+    void a_literal_expression_that_reads_an_entry_its_requirements_type_does_not_have_is_null_with_a_warning() {
+        // FEEL gives null for a path a context does not have, rather than fail: the decision is evaluated, unlike a table's column
+        var applicant = new FeelType.Context(Map.of("age", FeelType.of(ColumnType.NUMBER)));
+        var graph = DecisionGraph.builder().logValidationReport(false)
+                .inputData("Applicant", applicant)
+                .literalDecision("Income", "Applicant.income * 2")
+                .literalDecision("Age", "Applicant.age * 2")
+                .build();
+
+        assertThat(graph.validationReport().issues()).singleElement().satisfies(issue -> {
+            assertThat(issue.kind()).isEqualTo(Kind.ALWAYS_NULL);
+            assertThat(issue.detail()).isEqualTo("decision 'Income': in literal expression 'Applicant.income * 2', "
+                    + "a context<age: number> has no entry 'income'; its value is null (DMN 1.5, 10.3.2.15)");
+        });
+        assertThat(graph.canEvaluate("Income")).isTrue();
+        assertThat(graph.evaluate("Income", Map.of("Applicant", Map.of("age", 21)))).isNull();
+        assertThat(graph.evaluate("Age", Map.of("Applicant", Map.of("age", 21)))).isEqualTo(new BigDecimal("42"));
+    }
 }

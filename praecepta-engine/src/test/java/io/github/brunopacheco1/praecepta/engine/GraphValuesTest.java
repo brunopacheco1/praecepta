@@ -334,6 +334,56 @@ class GraphValuesTest {
     }
 
     @Test
+    void a_list_within_a_context_is_checked_element_by_element() {
+        var tagged = new FeelType.Context(Map.of("tags", FeelType.listOf(ColumnType.STRING)));
+        var tags = Map.of("tags", List.of("a", "b"));
+
+        assertThat(GraphValues.conform(tags, tagged, 0)).isSameAs(tags);
+        assertThat(GraphValues.conform(Map.of("tags", List.of("a", 1)), tagged, 0)).isNull();
+        assertThat(GraphValues.conform(Map.of("tags", "a"), tagged, 0)).as("within a context, a value is not made a list").isNull();
+    }
+
+    /** A number inside that many lists, or contexts of one component {@code k}, and the type of such a value. */
+    private static Object nestedValue(int levels, boolean contexts) {
+        Object value = BigDecimal.ONE;
+        for (int i = 0; i < levels; i++) {
+            value = contexts ? Map.of("k", value) : List.of(value);
+        }
+        return value;
+    }
+
+    private static FeelType nestedType(int levels, boolean contexts) {
+        var type = NUMBER;
+        for (int i = 0; i < levels; i++) {
+            type = contexts ? new FeelType.Context(Map.of("k", type)) : new FeelType.ListOf(type);
+        }
+        return type;
+    }
+
+    @Test
+    void a_value_is_checked_against_a_type_64_lists_or_contexts_deep_and_no_deeper() {
+        int deepest = GraphValues.MAX_DEPTH;
+        var lists = nestedValue(deepest, false);
+        var contexts = nestedValue(deepest, true);
+
+        assertThat(GraphValues.conform(lists, nestedType(deepest, false), 0)).isSameAs(lists);
+        assertThat(GraphValues.conform(nestedValue(deepest + 1, false), nestedType(deepest + 1, false), 0)).isNull();
+        assertThat(GraphValues.conform(contexts, nestedType(deepest, true), 0)).isSameAs(contexts);
+        assertThat(GraphValues.conform(nestedValue(deepest + 1, true), nestedType(deepest + 1, true), 0)).isNull();
+        assertThat(GraphValues.conform(BigDecimal.ONE, nestedType(deepest, false), 0)).as("a value, made a list of one at each level")
+                .isEqualTo(lists);
+        assertThat(GraphValues.conform(BigDecimal.ONE, nestedType(deepest + 1, false), 0)).isNull();
+    }
+
+    @Test
+    void a_value_of_any_type_nests_as_many_contexts_as_the_limit_and_no_more() {
+        assertThat(GraphValues.normalise(nestedValue(GraphValues.MAX_DEPTH, true), FeelType.ANY, "X"))
+                .isEqualTo(nestedValue(GraphValues.MAX_DEPTH, true));
+        assertThatThrownBy(() -> GraphValues.normalise(nestedValue(GraphValues.MAX_DEPTH + 1, true), FeelType.ANY, "X"))
+                .isInstanceOf(InvalidInputException.class).hasMessage("Input X" + ".k".repeat(65) + "=null nests more than 64 lists and contexts");
+    }
+
+    @Test
     void a_value_is_one_of_a_column_type_by_its_java_type() {
         assertThat(GraphValues.isValueOf(Period.ofYears(1), ColumnType.YEAR_MONTH_DURATION)).isTrue();
         assertThat(GraphValues.isValueOf(new YearsAndMonths(12), ColumnType.YEAR_MONTH_DURATION)).isTrue();

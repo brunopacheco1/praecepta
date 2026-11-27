@@ -146,6 +146,39 @@ class DecisionServicesTest {
     }
 
     @Test
+    void a_service_that_evaluates_a_decision_that_cannot_be_evaluated_cannot_be_either_nor_can_what_requires_it() {
+        // Evaluation has no logic, and is no input decision of the service, which so evaluates it
+        var evaluation = new DecisionModel.Decision("Evaluation", List.of(), List.of(), new DecisionLogic.NoLogic(FeelType.of(ColumnType.STRING)));
+        var result = new DecisionModel.Decision("Result", List.of("Evaluation"), List.of(),
+                new DecisionLogic.LiteralExpression("\"evaluated: \" + Evaluation"));
+        var grade = new DecisionModel.DecisionService("Grade", List.of("Result"), List.of(), List.of(), List.of(), FeelType.ANY);
+        var constant = new DecisionModel.Decision("Constant", List.of(), List.of(), new DecisionLogic.LiteralExpression("1"));
+        var sound = new DecisionModel.DecisionService("Sound", List.of("Constant"), List.of(), List.of(), List.of(), FeelType.ANY);
+        var uses = new DecisionModel.Decision("Uses", List.of(), List.of(), List.of("Grade"), new DecisionLogic.LiteralExpression("Grade()"));
+        var after = new DecisionModel.Decision("After", List.of("Uses"), List.of(), new DecisionLogic.LiteralExpression("Uses"));
+        var usesSound = new DecisionModel.Decision("Uses Sound", List.of(), List.of(), List.of("Sound"),
+                new DecisionLogic.LiteralExpression("Sound()"));
+        var viaService = new DecisionModel.BusinessKnowledgeModel("viaService", List.of("Grade"), new DecisionLogic.FunctionDefinition(
+                List.of(), new DecisionLogic.LiteralExpression("Grade()"), FeelType.ANY));
+        var graph = graph(new DecisionModel("M", List.of(), List.of(evaluation, result, constant, uses, after, usesSound), List.of(viaService),
+                List.of(grade, sound), Map.of()));
+
+        assertThatThrownBy(() -> graph.evaluateService("Grade", Map.of())).isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Decision service 'Grade' cannot be evaluated: it evaluates decision 'Evaluation', which cannot be evaluated: "
+                        + "it has no decision logic; its value is given only to a decision service that takes it as an input decision");
+        assertThatThrownBy(() -> graph.evaluate("Uses", Map.of())).isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Decision 'Uses' cannot be evaluated: it requires a decision service 'Grade', which cannot be evaluated");
+        assertThatThrownBy(() -> graph.evaluate("After", Map.of())).isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Decision 'After' cannot be evaluated: it requires decision 'Uses', which cannot be evaluated: "
+                        + "it requires a decision service 'Grade', which cannot be evaluated");
+        assertThatThrownBy(() -> graph.invokeKnowledgeModel("viaService", Map.of())).isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Business knowledge model 'viaService' cannot be evaluated: it requires a decision service 'Grade', "
+                        + "which cannot be evaluated");
+        assertThat(graph.evaluate("Uses Sound", Map.of())).as("a service that can be evaluated, and what requires it").isEqualTo(new BigDecimal("1"));
+        assertThat(graph.evaluateService("Sound", Map.of()).value()).isEqualTo(Map.of("Constant", new BigDecimal("1")));
+    }
+
+    @Test
     void a_service_takes_the_value_of_an_input_decision_without_logic_which_the_graph_cannot_evaluate() {
         // the DMN TCK's 0088-no-decision-logic: a person's evaluation, given to the service
         var evaluation = new DecisionModel.Decision("Evaluation", List.of(), List.of(), new DecisionLogic.NoLogic(FeelType.of(ColumnType.STRING)));

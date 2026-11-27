@@ -325,7 +325,7 @@ class KnowledgeModelsTest {
         var graph = graph(new DecisionModel("M", inputs, List.of(gross), List.of(viaModel, viaService), List.of(partial), Map.of()));
 
         assertThatThrownBy(() -> graph.invokeKnowledgeModel("viaService", Map.of("x", 1))).isInstanceOf(InvalidDecisionTableException.class)
-                .hasMessage("Business knowledge model 'viaService' cannot be evaluated: it requires decision service 'Partial', "
+                .hasMessage("Business knowledge model 'viaService' cannot be evaluated: it requires a decision service 'Partial', "
                         + "which cannot be evaluated");
         assertThatThrownBy(() -> graph.invokeKnowledgeModel("viaModel", Map.of("x", 1))).isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessage("Business knowledge model 'viaModel' cannot be evaluated: it requires business knowledge model 'viaService', "
