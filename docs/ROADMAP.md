@@ -18,8 +18,11 @@ Praecepta evaluates all of DMN 1.5 except external functions, which it rejects b
 - **A claim of DMN 1.5 conformance**, scored against the whole TCK, with external functions as its one
   deliberate exception ([#120](https://github.com/brunopacheco1/praecepta/issues/120)).
 - **A listing on the [DMN TCK results site](https://dmn-tck.github.io/tck/)**
-  ([how](../praecepta-tck/README.md#publishing-results-on-the-dmn-tck-site)).
-- **A stable API.** After 1.0, breaking changes wait for a major version.
+  ([#149](https://github.com/brunopacheco1/praecepta/issues/149), after updating the kit, [#148](https://github.com/brunopacheco1/praecepta/issues/148);
+  [how](../praecepta-tck/README.md#publishing-results-on-the-dmn-tck-site)).
+- **Fresh benchmark numbers** from the current code ([#147](https://github.com/brunopacheco1/praecepta/issues/147)).
+- **A stable API**, which the build checks ([#159](https://github.com/brunopacheco1/praecepta/issues/159)). After 1.0, breaking changes wait for a major
+  version.
 - **A second maintainer**, so that someone other than its author reviews every change.
 
 ## After 1.0
