@@ -125,6 +125,27 @@ class DecisionServicesTest {
     }
 
     @Test
+    void a_service_of_one_output_invoked_from_outside_gives_it_by_name_and_a_parameter_not_given_is_null() {
+        var price = new DecisionModel.InputData("Price", NUMBER);
+        var twice = new DecisionModel.Decision("Twice", List.of(), List.of("Price"), new DecisionLogic.LiteralExpression("Price * 2"));
+        var given = new DecisionModel.Decision("Given", List.of(), List.of("Price"), new DecisionLogic.LiteralExpression("Price != null"));
+        var doubling = new DecisionModel.DecisionService("Doubling", List.of("Twice"), List.of(), List.of(), List.of("Price"), FeelType.ANY);
+        var whether = new DecisionModel.DecisionService("Whether", List.of("Given"), List.of(), List.of(), List.of("Price"), FeelType.ANY);
+        var graph = graph(new DecisionModel("M", List.of(price), List.of(twice, given), List.of(), List.of(doubling, whether), Map.of()));
+
+        var outcome = graph.evaluateService("Doubling", Map.of("Price", 4, "Quantity", 5));
+
+        assertThat(outcome.value()).as("the one output, by its name; an argument that is no parameter is ignored")
+                .isEqualTo(Map.of("Twice", new BigDecimal("8")));
+        assertThat(outcome.errors()).isEmpty();
+        assertThat(graph.evaluateService("Whether", Map.of("Price", 4)).value()).isEqualTo(Map.of("Given", true));
+        assertThat(graph.evaluateService("Whether", Map.of()).value()).isEqualTo(Map.of("Given", false));
+        assertThatThrownBy(() -> graph.evaluateService("Halving", Map.of())).isInstanceOf(java.util.NoSuchElementException.class)
+                .hasMessage("Decision model 'M' has no decision service named 'Halving'; it has [Doubling, Whether]");
+        assertThatThrownBy(() -> graph.evaluateService(null, Map.of())).isInstanceOf(NullPointerException.class).hasMessage("service");
+    }
+
+    @Test
     void a_service_takes_the_value_of_an_input_decision_without_logic_which_the_graph_cannot_evaluate() {
         // the DMN TCK's 0088-no-decision-logic: a person's evaluation, given to the service
         var evaluation = new DecisionModel.Decision("Evaluation", List.of(), List.of(), new DecisionLogic.NoLogic(FeelType.of(ColumnType.STRING)));

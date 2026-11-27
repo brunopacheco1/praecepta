@@ -102,6 +102,66 @@ class BuiltInFunctionsTest {
         assertFeel(expression, expected);
     }
 
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+        "string(null) = null                                    | true",
+        "string(true)                                           | \"true\"",
+        "string([1..5))                                         | \"[1..5)\"",
+        "string(-@\"P1Y2M\")                                    | \"-P1Y2M\"",
+        "number(\"1.000,5\", \".\", \",\")                      | 1000.5",
+        "number(\"1 000\", \" \")                               | 1000",
+        "number(\".5\")                                         | 0.5",
+        "number(\"5.\")                                         | 5",
+        "number(\"+5\")                                         | 5",
+        "number(\"1,5\", null, \",\")                           | 1.5",
+        "is(null, 1)                                            | false",
+        "is(1, null)                                            | false",
+        "is(1, 2)                                               | false",
+        "is(1, \"1\")                                           | false",
+        "is(@\"P1D\", @\"PT24H\")                               | true",
+        "is(@\"P1D\", @\"PT25H\")                               | false",
+        "is(@\"10:00:00+01:00\", @\"10:00:00+01:00\")           | true",
+        "is(@\"10:00:00\", @\"10:00:00Z\")                      | false",
+        "is(@\"2025-01-31\", @\"2025-01-31\")                   | true",
+        "is([1, 2], [2, 1])                                     | false",
+        "is({a: 1}, {a: 1.0})                                   | true",
+        "day of week(@\"2025-02-02\")                           | \"Sunday\"",
+        "month of year(@\"2025-12-31T23:00:00@Europe/Paris\")   | \"December\"",
+        "day of year(@\"2024-12-31T10:00:00\")                  | 366",
+        "years and months duration(@\"2024-01-31\", @\"2024-02-29\") | @\"P0M\"",
+        "years and months duration(@\"2024-01-31\", @\"2024-03-31T00:00:00@Europe/Paris\") | @\"P2M\"",
+    })
+    void conversion_boolean_and_date_functions_at_their_edges(String expression, String expected) {
+        assertFeel(expression, expected);
+    }
+
+    @Test
+    void a_conversion_function_says_what_it_takes_and_what_it_was_given() {
+        assertThat(errors("number(\"1.000,5\", \".\", \".\")"))
+                .containsExactly("number(...) takes a grouping separator and a decimal separator that differ, not two \".\"");
+        assertThat(errors("number(\"1;5\", \";\")"))
+                .containsExactly("number(...) takes a grouping separator of \" \", \",\", \".\", not \";\"");
+        assertThat(errors("number(\"1;5\", null, \";\")")).containsExactly("number(...) takes a decimal separator of \".\", \",\", not \";\"");
+        assertThat(errors("number(\"1.5\", null, \",\")")).as("a period where the decimal separator is a comma")
+                .containsExactly("number(...) takes a string that writes a number, not \"1.5\"");
+        assertThat(errors("number(\"1 000\")")).containsExactly("number(...) takes a string that writes a number, not \"1 000\"");
+        assertThat(errors("number(\"0x1F\")")).containsExactly("number(...) takes a string that writes a number, not \"0x1F\"");
+        assertThat(errors("number(\"1e7000\")")).containsExactly("number(...) takes a number FEEL holds, not \"1e7000\"");
+        assertThat(errors("date([null][1])")).containsExactly("date(...) takes no null argument");
+        assertThat(errors("time(10, [null][1], 0)")).containsExactly("time(...) takes no null argument");
+        assertThat(errors("date(2025, 2, 30)")).singleElement().asString().startsWith("date(...) gives no value: ");
+        assertThat(errors("day of week(1)")).containsExactly("day of week(...) takes a date or a date and time as its 'date', not 1");
+        assertThat(errors("years and months duration(@\"2025-01-01\", @\"10:00:00\")"))
+                .containsExactly("years and months duration(...) takes a date or a date and time as its 'to', not 10:00:00");
+        assertThat(errors("range(\"1\")")).containsExactly("range(...) takes a range literal, not \"1\"");
+        assertThat(errors("range(\"[1..\")")).containsExactly("range(...) takes a range literal, not \"[1..\"");
+        assertThat(errors("range(\"[1..x]\")")).containsExactly("range(...) takes a range literal whose endpoints are literals, not \"[1..x]\"");
+        assertThat(errors("range(\"[3..1]\")"))
+                .containsExactly("range(...) takes a range literal whose endpoints are of one type FEEL orders, in order, not \"[3..1]\"");
+        assertThat(errors("range(\"[@\\\"2025-01-01\\\"..@\\\"2025-01-01T00:00:00\\\"]\")")).as("a date and a date and time").singleElement()
+                .asString().startsWith("range(...) takes a range literal whose endpoints are of one type FEEL orders, in order, not ");
+    }
+
     @Test
     void now_and_today_are_the_current_date_and_time() {
         var before = ZonedDateTime.now().minusSeconds(1);
@@ -296,6 +356,135 @@ class BuiltInFunctionsTest {
     })
     void range_functions(String expression, String expected) {
         assertFeel(expression, expected);
+    }
+
+    /** Each function where an endpoint of one range is an endpoint of the other, or the point: which is in, tells (Table 78). */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        "before([1..5], 5)                      | false",
+        "before((1..5], (5..8])                 | true",
+        "after([5..8], [1..5])                  | false",
+        "after((5..8], [1..5])                  | true",
+        "after(5, [1..5))                       | true",
+        "after(5, [1..5])                       | false",
+        "after((1..5], 1)                       | true",
+        "after([1..5], 1)                       | false",
+        "meets([1..5], (5..10])                 | false",
+        "meets([1..5], [6..10])                 | false",
+        "met by([5..10], [1..5))                | false",
+        "met by((5..10], [1..5])                | false",
+        "overlaps([1..5), [5..8])               | false",
+        "overlaps([1..5], (5..8])               | false",
+        "overlaps([5..8], [1..5])               | true",
+        "overlaps((5..8], [1..5])               | false",
+        "overlaps([5..8], [1..5))               | false",
+        "overlaps([6..8], [1..5])               | false",
+        "overlaps([3..4], [1..5])               | true",
+        "overlaps before([1..5], [5..8])        | true",
+        "overlaps before([1..5), [5..8])        | false",
+        "overlaps before([1..5], (5..8])        | false",
+        "overlaps before([1..5], [1..8])        | false",
+        "overlaps before([1..5], (1..8])        | true",
+        "overlaps before((1..5], (1..8])        | false",
+        "overlaps before([1..8], [3..8])        | true",
+        "overlaps before([1..8], [3..8))        | false",
+        "overlaps before([1..8), [3..8))        | true",
+        "overlaps before([1..9], [3..8])        | false",
+        "overlaps before([1..2], [3..8])        | false",
+        "overlaps after([5..8], [1..5])         | true",
+        "overlaps after([5..8], [1..5))         | false",
+        "finishes(5, [1..5))                    | false",
+        "finishes(4, [1..5])                    | false",
+        "finishes([3..5], [1..5))               | false",
+        "finishes([3..5), [1..5))               | true",
+        "finishes([1..5], [1..5])               | true",
+        "finishes([1..5], (1..5])               | false",
+        "finishes((1..5], [1..5])               | true",
+        "finishes([0..5], [1..5])               | false",
+        "finishes([3..4], [1..5])               | false",
+        "finished by([1..5), 5)                 | false",
+        "finished by([1..5], 5)                 | true",
+        "includes([1..10], 1)                   | true",
+        "includes((1..10], 1)                   | false",
+        "includes([1..10], 10)                  | true",
+        "includes([1..10], 11)                  | false",
+        "includes([1..10], 0)                   | false",
+        "includes([1..10], [1..10])             | true",
+        "includes((1..10], [1..10])             | false",
+        "includes((1..10], (1..10])             | true",
+        "includes([1..10), [1..10])             | false",
+        "includes([1..10), [1..10))             | true",
+        "includes([1..10], [0..5])              | false",
+        "includes([1..10], [5..11])             | false",
+        "during(1, (1..10])                     | false",
+        "during(10, [1..10])                    | true",
+        "during([1..10], (1..10])               | false",
+        "starts(1, (1..5])                      | false",
+        "starts(2, [1..5])                      | false",
+        "starts([1..5], [1..5])                 | true",
+        "starts([1..5], [1..5))                 | false",
+        "starts([1..5), [1..5))                 | true",
+        "starts((1..3], [1..5])                 | false",
+        "starts([1..6], [1..5])                 | false",
+        "starts([2..3], [1..5])                 | false",
+        "started by([1..5], 1)                  | true",
+        "started by((1..5], 1)                  | false",
+        "coincides(5, 6)                        | false",
+        "coincides([1..5], [1..5))              | false",
+        "coincides([1..5], [1..6])              | false",
+        "coincides([1..5], [2..5])              | false",
+        "coincides((1..5), (1..5))              | true",
+    })
+    void range_functions_where_endpoints_meet(String expression, String expected) {
+        assertFeel(expression, expected);
+    }
+
+    /** A range of one endpoint has no start, or no end: below, or above, every value, and never in the range. */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+        "before(< 5, 5)                         | true",
+        "before(<= 5, 5)                        | false",
+        "before(< 5, > 5)                       | true",
+        "before(<= 5, >= 5)                     | false",
+        "before(> 5, 1000)                      | false",
+        "after(> 5, 5)                          | true",
+        "after(>= 5, 5)                         | false",
+        "meets(<= 5, >= 5)                      | true",
+        "meets(< 5, >= 5)                       | false",
+        "overlaps(< 5, > 3)                     | true",
+        "overlaps(< 3, > 5)                     | false",
+        "overlaps(< 5, < 3)                     | true",
+        "includes(< 10, 10)                     | false",
+        "includes(<= 10, 10)                    | true",
+        "includes(> 3, 1000)                    | true",
+        "includes(< 10, < 5)                    | true",
+        "includes(< 10, > 5)                    | false",
+        "includes(< 10, [1..5])                 | true",
+        "starts(< 5, < 10)                      | true",
+        "finishes(> 5, > 3)                     | true",
+        "coincides(< 5, < 5)                    | true",
+        "coincides(< 5, <= 5)                   | false",
+        "coincides(< 5, > 5)                    | false",
+    })
+    void range_functions_of_ranges_of_one_endpoint(String expression, String expected) {
+        assertFeel(expression, expected);
+    }
+
+    @Test
+    void a_range_function_says_what_it_takes_and_what_it_was_given() {
+        assertThat(errors("meets(1, [1..5])")).containsExactly("meets(...) takes a range and a range, not a point and a range");
+        assertThat(errors("coincides([1..5], 1)"))
+                .containsExactly("coincides(...) takes a point and a point, or a range and a range, not a range and a point");
+        assertThat(errors("finishes([1..5], 5)"))
+                .containsExactly("finishes(...) takes a point and a range, or a range and a range, not a range and a point");
+        assertThat(errors("finished by(5, [1..5])"))
+                .containsExactly("finished by(...) takes a range and a point, or a range and a range, not a point and a range");
+        assertThat(errors("before(null, 1)")).containsExactly("before(...) takes a point or a range, not null");
+        assertThat(errors("before(1, null)")).containsExactly("before(...) takes a point or a range, not null");
+        assertThat(errors("before([1..5], \"a\")"))
+                .containsExactly("before(...) takes points and endpoints FEEL orders with each other, not 5 and \"a\"");
+        assertThat(errors("includes(= 5, 5)")).containsExactly("includes(...) takes ranges that are intervals, not = 5");
+        assertThat(errors("includes([1..5], != 5)")).containsExactly("includes(...) takes ranges that are intervals, not != 5");
     }
 
     // ---- contexts (10.3.4.10) -----------------------------------------------------------------------
