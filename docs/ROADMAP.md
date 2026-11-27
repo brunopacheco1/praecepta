@@ -27,6 +27,8 @@ Praecepta evaluates all of DMN 1.5 except external functions, which it rejects b
 - **Fresh benchmark numbers** from the current code ([#147](https://github.com/brunopacheco1/praecepta/issues/147)).
 - **A stable API**, which the build checks ([#159](https://github.com/brunopacheco1/praecepta/issues/159)). After 1.0, breaking changes wait for a major
   version.
+- **Micronaut 5** ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25.
+- **Simpler code where it is still dense** ([#152](https://github.com/brunopacheco1/praecepta/issues/152)).
 - **A second maintainer**, so that someone other than its author reviews every change.
 
 ## After 1.0
@@ -36,10 +38,6 @@ Praecepta evaluates all of DMN 1.5 except external functions, which it rejects b
   ([#104](https://github.com/brunopacheco1/praecepta/issues/104)), Kotlin code from the build plugins
   ([#105](https://github.com/brunopacheco1/praecepta/issues/105)) and a Kotlin DSL
   ([#106](https://github.com/brunopacheco1/praecepta/issues/106)).
-
-## Later
-- **Micronaut 5** ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25:
-  once the project's Java baseline moves past 21.
 
 ## The project itself
 - Keep the OpenSSF Best Practices silver badge current, and work towards gold, which needs a second
