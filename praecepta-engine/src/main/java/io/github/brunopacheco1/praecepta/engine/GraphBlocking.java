@@ -45,7 +45,8 @@ final class GraphBlocking {
                 for (var required : knowledgeModels.get(k).requiredKnowledge()) {
                     var slot = slots.of(required);
                     if (slots.isInvocable(slot) && graph.knowledgeBlocked[slots.invocableAt(slot)] != null) {
-                        graph.knowledgeBlocked[k] = "it requires business knowledge model '%s', which cannot be evaluated".formatted(required);
+                        graph.knowledgeBlocked[k] = "it requires %s '%s', which cannot be evaluated"
+                                .formatted(slots.isService(slot) ? "decision service" : "business knowledge model", required);
                         changed = true;
                         break;
                     }

@@ -100,41 +100,68 @@ final class GraphTypes {
     /**
      * Types every business knowledge model as the function its logic defines, each from the types of those it invokes,
      * in the order they require one another; one that invokes itself, directly or not, reads its own type as any type.
+     * The models being typed are on a stack of its own, not the thread's, so a chain of any length is typed: a model
+     * that reads one not typed yet waits on the stack while that one is typed, and is then typed again from the start.
      */
     private void typeKnowledge() {
         var state = new int[slots.knowledgeCount]; // 0: not typed, 1: being typed, 2: typed
-        for (int k = 0; k < state.length; k++) {
-            typeKnowledge(k, state);
+        var typing = new ArrayDeque<Integer>();
+        for (int first = 0; first < state.length; first++) {
+            if (state[first] == 0) {
+                state[first] = 1;
+                typing.push(first);
+            }
+            while (!typing.isEmpty()) {
+                int k = typing.peek();
+                int untyped = typeKnowledge(k, state);
+                if (untyped < 0) {
+                    state[k] = 2;
+                    typing.pop();
+                } else {
+                    state[untyped] = 1;
+                    typing.push(untyped);
+                }
+            }
         }
     }
 
-    private FeelType typeKnowledge(int k, int[] state) {
-        int slot = slots.ofKnowledge(k);
-        if (state[k] == 2) {
-            return types[slot];
-        }
-        if (state[k] == 1) {
-            return FeelType.ANY;
-        }
-        state[k] = 1;
+    /**
+     * Types a business knowledge model from the types of those it reads, unless it reads one that is not typed yet.
+     *
+     * @return the first business knowledge model it reads that is not typed yet, by index, which is to be typed before
+     *         it; -1 if it read none, and so is typed
+     */
+    private int typeKnowledge(int k, int[] state) {
         var expression = graph.knowledgeExpressions[k];
         var declared = model.knowledgeModels().get(k).logic().type();
         FeelType type = declared;
         if (expression != null && graph.knowledgeBlocked[k] == null) {
             var reads = graph.knowledgeReads.get(k);
+            var untyped = new int[] {-1};
             var computed = expression.type(name -> {
                 var read = reads.get(name);
                 if (read == null) {
                     return null;
                 }
-                // a decision service is typed after the decisions, so a business knowledge model reads it as any function
-                return slots.isService(read) ? FeelType.ANY : typeKnowledge(slots.invocableAt(read), state);
+                if (slots.isService(read)) {
+                    return FeelType.ANY; // typed after the decisions, so a business knowledge model reads it as any function
+                }
+                int invoked = slots.invocableAt(read);
+                if (state[invoked] == 2) {
+                    return types[slots.ofKnowledge(invoked)];
+                }
+                if (state[invoked] == 0 && untyped[0] < 0) {
+                    untyped[0] = invoked;
+                }
+                return FeelType.ANY; // itself, or one that waits for it: a cycle; or one not typed yet, and this type is dropped
             });
+            if (untyped[0] >= 0) {
+                return untyped[0];
+            }
             type = declared instanceof FeelType.Any ? computed : declared;
         }
-        types[slot] = type;
-        state[k] = 2;
-        return type;
+        types[slots.ofKnowledge(k)] = type;
+        return -1;
     }
 
     // ---- decisions ----------------------------------------------------------------------------------
