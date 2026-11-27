@@ -24,7 +24,14 @@ you call `UnsupportedFeatureException.release()` or `issue()`, or construct `Fee
   Praecepta, Camunda and Drools. [praecepta-benchmarks/README.md](praecepta-benchmarks/README.md) describes every
   benchmark.
 
+- **An export for the DMN TCK results site.** `mvn -pl praecepta-tck -am test -Dtck.results=<dir>` writes
+  `tck_results.csv` and `tck_results.properties` in the format the [site](https://dmn-tck.github.io/tck/) reads
+  ([how to publish](praecepta-tck/README.md#publishing-results-on-the-dmn-tck-site)).
+
 ### Changed
+- **`praecepta-tck` scores every result node through the decision requirement graph only.** The evaluators that
+  evaluated one decision on its own, and the per-release feature areas, are gone: no node needed them. The scores are
+  unchanged, and [RESULTS.md](praecepta-tck/RESULTS.md) no longer has a separate decision-table score.
 - **`UnsupportedFeatureException` no longer names a release.** `release()` and `issue()` are removed, and its
   constructor takes only the message. **Upgrade note:** both methods returned null and 0 for everything Praecepta
   0.11 rejects but an import read without the models it imports; tell an unsupported model from an invalid one by the

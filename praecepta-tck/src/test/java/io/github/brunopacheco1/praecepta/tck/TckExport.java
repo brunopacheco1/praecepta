@@ -108,9 +108,13 @@ final class TckExport {
         return text.toString();
     }
 
-    /** A field on one line and without double quotes, which become single ones. */
+    /** The longest field written: a failure may quote a whole context, which the kit's site shows on one line. */
+    static final int MAX_FIELD_LENGTH = 500;
+
+    /** A field on one line, without double quotes, which become single ones, and cut to {@link #MAX_FIELD_LENGTH}. */
     static String field(String text) {
-        return text.replace('"', '\'').replaceAll("\\s*\\R\\s*", " ");
+        var line = text.replace('"', '\'').replaceAll("\\s*\\R\\s*", " ");
+        return line.length() <= MAX_FIELD_LENGTH ? line : line.substring(0, MAX_FIELD_LENGTH - 3) + "...";
     }
 
     /**

@@ -143,4 +143,12 @@ class TckExportTest {
         var check = new Check(testCase, testFile, id, Invocable.DECISION, "", node, Path.of("model.dmn"), Map.of(), TckValue.NIL, false);
         return new Result(check, outcome);
     }
+
+    @Test
+    void a_long_field_is_cut() {
+        var cut = TckExport.field("x".repeat(2 * TckExport.MAX_FIELD_LENGTH));
+
+        assertThat(cut).hasSize(TckExport.MAX_FIELD_LENGTH).endsWith("...");
+        assertThat(TckExport.field("x".repeat(TckExport.MAX_FIELD_LENGTH))).hasSize(TckExport.MAX_FIELD_LENGTH).doesNotContain(".");
+    }
 }
