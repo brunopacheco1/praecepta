@@ -464,7 +464,7 @@ Praecepta does.
 | Generated code | The build plugins generate typed records around the engine, never per-rule code. | Same reason; and the generated classes then agree with the engine by construction. |
 | Exchange format | DMN. Excel and CSV compile to DMN at build time. | DMN carries the hit policy, the types and the value lists. Apache POI stays out of applications. |
 | Dependencies | The engine depends on the JDK only. | It is safe to add anywhere, and it builds as a native image without configuration. |
-| Java baseline | Java 21. CI also builds on 25 and 27. | 21 is the LTS most users run. |
+| Baselines | Java 21, and the oldest framework and build-tool versions supported today. None changes before 1.0. CI also builds on Java 25 and 27. | 21 is the LTS most users run, and 1.0 should run where 0.x does. |
 | External functions | Never evaluated. | Evaluating a DMN file must not reach the class path or the file system ([security assurance](SECURITY-ASSURANCE.md)). |
 | Tables inside FEEL | A decision table inside a boxed expression or a business knowledge model keeps its own index and report. | The index and the analysis are what set Praecepta apart. |
 | Gradle plugin build | Built by Maven against the Gradle 8.11.1 API. | One reactor builds and rebuilds every module the same way, which keeps releases reproducible. The functional tests run it on Gradle 8.5, the last 8.x and 9. |

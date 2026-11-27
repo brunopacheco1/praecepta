@@ -15,7 +15,8 @@ Praecepta evaluates all of DMN 1.5 except external functions, which it rejects b
 3,482 of the 3,511 checks of the DMN TCK ([results](../praecepta-tck/RESULTS.md)).
 
 ## Before 1.0
-Everything planned comes before 1.0, in three releases. The milestones list every issue.
+Everything planned comes before 1.0, in three releases, except what needs a baseline change. The
+milestones list every issue.
 
 **[0.13](https://github.com/brunopacheco1/praecepta/milestone/11): fixes and firmer builds**
 - The smaller defects the 0.12 review found ([#153](https://github.com/brunopacheco1/praecepta/issues/153), [#154](https://github.com/brunopacheco1/praecepta/issues/154), [#155](https://github.com/brunopacheco1/praecepta/issues/155),
@@ -30,7 +31,6 @@ Everything planned comes before 1.0, in three releases. The milestones list ever
   allocates ([#157](https://github.com/brunopacheco1/praecepta/issues/157)).
 - More mutation testing and tests where coverage is thin ([#150](https://github.com/brunopacheco1/praecepta/issues/150), [#151](https://github.com/brunopacheco1/praecepta/issues/151)).
 - An API compatibility check in the build ([#159](https://github.com/brunopacheco1/praecepta/issues/159)).
-- Micronaut 5 ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25.
 - Simpler code where it is still dense ([#152](https://github.com/brunopacheco1/praecepta/issues/152)).
 
 **[0.15](https://github.com/brunopacheco1/praecepta/milestone/14): the playground and Kotlin**
@@ -46,6 +46,12 @@ finds fixed first. Nothing else waits for 1.0.
 
 With 1.0 come the claim of DMN 1.5 conformance, with external functions as its one deliberate exception,
 and a stable API: after 1.0, breaking changes wait for a major version.
+
+## After 1.0
+No baseline changes before 1.0: the oldest Java, framework and build-tool versions Praecepta supports stay
+as they are until then.
+
+- **Micronaut 5** ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25.
 
 ## The project itself
 - Find a second maintainer, so that someone other than its author reviews every change.
