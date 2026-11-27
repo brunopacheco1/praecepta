@@ -18,10 +18,9 @@ import io.github.brunopacheco1.praecepta.integration.Decisions;
 import io.quarkus.test.QuarkusExtensionTest;
 
 /**
- * A DMN file whose model uses what a later release plans (here an external function, which it does not evaluate by design) still loads its
- * decision tables alone, as in 0.6, whether found at a location or declared under {@code quarkus.praecepta.tables},
- * and the build logs one line at INFO per such file, naming it, the feature and the release and issue that plan it,
- * so that the graph left out is seen.
+ * A DMN file whose model uses what Praecepta does not evaluate (an external function, by design) still loads its
+ * decision tables alone, whether found at a location or declared under {@code quarkus.praecepta.tables}, and the
+ * build logs one line at INFO per such file, naming it and the feature, so that the graph left out is seen.
  */
 class FallbackLoggingTest {
 

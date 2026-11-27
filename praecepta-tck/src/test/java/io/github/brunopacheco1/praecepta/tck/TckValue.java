@@ -93,8 +93,8 @@ sealed interface TckValue {
      * Whether {@code actual} is the value this expected value describes. A simple value must be of the expected
      * kind (a number, a string, a boolean, a date, a time, a date and time or a duration) when both name theirs, so the
      * text {@code "10"} is not the number 10; numbers compare as decimals, dates, times and date-times by value, and
-     * booleans ignoring case; a list compares in order unless {@code ordered} is false. Praecepta's single decision
-     * tables have no null list, so an empty list stands for null.
+     * booleans ignoring case; a list compares in order unless {@code ordered} is false. An empty list and
+     * null match each other.
      */
     default boolean matches(TckValue actual, boolean ordered) {
         return switch (this) {

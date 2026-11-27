@@ -24,7 +24,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureExc
 
 /**
  * Compiles a DMN source whose decisions require other decisions, or are literal expressions, as a decision requirements
- * graph (#14): validates the graph as {@link DecisionGraph} does, writes the model as DMN, and generates its classes
+ * graph: validates the graph as {@link DecisionGraph} does, writes the model as DMN, and generates its classes
  * ({@link GraphSourceGenerator}). A DMN source compiles as a graph when the decision it names requires another decision
  * or is a literal expression, or when it names none and one of its decisions does; any other compiles as a table, as
  * before.
@@ -103,16 +103,11 @@ final class GraphCompiler {
      * The line logged of a DMN source whose decision table is compiled alone because {@code DmnReader.readModel}
      * rejects its model with what Praecepta does not evaluate: {@code src/main/rules/fees.dmn: its decision table is
      * compiled alone, without its decision requirements graph, which uses what Praecepta does not evaluate: decision
-     * 'Rate' uses an external function ...}, or, for what a later release plans, {@code ... which needs Praecepta 0.12
-     * (#n): ...}.
+     * 'Rate' uses an external function ...}.
      */
     static String fallbackMessage(String source, UnsupportedFeatureException rejected) {
-        if (rejected.release() == null) {
-            return ("%s: its decision table is compiled alone, without its decision requirements graph, which uses what Praecepta "
-                    + "does not evaluate: %s").formatted(source, rejected.getMessage());
-        }
-        return "%s: its decision table is compiled alone, without its decision requirements graph, which needs Praecepta %s (#%d): %s"
-                .formatted(source, rejected.release(), rejected.issue(), rejected.getMessage());
+        return ("%s: its decision table is compiled alone, without its decision requirements graph, which uses what Praecepta "
+                + "does not evaluate: %s").formatted(source, rejected.getMessage());
     }
 
     /** Whether the source has the decision table to compile, as {@code DmnReader.read} reads it alone. */

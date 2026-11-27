@@ -11,7 +11,7 @@ import java.util.List;
 
 /**
  * Prints retained heap and build time for each engine and table. JMH measures latency only;
- * this complements it with the footprint that the modernisation targets.
+ * this complements it with the memory an engine keeps and the time it takes to build.
  *
  * <p>Run each measurement in a fresh JVM for clean numbers:
  * {@code java -cp benchmarks.jar io.github.brunopacheco1.praecepta.benchmarks.FootprintReport praecepta real}

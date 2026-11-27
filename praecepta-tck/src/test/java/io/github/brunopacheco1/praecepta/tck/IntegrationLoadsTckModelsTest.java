@@ -38,7 +38,7 @@ class IntegrationLoadsTckModelsTest {
         Assertions.assertThat(count.evaluate("Salary", Map.of("NumOfYears", "2"))).containsExactly(Map.of("Salary", "1"));
     }
 
-    /** 0020-vacation-days: its three decision tables MAX their outputs, which default to 0 (#79). */
+    /** 0020-vacation-days: its three decision tables MAX their outputs, which default to 0. */
     @Test
     void the_vacation_days_tables_load_and_give_their_maximum_or_default() {
         var days = load("compliance-level-3/0020-vacation-days/0020-vacation-days.dmn");

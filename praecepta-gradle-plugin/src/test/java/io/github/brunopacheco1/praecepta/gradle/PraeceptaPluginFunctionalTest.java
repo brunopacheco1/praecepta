@@ -122,7 +122,7 @@ class PraeceptaPluginFunctionalTest {
     }
 
     /**
-     * Decision tables in the full FEEL language (0.8, #116), compiled as a decision requirements graph: FEEL cells, a
+     * Decision tables in the full FEEL language, compiled as a decision requirements graph: FEEL cells, a
      * column computed by its input expression, and output entries of several types, read by a literal expression.
      */
     @Test
@@ -315,11 +315,11 @@ class PraeceptaPluginFunctionalTest {
     }
 
     /**
-     * A DMN file whose model uses what a later release plans compiles its decision table alone, as in 0.6, and the
+     * A DMN file whose model uses what Praecepta does not evaluate compiles its decision table alone, and the
      * build says so at lifecycle level, shown without {@code --info}, once per file however many tables read it.
      */
     @Test
-    void a_table_compiled_alone_for_what_a_later_release_plans_is_logged_once_per_file() throws IOException {
+    void a_table_compiled_alone_for_what_praecepta_does_not_evaluate_is_logged_once_per_file() throws IOException {
         var project = project("later", javaProject() + """
                 praecepta {
                     packageName = 'com.acme.rules'

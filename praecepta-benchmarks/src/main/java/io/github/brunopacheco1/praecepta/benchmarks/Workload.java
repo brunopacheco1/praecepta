@@ -98,7 +98,7 @@ public final class Workload {
         return input;
     }
 
-    /** String tables, with Praecepta's legacy cells ({@code a,b}); unchanged since Phase 0. */
+    /** String tables, whose cells list unquoted values ({@code a,b}). */
     private static List<Map<String, Object>> strings(Table table, int size, long seed) {
         var domains = new ArrayList<List<String>>();
         for (var column : table.inputs()) {

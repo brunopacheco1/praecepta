@@ -96,6 +96,19 @@ def evaluation_section(entries, title, description):
             + grid(["Table"] + ENGINES, memory) + [""])
 
 
+def graph_section(entries):
+    engines = {entry.get("params", {}).get("engine"): entry for entry in entries}
+    latency = [["`MonthlyLimit`"] + [measured(engines.get(e), TO_MICROSECONDS) for e in ENGINES]
+               + [ratio(engines, "camunda"), ratio(engines, "drools")]]
+    memory = [["`MonthlyLimit`"] + [allocation(engines.get(e)) for e in ENGINES]]
+    return (["## Decision requirement graph", "",
+             "One decision of a graph on one thread: a literal expression that requires a decision table, which "
+             "requires another (`graphs/credit.dmn`).", "", "Latency in µs:", ""]
+            + grid(["Decision"] + ENGINES + ["Camunda / Praecepta", "Drools / Praecepta"], latency)
+            + ["", "Memory allocated per decision, in bytes:", ""]
+            + grid(["Decision"] + ENGINES, memory) + [""])
+
+
 def tails_section(entries):
     rows = []
     for entry in entries:
@@ -149,6 +162,11 @@ def main(directory):
         if entries:
             out += evaluation_section(entries, title, description)
             measurements += [(suite, e) for e in entries]
+
+    entries = load(directory, "graph")
+    if entries:
+        out += graph_section(entries)
+        measurements += [("graph", e) for e in entries]
 
     entries = load(directory, "tails")
     if entries:

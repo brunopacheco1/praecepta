@@ -23,7 +23,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.ColumnType;
 /**
  * FEEL's function values (DMN 1.5, 10.3.2.13): a function definition's value keeps the names in scope where it was
  * defined, and nothing of the evaluation that defined it, so that it may be invoked from Java any number of times, from
- * any number of threads; and the built-in functions' shape (#117), which BuiltInFunctionsTest covers function by function.
+ * any number of threads; and the built-in functions' shape, which BuiltInFunctionsTest covers function by function.
  */
 class FeelFunctionTest {
 

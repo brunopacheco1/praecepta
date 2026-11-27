@@ -11,6 +11,71 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-27
+
+A hardening release, with no new DMN features: four fixes, of which two for files that could hang the reader or
+overflow the stack, simpler code, shorter documentation and more tests. The plan to grow Praecepta into a DMN 1.5
+engine one layer per release is finished, so the code and the documentation no longer speak of planned releases. Of
+the DMN TCK's 3,511 result nodes, 3,482 pass, as in 0.11 ([RESULTS.md](praecepta-tck/RESULTS.md)). Read *Changed*
+before upgrading if you call `UnsupportedFeatureException.release()` or `issue()`, or construct
+`FeelExpression.Unsupported`.
+
+### Added
+- **A user guide**, [docs/GUIDE.md](docs/GUIDE.md): cells, typed columns, list inputs, hit policies, validation, DMN
+  files and decision requirement graphs, which the README held before.
+- **C4 diagrams** in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): system context, containers, components and code,
+  and sequence diagrams of the main flows.
+- **`GraphBenchmark`** in `praecepta-benchmarks`: the latency of one decision of a decision requirement graph, in
+  Praecepta, Camunda and Drools. [praecepta-benchmarks/README.md](praecepta-benchmarks/README.md) describes every
+  benchmark.
+
+- **Mutation testing, on demand.** The Maven profile `mutation` of `praecepta-engine` runs [PIT](https://pitest.org)
+  on the classes you name ([CONTRIBUTING.md](CONTRIBUTING.md#mutation-testing)). Its first runs on the table engine
+  and the decision graph led to about 60 new tests.
+- **A test of the engine's package layers** (`LayeringTest`, with ArchUnit): `feel`, `beans` and `dmn` do not depend
+  on the root package.
+- **An export for the DMN TCK results site.** `mvn -pl praecepta-tck -am test -Dtck.results=<dir>` writes
+  `tck_results.csv` and `tck_results.properties` in the format the [site](https://dmn-tck.github.io/tck/) reads
+  ([how to publish](praecepta-tck/README.md#publishing-results-on-the-dmn-tck-site)).
+
+### Changed
+- **`praecepta-tck` scores every result node through the decision requirement graph only.** The evaluators that
+  evaluated one decision on its own, and the per-release feature areas, are gone: no node needed them. The scores are
+  unchanged, and [RESULTS.md](praecepta-tck/RESULTS.md) no longer has a separate decision-table score.
+- **`UnsupportedFeatureException` no longer names a release.** `release()` and `issue()` are removed, and its
+  constructor takes only the message. **Upgrade note:** both methods returned null and 0 for everything Praecepta
+  0.11 rejects but an import read without the models it imports; tell an unsupported model from an invalid one by the
+  exception's type, as before.
+- **`FeelExpression.Unsupported` is `record Unsupported(String feature)`.** Its `release` and `issue` components and
+  `planned()` are removed.
+- **Messages no longer speak of planned releases.** A literal expression with `importedValues` is rejected with
+  `... imports values (importedValues), which Praecepta does not read`. A model that imports another, read without
+  it, no longer cites an issue number. The line the framework integrations and the build plugins log for a file
+  whose tables they load alone always ends `which uses what Praecepta does not evaluate: ...`.
+- **The engine's largest classes are split by concern**, with no change in behaviour or public API:
+  `PraeceptaEngine`, `GraphAnalysis`, `DmnReader` and `DmnWriter` now delegate to package-private classes
+  ([where to start reading](docs/ARCHITECTURE.md#praecepta-engine)). Evaluation is as fast as before.
+- **A support policy** in [GOVERNANCE.md](GOVERNANCE.md#what-is-supported): one version for all modules, Java 21 as
+  the baseline until 1.0, and one major line of each framework per module. It names what 0.13 changes: the framework
+  modules are renamed after the framework major they support.
+- **The documentation is shorter and has one place per fact.** The README is an overview.
+  [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) is the one guide to the build plugins, the framework integrations and
+  native images. [docs/ROADMAP.md](docs/ROADMAP.md) lists only what comes next.
+
+### Fixed
+- **A long chain of business knowledge models no longer overflows the stack when a graph is built.** A model of
+  1,000 business knowledge models, each invoking the next, threw `StackOverflowError`.
+- **A business knowledge model that requires a decision service which cannot be evaluated says so.** Its message
+  named the service as a business knowledge model.
+- **A DMN model with an item definition without a name no longer hangs `DmnReader.readModel`.** The reader looped
+  for ever looking for that empty name in the model's expressions. A file can no longer stop a thread this way.
+- **Several decision tables in one boxed list or relation row are each read as themselves.** The reader read every
+  one of them as the first.
+
+### Removed
+- **`docs/MODERNISATION.md`.** The modernisation is finished. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#design-decisions)
+  keeps its design decisions.
+
 ## [0.11.0] - 2026-11-26
 
 Decision services, imports and the rest of DMN 1.5, the fifth step of Praecepta's plan to grow from a decision-table
@@ -1649,7 +1714,8 @@ Code written against the prototype needs the changes listed under *Changed*.
 - **`MissingOutputException`** (no match now yields an empty result), **`InvalidPraeceptaException`**
   and the trie visitor API.
 
-[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/brunopacheco1/praecepta/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/brunopacheco1/praecepta/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/brunopacheco1/praecepta/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/brunopacheco1/praecepta/compare/v0.8.0...v0.9.0

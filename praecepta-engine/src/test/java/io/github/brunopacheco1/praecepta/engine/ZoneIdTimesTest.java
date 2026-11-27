@@ -97,7 +97,7 @@ class ZoneIdTimesTest {
 
     @Test
     void a_rule_reached_only_by_a_time_with_a_zone_id_no_cell_names_is_reachable() {
-        // #114, shrunk from EngineMatchesReferencePropertiesTest: rule 2 matches every time c1 takes but one in a zone id
+        // shrunk from EngineMatchesReferencePropertiesTest: rule 2 matches every time c1 takes but one in a zone id
         // with a changing offset, which it compares with none (FEEL's null), and a missing one; rule 5 the missing one
         var rules = List.of(rule(1, "> c0", "-", "x"), rule(2, "-", "not([time(\"08:00:00@Etc/UTC\")..time(\"08:00:00@Etc/UTC\")))", "x"),
                 rule(3, "-", "c0", "x"), rule(4, "c1", "-", "x"), rule(5, "-", "= null", "y"));
@@ -117,7 +117,7 @@ class ZoneIdTimesTest {
 
     @Test
     void a_time_with_a_zone_id_no_cell_names_is_a_gap_where_no_rule_takes_any_value() {
-        // #114: such a time compares with none of the cells (FEEL's null), so neither rule matches it
+        // such a time compares with none of the cells (FEEL's null), so neither rule matches it
         var engine = PraeceptaEngine.<Map<String, String>, String>builder()
                 .hitPolicy(HitPolicy.UNIQUE)
                 .inputs(PraeceptaInput::new)
@@ -144,7 +144,7 @@ class ZoneIdTimesTest {
 
     @Test
     void a_list_holding_a_time_with_a_zone_id_no_cell_names_reaches_the_rules_after_a_not() {
-        // #114, in a list's elements: not(12:00) of such an element is unknown, so a list holding it matches neither rule 2 nor 3
+        // in a list's elements, not(12:00) of such an element is unknown, so a list holding it matches neither rule 2 nor 3
         var engine = PraeceptaEngine.<Map<String, String>, String>builder()
                 .hitPolicy(HitPolicy.FIRST)
                 .inputs(PraeceptaInput::new)

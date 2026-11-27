@@ -6,115 +6,56 @@ SPDX-License-Identifier: Apache-2.0
 
 # Roadmap
 
-What Praecepta intends to do over the next year (to late 2027). These are intentions, not promises:
-priorities follow what users ask for, so a 👍 or a comment on an issue moves it up. How decisions
-are made is in [GOVERNANCE.md](../GOVERNANCE.md); past decisions are in
-[MODERNISATION.md](MODERNISATION.md).
+What Praecepta intends to do next. These are intentions, not promises: priorities follow what users ask
+for, so a 👍 or a comment on an issue moves it up. [GOVERNANCE.md](../GOVERNANCE.md) explains how the
+project decides. The [changelog](../CHANGELOG.md) lists what each release brought.
 
-## The plan: a full DMN 1.5 engine
-From 0.7, Praecepta grows from a validated decision-table engine into a full DMN 1.5 engine, one layer
-per release, tracked in [#120](https://github.com/brunopacheco1/praecepta/issues/120). Each layer is
-scored against the whole [DMN TCK](../praecepta-tck/RESULTS.md) and judged by the DMN 1.5
-specification and the TCK alone. Decision tables keep what sets Praecepta apart, the validation report
-and the typed generated code; the general engine evaluates everything around them, and the generated
-classes gain each feature through it.
+## Where it stands
+Praecepta evaluates all of DMN 1.5 except external functions, which it rejects by design. It passes
+3,482 of the 3,511 checks of the DMN TCK ([results](../praecepta-tck/RESULTS.md)).
 
-## 0.7
-Released in November 2026 (see the [changelog](../CHANGELOG.md)):
-- **Decision requirement graphs** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)):
-  DMN models whose decisions require other decisions and input data, where each decision is a
-  decision table or a literal expression in the arithmetic of output entries. `DecisionGraph`
-  evaluates them in dependency order and reports cycles, missing requirements and type mismatches
-  when it is built; the Maven and Gradle plugins generate a typed class per decision, and Spring
-  Boot, Micronaut and Quarkus evaluate them by name.
-- **The whole DMN TCK, scored** ([#115](https://github.com/brunopacheco1/praecepta/issues/115)):
-  every model of compliance levels 2 and 3. 454 of its 3,511 result nodes pass (12.9 %), and 454
-  of the 458 that Praecepta evaluates; every other node is listed with the release that brings what
-  it needs. The decision-table checks still pass 83 of 86, and the build fails only on a
-  regression.
-- **Fixes**: rules reached only by a time with a zone id that no cell names are no longer reported
-  unreachable ([#114](https://github.com/brunopacheco1/praecepta/issues/114)), and dates, times and
-  date-times are read in XML Schema's lexical forms: an offset beyond -14:00..+14:00
-  ([#123](https://github.com/brunopacheco1/praecepta/issues/123)) and a year with a leading `+`
-  ([#124](https://github.com/brunopacheco1/praecepta/issues/124)) are rejected.
+## Before 1.0
+Everything planned comes before 1.0, in three releases. The milestones list every issue. The project's
+baselines do not change before 1.0: Java 21, and the oldest framework and build-tool versions supported
+today.
 
-## 0.8
-Released in November 2026 (see the [changelog](../CHANGELOG.md)):
-- **The full FEEL language** ([#116](https://github.com/brunopacheco1/praecepta/issues/116)): the
-  expression language of DMN 1.5, chapter 10, but its built-in functions: three-valued boolean logic,
-  lists, contexts, ranges and functions as values, `if`, comparisons, `between`, `in` and
-  `instance of`, paths, filters, `for` and `some`/`every`, invocations of function values, and FEEL's
-  errors, which give null. Literal expression decisions are any FEEL expression, and so are decision
-  tables' input expressions and output entries; their input entries are any FEEL unary tests. Tables
-  keep their bitset index, analysis and generated code: a cell beyond the simple unary tests is
-  applied to the rules the index matches, and the analysis reports nothing it cannot prove.
-- **The DMN TCK**: 2,275 of its 3,511 result nodes pass (64.8 %, from 454), and 2,275 of the 2,279
-  that Praecepta evaluates; all 1,289 nodes of FEEL's feature area pass. Most of the 1,232
-  nodes not supported yet need FEEL's built-in functions. The decision-table checks still pass 83 of
-  86.
+**[0.13](https://github.com/brunopacheco1/praecepta/milestone/11): fixes and firmer builds**
+- The smaller defects the 0.12 review found ([#153](https://github.com/brunopacheco1/praecepta/issues/153), [#154](https://github.com/brunopacheco1/praecepta/issues/154), [#155](https://github.com/brunopacheco1/praecepta/issues/155),
+  [#156](https://github.com/brunopacheco1/praecepta/issues/156)).
+- The DMN TCK updated to its latest test cases ([#148](https://github.com/brunopacheco1/praecepta/issues/148)).
+- CI that does not fail when a download does ([#161](https://github.com/brunopacheco1/praecepta/issues/161)), and that tests on the baseline JDK
+  ([#164](https://github.com/brunopacheco1/praecepta/issues/164)).
+- Framework modules named after the framework major they support ([#163](https://github.com/brunopacheco1/praecepta/issues/163)), as the
+  [support policy](../GOVERNANCE.md#what-is-supported) says, and with them modules for Micronaut 5
+  ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25 on its own, and Quarkus 4 ([#167](https://github.com/brunopacheco1/praecepta/issues/167)).
 
-## 0.9
-Released in November 2026 (see the [changelog](../CHANGELOG.md)):
-- **Built-in functions** ([#117](https://github.com/brunopacheco1/praecepta/issues/117)): DMN 1.5's
-  whole function library, conversion, boolean, string, list, sort, numeric, date and time, range and
-  context functions, such as `substring`, `sum`, `round half up` and `day of week`, in literal
-  expressions and in decision tables alike, with named arguments, and each function's work counted
-  against the evaluation's limits, regular expressions included.
-- **The DMN TCK**: 3,276 of its 3,511 result nodes pass (93.3 %, from 2,275), and 3,276 of the 3,280
-  that Praecepta evaluates; 1,066 of the built-in functions' 1,071. Most of the 231 nodes not
-  supported yet need boxed expressions and business knowledge models. The decision-table checks still
-  pass 83 of 86.
+**[0.14](https://github.com/brunopacheco1/praecepta/milestone/13): quality, speed and the TCK site**
+- A listing on the [DMN TCK results site](https://dmn-tck.github.io/tck/) ([#149](https://github.com/brunopacheco1/praecepta/issues/149);
+  [how](../praecepta-tck/README.md#publishing-results-on-the-dmn-tck-site)).
+- Fresh benchmark numbers from the current code ([#147](https://github.com/brunopacheco1/praecepta/issues/147)), after reducing what a decision graph
+  allocates ([#157](https://github.com/brunopacheco1/praecepta/issues/157)).
+- More mutation testing and tests where coverage is thin ([#150](https://github.com/brunopacheco1/praecepta/issues/150), [#151](https://github.com/brunopacheco1/praecepta/issues/151)).
+- An API compatibility check in the build ([#159](https://github.com/brunopacheco1/praecepta/issues/159)).
+- Each framework module tested at the oldest and the latest version of its line ([#165](https://github.com/brunopacheco1/praecepta/issues/165)).
+- Simpler code where it is still dense ([#152](https://github.com/brunopacheco1/praecepta/issues/152)).
 
-## 0.10
-Released in November 2026 (see the [changelog](../CHANGELOG.md)):
-- **Boxed expressions and business knowledge models**
-  ([#118](https://github.com/brunopacheco1/praecepta/issues/118)): contexts, invocations, function
-  definitions, relations, lists, conditionals, iterators and filters, as decision logic and as parts
-  of one another, each evaluated as the FEEL it boxes; and business knowledge models, functions that
-  decisions invoke by name or through a boxed invocation, and that may invoke those they require,
-  and themselves.
-- **Decision tables within them**: a business knowledge model's body, a context entry or any other
-  part of a boxed expression may be a decision table, which keeps its bitset index and its validation
-  report.
-- **The DMN TCK**: 3,409 of its 3,511 result nodes pass (97.1 %, from 3,276), and 3,409 of the 3,420
-  that Praecepta evaluates. The decision-table checks pass 86 of 86. Nearly all of the 91 nodes not
-  supported yet are in models that use decision services, imports or external functions.
+**[0.15](https://github.com/brunopacheco1/praecepta/milestone/14): the playground and Kotlin**
+- An online playground ([#21](https://github.com/brunopacheco1/praecepta/issues/21)): paste a table, see its validation report and evaluate inputs,
+  without installing anything.
+- Praecepta for Kotlin: a null-safe API through [JSpecify](https://jspecify.dev) ([#104](https://github.com/brunopacheco1/praecepta/issues/104)), Kotlin
+  code from the build plugins ([#105](https://github.com/brunopacheco1/praecepta/issues/105)) and a Kotlin DSL ([#106](https://github.com/brunopacheco1/praecepta/issues/106)).
 
-## 0.11
-Released in November 2026 (see the [changelog](../CHANGELOG.md)):
-- **Decision services, imports and the rest of DMN 1.5**
-  ([#119](https://github.com/brunopacheco1/praecepta/issues/119)): decision services, invoked by the
-  decisions that require them and from outside the model; models that import others, evaluated as
-  one, in the engine, the framework integrations and the build plugins; and decisions without
-  decision logic, whose value a decision service is given.
-- **External functions are rejected by design**: Praecepta runs no code from outside the model, a
-  deliberate deviation from DMN 1.5 for security ([DMN conformance](DMN-CONFORMANCE.md#known-deviations)).
-- **The DMN TCK**: 3,482 of its 3,511 result nodes pass (99.2 %, from 3,409), and 3,482 of the 3,493
-  that Praecepta evaluates. The 18 nodes not supported are all in the kit's model of external
-  functions.
+## 1.0
+1.0 is released only once Praecepta has been tested with a real use case ([#162](https://github.com/brunopacheco1/praecepta/issues/162)): real tables or
+models that an application depends on, run on a release candidate as a user would, with every problem it
+finds fixed first. Nothing else waits for 1.0.
 
-## Next: 1.0
-- **A claim of DMN 1.5 conformance**, scored against the whole TCK, and a stable API, once the
-  project has a second maintainer (see [GOVERNANCE.md](../GOVERNANCE.md)). After 1.0, breaking
-  changes wait for a major version.
-
-## After 1.0
-- **An online playground** ([#21](https://github.com/brunopacheco1/praecepta/issues/21)): paste a
-  table, see its validation report and evaluate inputs, without installing anything.
-- **Praecepta for Kotlin**: a null-safe API through [JSpecify](https://jspecify.dev)
-  ([#104](https://github.com/brunopacheco1/praecepta/issues/104)), so Kotlin, and Java tools such
-  as NullAway, see which values may be null, in the engine and in the generated classes; Kotlin
-  code from the build plugins ([#105](https://github.com/brunopacheco1/praecepta/issues/105)), data
-  classes and objects instead of Java when asked; and a Kotlin DSL module
-  ([#106](https://github.com/brunopacheco1/praecepta/issues/106)), `praecepta-kotlin`, for building
-  engines and rules in Kotlin.
-
-## Later
-- **Micronaut 5** ([#94](https://github.com/brunopacheco1/praecepta/issues/94)), which needs Java 25:
-  once the project's Java baseline moves past 21.
+With 1.0 come the claim of DMN 1.5 conformance, with external functions as its one deliberate exception,
+and a stable API: after 1.0, breaking changes wait for a major version.
 
 ## The project itself
-- **A second maintainer**, so every change can be reviewed by someone other than its author.
-- **Keeping the OpenSSF Best Practices silver badge** current, and working towards gold, which needs
-  a second maintainer and reviewer; and keeping the security work current: fuzzing, dependency
-  updates, and the [assurance case](SECURITY-ASSURANCE.md).
+- Find a second maintainer, so that someone other than its author reviews every change.
+- Keep the OpenSSF Best Practices silver badge current, and work towards gold, which needs a second
+  maintainer.
+- Keep the security work current: fuzzing, dependency updates and the
+  [assurance case](SECURITY-ASSURANCE.md).

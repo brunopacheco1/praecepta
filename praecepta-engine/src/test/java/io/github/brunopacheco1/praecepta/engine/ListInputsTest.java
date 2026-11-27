@@ -6,8 +6,16 @@
 package io.github.brunopacheco1.praecepta.engine;
 
 import java.io.ByteArrayInputStream;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetTime;
+import java.time.Period;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -29,6 +37,8 @@ import io.github.brunopacheco1.praecepta.engine.dmn.DmnReader;
 import io.github.brunopacheco1.praecepta.engine.dmn.DmnWriter;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
+import io.github.brunopacheco1.praecepta.engine.feel.YearsAndMonths;
+import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
 
 /**
  * Inputs that hold lists (#25): a list column's cell holds when some element passes one of its tests,
@@ -224,6 +234,63 @@ class ListInputsTest {
         Assertions.assertThatThrownBy(() -> engine.evaluate(date))
                 .isInstanceOf(InvalidInputException.class)
                 .hasMessageContaining("holds a java.time.LocalDate, not a number");
+    }
+
+    /** An element type, elements of each Java type it takes, one of a type it does not take, and the example its message gives. */
+    private record ElementType(ColumnType type, List<Object> taken, Object notTaken, String example) {
+    }
+
+    private static final List<ElementType> ELEMENT_TYPES = List.of(
+            new ElementType(ColumnType.STRING, List.of("PT"), 1, "\"PT\", \"BR\""),
+            new ElementType(ColumnType.NUMBER, List.of(1, 2.5d, new BigDecimal("3")), true, "1, 2.5"),
+            new ElementType(ColumnType.DATE, List.of(LocalDate.of(2025, 1, 31)), LocalDateTime.of(2025, 1, 31, 8, 30), "2025-01-31, 2025-02-01"),
+            new ElementType(ColumnType.BOOLEAN, List.of(true), 1, "true, false"),
+            new ElementType(ColumnType.TIME, List.of(LocalTime.NOON, OffsetTime.of(LocalTime.NOON, ZoneOffset.UTC),
+                    new ZonedTime(LocalTime.NOON, ZoneId.of("Europe/Paris"))), LocalDate.of(2025, 1, 31), "08:30:00, 17:00:00"),
+            new ElementType(ColumnType.DATE_TIME, List.of(LocalDateTime.of(2025, 1, 31, 8, 30),
+                    LocalDateTime.of(2025, 1, 31, 8, 30).atZone(ZoneId.of("Europe/Paris"))), LocalDate.of(2025, 1, 31), "2025-01-31T08:30:00"),
+            new ElementType(ColumnType.DAY_TIME_DURATION, List.of(Duration.ofHours(12)), Period.ofDays(1), "P1D, PT12H"),
+            new ElementType(ColumnType.YEAR_MONTH_DURATION, List.of(Period.ofMonths(6), new YearsAndMonths(12)), Duration.ofDays(365),
+                    "P1Y, P6M"));
+
+    @Test
+    void a_list_of_each_type_takes_elements_of_its_java_types_and_names_the_class_of_any_other() {
+        record Values(List<?> values) {
+        }
+        Assertions.assertThat(ELEMENT_TYPES).extracting(ElementType::type).containsExactly(ColumnType.values());
+        for (var elements : ELEMENT_TYPES) {
+            var engine = PraeceptaEngine.<Values, String>builder()
+                    .hitPolicy(HitPolicy.COLLECT)
+                    .listInput("values", elements.type(), Values::values)
+                    .output(output -> output.values().get("id"))
+                    .rules(List.of(rule(1, Map.of("values", "null"), "none"), rule(2, Map.of(), "any")))
+                    .build();
+            Assertions.assertThat(engine.evaluate(new Values(elements.taken()))).as(elements.type().name()).containsExactly("any");
+            Assertions.assertThat(engine.evaluate(new Values(Arrays.asList(null, " ")))).as("missing elements").containsExactly("any");
+            var mixed = new ArrayList<>(elements.taken());
+            mixed.add(elements.notTaken());
+            Assertions.assertThatThrownBy(() -> engine.evaluate(new Values(mixed))).as(elements.type().name())
+                    .isInstanceOf(InvalidInputException.class)
+                    .hasMessage("Input values=%s holds a %s, not a %s", mixed, elements.notTaken().getClass().getName(), elements.type().feelName());
+        }
+    }
+
+    @Test
+    void text_that_is_no_list_of_a_type_is_rejected_with_an_example_of_one() {
+        for (var elements : ELEMENT_TYPES) {
+            var engine = PraeceptaEngine.<Map<String, String>, String>builder()
+                    .hitPolicy(HitPolicy.COLLECT)
+                    .inputs(PraeceptaInput::new)
+                    .listColumnType("values", elements.type())
+                    .output(output -> output.values().get("id"))
+                    .rules(List.of(rule(1, Map.of("values", "null"), "none"), rule(2, Map.of(), "any")))
+                    .build();
+            Assertions.assertThat(engine.evaluate(Map.of("values", "[" + elements.example() + "]"))).as("the example of %s", elements.type())
+                    .containsExactly("any");
+            Assertions.assertThatThrownBy(() -> engine.evaluate(Map.of("values", "not(null)"))).as(elements.type().name())
+                    .isInstanceOf(InvalidInputException.class)
+                    .hasMessage("Input values=not(null) is not a list of %s values, such as [%s]", elements.type().feelName(), elements.example());
+        }
     }
 
     @Test

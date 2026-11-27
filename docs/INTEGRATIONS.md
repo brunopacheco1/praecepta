@@ -6,274 +6,365 @@ SPDX-License-Identifier: Apache-2.0
 
 # Integrations
 
-Praecepta fits the build and the framework an application already uses: a Maven and a Gradle plugin,
-a Spring Boot starter, a Micronaut module, a Quarkus extension, and GraalVM native images. They are
-built to behave alike, so moving a table from one to another changes nothing about what it means or
-how a bad one fails. This document is what they have in common and where they differ; how to set up
-each one is in the README:
-[Maven](../README.md#praecepta-maven-plugin), [Gradle](../README.md#praecepta-gradle-plugin),
-[Spring Boot](../README.md#praecepta-spring-boot-starter), [Micronaut](../README.md#praecepta-micronaut),
-[Quarkus](../README.md#praecepta-quarkus-extension) and [native images](../README.md#native-images).
-Their internals are in [ARCHITECTURE.md](ARCHITECTURE.md).
+How to use Praecepta from your build tool or framework. All integrations behave alike: a table means the
+same everywhere, and an invalid table fails the same way.
 
-## Modules
+| You use | Add | Tables are checked |
+|---|---|---|
+| Maven 3.9+ | [`praecepta-maven-plugin`](#maven-plugin) | when the project builds |
+| Gradle 8.5+ | [plugin `io.github.brunopacheco1.praecepta`](#gradle-plugin) | when the project builds |
+| Spring Boot 4 | [`praecepta-spring-boot-starter`](#spring-boot) | when the application starts |
+| Micronaut 4 | [`praecepta-micronaut`](#micronaut) | when the application starts |
+| Quarkus 3.40+ | [`praecepta-quarkus`](#quarkus) | when Quarkus builds the application |
+| Another framework, or none | [`praecepta-integration`](#without-a-framework) | when you call it |
+| GraalVM | nothing | see [native images](#native-images) |
 
-| Module (artifactId) | For | Depends on | Tables are checked |
-|---|---|---|---|
-| `praecepta-maven-plugin` | Maven 3.9+ | `praecepta-compiler`; the Maven API (`provided`) | when the project builds |
-| Gradle plugin `io.github.brunopacheco1.praecepta` (`praecepta-gradle-plugin`) | Gradle 8.5+ | `praecepta-compiler`; the Gradle API (`provided`) | when the project builds |
-| `praecepta-spring-boot-starter` | Spring Boot 4 | `praecepta-integration`; Spring Boot (`provided`) | when the application starts |
-| `praecepta-micronaut` | Micronaut 4 | `praecepta-integration`; Micronaut (`provided`) | when the application starts |
-| `praecepta-quarkus` (and `praecepta-quarkus-deployment`, which Quarkus adds to its build) | Quarkus 3.40+ | `praecepta-integration`; `quarkus-arc` | when Quarkus builds the application |
-| `praecepta-compiler` | writing a build-tool integration | `praecepta-engine`, `praecepta-loader` | when you call it |
-| `praecepta-integration` | using the runtime core without a framework | `praecepta-engine` | when you call it |
+Every module needs Java 21 or later. All are on Maven Central under the groupId
+`io.github.brunopacheco1`, with the same version. The Gradle plugin is on the Gradle Plugin Portal too.
 
-Every module needs Java 21 or later and is published to Maven Central with the groupId
-`io.github.brunopacheco1` and the same version (the Gradle plugin's marker, which Gradle finds by the
-plugin id, has the groupId `io.github.brunopacheco1.praecepta`). From 0.6.0 the Gradle plugin is on the
-Gradle Plugin Portal too, with the same files. Micronaut 5 needs Java 25, so the module
-targets Micronaut 4. GraalVM native images need no module: the jars carry their own metadata.
+There are two ways to use tables, and you can mix them:
+- **Build plugins** compile Excel, CSV and DMN tables into typed Java classes. Your application ships
+  only `praecepta-engine`.
+- **Framework integrations** load DMN files when the application starts and give you one engine per
+  decision, which takes and returns maps of text.
 
-## What they share
-1. **The engine stays dependency-free.** Every build tool and framework has a module of its own;
-   `praecepta-engine` gains nothing a plain Java application could not use.
-2. **Two cores, no framework in either.** The build tools share `praecepta-compiler`: tables to DMN
-   resources and typed records, as the Maven plugin has always done, so the Maven and Gradle plugins
-   generate the same classes byte for byte (but for the tool named in their comments). The frameworks share
-   `praecepta-integration`: DMN files to named engines with their validation reports.
-3. **DMN at runtime, spreadsheets at build time.** Excel and CSV need Apache POI and a declaration of
-   their hit policy and columns; DMN carries both. The framework integrations read DMN only, and never
-   bring Apache POI into an application. Excel and CSV tables reach them through a build plugin, which
-   writes them as DMN resources a location pattern then finds, or through the Quarkus extension, which
-   compiles the tables declared in `application.properties` while it builds the application.
-4. **Strict and early.** A table that cannot be read or built, or that has validation issues at the
-   configured severity, stops the build (Maven, Gradle, Quarkus) or the application's startup (Spring Boot,
-   Micronaut), with every problem listed at once. The engine decides what a table means; no integration
-   adds a meaning of its own.
-5. **The same settings everywhere,** with the same defaults and values (below).
+## Build plugins
 
-## Inputs and outputs
-The build plugins generate typed records (`DiscountInput`, `DiscountOutput`) and a static class
-(`Discount.evaluate(...)`); see the [Maven plugin](../README.md#praecepta-maven-plugin). The framework
-integrations find their tables at runtime, so their engines take maps instead:
-- **Every decision table of every DMN file found becomes one decision**, and one engine of type
-  `PraeceptaEngine<Map<String, String>, Map<String, String>>`. A file with no decision table, or with one the
-  engine cannot read, is an error; so are two decisions with the same name, in one file or two. A file whose
-  decisions require other decisions is a decision requirements graph, whose decisions are evaluated from its
-  input data (below).
-- **Inputs** map column names to values as text, read with the column types the DMN declares, as
-  `PraeceptaEngine.Builder.inputs(...)` reads them: `"42"`, `"2025-01-31"`, `"08:30Z"`, `["PT", "BR"]` for
-  a list column (`["PT", null]` for one holding a missing element). A missing or blank value is a missing
-  input.
-- **Outputs** are one map per matching rule, in the hit policy's order (an output that is missing, such as
-  an expression with a missing operand, maps to null). Under a COLLECT aggregation, the one map holds the
-  aggregate, as DMN 1.5 defines it over a single output (`AggregationOperator.check`): SUM adds numbers with
-  FEEL's 34 digits and keeps their scale, as the build plugins' generated classes do; MIN and MAX return the
-  smallest or largest output as written, of any ordered type (numbers, strings by character, dates, times,
-  durations); COUNT is the number of matches, of outputs of any type. When a matching rule's output is
-  missing (a `null` entry, an expression with a missing operand), SUM, MIN and MAX are missing too, as FEEL's
-  `sum`, `min` and `max` are null for a list that holds null (10.3.4.4): the one map maps the output to null
-  (`[{fee=null}]`), as the build plugins' generated classes give an output whose component is null; COUNT
-  counts that rule. When no rule matches, a table whose outputs declare
-  default values (`defaultOutputEntry`, `null` included) gives one map of them, null for an output without
-  one, and any other table no map, whatever its hit policy or aggregation (DMN 1.5, 10.3.2.10, step 2): a
-  COUNT then gives no map rather than `0`, as the generated classes give an empty `Optional`.
-- **Validation** is that of the map-based engine. Times and date-times read from text may have a time zone
-  or not, so gaps are looked for among both kinds, and a time column's among times with a zone id too, whether its
-  cells name one or not (a time in a zone no cell names matches only the cells that accept any value).
-- **Decision requirement graphs** ([#14](https://github.com/brunopacheco1/praecepta/issues/14)). A file in
-  which a decision requires another decision or business knowledge, or is not a decision table (a literal expression,
-  or since 0.10 a boxed expression, [#118](https://github.com/brunopacheco1/praecepta/issues/118)), is read as a decision model
-  (`DmnReader.readModel`) and built into a `DecisionGraph` (`GraphModel` in `praecepta-integration`). Every
-  decision of the file is then a decision of `Decisions`, literal and boxed expressions included, and
-  `decisions.evaluate(name, inputData)` evaluates it from the model's **input data**, by name, as text, each
-  decision it requires once: `"30"`, `["PT", "BR"]` for a list, and a structured input data by its components'
-  paths (`Loan.principal`), as a column of that name reads it, as is an input data without a type that a decision
-  reads by path (`Applicant.age`, each component typed by the column that reads it); a list of structured values
-  cannot be given as text. Blank text is missing, as for a table's inputs, except for a `string` input data, for
-  which it is the empty string, as the engine's `DecisionGraph` has it. Its value comes as the maps a table's engine gives: one map with a table's outputs, a context's
-  components, or any other logic's value under the decision's name; one map per element of a list (RULE
-  ORDER, OUTPUT ORDER, COLLECT); none for null. Each decision table is still an engine bean, which evaluates the
-  table alone from its columns, the values of the decisions it requires included, as 0.6 did; other logic has no
-  engine bean, and a decision table within a boxed expression or a business knowledge model is checked as part of the
-  graph, under its decision's or business knowledge model's name. The graph's report (`DECISION_CYCLE`, `MISSING_REQUIREMENT`, `TYPE_MISMATCH`,
-  `UNSUPPORTED_FEATURE` and `INVALID_EXPRESSION`, ERRORs, and `ALWAYS_NULL`, a WARNING) fails loading at `fail-on` like a table's; below it,
-  a decision an ERROR concerns throws `InvalidDecisionTableException` when evaluated, and the others evaluate. A
-  decision table of the graph is checked against its analysis as the graph evaluates it
-  (`DecisionGraph.validationReport(decision)`, its `Decision.report()`), the report the build plugins check, so a
-  file fails at the same `fail-on` in both. A file that imports other models (since 0.11) is read with them, found
-  among the files loaded with it by namespace (`DmnReader.namespace`), so put them where the same locations find
-  them; the build plugins find them beside the file, by `locationURI` or by namespace among the directory's `.dmn`
-  files, never outside that directory, and ship each as a resource beside the model's, which the generated classes
-  read. Whether a file is no graph Praecepta evaluates is told by the `UnsupportedFeatureException`
-  `DmnReader.readModel` throws, not by its message. A file without such decisions loads exactly as before, its
-  decision tables read alone. So does a file that is no graph Praecepta evaluates: one that defines external
-  functions, which Praecepta rejects by design, or that is not a well-formed decision model (two elements of one
-  name, as `DmnWriter` writes a table with a column of its own name), which a file of tables never had to be. Its
-  decision tables load alone, as in 0.6, and nothing else of it is evaluated; a file with no decision table fails,
-  naming why its model was rejected. A file whose tables load alone because it uses what Praecepta does not evaluate
-  is logged, one line at INFO per file through the framework's logging (the same `DecisionsLoader.Log` that reports
-  what was loaded; `Decisions.load` on its own logs it through its `System.Logger`,
-  `io.github.brunopacheco1.praecepta.integration.Decisions`, unless told not to log), naming the file and what it
-  uses, so that the graph left out is seen: `rules/fees.dmn: its decision tables are loaded alone, without its
-  decision requirements graph, which uses what Praecepta does not evaluate: ...`; for what a later release plans,
-  the line names the release and issue instead (`... which needs Praecepta 0.12 (#n): ...`). The build plugins
-  compile such a file's table the same way, and log it likewise at info level (Maven's info, Gradle's lifecycle,
-  the Quarkus build step's INFO), once per file, through the compiler's `CompilerOptions.log`: `.../fees.dmn: its
-  decision table is compiled alone, ...`.
-- **Generated classes are not beans.** They are static and need no container; declare one as a bean
-  yourself if you want it injected. The DMN resources the build plugins write are ordinary DMN files, so a
-  location pattern that covers their package (`classpath*:com/acme/pricing/*.dmn`) gives them map-based
-  engines too.
+### Maven plugin
+```xml
+<plugin>
+  <groupId>io.github.brunopacheco1</groupId>
+  <artifactId>praecepta-maven-plugin</artifactId>
+  <version>0.12.0</version>
+  <executions><execution><goals><goal>generate</goal></goals></execution></executions>
+  <configuration>
+    <packageName>com.acme.pricing</packageName>
+    <tables>
+      <table>
+        <source>src/main/rules/discount.xlsx</source>
+        <hitPolicy>FIRST</hitPolicy>
+        <inputs>
+          <input><name>country</name><allowedValues>"PT","ES","FR"</allowedValues></input>
+          <input><name>age</name><type>NUMBER</type></input>
+        </inputs>
+        <outputs>
+          <output><name>discount</name><type>NUMBER</type></output>
+        </outputs>
+      </table>
+      <table>
+        <!-- DMN files carry their own hit policy, columns and value lists -->
+        <source>src/main/rules/shipping.dmn</source>
+      </table>
+    </tables>
+  </configuration>
+</plugin>
+```
 
-## Configuration
-Spring Boot and Micronaut read these keys under `praecepta`; Quarkus reads them under `quarkus.praecepta`,
-its prefix for extensions, and fixes them when it builds the application.
+For each table, the `generate` goal:
+1. loads it from Excel, CSV or DMN;
+2. validates it, and fails the build on issues at `<failOn>` (`ERROR` by default, `WARNING` or `NONE`);
+3. writes it as a DMN resource next to the generated classes;
+4. generates a `<Name>Input` record, a `<Name>Output` record and a `<Name>` class that evaluates the
+   table.
+
+```java
+Optional<DiscountOutput> discount = Discount.evaluate(new DiscountInput(DiscountInput.Country.PT, new BigDecimal(30)));
+```
+
+- A single-hit table or an aggregation returns an `Optional`. A multi-hit table returns a `List`.
+- `Discount.validationReport()` gives the build-time findings, and `Discount.engine()` the engine.
+- Generated code carries no licence header. Set `<fileHeader>` to add your own.
+
+Settings: `packageName`, `failOn`, `fileHeader`, `skip`; per table `source`, `name`, `decision`,
+`hitPolicy`, `aggregation`; per column `name`, `type`, `allowedValues`, `priority`, `list`.
+
+Generated Java types:
+
+| Column | Java type |
+|---|---|
+| STRING | `String`, or an enum when the column has a value list |
+| NUMBER | `BigDecimal` |
+| DATE | `LocalDate` |
+| TIME | `LocalTime`; `OffsetTime` when every value written for the column has an offset; the engine's `ZonedTime` when values have zone ids |
+| DATE_TIME | `LocalDateTime`; `ZonedDateTime` when every value written for the column has a zone |
+| durations | `Duration` or `Period` |
+| a list input (`<list>true</list>`, or a DMN collection) | `java.util.List` of its type |
+
+A time or date-time column that mixes values with and without a zone fails the build.
+
+### Gradle plugin
+The Gradle plugin does what the Maven plugin does, with the same settings and the same generated files.
+
+```kotlin
+// build.gradle.kts
+plugins {
+    java
+    id("io.github.brunopacheco1.praecepta") version "0.12.0"
+}
+
+dependencies {
+    implementation("io.github.brunopacheco1:praecepta-engine:0.12.0")
+}
+
+praecepta {
+    packageName = "com.acme.pricing"
+    tables {
+        register("discount") {
+            source = file("src/main/rules/discount.xlsx")
+            hitPolicy = "FIRST"
+            inputs {
+                column("country") { allowedValues = "\"PT\",\"ES\",\"FR\"" }
+                column("age") { type = "NUMBER" }
+            }
+            outputs {
+                column("discount") { type = "NUMBER" }
+            }
+        }
+        register("shipping") { source = file("src/main/rules/shipping.dmn") }
+    }
+}
+```
+
+- The `generatePraecepta` task writes classes to `build/generated/sources/praecepta/java/main` and DMN
+  resources to `build/generated/resources/praecepta/main`. Both belong to the `main` source set.
+- The task is cacheable and works with the configuration cache.
+- One setting differs from Maven: `name` is the name you register a table under, so `className` names the
+  generated class.
+
+The [plugin's page](https://bruno.pacheco.lu/praecepta/gradle-plugin/) lists every setting.
+
+### Decision graphs in generated code
+When a DMN file's decisions require one another, or are not decision tables, the plugins compile the file
+as a [decision requirement graph](GUIDE.md#decision-requirement-graphs):
+
+```java
+BigDecimal monthly = MonthlyLimit.evaluate(new MonthlyLimitInput(new BigDecimal(30), new BigDecimal(1200)));  // 200
+String risk = RiskCategory.evaluate(new RiskCategoryInput(new BigDecimal(30)));                              // "Low"
+DecisionGraph graph = CreditModel.graph();     // the whole graph
+```
+
+- **`<Model>Model`** (here `CreditModel`) loads the DMN once and holds the `DecisionGraph`, its
+  `validationReport()` and a record for each structured input data.
+- **Per decision**, `<Decision>Input` holds the input data the decision needs, and `<Decision>.evaluate`
+  returns its value as a Java type: `String`, `BigDecimal`, `Boolean`, `LocalDate`, `Duration`, `Period`,
+  a `List`, or a `<Decision>Output` record for a context. A date and time is a `TemporalAccessor` and a
+  time an `Object`, because a FEEL value of those types may have a zone or not.
+- `<decision>` compiles one decision of the file.
+- The plugins find imported models beside the file, by `locationURI` or by namespace.
+- A file that defines an external function is not a graph Praecepta evaluates. The plugins compile its
+  decision table alone and log one line that says so. Without a table, the build fails.
+
+## Frameworks
+The three framework integrations share one core, `praecepta-integration`, so they behave alike:
+
+- **Location.** They load every DMN file under `rules/` on the class path, such as
+  `src/main/resources/rules/discount.dmn`.
+- **One engine per decision table**, injected by the decision's name (its DMN `name`, or its `id` when it
+  has none). Its type is `PraeceptaEngine<Map<String, String>, Map<String, String>>`.
+- **One `Decisions` bean** evaluates every decision by name:
+  `decisions.evaluate("Discount", Map.of("country", "PT"))`. It also gives `names()`,
+  `get("Discount").report()` and `describe()`.
+- **Inputs** map column names to values as text: `"42"`, `"2025-01-31"`, `"08:30Z"`, `["PT", "BR"]` for a
+  list column. A missing or blank value is a missing input.
+- **Outputs** are one map per matching rule, in the hit policy's order. Under a COLLECT aggregation, the
+  one map holds the aggregate.
+- **Failures.** The application does not start (Quarkus: does not build) when a file cannot be read, two
+  decisions share a name, a location you set finds no file, or a table has validation issues at
+  `fail-on`. The failure lists every problem at once. The integration logs lesser issues as warnings,
+  such as `Discount: WARNING rule 3 can never be selected`.
+
+Settings (Quarkus reads them under `quarkus.praecepta`, at build time):
 
 | Key | Default | Meaning |
 |---|---|---|
-| `praecepta.enabled` | `true` | Spring Boot and Micronaut: `false` turns the integration off (no beans, no endpoint). Quarkus has no such key: remove the extension instead. |
-| `praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load: a comma-separated list (or a YAML list) of patterns. `classpath:` and `classpath*:` both search every class path root, directories and jars; `file:` searches the file system. `*` matches within a path segment, `**` across segments. A class path pattern with wildcards must start with a directory (`classpath*:rules/...`), since the roots themselves cannot be listed inside jars. |
-| `praecepta.fail-on` | `ERROR` | The validation severity that stops startup (Spring Boot, Micronaut) or the build (Quarkus): `ERROR`, `WARNING` or `NONE`, in any case. Tables that cannot be read or built fail whatever it says. |
+| `praecepta.locations` | `classpath*:rules/**/*.dmn` | The DMN files to load: a comma-separated list or a YAML list of patterns. `classpath:` and `classpath*:` search every class path root; `file:` searches the file system. `*` matches within a directory, `**` across directories. A class path pattern must start with a directory. |
+| `praecepta.fail-on` | `ERROR` | The validation severity that stops startup or the build: `ERROR`, `WARNING` or `NONE`. |
+| `praecepta.enabled` | `true` | Spring Boot and Micronaut: `false` turns the integration off. |
 
-With the default location, finding no file gives no decisions and the INFO line
-`No decision tables found at <patterns>`; otherwise `Loaded <n> decision(s) from <m> DMN file(s): <names>`.
-A location you set yourself must find something. The three frameworks share this step
-(`DecisionsLoader`), so they word their problems alike, and list them together with the tables' own
-problems:
-- `<pattern>: no DMN file matches this location`, for a location you set that finds nothing;
-- `praecepta.locations is set but names no location` (Spring Boot and Micronaut; Quarkus reads an empty
-  value as unset);
-- `Location '<pattern>': expected classpath:, classpath*: or file:`, for a malformed pattern, and
-  `Location '<pattern>': a class path pattern must start with a directory without wildcards, ...`;
-- `<pattern>: cannot be searched (<why>)`;
-- `praecepta.fail-on must be ERROR, WARNING or NONE, not <value>` (`quarkus.praecepta.fail-on` in
-  Quarkus); the tables are then still loaded and checked at `ERROR`, so their problems are listed too.
-
-The Quarkus extension has one more setting: Excel and CSV tables to compile while it builds the
-application, under `quarkus.praecepta.tables."<key>"`, with the Maven plugin's settings in kebab-case
-(`source`, `decision`, `hit-policy`, `aggregation`, and `inputs[n]`/`outputs[n]` with `name`, `type`,
-`allowed-values`, `priority`, `list`). The key only groups a table's settings: the decision is named after
-the file, as a build plugin names it. A relative `source` is resolved against the project's directory.
-
-The build plugins' settings are the Maven plugin's in every tool: `packageName`, `failOn` (`ERROR`,
-`WARNING`, `NONE`), `fileHeader`, `skip`, and per table `source`, `name`, `decision`, `hitPolicy`,
-`aggregation`, and the columns' `name`, `type`, `allowedValues`, `priority` and `list`. In Gradle, `name`
-is the name a table is registered under, so the generated class is named by `className`.
-
-## Names and beans
-- **A decision's name** is the DMN decision's `name` attribute (its `id` when it has none), exactly as
-  written: `Discount`, `Credit Score`. A table the Quarkus extension compiles from a spreadsheet is named
-  after the file, without its extension.
-- **Every framework registers one `Decisions` bean**, created at startup, never lazily (in Spring Boot,
-  named `praeceptaDecisions`). It works the same everywhere:
-  `decisions.evaluate("Discount", Map.of("country", "PT"))`, `decisions.names()`,
-  `decisions.get("Discount").report()`.
-- **Each decision is also an engine bean**, qualified by the decision's name:
-
-  | | Inject with | Notes |
-  |---|---|---|
-  | Spring Boot | `@Qualifier("Discount")` | The bean is named `praecepta.Discount`, so a table cannot clash with another bean. `@Named("Discount")` works too when the application has `jakarta.inject-api`. |
-  | Micronaut | `@Named("Discount")` | Registered before the application's own beans are created, so context-scoped beans can inject it too. |
-  | Quarkus | `@Identifier("Discount")` or `@Named("Discount")` | A `@Singleton`: an engine is immutable, and `PraeceptaEngine`, a final class, cannot have the client proxy of a normal scope. |
-
-  So `@Named("Discount")` injects an engine in all three.
-
-## Reports and failures
-
-| | Spring Boot | Micronaut | Quarkus |
-|---|---|---|---|
-| Validation runs | at startup | at startup | while Quarkus builds the application (`quarkus:build`, dev mode, tests) |
-| A failing table | the application does not start; Spring Boot's failure report lists every problem | the application does not start, with every problem in one `DecisionsException` | the build fails, listing every problem |
-| Other issues | logged as warnings at startup | logged as warnings at startup | logged as warnings by the build |
-| Report endpoint | Actuator endpoint `praecepta` (`/actuator/praecepta`, `/actuator/praecepta/{name}`), exposed under Actuator's usual rules | management endpoint `praecepta` (`/praecepta`, `/praecepta/{name}`) with `micronaut-management`, sensitive by default | none yet; `decisions.describe()` gives the same at runtime |
-
-Warnings are one line per issue, prefixed with the decision's name:
-`Discount: WARNING rule 3 can never be selected`, or for a decision requirements graph with its model's,
-`Decision model Credit: ERROR decisions 'A' -> 'B' -> 'A' require one another in a cycle (...)`. Each issue is logged once, through the framework's logging:
-the engines do not log their reports as well, and in Quarkus the application's startup does not repeat what
-the build logged. The endpoints return `Decisions.describe()`,
-`{"decisions": {"Discount": {...}}}`, or one decision's description (404 for an unknown name): `name`,
-`location`, `hitPolicy`, `aggregation`, `rules` (the number of rules), `inputs` and `outputs` (`name`,
-`type`, and `list` for inputs), and `issues` (`severity`, `kind`, `rules`, `detail`, `example`,
-`message`). A decision of a decision requirements graph has no table keys if it is a literal expression, and adds
-`model`, `logic` (`decisionTable` or `literalExpression`), `expression`, `type` (FEEL's name of its value's type),
-`requiredDecisions`, `inputData` (what it reads, directly or through the decisions it requires) and `canEvaluate`;
-when there are such graphs, `models` lists each one's `name`, `location`, `decisions`, `inputData` (`name`,
-`type`) and `issues`. An issue's `kind` is one of `ValidationReport.Kind`: `OVERLAPPING_RULES`, `CONFLICTING_OUTPUTS`
-and `UNREACHABLE_DEFAULT_OUTPUT` (a default output on a table that every input matches, which DMN 1.5,
-10.3.2.10, forbids) are errors, so they fail the build or the startup at the default `fail-on`;
-`UNREACHABLE_RULE` and `GAP` are warnings; a graph's `DECISION_CYCLE`, `MISSING_REQUIREMENT`, `TYPE_MISMATCH`,
-`UNSUPPORTED_FEATURE` and `INVALID_EXPRESSION` are errors, and its `ALWAYS_NULL` a warning. They only read; nothing is evaluated through them. The descriptions show the rules'
-conditions, so expose the endpoints as you would any other that shows configuration.
-
-In Quarkus, the application builds its engines from the DMN the build validated, so it cannot fail
-differently at runtime.
-
-## Without a framework
-`praecepta-integration` is what the framework integrations use, and works on its own:
+**Decision graphs.** A file whose decisions require one another, or are not decision tables, loads as a
+[decision requirement graph](GUIDE.md#decision-requirement-graphs). `decisions.evaluate` then evaluates
+any of its decisions from the model's input data:
 
 ```java
-var sources = TableLocations.find(List.of("classpath*:rules/**/*.dmn"), getClass().getClassLoader());
+decisions.evaluate("Monthly Limit", Map.of("Applicant Age", "30", "Income", "1200"));   // [{Monthly Limit=200}]
+decisions.evaluate("Payment", Map.of("Loan.principal", "600000", "Loan.rate", "0.0375", "Loan.months", "360"));
+```
+
+- Give a structured input data by its components' paths (`Loan.principal`).
+- The result is one map for a table's outputs or a context's components, the value under the decision's
+  name for other logic, one map per element of a list, and no map for null.
+- A decision table of a graph is still an engine bean, which evaluates that table alone. Other logic has
+  no engine bean.
+- Load a model and the models it imports together: the integration finds them by namespace among the
+  files it loads.
+- A file that defines an external function loads its decision tables alone, and the integration logs one
+  INFO line that says so. Without a table, loading fails.
+
+**Excel and CSV.** The frameworks read DMN only. Compile spreadsheets with a build plugin, and add the
+package of the DMN resources it writes to `praecepta.locations`
+(`classpath*:com/acme/pricing/*.dmn`). The Quarkus extension can also compile them itself.
+
+### Spring Boot
+```xml
+<dependency>
+  <groupId>io.github.brunopacheco1</groupId>
+  <artifactId>praecepta-spring-boot-starter</artifactId>
+  <version>0.12.0</version>
+</dependency>
+```
+
+```java
+@Service
+class Pricing {
+    private final PraeceptaEngine<Map<String, String>, Map<String, String>> discount;
+
+    Pricing(@Qualifier("Discount") PraeceptaEngine<Map<String, String>, Map<String, String>> discount) {
+        this.discount = discount;
+    }
+
+    List<Map<String, String>> discounts(String country, int age) {
+        return discount.evaluate(Map.of("country", country, "age", Integer.toString(age)));
+    }
+}
+```
+
+- Inject an engine with `@Qualifier("Discount")`, or `@Named("Discount")` when `jakarta.inject-api` is
+  on the class path. The engine beans are named `praecepta.<decision name>`, and the `Decisions` bean
+  `praeceptaDecisions`.
+- With Actuator, the endpoint `praecepta` reports each decision's columns, hit policy and validation
+  issues (`/actuator/praecepta`, `/actuator/praecepta/{name}`). Expose it as you would any endpoint:
+  `management.endpoints.web.exposure.include=health,praecepta`. It evaluates nothing.
+- Spring AOT works. It validates the tables at build time and reads them again at startup. Set
+  `praecepta.locations` and `praecepta.enabled` for the build as for the application.
+
+### Micronaut
+```xml
+<dependency>
+  <groupId>io.github.brunopacheco1</groupId>
+  <artifactId>praecepta-micronaut</artifactId>
+  <version>0.12.0</version>
+</dependency>
+```
+
+- Inject an engine with `@Named("Discount")`.
+- With `micronaut-management`, the `praecepta` endpoint reports every decision (`GET /praecepta`,
+  `GET /praecepta/Discount`). It is sensitive by default, because the reports show the rules' conditions.
+  Open it with `endpoints.praecepta.sensitive: false`, or secure it with Micronaut Security.
+- The module needs no reflection and no annotation processing in your build.
+
+### Quarkus
+```xml
+<dependency>
+  <groupId>io.github.brunopacheco1</groupId>
+  <artifactId>praecepta-quarkus</artifactId>
+  <version>0.12.0</version>
+</dependency>
+```
+
+```java
+@ApplicationScoped
+class Pricing {
+
+    @Inject
+    @Identifier("Discount") // or @Named("Discount")
+    PraeceptaEngine<Map<String, String>, Map<String, String>> discount;
+
+    @Inject
+    Decisions decisions;
+}
+```
+
+The extension works while Quarkus builds the application (`quarkus:build`, dev mode and tests):
+1. it finds the DMN files under `rules/` in the application and its dependencies;
+2. it compiles the Excel and CSV tables you declare in `application.properties`;
+3. it validates everything, and fails the build at `quarkus.praecepta.fail-on`;
+4. it registers the `Decisions` bean and one `@Singleton` engine per decision.
+
+The application then builds its engines from the DMN the build validated, so it cannot fail differently
+at runtime.
+
+To compile a spreadsheet, declare it with the Maven plugin's settings in kebab-case:
+
+```properties
+quarkus.praecepta.tables.discount.source=src/main/rules/discount.xlsx
+quarkus.praecepta.tables.discount.hit-policy=FIRST
+quarkus.praecepta.tables.discount.inputs[0].name=country
+quarkus.praecepta.tables.discount.inputs[0].allowed-values="PT","ES","FR"
+quarkus.praecepta.tables.discount.inputs[1].name=age
+quarkus.praecepta.tables.discount.inputs[1].type=NUMBER
+quarkus.praecepta.tables.discount.outputs[0].name=discount
+quarkus.praecepta.tables.discount.outputs[0].type=NUMBER
+```
+
+- The decision is named after the file, without its extension.
+- Keep spreadsheets out of `src/main/resources`, so Quarkus does not package them. Apache POI stays in
+  the build and never reaches the application.
+- In dev mode, a change to a DMN file or a declared spreadsheet restarts the application. A table that
+  fails validation shows on the error page. A file added under a `file:` location needs a manual restart.
+- There is no report endpoint. `decisions.describe()` gives the same data at runtime.
+
+## Without a framework
+`praecepta-integration` is the core the frameworks share. It needs only the engine.
+
+```xml
+<dependency>
+  <groupId>io.github.brunopacheco1</groupId>
+  <artifactId>praecepta-integration</artifactId>
+  <version>0.12.0</version>
+</dependency>
+```
+
+```java
+var sources = TableLocations.find(List.of(TableLocations.DEFAULT), getClass().getClassLoader());
 var decisions = Decisions.load(sources, Severity.ERROR);       // throws DecisionsException
+
 List<Map<String, String>> discount = decisions.evaluate("Discount", Map.of("country", "PT", "age", "42"));
+PraeceptaEngine<Map<String, String>, Map<String, String>> engine = decisions.engine("Discount");
 ```
 
 | Type | Role |
 |---|---|
-| `TableLocations` | Finds DMN files by pattern on the class path (directories, jars, and a native image's resources) or the file system: `find(patterns, classLoader)`, `find(location, classLoader)`, `split("a,b")`, `Location.parse(pattern).matches(path)`. `TableLocations.DEFAULT` is the default pattern. |
-| `DecisionsLoader` | What a framework does with its settings: `new DecisionsLoader("praecepta", locations, failOn).load(finder, log)` reads `locations` (null for the default) and `fail-on`, finds the files with the framework's lookup (`finder`), loads them, fails with every problem worded as above, and logs what it loaded and the issues below `fail-on`. |
-| `TableSource` | A DMN file: where it is (for messages and reports) and how to open it. `TableSource.of(Path)`, `of(URL)`, `of(location, bytes)`. |
-| `Decisions` | The decisions by name: `Decisions.load(sources, failOn)`, `get(name)`, `find(name)`, `engine(name)`, `evaluate(name, input)`, `names()`, `all()`, `describe()`; `Decisions.failOn("ERROR")` reads a severity as the settings above do. Immutable and thread-safe. Each engine logs its validation report, as `PraeceptaEngine` does by default; `Decisions.load(sources, failOn, false)` builds them without, for a caller that reports `Decision.report()` itself (as `DecisionsLoader` does). |
-| `Decision` | One decision: its `name`, `location`, `table`, `engine`, validation `report` and the `model` it belongs to (null for a table read alone; `table` and `engine` are null for a literal expression); `evaluate(input)`; `describe()` as plain maps. |
-| `GraphModel` | A file's decision requirements graph: `of(location, model, logReport)`, `needed(model)`, `graph()`, `report()`, `evaluate(decision, inputData)` from text, `describe()`. `Decisions.models()` lists them. |
-| `DecisionsException` | Everything that went wrong while loading, as `problems()` (`<location>: <what>`), all at once. |
+| `TableLocations` | Finds DMN files by pattern on the class path or the file system. `DEFAULT` is `classpath*:rules/**/*.dmn`. |
+| `TableSource` | One DMN file: `TableSource.of(path)`, `of(url)`, `of(name, bytes)`. |
+| `Decisions` | The decisions by name: `load`, `evaluate`, `engine`, `get`, `names`, `describe`, `models`. Immutable and thread-safe. |
+| `Decision` | One decision: its table, engine, validation report and model. |
+| `GraphModel` | A file's decision requirement graph. `graph()` is its `DecisionGraph`, for Java values. |
+| `DecisionsLoader` | What a framework does with its settings: finds the files, loads them, logs, and words every failure alike. |
+| `DecisionsException` | Everything that went wrong while loading, as `problems()`. |
 
-## Writing a build-tool integration
-`praecepta-compiler` is what the Maven plugin's `generate` goal does, without Maven: it loads a table
-(Excel, CSV or DMN), validates it as the generated code will bind it, renders it as DMN, and generates
-the `<Name>Input` and `<Name>Output` records and the `<Name>` class. A build tool translates its own
-configuration and writes the result.
-
-| Type | Role |
-|---|---|
-| `TableDefinition(source, name, decision, hitPolicy, aggregation, inputs, outputs)` | One table, as configured; `TableDefinition.dmn(path)` for a DMN file, which takes only `source`, `name` and `decision`. |
-| `ColumnDefinition(name, type, allowedValues, priority, list)` | A column of an Excel or CSV table; `ColumnDefinition.of(name, type)`, `ColumnDefinition.listInput(name, type, allowedValues)`. |
-| `CompilerOptions(packageName, failOn, fileHeader, generator, settingNames)` | `CompilerOptions.of(packageName, generator)` fails on ERROR and adds no header; `withFailOn`, `withFileHeader`, `withSettingNames`. `generator` is the tool named in the generated files ("Generated by praecepta-gradle-plugin from discount.csv"); `settingNames` spells the settings in messages as the tool does: `CompilerOptions.XML_ELEMENTS` (`<hitPolicy>`) for Maven, `QUOTED` (`'hitPolicy'`) by default. |
-| `CompiledTable(table, packageName, className, report, dmn, sources, model, reports)` | The result. `write(sourceRoot, resourceRoot)` writes the DMN at `resourcePath()` (`com/acme/Discount.dmn`) and each source in its package's directory, and returns the files written. For a decision model compiled as a graph, `table` is null, `model` its `DecisionModel`, `className` its model class (`CreditModel`) and `report` its graph's; `reports()` gives every report by the class it concerns, `classNames()` every generated class, the main one first, and `summary()` what was compiled (`3 rules, FIRST`, `3 decisions`). |
-
-What the Maven and Gradle plugins do, and another tool should too:
-- `TableCompiler.compile` throws `IllegalArgumentException` with a readable message for any mistake in
-  the configuration or the table, and for validation issues at `failOn`; the tool reports it as its build
-  failure, unchanged.
-- Every other issue of `reports()` is logged as a warning, prefixed with the class it concerns
-  (`Fees: WARNING rule 3 can never be selected`, `CreditModel: ERROR ...` for a graph's). The compiler does not log the report itself (its engine is
-  built with `logValidationReport(false)`), so each issue appears once.
-- Two tables that generate the same class (any of `classNames()`) are rejected: `Two tables generate the class
-  <X>; set <name> on one`, with the tool's spelling of `name`.
-- A DMN source whose decision (`decision`), or, without one, one of whose decisions, requires another decision or
-  business knowledge, or is not a decision table, compiles as a decision requirements graph: a model class named after the model, or
-  `name`, with `Model` appended (`CreditModel`), holding the `DecisionGraph`, and per decision an input record of
-  the input data it needs and a class whose `evaluate` evaluates it through the graph. Every other source compiles
-  as before, byte for byte.
-- Relative sources are resolved against the project directory, and the results go to the tool's
-  generated-sources and generated-resources directories, registered with the build so that they are
-  compiled and packaged. Files are written only through `CompiledTable.write`.
+To write a build-tool integration, use `praecepta-compiler`: `TableCompiler.compile` takes a
+`TableDefinition` and `CompilerOptions`, and returns a `CompiledTable` that writes the DMN resource and
+the Java sources. The Javadoc of [praecepta-compiler](https://bruno.pacheco.lu/praecepta/api/compiler/)
+and [praecepta-integration](https://bruno.pacheco.lu/praecepta/api/integration/) has the details.
 
 ## Native images
-The jars carry the reachability metadata they need, under
-`META-INF/native-image/io.github.brunopacheco1/<artifactId>/resource-config.json`: the engine registers
-the XML parser's messages, and `praecepta-integration` the files of the default location,
-`rules/**/*.dmn`. So an application with its tables there needs no configuration for Praecepta. The
-framework integrations use no reflection; register tables at other locations yourself, through the
-framework's own native support (Spring's `RuntimeHints`, Micronaut's resource configuration) or a
-`resource-config.json` of the application's. The Spring Boot starter works with Spring AOT, which processes
-it while the application is built (the engine beans are then those of the decisions found at that time,
-and the tables are read again at startup). The Quarkus extension registers the tables it validated
-itself. CI builds and runs a native application that uses the
-engine, the CSV loader, `praecepta-integration` and generated classes, with GraalVM for JDK 21 and 25, and
-a Spring Boot, a Micronaut and a Quarkus application, each with its framework's own native build
-(`praecepta-native-tests`), which evaluate decisions through the beans they inject. A change to an
-integration must keep them passing (the `Native frameworks` workflow). `ExcelLoader` does not work
-in a native image: compile Excel tables at build time. Details are in the
-[README](../README.md#native-images).
+Applications that use Praecepta build as GraalVM native executables with no configuration for Praecepta.
+The engine uses no reflection, and each jar carries the metadata it needs under
+`META-INF/native-image/io.github.brunopacheco1/<artifactId>/`.
+
+| Works natively | Notes |
+|---|---|
+| The engine, `DmnReader`, `DmnWriter` | |
+| Classes the build plugins generate | Nothing to do. |
+| `praecepta-integration` and the frameworks | The default location, `rules/**/*.dmn`, is registered. Register files elsewhere yourself. |
+| `CsvLoader` | Register the CSV files it reads. |
+| `ExcelLoader` | **Not supported**: Apache POI does not run in a native image. Compile Excel tables at build time instead. |
+
+Register files your own code reads by a computed name, for example in
+`src/main/resources/META-INF/native-image/<groupId>/<artifactId>/resource-config.json`:
+
+```json
+{ "resources": { "includes": [ { "pattern": "\\Qtables/discount.csv\\E" }, { "pattern": "tables/.*\\.dmn" } ] } }
+```
+
+Use each framework's own native build: Spring Boot's `native` profile, Micronaut's
+`-Dpackaging=native-image`, Quarkus' `-Dnative`. Without a framework, use GraalVM's
+`native-maven-plugin` or the Gradle plugin `org.graalvm.buildtools.native`.
+
+`--exact-reachability-metadata` (GraalVM for JDK 24 and later) works for Praecepta's own reads. Applied to
+the whole program, it stops `java.util.logging` from printing the engine's validation warnings unless you
+register the JDK's logging resources for your locale. To avoid that, limit it to your packages:
+`--exact-reachability-metadata=com.acme`.
+
+CI builds and runs a native application of each kind: one without a framework (GraalVM for JDK 21 and
+25), and a Spring Boot, a Micronaut and a Quarkus application (`praecepta-native-tests`).

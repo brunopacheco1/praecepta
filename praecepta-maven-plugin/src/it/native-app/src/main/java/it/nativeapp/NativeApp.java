@@ -106,7 +106,7 @@ public final class NativeApp {
     }
 
     /**
-     * The decisions of rules/credit.dmn, a decision requirements graph (#14) of two tables and a literal expression,
+     * The decisions of rules/credit.dmn, a decision requirements graph of two tables and a literal expression,
      * each generated as a class that evaluates it through CreditModel's graph.
      */
     private void generatedFromGraph() {
@@ -120,7 +120,7 @@ public final class NativeApp {
     }
 
     /**
-     * The decisions of rules/feel.dmn (0.8, #116): a decision table in the full FEEL language, whose column Age * 12 is
+     * The decisions of rules/feel.dmn: a decision table in the full FEEL language, whose column Age * 12 is
      * computed, whose cells compare with Limit * 12, and whose outputs are a string, a number or a list, read by a literal
      * expression.
      */

@@ -31,7 +31,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.ExpressionSyntaxException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
-/** Boxed expressions (DMN 1.5, 10.2) as decision logic, as a decision requirements graph evaluates them (#118). */
+/** Boxed expressions (DMN 1.5, 10.2) as decision logic, as a decision requirements graph evaluates them. */
 class BoxedExpressionsTest {
 
     private static final FeelType NUMBER = FeelType.of(ColumnType.NUMBER);

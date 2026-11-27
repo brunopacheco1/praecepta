@@ -1,0 +1,4 @@
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" name="m" namespace="n">
+  <itemDefinition><typeRef>string</typeRef></itemDefinition>
+  <decision id="d" name="d"><literalExpression><text>1+1</text></literalExpression></decision>
+</definitions>

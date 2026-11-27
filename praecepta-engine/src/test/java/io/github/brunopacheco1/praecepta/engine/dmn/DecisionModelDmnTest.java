@@ -149,13 +149,13 @@ class DecisionModelDmnTest {
     @ParameterizedTest
     @ValueSource(strings = {
         "<import namespace=\"https://example.com/other\" name=\"other\" importType=\"https://www.omg.org/spec/DMN/20230324/MODEL/\"/>"
-                + "|imports 'other'|#119",
+                + "|imports 'other'|reads only with the models it imports",
         "<decision id=\"d\" name=\"D\"><functionDefinition kind=\"Java\"><literalExpression><text>1</text></literalExpression>"
                 + "</functionDefinition></decision>|defines a function in Java|by design",
         "<decision id=\"d\" name=\"D\"><informationRequirement><requiredDecision href=\"other.dmn#x\"/></informationRequirement>"
                 + "<literalExpression><text>1</text></literalExpression></decision>|an element of a model it does not import|Decision 'D'",
     })
-    void what_praecepta_does_not_evaluate_yet_is_rejected_naming_the_issue_that_plans_it(String row) {
+    void what_praecepta_does_not_evaluate_or_read_is_rejected_naming_it(String row) {
         var parts = row.split("\\|");
         var xml = dmn(parts[0]);
 
@@ -427,5 +427,41 @@ class DecisionModelDmnTest {
 
         assertThatThrownBy(() -> DmnWriter.write(model)).isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageContaining("input data 'X' is a list of lists");
+    }
+
+    @Test
+    void an_item_definition_without_a_name_does_not_stop_the_reader() {
+        var xml = dmn("""
+                <itemDefinition><typeRef>string</typeRef></itemDefinition>
+                <decision id="d" name="D"><literalExpression><text>1 + 1</text></literalExpression></decision>
+                """);
+
+        var model = org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(10), () -> read(xml));
+
+        assertThat(model.decisions()).extracting(DecisionModel.Decision::name).containsExactly("D");
+    }
+
+    @Test
+    void each_decision_table_of_a_boxed_list_is_read_as_itself() {
+        var table = """
+                <decisionTable hitPolicy="FIRST">
+                  <input><inputExpression typeRef="number"><text>A</text></inputExpression></input>
+                  <output typeRef="string"/>
+                  <rule><inputEntry><text>-</text></inputEntry><outputEntry><text>"%s"</text></outputEntry></rule>
+                </decisionTable>
+                """;
+        var model = read(dmn("""
+                <inputData id="a" name="A"><variable name="A" typeRef="number"/></inputData>
+                <decision id="d" name="D">
+                  <informationRequirement><requiredInput href="#a"/></informationRequirement>
+                  <list>%s%s</list>
+                </decision>
+                """.formatted(table.formatted("first"), table.formatted("second"))));
+
+        var list = (DecisionLogic.BoxedList) model.decisions().getFirst().logic();
+        assertThat(list.elements()).extracting(element -> ((DecisionLogic.Table) element).table().rules().getFirst().output().values())
+                .containsExactly(Map.of("D", "first"), Map.of("D", "second"));
+        var graph = DecisionGraph.builder().model(model).logValidationReport(false).build();
+        assertThat(graph.evaluate("D", Map.of("A", 1))).isEqualTo(List.of("first", "second"));
     }
 }

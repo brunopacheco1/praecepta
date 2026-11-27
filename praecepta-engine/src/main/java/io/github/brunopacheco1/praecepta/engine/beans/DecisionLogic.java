@@ -18,7 +18,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * A decision's logic (DMN 1.5, 6.3.7, {@code decisionLogic}), and any expression within it: the expression that gives a
  * value from the names in scope, a decision's information requirements and the business knowledge it requires. It is a
  * {@linkplain Table decision table}, a {@linkplain LiteralExpression literal expression} in FEEL, or one of the boxed
- * expressions of DMN 1.5, chapter 10 (since 0.10, <a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>):
+ * expressions of DMN 1.5, chapter 10:
  * a {@linkplain Context context}, an {@linkplain Invocation invocation}, a {@linkplain FunctionDefinition function
  * definition}, a {@linkplain Relation relation}, a {@linkplain BoxedList list}, a {@linkplain Conditional conditional},
  * an {@linkplain Iteration iteration} ({@code for}, {@code some}, {@code every}) or a {@linkplain Filter filter}, whose
@@ -86,14 +86,13 @@ public sealed interface DecisionLogic {
      * as {@code "Hello " + Full Name}, {@code if Applicant.age >= 18 then "adult" else "minor"} or
      * {@code Orders[amount > 100].customer}. The names it reads are those of the decision's information requirements, and
      * the business knowledge models it requires, and the graph parses it with them in scope, as FEEL's names may hold
-     * spaces, keywords and numbers ({@code decision A 2.1}). FEEL's built-in functions are evaluated (since 0.9,
-     * <a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>); a decision that defines an external
-     * function, planned for 0.11, is reported as not evaluated yet.
+     * spaces, keywords and numbers ({@code decision A 2.1}). FEEL's built-in functions are evaluated; a decision that
+     * defines an external function is reported as not evaluated, by design.
      *
      * <p>Whether it is FEEL depends on the names in scope where it is, so it is checked there: {@code DmnReader} rejects a
      * model whose expressions are not FEEL with the names their elements may read, and {@code DecisionGraph} reports one
-     * built in code ({@link io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind#INVALID_EXPRESSION}). Since
-     * 0.10, it is not checked when it is made.
+     * built in code ({@link io.github.brunopacheco1.praecepta.engine.ValidationReport.Kind#INVALID_EXPRESSION}). It is
+     * not checked when it is made.
      *
      * @param text the expression, as written
      * @param type the type the model declares for the decision's value (its variable's {@code typeRef}), or
@@ -208,8 +207,8 @@ public sealed interface DecisionLogic {
     /**
      * A boxed function definition (DMN 1.5, 10.2.3 and 10.3.2.13), in FEEL: its value is a function of its parameters
      * whose body is evaluated in the scope it is defined in, with the parameters bound to the arguments, each to its
-     * declared type. A business knowledge model's logic is one. Functions in Java or PMML, planned for 0.11 (#119), are
-     * rejected when read.
+     * declared type. A business knowledge model's logic is one. Functions in Java or PMML are external functions, which
+     * Praecepta does not evaluate, by design: they are rejected when read.
      *
      * @param parameters its formal parameters, of distinct names
      * @param body       its body

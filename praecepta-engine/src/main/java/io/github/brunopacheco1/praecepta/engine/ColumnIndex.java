@@ -78,7 +78,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.ZonedTime;
  * cells name has a line of local times, split by its boundaries; after those come a class for every other zone
  * id, then the missing class. A column whose inputs may have a zone id (map-based inputs, {@code zonedTimeInput}, a
  * list's elements) has that class even if its cells name none: such a time then matches only the rules that accept
- * any value, and the analyses visit it as they do every class (#114). A time in a zone with one fixed offset
+ * any value, and the analyses visit it as they do every class. A time in a zone with one fixed offset
  * ({@code Etc/UTC}) is no such time: it is the time at that offset (DMN 1.5, Table 72), in cells as in inputs
  * ({@link FeelTemporals#withFixedOffset}), so a column bound with {@code zonedTimeInput} also takes times with a zone
  * that has an offset.</li>
@@ -338,7 +338,7 @@ final class ColumnIndex {
                     zoneBases.put(zone, classes.size());
                     orderedClasses(times.toArray(Comparable<?>[]::new), false).forEach(part -> classes.add(new ValueClass.InZone(zone, part)));
                 });
-                // also where the cells name no zone id: such a time then matches only the rules that accept any value (#114)
+                // also where the cells name no zone id: such a time then matches only the rules that accept any value
                 otherZoneIdClass = classes.size();
                 classes.add(new ValueClass.OtherZoneId());
             }

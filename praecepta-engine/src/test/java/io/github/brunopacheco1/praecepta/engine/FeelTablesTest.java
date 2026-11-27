@@ -32,7 +32,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelExpression;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
 /**
- * Decision tables in the full FEEL language (#116): input entries that are any unary tests (DMN 1.5, grammar rules 13
+ * Decision tables in the full FEEL language: input entries that are any unary tests (DMN 1.5, grammar rules 13
  * to 17, 10.3.2.10 and Table 55), input expressions that are expressions, and output entries that are expressions
  * (chapter 10), with FEEL's nulls, bound to their outputs' and decisions' types (10.3.2.9.4).
  */
@@ -226,7 +226,7 @@ class FeelTablesTest {
 
     /**
      * DMN 1.5, the text before Tables 56 and 58: operands FEEL does not combine give null; the TCK's 0100-arithmetic. An
-     * output entry that is null whatever its inputs is a WARNING, and the table is evaluated (0.7 rejected it).
+     * output entry that is null whatever its inputs is a WARNING, and the table is evaluated.
      */
     @Test
     void an_output_entry_feel_gives_null_is_null_and_a_warning() {
@@ -244,7 +244,7 @@ class FeelTablesTest {
 
     /**
      * DMN 1.5, 10.3.2.10, step 3c: an output whose type nothing declares gives each entry's own value, here a number and a
-     * string (0.7 gave both as strings).
+     * string.
      */
     @Test
     void an_untyped_output_gives_each_entry_its_own_type() {
@@ -283,7 +283,7 @@ class FeelTablesTest {
         Assertions.assertThat(graph.evaluate("Price", Map.of("Base", 10, "Rate", 2))).isNull();
     }
 
-    /** FEEL's built-in functions (since 0.9, #117) in a cell and in an output entry; an external function is not, by design. */
+    /** FEEL's built-in functions in a cell and in an output entry; an external function is not evaluated, by design. */
     @Test
     void an_entry_may_invoke_a_built_in_function() {
         var cell = DecisionGraph.read(stream(AMOUNTS.formatted("&gt; abs(Limit)")));
@@ -294,8 +294,7 @@ class FeelTablesTest {
         var external = stream(AMOUNTS.formatted("&gt; (function(a) external {java: {class: \"C\"}})(Limit)"));
         Assertions.assertThatThrownBy(() -> DmnReader.readModel(external))
                 .isInstanceOf(UnsupportedFeatureException.class)
-                .hasMessageContaining("an external function (Java or PMML), which Praecepta does not evaluate, by design")
-                .extracting(e -> ((UnsupportedFeatureException) e).release()).isNull();
+                .hasMessageContaining("an external function (Java or PMML), which Praecepta does not evaluate, by design");
     }
 
     /** A cell that is neither simple unary tests nor FEEL is rejected, naming where it is, as before. */
@@ -436,7 +435,7 @@ class FeelTablesTest {
         var model = DmnReader.readModel(stream(PRICES.formatted("", entry, "null")));
         var table = ((io.github.brunopacheco1.praecepta.engine.beans.DecisionLogic.Table) model.decisions().getFirst().logic()).table();
         var text = mapEngine(table).evaluate(Map.of("Base", "1", "Rate", "1")).getFirst().get("value");
-        Assertions.assertThat(text).startsWith("[[[[").endsWith("...").hasSizeLessThanOrEqualTo(PraeceptaEngine.MAX_TEXT_LENGTH + 3);
+        Assertions.assertThat(text).startsWith("[[[[").endsWith("...").hasSizeLessThanOrEqualTo(OutputText.MAX_TEXT_LENGTH + 3);
     }
 
     /** A name the table's FEEL reads that is neither a column nor a value given to it cannot be read: it is rejected. */
@@ -447,9 +446,9 @@ class FeelTablesTest {
         var order = List.of("y");
         var given = List.of("z");
         var computed = Map.<String, FeelExpression>of();
-        Assertions.assertThatThrownBy(() -> PraeceptaEngine.nameReads(expressions, order, given, computed))
+        Assertions.assertThatThrownBy(() -> TableColumns.nameReads(expressions, order, given, computed))
                 .isInstanceOf(InvalidDecisionTableException.class).hasMessageContaining("'x'");
-        Assertions.assertThat(PraeceptaEngine.nameReads(expressions, List.of("y"), List.of("z", "x"), Map.of())).containsEntry("x", -2);
+        Assertions.assertThat(TableColumns.nameReads(expressions, List.of("y"), List.of("z", "x"), Map.of())).containsEntry("x", -2);
     }
 
     /**

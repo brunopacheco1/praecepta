@@ -110,7 +110,7 @@ public class GenerateMojo extends AbstractMojo {
         if (tables.isEmpty()) {
             throw new MojoFailureException("Configure at least one <table>");
         }
-        // a DMN file compiled as its decision table alone, as its model uses what a later release plans: once per file
+        // a DMN file compiled as its decision table alone, as its model uses what Praecepta does not evaluate: once per file
         var logged = new HashSet<String>();
         var options = new CompilerOptions(packageName, severity(failOn), fileHeader, GENERATOR, CompilerOptions.XML_ELEMENTS)
                 .withLog(line -> {

@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -30,7 +31,7 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
 /**
  * Business knowledge models (DMN 1.5, 6.3.10) and their invocations, and decision tables within boxed expressions, as a decision
- * requirements graph evaluates them (#118).
+ * requirements graph evaluates them.
  */
 class KnowledgeModelsTest {
 
@@ -255,5 +256,79 @@ class KnowledgeModelsTest {
             assertThat(result.value()).isNull();
             assertThat(result.errors().get("D")).anyMatch(error -> error.contains("more deeply than Praecepta evaluates"));
         });
+    }
+
+    private static DecisionModel.BusinessKnowledgeModel function(String name, List<String> requires, String body) {
+        return new DecisionModel.BusinessKnowledgeModel(name, requires, new DecisionLogic.FunctionDefinition(
+                List.of(new DecisionLogic.Parameter("x", NUMBER)), new DecisionLogic.LiteralExpression(body), FeelType.ANY));
+    }
+
+    @Test
+    void a_long_chain_of_business_knowledge_models_each_invoking_the_next_is_typed_on_a_small_stack() throws Exception {
+        // no walk over a graph recurses on the thread's stack: typing each model from the one it invokes did, 1,000 deep
+        int length = 4000;
+        var chain = new ArrayList<DecisionModel.BusinessKnowledgeModel>();
+        for (int i = 0; i < length - 1; i++) {
+            chain.add(function("f" + i, List.of("f" + (i + 1)), "f" + (i + 1) + "(x) + 1"));
+        }
+        chain.add(function("f" + (length - 1), List.of(), "x * 2"));
+        var first = new DecisionModel.Decision("First", List.of(), List.of(), List.of("f0"), new DecisionLogic.LiteralExpression("f0(1)"));
+        var last = new DecisionModel.Decision("Last", List.of(), List.of(), List.of("f" + (length - 2)),
+                new DecisionLogic.LiteralExpression("f" + (length - 2) + "(1)"));
+        var model = new DecisionModel("M", List.of(), List.of(first, last), chain, List.of(), Map.of());
+        var built = new java.util.concurrent.atomic.AtomicReference<Object>();
+        var thread = new Thread(null, () -> {
+            try {
+                built.set(graph(model));
+            } catch (Throwable e) {
+                built.set(e);
+            }
+        }, "small stack", 512 * 1024);
+        thread.start();
+        thread.join();
+
+        assertThat(built.get()).isInstanceOfSatisfying(DecisionGraph.class, graph -> {
+            assertThat(graph.validationReport().issues()).isEmpty();
+            assertThat(graph.type("First")).as("the type of the last model, through every model before it").isEqualTo(NUMBER);
+            assertThat(graph.evaluate("Last", Map.of())).isEqualTo(new BigDecimal("3"));
+        });
+    }
+
+    @Test
+    void business_knowledge_models_that_invoke_one_another_in_a_cycle_read_the_one_being_typed_as_any_type() {
+        var even = new DecisionModel.BusinessKnowledgeModel("even", List.of("odd"), new DecisionLogic.FunctionDefinition(
+                List.of(new DecisionLogic.Parameter("n", NUMBER)), new DecisionLogic.LiteralExpression("if n = 0 then true else odd(n - 1)"),
+                FeelType.ANY));
+        var odd = new DecisionModel.BusinessKnowledgeModel("odd", List.of("even"), new DecisionLogic.FunctionDefinition(
+                List.of(new DecisionLogic.Parameter("n", NUMBER)), new DecisionLogic.LiteralExpression("if n = 0 then false else even(n - 1)"),
+                FeelType.ANY));
+        var isEven = new DecisionModel.Decision("Is Even", List.of(), List.of(), List.of("even"), new DecisionLogic.LiteralExpression("even(4)"));
+        var isOdd = new DecisionModel.Decision("Is Odd", List.of(), List.of(), List.of("odd"), new DecisionLogic.LiteralExpression("odd(4)"));
+        var graph = graph(new DecisionModel("M", List.of(), List.of(isEven, isOdd), List.of(even, odd), List.of(), Map.of()));
+
+        assertThat(graph.validationReport().issues()).isEmpty();
+        assertThat(graph.evaluate("Is Even", Map.of())).isEqualTo(true);
+        assertThat(graph.evaluate("Is Odd", Map.of())).isEqualTo(false);
+        // even is typed first and waits for odd, which reads even as any type; even then reads the type odd was given
+        assertThat(graph.type("Is Even")).isEqualTo(FeelType.ANY);
+        assertThat(graph.type("Is Odd")).isEqualTo(FeelType.ANY);
+    }
+
+    @Test
+    void a_business_knowledge_model_that_requires_a_decision_service_that_cannot_be_evaluated_names_it_as_a_decision_service() {
+        var inputs = List.of(new DecisionModel.InputData("Price", NUMBER), new DecisionModel.InputData("Quantity", NUMBER));
+        var gross = new DecisionModel.Decision("Gross", List.of(), List.of("Price", "Quantity"),
+                new DecisionLogic.LiteralExpression("Price * Quantity"));
+        var partial = new DecisionModel.DecisionService("Partial", List.of("Gross"), List.of(), List.of(), List.of("Price"), FeelType.ANY);
+        var viaService = function("viaService", List.of("Partial"), "Partial(x)");
+        var viaModel = function("viaModel", List.of("viaService"), "viaService(x)");
+        var graph = graph(new DecisionModel("M", inputs, List.of(gross), List.of(viaModel, viaService), List.of(partial), Map.of()));
+
+        assertThatThrownBy(() -> graph.invokeKnowledgeModel("viaService", Map.of("x", 1))).isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Business knowledge model 'viaService' cannot be evaluated: it requires a decision service 'Partial', "
+                        + "which cannot be evaluated");
+        assertThatThrownBy(() -> graph.invokeKnowledgeModel("viaModel", Map.of("x", 1))).isInstanceOf(InvalidDecisionTableException.class)
+                .hasMessage("Business knowledge model 'viaModel' cannot be evaluated: it requires business knowledge model 'viaService', "
+                        + "which cannot be evaluated");
     }
 }

@@ -352,7 +352,7 @@ class ColumnIndexBehaviourTest {
     void a_map_input_with_a_zone_id_has_a_class_when_no_cell_names_one() {
         var column = columnTaking(ColumnType.TIME, Zoning.EITHER, null, "< time(\"12:00:00\")", "not(time(\"12:00:00\"))", "!= null",
                 "not(null)", "-");
-        // #114: the analyses visit it as any other class; only the cells that accept any value match it
+        // the analyses visit it as any other class; only the cells that accept any value match it
         Assertions.assertThat(dump(column)).contains("""
                 6 any time with a zone id no cell names rules=[2, 3, 4] example=12:00:00@Africa/Abidjan (ZonedTime)
                 7 null missing rules=[1, 4] example=-

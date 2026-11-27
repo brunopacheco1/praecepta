@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- A model with an external function, which DmnReader.readModel rejects by design: its decisions are evaluated alone. -->
+<!-- A model with an external function, which DmnReader.readModel rejects by design: none of its decisions is evaluated. -->
 <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="external" name="External" namespace="https://example.com/external">
   <inputData id="score" name="Score"><variable name="Score" typeRef="number"/></inputData>
   <decision id="band" name="Band">

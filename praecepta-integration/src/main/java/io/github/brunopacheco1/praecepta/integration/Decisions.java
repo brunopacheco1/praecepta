@@ -78,11 +78,11 @@ public final class Decisions {
      * The models a source imports are found among the sources, by namespace. A model that uses what Praecepta does not
      * evaluate (external functions), or that is not a well-formed decision model (two elements of one
      * name, such as a table with a column of its own name as {@code DmnWriter} writes it),
-     * which a file of decision tables never had to be, has its decision tables read alone, as before
+     * which a file of decision tables need not be, has its decision tables read alone
      * ({@code DmnReader.readAll}), and nothing else of it is evaluated; one that has no decision table is rejected,
      * naming the feature. A file whose tables are read alone because the model uses what Praecepta does not evaluate
-     * is logged, one line at INFO, naming the file and the feature, and the release and issue that plan it if one does
-     * ({@link #fallbackMessage}), so that its graph is not left out unseen.
+     * is logged, one line at INFO, naming the file and the feature ({@link #fallbackMessage}), so that its graph is not
+     * left out unseen.
      *
      * @param failOn     the validation severity that fails loading: ERROR, WARNING, or null for none
      *                   (unreadable or invalid tables always fail)
@@ -158,15 +158,11 @@ public final class Decisions {
      * The line logged, at INFO, of a DMN file whose decision tables are loaded alone because {@code DmnReader.readModel}
      * rejects its model with what Praecepta does not evaluate: {@code rules/fees.dmn: its decision tables are loaded alone,
      * without its decision requirements graph, which uses what Praecepta does not evaluate: decision 'Rate' uses an
-     * external function ...}, or, for what a later release plans, {@code ... which needs Praecepta 0.12 (#n): ...}.
+     * external function ...}.
      */
     static String fallbackMessage(String location, UnsupportedFeatureException rejected) {
-        if (rejected.release() == null) {
-            return ("%s: its decision tables are loaded alone, without its decision requirements graph, which uses what Praecepta "
-                    + "does not evaluate: %s").formatted(location, rejected.getMessage());
-        }
-        return "%s: its decision tables are loaded alone, without its decision requirements graph, which needs Praecepta %s (#%d): %s"
-                .formatted(location, rejected.release(), rejected.issue(), rejected.getMessage());
+        return ("%s: its decision tables are loaded alone, without its decision requirements graph, which uses what Praecepta "
+                + "does not evaluate: %s").formatted(location, rejected.getMessage());
     }
 
     /**
@@ -201,7 +197,7 @@ public final class Decisions {
         } catch (RuntimeException e) {
             // not a decision model Praecepta evaluates as a graph: one with what Praecepta does not evaluate, or not well
             // formed (two elements of one name, an import it cannot find...), which a file of decision tables read alone
-            // never had to be; its tables are read as before, and if it has none, why the model was rejected is the problem
+            // need not be; its tables are read alone, and if it has none, why the model was rejected is the problem
             rejected = e;
         }
         if (model != null && GraphModel.needed(model)) {

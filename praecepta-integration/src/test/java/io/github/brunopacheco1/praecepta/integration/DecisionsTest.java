@@ -542,7 +542,7 @@ class DecisionsTest {
     }
 
     /**
-     * The 0.6 features together in the map-based engine: an output expression over a date (#85), whose missing
+     * Features together in the map-based engine: an output expression over a date (#85), whose missing
      * result makes the MIN missing (#90), a {@code null} default output (#92), and cells with at-literals and
      * comments (#81).
      */

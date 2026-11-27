@@ -5,6 +5,7 @@
  */
 package io.github.brunopacheco1.praecepta.engine;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +18,7 @@ import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaInput;
 import io.github.brunopacheco1.praecepta.engine.beans.PraeceptaOutput;
 import io.github.brunopacheco1.praecepta.engine.beans.Praeceptum;
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableException;
+import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 
 /** How the engine works out its columns, their types and their input value lists when it is built. */
 class PraeceptaEngineColumnsTest {
@@ -87,6 +89,67 @@ class PraeceptaEngineColumnsTest {
                 .isInstanceOf(InvalidDecisionTableException.class)
                 .hasMessageStartingWith("Input values of column 'age': ")
                 .hasMessageContaining("interval starts after it ends");
+    }
+
+    private static PraeceptaEngine<Order, String> withInputValues(List<Praeceptum> rules) {
+        return PraeceptaEngine.<Order, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .input("country", Order::country)
+                .input("segment", Order::segment)
+                .allowedValues("country", List.of("PT", "ES"))
+                .allowedValues("segment", List.of("SMB", "CORP"))
+                .output(output -> output.values().get("discount"))
+                .logValidationReport(false)
+                .rules(rules)
+                .build();
+    }
+
+    @Test
+    void a_value_outside_its_columns_input_values_is_rejected_though_no_rule_is_left_to_match() {
+        // whichever column is read first, the other is still checked once the first leaves no rule
+        var engine = withInputValues(List.of(rule(1, Map.of("country", "PT", "segment", "\"SMB\""), "10")));
+
+        Assertions.assertThat(engine.evaluate(new Order("PT", "SMB"))).containsExactly("10");
+        Assertions.assertThat(engine.evaluate(new Order("ES", "CORP"))).isEmpty();
+        Assertions.assertThatThrownBy(() -> engine.evaluate(new Order("ES", "GOV"))).isInstanceOf(InvalidInputException.class)
+                .hasMessage("Input segment=GOV is not one of the column's allowed input values");
+        Assertions.assertThatThrownBy(() -> engine.evaluate(new Order("FR", "CORP"))).isInstanceOf(InvalidInputException.class)
+                .hasMessage("Input country=FR is not one of the column's allowed input values");
+    }
+
+    @Test
+    void a_value_outside_its_input_values_is_rejected_though_the_columns_read_before_it_leave_no_rule() {
+        // two columns that each match another rule leave none: the third is still checked, whichever the engine reads last
+        var builder = PraeceptaEngine.<Map<String, String>, String>builder()
+                .hitPolicy(HitPolicy.FIRST)
+                .output(output -> output.values().get("discount"))
+                .logValidationReport(false)
+                .rules(List.of(rule(1, Map.of("a", "x", "b", "x", "c", "x"), "10"), rule(2, Map.of("a", "y", "b", "y", "c", "y"), "5")));
+        for (var column : List.of("a", "b", "c")) {
+            builder.input(column, input -> input.get(column)).allowedValues(column, List.of("x", "y"));
+        }
+        var engine = builder.build();
+
+        Assertions.assertThat(engine.evaluate(Map.of("a", "y", "b", "y", "c", "y"))).containsExactly("5");
+        Assertions.assertThat(engine.evaluate(Map.of("a", "x", "b", "y", "c", "x"))).isEmpty();
+        for (var column : List.of("a", "b", "c")) {
+            var input = new HashMap<>(Map.of("a", "x", "b", "y", "c", "x"));
+            if (column.equals("b")) {
+                input.put("c", "y"); // the two others still differ
+            }
+            input.put(column, "z");
+            Assertions.assertThatThrownBy(() -> engine.evaluate(input)).as(column).isInstanceOf(InvalidInputException.class)
+                    .hasMessage("Input %s=z is not one of the column's allowed input values", column);
+        }
+    }
+
+    @Test
+    void a_table_without_rules_still_rejects_a_value_outside_its_columns_input_values() {
+        var engine = withInputValues(List.of());
+
+        Assertions.assertThat(engine.evaluate(new Order("ES", "CORP"))).isEmpty();
+        Assertions.assertThatThrownBy(() -> engine.evaluate(new Order("ES", "GOV"))).isInstanceOf(InvalidInputException.class)
+                .hasMessage("Input segment=GOV is not one of the column's allowed input values");
     }
 
     // ---- fixtures ------------------------------------------------------------------------------

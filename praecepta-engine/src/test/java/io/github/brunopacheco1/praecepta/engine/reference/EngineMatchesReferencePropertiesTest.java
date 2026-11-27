@@ -310,7 +310,7 @@ class EngineMatchesReferencePropertiesTest {
 
     /**
      * Among times and date-times of every kind: with map-based inputs, a time column takes times with a zone id whether
-     * its cells name one or not, and they are gaps unless a rule takes any value there (#114).
+     * its cells name one or not, and they are gaps unless a rule takes any value there.
      */
     @Property(tries = ANALYSIS_TRIES, edgeCases = EdgeCasesMode.NONE)
     void temporal_tables_gaps_are_reported_exactly_wherever_gap_analysis_applies(@ForAll("temporalScenarios") DecisionTableScenario s,

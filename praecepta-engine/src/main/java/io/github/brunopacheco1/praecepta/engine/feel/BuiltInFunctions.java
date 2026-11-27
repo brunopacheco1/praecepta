@@ -12,7 +12,7 @@ import java.util.function.Consumer;
 
 /**
  * FEEL's built-in functions (DMN 1.5, 10.3.4): their names, which are in every expression's scope, and the functions,
- * since 0.9 (<a href="https://github.com/brunopacheco1/praecepta/issues/117">#117</a>), each a {@link BuiltInFunction}
+ * each a {@link BuiltInFunction}
  * under its FEEL name, with its parameters, the arguments it takes ({@link BuiltInFunction.Arity}: fixed, optional or
  * variadic) and a body given the evaluation that invokes it, so that it counts against that evaluation's limits and
  * reports its errors there: the conversion, boolean, date and time and miscellaneous functions

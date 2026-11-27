@@ -24,7 +24,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableE
 import io.github.brunopacheco1.praecepta.engine.exceptions.UnsupportedFeatureException;
 import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
 
-/** Models that import others (DMN 1.5, 6.3.3), read with the models they import and evaluated as one graph (#119). */
+/** Models that import others (DMN 1.5, 6.3.3), read with the models they import and evaluated as one graph. */
 class ImportsTest {
 
     private static InputStream resource(String name) {
@@ -127,6 +127,35 @@ class ImportsTest {
                 </definitions>"""));
 
         assertThat(model.decision("D").orElseThrow().requiredInputs()).containsExactly("X");
+    }
+
+    @Test
+    void a_model_imported_twice_under_two_names_is_one_model_whose_elements_either_name_reads() {
+        // an href names the namespace, not the import: the requirement is under the first import's name, and FEEL reads both
+        var twice = """
+                <definitions xmlns="https://www.omg.org/spec/DMN/20230324/MODEL/" id="t" name="Twice" namespace="https://example.com/twice">
+                  <import name="first" namespace="https://example.com/people" importType="https://www.omg.org/spec/DMN/20230324/MODEL/" locationURI="people.dmn"/>
+                  <import name="second" namespace="https://example.com/people" importType="https://www.omg.org/spec/DMN/20230324/MODEL/" locationURI="people.dmn"/>
+                  <inputData id="guest" name="Guest"><variable name="Guest" typeRef="second.tPerson"/></inputData>
+                  <decision id="both" name="Both">
+                    <variable name="Both" typeRef="string"/>
+                    <informationRequirement><requiredInput href="#guest"/></informationRequirement>
+                    <informationRequirement><requiredDecision href="https://example.com/people#adult"/></informationRequirement>
+                    <knowledgeRequirement><requiredKnowledge href="https://example.com/people#greet"/></knowledgeRequirement>
+                    <literalExpression><text>second.Greet(Guest) + "; " + first.Greet(Guest) + "; " + string(second.Adult)</text></literalExpression>
+                  </decision>
+                </definitions>""";
+        var model = DmnReader.readModel(stream(twice), BESIDE);
+
+        assertThat(model.imports()).extracting(DecisionModel.Import::name).containsExactly("first", "second");
+        assertThat(model.imports().get(1).model()).as("read once").isSameAs(model.imports().getFirst().model());
+        assertThat(model.inputData().getFirst().type().component("age")).as("a type by the second name").isEqualTo(FeelType.of(ColumnType.NUMBER));
+        assertThat(model.decision("Both").orElseThrow().requiredKnowledge()).containsExactly("first.Greet");
+        var graph = DecisionGraph.builder().model(model).logValidationReport(false).build();
+        assertThat(graph.validationReport().issues()).isEmpty();
+        assertThat(graph.decisions()).as("the imported model's elements, once").containsExactly("Both", "first.Adult");
+        var inputs = Map.of("Guest", GUEST.get("Guest"), "first.Person", Map.of("name", "Bob", "age", 15));
+        assertThat(graph.evaluate("Both", inputs)).isEqualTo("Hello Ada; Hello Ada; false");
     }
 
     private static InputStream stream(String xml) {

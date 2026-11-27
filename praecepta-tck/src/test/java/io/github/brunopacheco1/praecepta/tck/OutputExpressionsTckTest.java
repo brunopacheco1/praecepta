@@ -29,13 +29,13 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 
 /**
  * The TCK's arithmetic test cases, whose decisions are literal expressions rather than decision tables, evaluated as the
- * output entry of a decision table, which is any FEEL expression since 0.8 (#116): every expression gives the kit's
+ * output entry of a decision table, which is any FEEL expression: every expression gives the kit's
  * result, through a {@link DecisionGraph} of a one-rule table whose output declares no type, so that each value keeps its
  * own (DMN 1.5, 10.3.2.10, step 3c). Their literals are at-literals ({@code @"2021-01-01" + @"P1D"}), so the cases check
  * the arithmetic of dates, times, date-times and durations (DMN 1.5, Tables 57, 59 and 62), and operands FEEL does not
- * combine ({@code @"P1D" + 10}), which give null, with an error, where 0.7 rejected the table. An expression wrapped in
+ * combine ({@code @"P1D" + 10}), which give null, with an error. An expression wrapped in
  * {@code string(...)}, which the kit uses for values it cannot write otherwise (a time with a zone id), and any other
- * that invokes a built-in function, is evaluated as it is (since 0.9, #117).
+ * that invokes a built-in function, is evaluated as it is.
  */
 class OutputExpressionsTckTest {
 

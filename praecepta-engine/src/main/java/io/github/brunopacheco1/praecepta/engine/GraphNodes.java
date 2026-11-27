@@ -19,8 +19,8 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import io.github.brunopacheco1.praecepta.engine.GraphAnalysis.ColumnRead;
 import io.github.brunopacheco1.praecepta.engine.GraphAnalysis.Resolution;
+import io.github.brunopacheco1.praecepta.engine.TableReads.ColumnRead;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionModel;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable;
 import io.github.brunopacheco1.praecepta.engine.beans.DecisionTable.OutputColumn;
@@ -83,7 +83,7 @@ final class GraphNodes {
          * @throws InvalidDecisionTableException if the table cannot be built into an engine
          */
         TableNode(DecisionTable table, GraphAnalysis analysis, int d, FeelType declared, boolean log) {
-            this(table, analysis.tableReads(d), analysis.reads.get(d), analysis.propertyColumns.get(d), analysis.listedNamedInputs.get(d),
+            this(table, analysis.tableReads[d], analysis.reads.get(d), analysis.propertyColumns.get(d), analysis.listedNamedInputs.get(d),
                     analysis.bindings[d], declared, analysis.model.types(), log);
         }
 
@@ -96,7 +96,7 @@ final class GraphNodes {
          * @param types      the types the model defines, which its FEEL may name
          * @throws InvalidDecisionTableException if the table cannot be built into an engine
          */
-        TableNode(DecisionTable table, GraphAnalysis.TableReads reads, Map<String, Resolution> names,
+        TableNode(DecisionTable table, TableReads reads, Map<String, Resolution> names,
                 Map<String, GraphAnalysis.PropertyColumn> properties, Set<String> listed, GraphValues.Binding binding, FeelType declared,
                 Map<String, FeelType> types, boolean log) {
             listResult = !table.hitPolicy().isSingleHit() && table.aggregation() == null;
@@ -128,7 +128,7 @@ final class GraphNodes {
          * Binds the columns that name what they read and the inputs simple cells compare with, each to a getter of its
          * slot and path, or, for a path to a property of a date, time or duration, to the property as FEEL reads it.
          */
-        private static void bindColumns(PraeceptaEngine.Builder<Object[], Object> builder, GraphAnalysis.TableReads reads,
+        private static void bindColumns(PraeceptaEngine.Builder<Object[], Object> builder, TableReads reads,
                 Map<String, Resolution> names, Map<String, GraphAnalysis.PropertyColumn> properties, Set<String> lists) {
             for (var column : reads.columns()) {
                 var list = lists.contains(column.name());
@@ -143,7 +143,7 @@ final class GraphNodes {
          * Binds what the table's FEEL reads: the names its cells, input expressions and output entries read beside its
          * columns, given as their values are. The columns its input expressions compute, the engine computes from them.
          */
-        private static void bindExpressions(PraeceptaEngine.Builder<Object[], Object> builder, GraphAnalysis.TableReads reads,
+        private static void bindExpressions(PraeceptaEngine.Builder<Object[], Object> builder, TableReads reads,
                 Map<String, Resolution> names) {
             for (var name : reads.expressions()) {
                 var resolution = names.get(name);
@@ -267,8 +267,8 @@ final class GraphNodes {
          */
         EmbeddedTable(FeelExpression.TableSite site, boolean log) {
             var table = site.table().table();
-            var scope = GraphAnalysis.tableScope(new LinkedHashSet<>(site.names()), table, site.types());
-            var reads = GraphAnalysis.tableReads(table.name(), table, scope);
+            var scope = TableReads.scope(new LinkedHashSet<>(site.names()), table, site.types());
+            var reads = TableReads.of(table.name(), table, scope);
             var locals = site.locals();
             var keyList = new ArrayList<String>();
             var slots = new HashMap<String, Integer>();
@@ -276,7 +276,7 @@ final class GraphNodes {
             for (var name : reads.names()) {
                 var local = DecisionModel.elementOf(name, locals::contains);
                 var key = local == null ? name : local;
-                var path = local == null || local.length() == name.length() ? new String[0] : name.substring(local.length() + 1).split("\\.");
+                var path = local == null ? new String[0] : Resolution.pathOf(name, local);
                 int slot = slots.computeIfAbsent(key, k -> {
                     keyList.add(k);
                     return keyList.size() - 1;
@@ -287,7 +287,7 @@ final class GraphNodes {
             names = List.copyOf(reads.names());
             var declared = site.table().type();
             node = new TableNode(table, reads, resolutions, Map.of(), Set.of(), GraphValues.Binding.AS_IS, declared, site.types(), log);
-            type = declared instanceof FeelType.Any ? GraphAnalysis.tableType(table) : declared;
+            type = declared instanceof FeelType.Any ? GraphTypes.tableType(table) : declared;
         }
 
         @Override

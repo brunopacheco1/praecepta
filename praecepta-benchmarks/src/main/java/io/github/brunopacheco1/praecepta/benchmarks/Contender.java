@@ -109,8 +109,7 @@ public sealed interface Contender permits Contender.Praecepta, Contender.Camunda
 
     /**
      * Camunda 8's DMN engine (dmn-scala with feel-scala), the engine Zeebe embeds. It reads the
-     * standard DMN types, so it gets the same model as Drools. Camunda 7 (community edition ended at
-     * 7.24.0) and its legacy JUEL-based FEEL mode were benchmarked up to Phase 3.
+     * standard DMN types, so it gets the same model as Drools.
      */
     final class Camunda implements Contender {
         private final DmnEngine engine;

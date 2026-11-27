@@ -49,7 +49,7 @@ class GeneratedSourcesGoldenTest {
                         new ColumnDefinition("since", ColumnType.DATE, null, List.of())),
                 List.of(new ColumnDefinition("discount", ColumnType.NUMBER, null, List.of()),
                         new ColumnDefinition("tier", ColumnType.STRING, null, List.of())));
-        // decision requirements graphs (#14): a chain of tables and a literal expression, and a table whose two outputs
+        // decision requirements graphs: a chain of tables and a literal expression, and a table whose two outputs
         // make a context, read by path downstream
         var credit = TableDefinition.dmn(table("graph/chain.dmn"));
         var pricing = TableDefinition.dmn(table("graph/multi-output.dmn"));

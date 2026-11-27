@@ -173,7 +173,7 @@ sealed interface Node {
      * What DMN 1.5 defines but Praecepta does not evaluate, such as an external function, which it rejects by design: its
      * value is null, with an error; {@link FeelExpression#unsupported()} names it, so a decision that uses it is reported.
      *
-     * @param what what it is, and the release that plans it, if one does
+     * @param what what it is
      */
     record Unsupported(FeelExpression.Unsupported what, List<Node> arguments) implements Node {
         @Override

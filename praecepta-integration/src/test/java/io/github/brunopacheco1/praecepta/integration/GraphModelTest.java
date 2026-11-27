@@ -33,7 +33,7 @@ import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidDecisionTableE
 import io.github.brunopacheco1.praecepta.engine.exceptions.InvalidInputException;
 
 /**
- * DMN files whose decisions require other decisions (#14): each decision evaluated from the model's input data through
+ * DMN files whose decisions require other decisions: each decision evaluated from the model's input data through
  * its graph, with the same values as the engine's {@link DecisionGraph} and as each table's own map-based engine.
  */
 class GraphModelTest {
@@ -96,7 +96,7 @@ class GraphModelTest {
     }
 
     /**
-     * The map engine of a decision table evaluates it alone from its columns, as in 0.6: given the values of the
+     * The map engine of a decision table evaluates it alone from its columns: given the values of the
      * decisions it requires, as the graph computes them, it gives what the graph gives from the input data.
      */
     @Test
@@ -269,9 +269,9 @@ class GraphModelTest {
     }
 
     /**
-     * Decision tables in the full FEEL language (#116) load as graphs, their cells and output entries read as FEEL, built-in
-     * functions (#117) included; a table entry that defines an external function (by design) is rejected as a literal
-     * expression is, naming the release.
+     * Decision tables in the full FEEL language load as graphs, their cells and output entries read as FEEL, built-in
+     * functions included; a table entry that defines an external function is rejected as a literal expression is, by
+     * design.
      */
     @Test
     void tables_in_the_full_feel_language_load_as_graphs_and_external_functions_are_rejected_by_design() {
@@ -314,11 +314,11 @@ class GraphModelTest {
     }
 
     /**
-     * A model with what a later release brings is no graph Praecepta evaluates: its decision tables load alone, as in
-     * 0.6, and nothing else of it; without a decision table, the file fails naming the feature and its issue.
+     * A model that uses what Praecepta does not evaluate is no graph it evaluates: its decision tables load alone, and
+     * nothing else of it; without a decision table, the file fails naming the feature.
      */
     @Test
-    void what_later_releases_bring_is_not_evaluated_and_a_file_without_tables_fails_naming_it() {
+    void what_praecepta_does_not_evaluate_is_left_out_and_a_file_without_tables_fails_naming_it() {
         var file = """
                 <definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="d" name="d" namespace="n">
                   <decision id="rate" name="Rate"><literalExpression>
@@ -339,7 +339,7 @@ class GraphModelTest {
         Assertions.assertThat(decisions.models()).isEmpty();
         Assertions.assertThat(decisions.evaluate("Tier", Map.of("age", "3"))).containsExactly(Map.of("tier", "any"));
 
-        // the loader says so, one line at INFO per such file, naming it, the feature and the release that plans it
+        // the loader says so, one line at INFO per such file, naming it and the feature
         var infos = new ArrayList<String>();
         var warnings = new ArrayList<String>();
         var bkm = TableSource.of("rules/bkm.dmn", file.getBytes(StandardCharsets.UTF_8));

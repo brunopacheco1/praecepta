@@ -22,11 +22,11 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelLiterals;
 
 /**
  * Dates, times and date-times are read in XML Schema's lexical forms (DMN 1.5, 10.3.4.1, date string, time string and
- * date time string). Their offsets lie in -14:00..+14:00, as Table 66 bounds the time offset property: an offset beyond
- * them (#123) is not a time, where 0.6 read {@code 13:20:00+19:00} as {@code 13:20:00}, dropping the offset Java does
- * not take, and {@code 13:20:00+15:00} at that offset. A year has an optional {@code -} and no {@code +} (#124), where
- * 0.6 read {@code +99999-12-01} as Java writes it, and four digits or more, so {@code 99999-12-31} is a date, which 0.6
- * did not read. Each place Praecepta reads one rejects other text: a cell, a value list, an output entry and a default
+ * date time string). Their offsets lie in -14:00..+14:00, as Table 66 bounds the time offset property, so an offset
+ * beyond them (#123) is not a time: neither {@code 13:20:00+19:00}, whose offset Java does not take either, nor
+ * {@code 13:20:00+15:00}, which Java reads at that offset. A year has an optional {@code -} and no {@code +} (#124), so
+ * {@code +99999-12-01}, as Java writes it, is not a date, and four digits or more, so {@code 99999-12-31} is one.
+ * Each place Praecepta reads one rejects other text: a cell, a value list, an output entry and a default
  * output when a table is read from DMN or its engine built, as it rejects any invalid literal; and a map-based input or
  * a graph's input data given as text when it is evaluated, as any text that is not of the column's type
  * ({@code InvalidInputException}). The DMN TCK expects FEEL's null from {@code time(from)}, {@code date(from)} and

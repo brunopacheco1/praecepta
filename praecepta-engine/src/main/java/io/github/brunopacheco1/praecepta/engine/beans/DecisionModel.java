@@ -28,13 +28,11 @@ import io.github.brunopacheco1.praecepta.engine.feel.FeelType;
  * @param name            the model's name (the {@code definitions} element's)
  * @param inputData       the input data, in the model's order
  * @param decisions       the decisions, in the model's order
- * @param knowledgeModels  the business knowledge models, in the model's order (since 0.10,
- *                         <a href="https://github.com/brunopacheco1/praecepta/issues/118">#118</a>)
- * @param decisionServices the decision services, in the model's order (since 0.11,
- *                         <a href="https://github.com/brunopacheco1/praecepta/issues/119">#119</a>)
+ * @param knowledgeModels  the business knowledge models, in the model's order
+ * @param decisionServices the decision services, in the model's order
  * @param namespace        the model's namespace (the {@code definitions} element's), by which other models import it;
  *                         empty if it has none
- * @param imports          the models it imports (DMN 1.5, 6.3.3; since 0.11), whose elements its own read by qualified
+ * @param imports          the models it imports (DMN 1.5, 6.3.3), whose elements its own read by qualified
  *                         names ({@code importName.elementName}), or by their own names for an import without a name
  * @param types           the types the model defines (its item definitions, DMN 1.5, 7.3.2), by name, which a literal
  *                  expression's {@code instance of} and function parameters may name (10.3.2.9); empty if it defines
@@ -98,13 +96,18 @@ public record DecisionModel(String name, List<InputData> inputData, List<Decisio
         Objects.requireNonNull(namespace, "namespace");
         imports = List.copyOf(imports);
         types = Collections.unmodifiableMap(new LinkedHashMap<>(types));
-        var names = new HashSet<String>();
         var all = new ArrayList<String>();
         inputData.forEach(input -> all.add(input.name()));
         decisions.forEach(decision -> all.add(decision.name()));
         knowledgeModels.forEach(knowledgeModel -> all.add(knowledgeModel.name()));
         decisionServices.forEach(service -> all.add(service.name()));
-        for (var element : all) {
+        requireDistinct(all);
+    }
+
+    /** Rejects the first name that names two elements of the model. */
+    private static void requireDistinct(List<String> elements) {
+        var names = new HashSet<String>();
+        for (var element : elements) {
             if (!names.add(element)) {
                 throw new IllegalArgumentException(("'%s' names two elements of the decision model; the names of its decisions, "
                         + "input data, business knowledge models and decision services must differ (DMN 1.5, 6.3.7 and 6.3.11)")
