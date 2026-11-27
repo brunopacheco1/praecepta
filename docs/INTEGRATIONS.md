@@ -35,7 +35,7 @@ There are two ways to use tables, and you can mix them:
 <plugin>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-maven-plugin</artifactId>
-  <version>0.11.0</version>
+  <version>0.12.0</version>
   <executions><execution><goals><goal>generate</goal></goals></execution></executions>
   <configuration>
     <packageName>com.acme.pricing</packageName>
@@ -99,11 +99,11 @@ The Gradle plugin does what the Maven plugin does, with the same settings and th
 // build.gradle.kts
 plugins {
     java
-    id("io.github.brunopacheco1.praecepta") version "0.11.0"
+    id("io.github.brunopacheco1.praecepta") version "0.12.0"
 }
 
 dependencies {
-    implementation("io.github.brunopacheco1:praecepta-engine:0.11.0")
+    implementation("io.github.brunopacheco1:praecepta-engine:0.12.0")
 }
 
 praecepta {
@@ -209,7 +209,7 @@ package of the DMN resources it writes to `praecepta.locations`
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-spring-boot-starter</artifactId>
-  <version>0.11.0</version>
+  <version>0.12.0</version>
 </dependency>
 ```
 
@@ -242,7 +242,7 @@ class Pricing {
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-micronaut</artifactId>
-  <version>0.11.0</version>
+  <version>0.12.0</version>
 </dependency>
 ```
 
@@ -257,7 +257,7 @@ class Pricing {
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-quarkus</artifactId>
-  <version>0.11.0</version>
+  <version>0.12.0</version>
 </dependency>
 ```
 
@@ -310,7 +310,7 @@ quarkus.praecepta.tables.discount.outputs[0].type=NUMBER
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
   <artifactId>praecepta-integration</artifactId>
-  <version>0.11.0</version>
+  <version>0.12.0</version>
 </dependency>
 ```
 

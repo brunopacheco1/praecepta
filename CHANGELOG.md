@@ -11,9 +11,14 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
-A clean-up release: no new features. The plan to grow Praecepta into a DMN 1.5 engine one layer per release is
-finished, so the code and the documentation no longer speak of planned releases. Read *Changed* before upgrading if
-you call `UnsupportedFeatureException.release()` or `issue()`, or construct `FeelExpression.Unsupported`.
+## [0.12.0] - 2026-11-27
+
+A hardening release, with no new DMN features: four fixes, of which two for files that could hang the reader or
+overflow the stack, simpler code, shorter documentation and more tests. The plan to grow Praecepta into a DMN 1.5
+engine one layer per release is finished, so the code and the documentation no longer speak of planned releases. Of
+the DMN TCK's 3,511 result nodes, 3,482 pass, as in 0.11 ([RESULTS.md](praecepta-tck/RESULTS.md)). Read *Changed*
+before upgrading if you call `UnsupportedFeatureException.release()` or `issue()`, or construct
+`FeelExpression.Unsupported`.
 
 ### Added
 - **A user guide**, [docs/GUIDE.md](docs/GUIDE.md): cells, typed columns, list inputs, hit policies, validation, DMN
@@ -1706,7 +1711,8 @@ Code written against the prototype needs the changes listed under *Changed*.
 - **`MissingOutputException`** (no match now yields an empty result), **`InvalidPraeceptaException`**
   and the trie visitor API.
 
-[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/brunopacheco1/praecepta/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/brunopacheco1/praecepta/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/brunopacheco1/praecepta/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/brunopacheco1/praecepta/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/brunopacheco1/praecepta/compare/v0.8.0...v0.9.0
