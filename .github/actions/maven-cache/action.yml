@@ -1,0 +1,89 @@
+# SPDX-FileCopyrightText: Bruno Pacheco
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# The Maven repositories of a job, cached (#161): ~/.m2/repository, and the repositories of the invoker's
+# test projects (*/target/it-repo), which resolve the frameworks themselves. Neither keeps this build's own
+# artifacts (io/github/brunopacheco1), so a cache never serves a stale snapshot of a module.
+#
+# Use it twice in a job: once after the checkout, to restore, and once as the last step, with `save: true`
+# and the keys the first use gave, to save. The key holds the hash of the POMs before the build, so a cache
+# is found again after a build that copied test projects (and their POMs) under target/. Without an exact
+# match, the newest cache of the same name is restored, then the newest of the main build, so a pull
+# request that changes a POM downloads only what is new.
+#
+# Caches are saved from main only (pushes, scheduled runs and manual runs), never from a pull request, so a
+# pull request cannot put anything into a cache that another build restores.
+name: Maven cache
+description: Restores or saves the Maven repositories of a job
+inputs:
+  name:
+    description: >
+      Which cache: jobs that resolve the same artifacts share a name. Jobs that only restore use "build",
+      the cache of the main build.
+    required: false
+    default: build
+  save:
+    description: true to save the cache; give it the key the restore returned
+    required: false
+    default: 'false'
+  key:
+    description: the key the restore returned (saving only)
+    required: false
+    default: ''
+  restored-key:
+    description: the key of the cache the restore found (saving only); a cache that matched exactly is not saved again
+    required: false
+    default: ''
+outputs:
+  key:
+    description: the key to save the cache under, at the end of the job
+    value: ${{ steps.key.outputs.key }}
+  restored-key:
+    description: the key of the cache restored, empty if none was
+    value: ${{ steps.restore.outputs.cache-matched-key }}
+runs:
+  using: composite
+  steps:
+    - id: key
+      if: inputs.save != 'true'
+      shell: bash
+      env:
+        NAME: ${{ inputs.name }}
+        POMS: ${{ hashFiles('**/pom.xml') }}
+        ON_MAIN: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+      # The month in the key starts the caches of main afresh each month, so artifacts no build uses any
+      # more (older versions) do not pile up: main restores only a cache of the same month. A pull request
+      # restores any, the newest first.
+      run: |
+        month=$(date -u +%Y-%m)
+        echo "key=maven-${RUNNER_OS}-${NAME}-${month}-${POMS}" >> "$GITHUB_OUTPUT"
+        {
+          echo "restore-keys<<EOF"
+          echo "maven-${RUNNER_OS}-${NAME}-${month}-"
+          if [ "${ON_MAIN}" != true ]; then
+            echo "maven-${RUNNER_OS}-${NAME}-"
+            echo "maven-${RUNNER_OS}-build-"
+          fi
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+    - id: restore
+      if: inputs.save != 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        key: ${{ steps.key.outputs.key }}
+        restore-keys: ${{ steps.key.outputs.restore-keys }}
+        path: |
+          ~/.m2/repository
+          !~/.m2/repository/io/github/brunopacheco1
+          */target/it-repo
+          !*/target/it-repo/io/github/brunopacheco1
+    - if: inputs.save == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && inputs.key != inputs.restored-key
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        key: ${{ inputs.key }}
+        path: |
+          ~/.m2/repository
+          !~/.m2/repository/io/github/brunopacheco1
+          */target/it-repo
+          !*/target/it-repo/io/github/brunopacheco1

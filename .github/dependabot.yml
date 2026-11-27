@@ -26,7 +26,8 @@ updates:
     schedule:
       interval: weekly
   - package-ecosystem: github-actions
-    directory: /
+    # the workflows, and the actions of this repository (the Maven cache)
+    directories: ['/', '/.github/actions/*']
     schedule:
       interval: weekly
     groups:

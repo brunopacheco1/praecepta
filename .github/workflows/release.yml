@@ -51,7 +51,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
+          # no Maven cache: the release resolves everything from Maven Central (#161)
           # writes ~/.m2/settings.xml with the Central Portal credentials read from these variables
           server-id: central
           server-username: MAVEN_CENTRAL_USERNAME

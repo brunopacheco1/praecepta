@@ -118,7 +118,7 @@ tables to load and how strictly to check them.
 
 ## Evidence
 - **Tests:** line coverage above 90% (the SonarCloud badge has the current figure); property-based tests
-  compare the engine with a naive reference implementation; tests run on Java 21, 25 and 27 on every pull
+  compare the engine with a naive reference implementation; tests run on Java 21 and 25 on every pull
   request.
 - **Fuzzing:** Jazzer targets for the cell parser, FEEL expressions, FEEL unary tests and the DMN reader
   (single tables, and whole decision models built into graphs and evaluated) run on every pull request that

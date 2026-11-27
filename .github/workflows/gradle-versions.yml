@@ -27,6 +27,8 @@ on:
       - '.mvn/**'
       - '.github/workflows/gradle-versions.yml'
       - '.github/scripts/install_gradle.sh'
+      - '.github/actions/maven-cache/**'
+      - '.github/scripts/retry_downloads.py'
   schedule:
     - cron: '47 3 * * 1'
   workflow_dispatch:
@@ -62,11 +64,12 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
-          cache: maven
+      - uses: ./.github/actions/maven-cache # restores the main build's cache; only main's builds save one
       - name: Build the plugin and run its functional tests
         # TestKit downloads the Gradle distribution. The modules the plugin depends on are built but their
         # tests, which the Java CI workflow runs, are not: only the plugin's own tests run here.
         run: >
+          python3 .github/scripts/retry_downloads.py
           mvn -B -pl praecepta-gradle-plugin -am verify -P gradle-functional
           -Dpraecepta.gradle.version=${{ matrix.gradle }}
           -Dtest=PraeceptaPluginTest -Dsurefire.failIfNoSpecifiedTests=false
@@ -80,7 +83,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '25'
-          cache: maven
+      - uses: ./.github/actions/maven-cache # restores the main build's cache; only main's builds save one
       - name: Install Gradle
         run: bash .github/scripts/install_gradle.sh
       - name: Build the plugin as a release would

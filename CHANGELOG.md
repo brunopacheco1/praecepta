@@ -24,6 +24,15 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   | `praecepta-micronaut` | `praecepta-micronaut4` |
   | `praecepta-quarkus` | `praecepta-quarkus3` |
   | `praecepta-quarkus-deployment` | `praecepta-quarkus3-deployment` |
+- **CI tests on the JDKs the support policy names** ([#164](https://github.com/brunopacheco1/praecepta/issues/164)):
+  Java 25, the latest long-term-support release, which builds the release, and Java 21, the baseline. Java 27
+  is no longer tested. Each native application is built once, on GraalVM for the higher of Java 21 and its
+  framework's baseline.
+- **A failed download no longer fails a CI build** ([#161](https://github.com/brunopacheco1/praecepta/issues/161)):
+  Maven retries failed requests (`.mvn/maven.config`, local builds included); CI runs a build that failed on
+  an unresolved artifact once more, and restores the Maven repositories, the test projects' included, from a
+  cache that only main saves, so a pull request that changes a POM downloads only what is new. The release
+  still resolves everything from Maven Central.
 
 ## [0.12.0] - 2026-11-27
 
