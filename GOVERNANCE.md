@@ -33,6 +33,9 @@ be invited; the maintainer adds them to CODEOWNERS, gives them write access, and
   README, "What Praecepta is not"). [docs/ROADMAP.md](docs/ROADMAP.md) has what comes next.
 
 ## Releases
+1.0 is released only once Praecepta has been tested with a real use case
+([#162](https://github.com/brunopacheco1/praecepta/issues/162)).
+
 The maintainer releases by pushing a signed `v*` tag; CI builds, signs and publishes to Maven
 Central and GitHub ([docs/RELEASING.md](docs/RELEASING.md)). Security fixes follow
 [SECURITY.md](SECURITY.md).

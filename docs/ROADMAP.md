@@ -15,6 +15,10 @@ Praecepta evaluates all of DMN 1.5 except external functions, which it rejects b
 3,482 of the 3,511 checks of the DMN TCK ([results](../praecepta-tck/RESULTS.md)).
 
 ## Next: 1.0
+1.0 is released only once Praecepta has been tested with a real use case.
+
+- **A test with a real use case** ([#162](https://github.com/brunopacheco1/praecepta/issues/162)): real tables or models that an application depends on, run
+  on a release candidate as a user would, with every problem it finds fixed first.
 - **A claim of DMN 1.5 conformance**, scored against the whole TCK, with external functions as its one
   deliberate exception ([#120](https://github.com/brunopacheco1/praecepta/issues/120)).
 - **A listing on the [DMN TCK results site](https://dmn-tck.github.io/tck/)**
