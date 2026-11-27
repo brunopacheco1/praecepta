@@ -28,9 +28,29 @@ be invited; the maintainer adds them to CODEOWNERS, gives them write access, and
   The [architecture document](docs/ARCHITECTURE.md#design-decisions) records them with their reasons.
 - **Compatibility:** versions follow [Semantic Versioning](https://semver.org/). Until 1.0, minor
   versions may change the API; every change is listed in [CHANGELOG.md](CHANGELOG.md).
+  [What is supported](#what-is-supported) says what the promise covers.
 - **Scope:** a DMN 1.5 engine, judged by the specification and the DMN TCK alone. Praecepta is a
   library: it will not become a process engine, a modeller or a server around the decisions (see the
   README, "What Praecepta is not"). [docs/ROADMAP.md](docs/ROADMAP.md) has what comes next.
+
+## What is supported
+Praecepta promises its own API. It does not promise every version of the frameworks and tools around it.
+
+- **One version, one release.** Every module has the same version, and all are released together.
+- **Java.** The baseline is Java 21. A release is built with the latest long-term-support JDK, compiling
+  for Java 21, so that it stays reproducible, and tested on Java 21. The baseline does not change before
+  1.0. After 1.0 it changes only in a major version.
+- **Frameworks.** Each framework module supports one major line of its framework: Spring Boot 4,
+  Micronaut 4 and Quarkus 3 today. From 0.13 the module's name says which ([#163](https://github.com/brunopacheco1/praecepta/issues/163)). CI tests the
+  module at the oldest version of the line it supports and at the latest ([#165](https://github.com/brunopacheco1/praecepta/issues/165)), on the higher
+  of Java 21 and the framework's own baseline.
+- **The oldest framework version supported may rise in a minor release**, past versions the framework's
+  vendor no longer supports. The changelog says so in an upgrade note.
+- **A new framework major gets a module of its own**, in the same release as the others. The module for a
+  major that its vendor no longer supports is deprecated, then removed in a minor release at least six
+  months later. This is the one exception to semantic versioning.
+- **There is always a way without a framework module.** `praecepta-integration` works with any version of
+  any framework: one bean method that calls `Decisions.load` replaces the module.
 
 ## Releases
 1.0 is released only once Praecepta has been tested with a real use case

@@ -55,6 +55,9 @@ before upgrading if you call `UnsupportedFeatureException.release()` or `issue()
 - **The engine's largest classes are split by concern**, with no change in behaviour or public API:
   `PraeceptaEngine`, `GraphAnalysis`, `DmnReader` and `DmnWriter` now delegate to package-private classes
   ([where to start reading](docs/ARCHITECTURE.md#praecepta-engine)). Evaluation is as fast as before.
+- **A support policy** in [GOVERNANCE.md](GOVERNANCE.md#what-is-supported): one version for all modules, Java 21 as
+  the baseline until 1.0, and one major line of each framework per module. It names what 0.13 changes: the framework
+  modules are renamed after the framework major they support.
 - **The documentation is shorter and has one place per fact.** The README is an overview.
   [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) is the one guide to the build plugins, the framework integrations and
   native images. [docs/ROADMAP.md](docs/ROADMAP.md) lists only what comes next.

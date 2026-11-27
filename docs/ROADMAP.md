@@ -22,7 +22,10 @@ milestones list every issue.
 - The smaller defects the 0.12 review found ([#153](https://github.com/brunopacheco1/praecepta/issues/153), [#154](https://github.com/brunopacheco1/praecepta/issues/154), [#155](https://github.com/brunopacheco1/praecepta/issues/155),
   [#156](https://github.com/brunopacheco1/praecepta/issues/156)).
 - The DMN TCK updated to its latest test cases ([#148](https://github.com/brunopacheco1/praecepta/issues/148)).
-- CI that does not fail when a download does ([#161](https://github.com/brunopacheco1/praecepta/issues/161)).
+- CI that does not fail when a download does ([#161](https://github.com/brunopacheco1/praecepta/issues/161)), and that tests on the baseline JDK
+  ([#164](https://github.com/brunopacheco1/praecepta/issues/164)).
+- Framework modules named after the framework major they support ([#163](https://github.com/brunopacheco1/praecepta/issues/163)), as the
+  [support policy](../GOVERNANCE.md#what-is-supported) says.
 
 **[0.14](https://github.com/brunopacheco1/praecepta/milestone/13): quality, speed and the TCK site**
 - A listing on the [DMN TCK results site](https://dmn-tck.github.io/tck/) ([#149](https://github.com/brunopacheco1/praecepta/issues/149);
@@ -31,6 +34,7 @@ milestones list every issue.
   allocates ([#157](https://github.com/brunopacheco1/praecepta/issues/157)).
 - More mutation testing and tests where coverage is thin ([#150](https://github.com/brunopacheco1/praecepta/issues/150), [#151](https://github.com/brunopacheco1/praecepta/issues/151)).
 - An API compatibility check in the build ([#159](https://github.com/brunopacheco1/praecepta/issues/159)).
+- Each framework module tested at the oldest and the latest version of its line ([#165](https://github.com/brunopacheco1/praecepta/issues/165)).
 - Simpler code where it is still dense ([#152](https://github.com/brunopacheco1/praecepta/issues/152)).
 
 **[0.15](https://github.com/brunopacheco1/praecepta/milestone/14): the playground and Kotlin**
