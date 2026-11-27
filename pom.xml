@@ -65,6 +65,11 @@
         <assertj-core.version>3.27.7</assertj-core.version>
         <jqwik.version>1.10.2</jqwik.version>
         <jazzer.version>0.30.0</jazzer.version>
+        <!-- the engine's package layering test (LayeringTest) -->
+        <archunit.version>1.5.1</archunit.version>
+        <!-- mutation testing of the engine, only with -P mutation (CONTRIBUTING.md, "Mutation testing") -->
+        <pitest-maven.version>1.30.2</pitest-maven.version>
+        <pitest-junit5-plugin.version>1.2.3</pitest-junit5-plugin.version>
 
         <!-- build plugins -->
         <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
@@ -209,6 +214,12 @@
                 <groupId>com.code-intelligence</groupId>
                 <artifactId>jazzer-junit</artifactId>
                 <version>${jazzer.version}</version>
+            </dependency>
+            <dependency>
+                <!-- the engine's package layering test (LayeringTest), which reads the compiled classes -->
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit</artifactId>
+                <version>${archunit.version}</version>
             </dependency>
             <!-- Gradle plugin (#18): the Gradle API (provided) and TestKit (test). Their POMs also ask for
                  groovy-all and kotlin-stdlib at runtime, which Gradle itself provides: the plugin compiles

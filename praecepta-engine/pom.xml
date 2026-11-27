@@ -48,6 +48,11 @@
             <artifactId>jazzer-junit</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
@@ -74,6 +79,10 @@
                 <configuration>
                     <!-- @{argLine} keeps JaCoCo's agent -->
                     <argLine>@{argLine} --add-modules java.logging --add-reads ${praecepta.test.reads}</argLine>
+                    <systemPropertyVariables>
+                        <!-- ArchUnit (LayeringTest) logs through SLF4J, which says on stderr that it has no provider -->
+                        <slf4j.internal.verbosity>ERROR</slf4j.internal.verbosity>
+                    </systemPropertyVariables>
                     <excludes>
                         <exclude>**/*$*</exclude>
                         <!-- run by the feel-stack execution, in a JVM of its own -->
@@ -102,4 +111,67 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <!--
+            Mutation testing with PIT (CONTRIBUTING.md, "Mutation testing"). Never part of the default build:
+            ./mvnw -pl praecepta-engine -P mutation test-compile pitest:mutationCoverage
+            -Dpit.targetClasses=... picks the classes to mutate (globs, separated by commas; the whole engine takes hours),
+            -Dpit.targetTests=... the tests to run against them, -Dpit.threads=... the number of test JVMs.
+            The report is target/pit-reports/index.html.
+        -->
+        <profile>
+            <id>mutation</id>
+            <properties>
+                <pit.targetClasses>io.github.brunopacheco1.praecepta.engine.*</pit.targetClasses>
+                <pit.targetTests>io.github.brunopacheco1.praecepta.engine.*</pit.targetTests>
+                <pit.threads>4</pit.threads>
+                <!-- more test classes to leave out, as a glob: '**.*PropertiesTest' drops the property-based tests,
+                     which makes a run several times faster and its score lower -->
+                <pit.excludedTestClasses>none.*</pit.excludedTestClasses>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-maven</artifactId>
+                        <version>${pitest-maven.version}</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.pitest</groupId>
+                                <artifactId>pitest-junit5-plugin</artifactId>
+                                <version>${pitest-junit5-plugin.version}</version>
+                            </dependency>
+                        </dependencies>
+                        <configuration>
+                            <!-- as text, not as <param> elements, so that Maven splits a comma-separated list -->
+                            <targetClasses>${pit.targetClasses}</targetClasses>
+                            <targetTests>${pit.targetTests}</targetTests>
+                            <excludedTestClasses>
+                                <!-- fuzz tests replay saved inputs through Jazzer's agent, which PIT's test JVMs do not have -->
+                                <param>**.*FuzzTest</param>
+                                <param>**.*Fuzzer</param>
+                                <!-- needs an interpreted JVM of its own (the feel-stack execution of surefire) -->
+                                <param>**.FeelExpressionStackTest</param>
+                                <param>${pit.excludedTestClasses}</param>
+                            </excludedTestClasses>
+                            <mutators>
+                                <mutator>DEFAULTS</mutator>
+                            </mutators>
+                            <threads>${pit.threads}</threads>
+                            <timestampedReports>false</timestampedReports>
+                            <outputFormats>
+                                <outputFormat>HTML</outputFormat>
+                                <outputFormat>XML</outputFormat>
+                            </outputFormats>
+                            <failWhenNoMutations>false</failWhenNoMutations>
+                            <jvmArgs>
+                                <jvmArg>-Xmx768m</jvmArg>
+                                <jvmArg>-Djava.util.logging.config.file=${maven.multiModuleProjectDirectory}/test-logging.properties</jvmArg>
+                            </jvmArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

@@ -76,6 +76,8 @@ them fails before the tests run:
 - **Compiler warnings are errors** (`-Xlint:all -Werror`). Suppress a warning only where it cannot be
   fixed, as narrowly as possible, with a comment saying why.
 - **SonarCloud** reviews every pull request; its quality gate must pass.
+- **Package layers** of the engine: `LayeringTest` fails if `feel`, `beans` or `dmn` use the engine's
+  root package, or if `feel` or `beans` use `dmn` or `exceptions`.
 
 Run `mvn validate` to check the style alone.
 
@@ -94,6 +96,36 @@ and commit that file, so it stays a regression test. The `Fuzzing` workflow does
 Each fuzz test calls a plain Jazzer target (`*Fuzzer`), which [ClusterFuzzLite](https://google.github.io/clusterfuzzlite/)
 also runs for 5 minutes on every pull request that touches the engine (`.clusterfuzzlite/`, the
 `ClusterFuzzLite` workflow). Its report names the crashing input; save it the same way.
+
+## Mutation testing
+[PIT](https://pitest.org) changes the compiled engine a little at a time (a `<` becomes a `<=`, a
+method returns null) and runs the tests that cover the changed line against each change, a *mutant*.
+A mutant that no test fails for has *survived*: the tests run that line but do not check what it does.
+
+PIT is not part of the default build. Run it on the classes you work on, as globs separated by commas:
+
+```
+mvn -pl praecepta-engine -P mutation test-compile pitest:mutationCoverage \
+    -Dpit.targetClasses='io.github.brunopacheco1.praecepta.engine.Masks,io.github.brunopacheco1.praecepta.engine.HitPolicies*'
+```
+
+Without `-Dpit.targetClasses` it mutates the whole engine, which takes hours. It takes about two
+seconds per mutant: 4 minutes for `Masks` (126 mutants). Most of that goes to the property-based tests,
+which run hundreds of tries per mutant; `-Dpit.excludedTestClasses='**.*PropertiesTest'` leaves them
+out. The ten classes of the table engine (1,369 mutants) then take 10 minutes, but mutants that only
+a property kills count as survivors. `-Dpit.threads` sets the number of test JVMs (4). The fuzz tests
+and `FeelExpressionStackTest` never run under PIT.
+
+The report is `praecepta-engine/target/pit-reports/index.html`, with `mutations.xml` beside it. It
+shows each class's source: a red line has a mutant that survived, and its number in the margin says
+which change no test noticed. To read a survivor, ask what the change does to the result:
+- if a caller would see a different value, exception or message, a test is missing: write the one
+  that fails with the change, in the test class of that area;
+- if nothing outside the method can tell (a faster path that gives the same answer, a bound a caller
+  never reaches), the mutant is *equivalent*: leave it;
+- "no coverage" means no test runs the line at all, with or without the change.
+
+The score is a way to find missing tests, not a target: do not write a test only to kill a mutant.
 
 ## Adding a module
 A new integration or other module needs these, and nothing else:
