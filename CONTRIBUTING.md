@@ -154,7 +154,7 @@ A new integration or other module needs these, and nothing else:
    APIs) are `provided`, so they are not part of what Praecepta ships. Quarkus is the exception: an
    extension must depend on `quarkus-arc` (and its deployment module on `quarkus-arc-deployment`), so
    the licence check allows the Jakarta EE APIs for every module and Quarkus' build-time licences for
-   `praecepta-quarkus-deployment` only. If the licence
+   `praecepta-quarkus3-deployment` only. If the licence
    check rejects a dependency, raise it in the pull request rather than widening the allowlist there.
 5. **API documentation:** the website publishes every published module's Javadoc at
    `api/<directory without "praecepta-">` (`api/spring-boot-starter`, `api/quarkus`) with no change to

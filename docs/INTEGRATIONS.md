@@ -13,14 +13,23 @@ same everywhere, and an invalid table fails the same way.
 |---|---|---|
 | Maven 3.9+ | [`praecepta-maven-plugin`](#maven-plugin) | when the project builds |
 | Gradle 8.5+ | [plugin `io.github.brunopacheco1.praecepta`](#gradle-plugin) | when the project builds |
-| Spring Boot 4 | [`praecepta-spring-boot-starter`](#spring-boot) | when the application starts |
-| Micronaut 4 | [`praecepta-micronaut`](#micronaut) | when the application starts |
-| Quarkus 3.40+ | [`praecepta-quarkus`](#quarkus) | when Quarkus builds the application |
+| Spring Boot 4 | [`praecepta-spring-boot4-starter`](#spring-boot) | when the application starts |
+| Micronaut 4 | [`praecepta-micronaut4`](#micronaut) | when the application starts |
+| Quarkus 3.40+ | [`praecepta-quarkus3`](#quarkus) | when Quarkus builds the application |
 | Another framework, or none | [`praecepta-integration`](#without-a-framework) | when you call it |
 | GraalVM | nothing | see [native images](#native-images) |
 
 Every module needs Java 21 or later. All are on Maven Central under the groupId
 `io.github.brunopacheco1`, with the same version. The Gradle plugin is on the Gradle Plugin Portal too.
+
+Each framework module is named after the framework major it supports, and a later major gets a module of
+its own. [GOVERNANCE.md](../GOVERNANCE.md#what-is-supported) has the support policy.
+
+| Module | Framework | Java |
+|---|---|---|
+| `praecepta-spring-boot4-starter` | Spring Boot 4 | 21 or later |
+| `praecepta-micronaut4` | Micronaut 4 | 21 or later |
+| `praecepta-quarkus3` (and `praecepta-quarkus3-deployment`, which Quarkus adds to its build) | Quarkus 3, from 3.40 | 21 or later |
 
 There are two ways to use tables, and you can mix them:
 - **Build plugins** compile Excel, CSV and DMN tables into typed Java classes. Your application ships
@@ -208,7 +217,7 @@ package of the DMN resources it writes to `praecepta.locations`
 ```xml
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
-  <artifactId>praecepta-spring-boot-starter</artifactId>
+  <artifactId>praecepta-spring-boot4-starter</artifactId>
   <version>0.12.0</version>
 </dependency>
 ```
@@ -241,7 +250,7 @@ class Pricing {
 ```xml
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
-  <artifactId>praecepta-micronaut</artifactId>
+  <artifactId>praecepta-micronaut4</artifactId>
   <version>0.12.0</version>
 </dependency>
 ```
@@ -256,7 +265,7 @@ class Pricing {
 ```xml
 <dependency>
   <groupId>io.github.brunopacheco1</groupId>
-  <artifactId>praecepta-quarkus</artifactId>
+  <artifactId>praecepta-quarkus3</artifactId>
   <version>0.12.0</version>
 </dependency>
 ```

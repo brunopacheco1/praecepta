@@ -186,6 +186,15 @@ jobs:
             module="${module//\//-}"
             cp -R "${apidocs}" "_site/api/${module#praecepta-}"
           done
+          # 0.13 renamed the framework modules: their documentation is served at the old and the new
+          # address, whichever of the two the documented release has
+          for pair in spring-boot-starter:spring-boot4-starter micronaut:micronaut4 quarkus:quarkus3 \
+              quarkus-deployment:quarkus3-deployment; do
+            old="_site/api/${pair%%:*}"
+            new="_site/api/${pair##*:}"
+            if [ -d "${old}" ] && [ ! -d "${new}" ]; then cp -R "${old}" "${new}"; fi
+            if [ -d "${new}" ] && [ ! -d "${old}" ]; then cp -R "${new}" "${old}"; fi
+          done
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site

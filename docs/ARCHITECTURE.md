@@ -64,14 +64,14 @@ flowchart TB
     subgraph buildtime["Build time"]
         maven["<b>praecepta-maven-plugin</b><br/>[Maven plugin]<br/>The generate goal"]
         gradle["<b>praecepta-gradle-plugin</b><br/>[Gradle plugin]<br/>The generatePraecepta task"]
-        qdeploy["<b>praecepta-quarkus-deployment</b><br/>[Quarkus build steps]<br/>Finds, compiles and validates tables"]
+        qdeploy["<b>praecepta-quarkus3-deployment</b><br/>[Quarkus build steps]<br/>Finds, compiles and validates tables"]
         compiler["<b>praecepta-compiler</b><br/>[Java library]<br/>Validates tables, writes DMN,<br/>generates typed classes"]
         loader["<b>praecepta-loader</b><br/>[Java library, Apache POI]<br/>Reads Excel and CSV rules"]
     end
     subgraph runtime["Run time"]
-        spring["<b>praecepta-spring-boot-starter</b><br/>[Spring Boot auto-configuration]"]
-        micronaut["<b>praecepta-micronaut</b><br/>[Micronaut module]"]
-        quarkus["<b>praecepta-quarkus</b><br/>[Quarkus extension, runtime]"]
+        spring["<b>praecepta-spring-boot4-starter</b><br/>[Spring Boot auto-configuration]"]
+        micronaut["<b>praecepta-micronaut4</b><br/>[Micronaut module]"]
+        quarkus["<b>praecepta-quarkus3</b><br/>[Quarkus extension, runtime]"]
         integration["<b>praecepta-integration</b><br/>[Java library]<br/>Finds DMN files, builds named engines"]
         engine["<b>praecepta-engine</b><br/>[Java library, JPMS module, JDK only]<br/>Tables, FEEL, decision graphs,<br/>DMN reading and writing"]
     end
@@ -103,10 +103,10 @@ An arrow means "depends on".
 | `praecepta-maven-plugin` | compiler, Maven API | Runs the compiler on the configured tables. |
 | `praecepta-gradle-plugin` | compiler, Gradle API | The same, as a cacheable Gradle task. Built by Maven. |
 | `praecepta-gradle-plugin-marker` | gradle plugin | The marker POM through which Gradle finds the plugin by id on Maven Central. |
-| `praecepta-spring-boot-starter` | integration, Spring Boot | Registers a `Decisions` bean and an engine bean per decision at startup. |
-| `praecepta-micronaut` | integration, Micronaut 4 | The same, for Micronaut. |
-| `praecepta-quarkus` | integration, Quarkus ArC | Builds the beans at run time from the DMN the build validated. |
-| `praecepta-quarkus-deployment` | quarkus, compiler | Finds, compiles and validates the tables while Quarkus builds the application. |
+| `praecepta-spring-boot4-starter` | integration, Spring Boot | Registers a `Decisions` bean and an engine bean per decision at startup. |
+| `praecepta-micronaut4` | integration, Micronaut 4 | The same, for Micronaut. |
+| `praecepta-quarkus3` | integration, Quarkus ArC | Builds the beans at run time from the DMN the build validated. |
+| `praecepta-quarkus3-deployment` | quarkus, compiler | Finds, compiles and validates the tables while Quarkus builds the application. |
 
 Three more modules are never published: `praecepta-benchmarks` (JMH comparisons with Camunda and
 Drools), `praecepta-tck` (runs the DMN TCK) and `praecepta-native-tests` (builds an application per

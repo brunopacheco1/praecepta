@@ -39,7 +39,7 @@
     <dependencies>
         <dependency>
             <groupId>io.github.brunopacheco1</groupId>
-            <artifactId>praecepta-quarkus</artifactId>
+            <artifactId>praecepta-quarkus3</artifactId>
             <version>@project.version@</version>
         </dependency>
     </dependencies>

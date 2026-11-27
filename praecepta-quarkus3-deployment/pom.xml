@@ -13,9 +13,9 @@
         <artifactId>praecepta</artifactId>
         <version>0.12.0-SNAPSHOT</version>
     </parent>
-    <artifactId>praecepta-quarkus-deployment</artifactId>
+    <artifactId>praecepta-quarkus3-deployment</artifactId>
     <packaging>jar</packaging>
-    <name>praecepta-quarkus-deployment</name>
+    <name>praecepta-quarkus3-deployment</name>
     <description>
         Quarkus extension (build time): finds DMN tables, and compiles declared Excel and CSV tables, while
         Quarkus builds the application, validates them and fails the build on the configured issues.
@@ -36,7 +36,7 @@
     <dependencies>
         <dependency>
             <groupId>io.github.brunopacheco1</groupId>
-            <artifactId>praecepta-quarkus</artifactId>
+            <artifactId>praecepta-quarkus3</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

@@ -13,9 +13,9 @@
         <artifactId>praecepta</artifactId>
         <version>0.12.0-SNAPSHOT</version>
     </parent>
-    <artifactId>praecepta-micronaut</artifactId>
+    <artifactId>praecepta-micronaut4</artifactId>
     <packaging>jar</packaging>
-    <name>praecepta-micronaut</name>
+    <name>praecepta-micronaut4</name>
     <description>
         Micronaut integration: loads DMN decision tables at startup, validates them, and provides each as a
         named engine bean, with the validation reports on a management endpoint.

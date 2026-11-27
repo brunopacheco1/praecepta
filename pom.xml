@@ -95,14 +95,14 @@
         <native-maven-plugin.version>1.1.18</native-maven-plugin.version>
         <exec-maven-plugin.version>3.6.4</exec-maven-plugin.version>
 
-        <!-- Spring Boot starter (#20): its BOM is imported by praecepta-spring-boot-starter only -->
+        <!-- Spring Boot starter (#20): its BOM is imported by praecepta-spring-boot4-starter only -->
         <spring-boot.version>4.1.2</spring-boot.version>
 
-        <!-- Micronaut module (#77): the Micronaut 4 platform BOM, imported by praecepta-micronaut alone
+        <!-- Micronaut module (#77): the Micronaut 4 platform BOM, imported by praecepta-micronaut4 alone
              (Micronaut 5 needs Java 25, above the project's Java 21 baseline) -->
         <micronaut-platform.version>4.10.24</micronaut-platform.version>
 
-        <!-- Quarkus extension (#76): the BOM, imported by praecepta-quarkus and praecepta-quarkus-deployment
+        <!-- Quarkus extension (#76): the BOM, imported by praecepta-quarkus3 and praecepta-quarkus3-deployment
              only, and the extension's build plugin and annotation processor, released with it -->
         <quarkus.version>3.40.1.2</quarkus.version>
 
@@ -124,10 +124,10 @@
         <module>praecepta-maven-plugin</module>
         <module>praecepta-gradle-plugin</module>
         <module>praecepta-gradle-plugin-marker</module>
-        <module>praecepta-spring-boot-starter</module>
-        <module>praecepta-micronaut</module>
-        <module>praecepta-quarkus</module>
-        <module>praecepta-quarkus-deployment</module>
+        <module>praecepta-spring-boot4-starter</module>
+        <module>praecepta-micronaut4</module>
+        <module>praecepta-quarkus3</module>
+        <module>praecepta-quarkus3-deployment</module>
         <module>praecepta-benchmarks</module>
         <module>praecepta-tck</module>
     </modules>

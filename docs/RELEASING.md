@@ -19,8 +19,8 @@ which:
    (`.github/scripts/published_modules.py`), so a new module needs no change here. The published modules
    are the parent POM (`praecepta`), `praecepta-engine`, `praecepta-loader`, `praecepta-compiler`,
    `praecepta-integration`, `praecepta-maven-plugin`, `praecepta-gradle-plugin` with its plugin marker,
-   `praecepta-spring-boot-starter`, `praecepta-micronaut`, `praecepta-quarkus` and
-   `praecepta-quarkus-deployment`;
+   `praecepta-spring-boot4-starter`, `praecepta-micronaut4`, `praecepta-quarkus3` and
+   `praecepta-quarkus3-deployment`;
 5. records build provenance for the jars (GitHub artifact attestations);
 6. creates a GitHub release with the changelog section, jars, signatures, SBOMs, the provenance
    bundle (`praecepta-X.Y.Z.intoto.jsonl`) and `THIRD-PARTY-NOTICES.txt`;

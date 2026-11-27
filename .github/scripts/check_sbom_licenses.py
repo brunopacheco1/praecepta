@@ -22,7 +22,7 @@ ALLOWED = {
 # Our own modules: covered by this repository's REUSE check.
 OWN_GROUP = "io.github.brunopacheco1"
 # Jakarta EE APIs and Eclipse Parsson (Eclipse EE4J), dual-licensed EPL-2.0 OR GPL-2.0 with the
-# Classpath exception. praecepta-quarkus depends on quarkus-arc, as Quarkus extensions do, which
+# Classpath exception. praecepta-quarkus3 depends on quarkus-arc, as Quarkus extensions do, which
 # brings them; Praecepta references them as dependencies and never bundles or modifies them.
 # Allowed for these groups only, so EPL does not spread to other dependencies unnoticed.
 EE4J_GROUPS = ("jakarta.", "org.eclipse.parsson")
@@ -33,7 +33,7 @@ EE4J_ALLOWED = {"EPL-2.0"}
 # the class-file API backport (GPL-2.0 with the Classpath exception, OpenJDK's licence). Every Quarkus
 # build resolves these already. Allowed for this module only; every other module keeps ALLOWED.
 MODULE_ALLOWED = {
-    "praecepta-quarkus-deployment": {"EPL-2.0", "UPL-1.0", "GPL-2.0-with-classpath-exception"},
+    "praecepta-quarkus3-deployment": {"EPL-2.0", "UPL-1.0", "GPL-2.0-with-classpath-exception"},
 }
 
 

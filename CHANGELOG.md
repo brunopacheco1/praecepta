@@ -11,6 +11,20 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
 
 ## [Unreleased]
 
+### Changed
+- **The framework modules are named after the framework major they support**
+  ([#163](https://github.com/brunopacheco1/praecepta/issues/163)), as the
+  [support policy](GOVERNANCE.md#what-is-supported) says, so that a later major can get a module of its own.
+  **Upgrade note:** change the `artifactId` in your build. Nothing else changes: the Java packages, the configuration
+  keys and the bean names are the same. The old coordinates end at 0.12.0.
+
+  | Before | Now |
+  |---|---|
+  | `praecepta-spring-boot-starter` | `praecepta-spring-boot4-starter` |
+  | `praecepta-micronaut` | `praecepta-micronaut4` |
+  | `praecepta-quarkus` | `praecepta-quarkus3` |
+  | `praecepta-quarkus-deployment` | `praecepta-quarkus3-deployment` |
+
 ## [0.12.0] - 2026-11-27
 
 A hardening release, with no new DMN features: four fixes, of which two for files that could hang the reader or
