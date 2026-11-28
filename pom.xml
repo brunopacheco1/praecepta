@@ -96,7 +96,7 @@
         <exec-maven-plugin.version>3.6.4</exec-maven-plugin.version>
 
         <!-- Spring Boot starter (#20): its BOM is imported by praecepta-spring-boot4-starter only -->
-        <spring-boot.version>4.1.2</spring-boot.version>
+        <spring-boot.version>4.2.0</spring-boot.version>
 
         <!-- Micronaut module (#77): the Micronaut 4 platform BOM, imported by praecepta-micronaut4 alone
              (Micronaut 5 needs Java 25, above the project's Java 21 baseline) -->
