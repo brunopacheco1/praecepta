@@ -98,6 +98,9 @@
                             <goal>test</goal>
                         </goals>
                         <configuration>
+                            <!-- this test only, even with -Dtest on the command line, which would otherwise also run the
+                                 tests it names here, interpreted, many times slower (#156) -->
+                            <test>FeelExpressionStackTest</test>
                             <argLine>@{argLine} --add-modules java.logging --add-reads ${praecepta.test.reads} -Xint</argLine>
                             <excludes combine.self="override">
                                 <exclude>**/*$*</exclude>
