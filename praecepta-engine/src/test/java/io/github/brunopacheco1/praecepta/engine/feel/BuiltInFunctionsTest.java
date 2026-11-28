@@ -8,7 +8,6 @@ package io.github.brunopacheco1.praecepta.engine.feel;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -16,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -580,14 +580,21 @@ class BuiltInFunctionsTest {
 
     // ---- limits ---------------------------------------------------------------------------------------
 
+    /**
+     * Java's regular expressions backtrack over this one in time that grows as the twelfth power of the text: 6.6
+     * seconds for 30 characters, hours for 60. So the evaluation ends only if its limit stops the match while it runs
+     * (the text counts the characters the match reads); the error alone would not show that, since steps counted after
+     * the match would report it too. The timeout fails the test instead of letting it run for hours, in a thread of its
+     * own because a match does not stop when interrupted. Its margin is wide: the evaluation stops in about 0.3 seconds,
+     * 18 in an interpreted JVM (#156: a bound of 10 seconds on the elapsed time failed there).
+     */
     @Test
+    @Timeout(value = 120, threadMode = Timeout.ThreadMode.SEPARATE_THREAD)
     void a_regular_expression_that_backtracks_without_end_stops_at_the_evaluation_s_limits() {
-        // Java's regular expressions take ages over this one: 6.6 seconds for 30 characters
-        var expression = "matches(\"" + "a".repeat(30) + "!\", \"(.*a){12}!x\")";
-        long start = System.nanoTime();
-        assertThat(value(expression)).isNull();
-        assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(10));
-        assertThat(errors(expression)).containsExactly("the evaluation takes more than 1000000 steps");
+        var errors = new ArrayList<String>();
+        var value = FeelExpression.parse("matches(\"" + "a".repeat(60) + "!\", \"(.*a){12}!x\")").evaluate(name -> null, errors::add);
+        assertThat(value).isNull();
+        assertThat(errors).containsExactly("the evaluation takes more than 1000000 steps");
     }
 
     @Test
