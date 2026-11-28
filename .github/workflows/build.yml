@@ -23,7 +23,7 @@ jobs:
     # As the support policy says (GOVERNANCE.md, "What is supported"): built as the release is, with the
     # latest long-term-support JDK (25), which also runs the strict TCK check, the licences, the SBOMs and
     # SonarCloud; and tested on Java 21, the baseline the code targets (--release 21). A JDK nobody
-    # targets is not tested (#164). "Build & test (Java 25)" is a required check in the main branch ruleset.
+    # targets is not tested (#164). Both jobs are required checks in the main branch ruleset.
     name: Build & test (Java ${{ matrix.java }})
     runs-on: ubuntu-latest
     strategy:

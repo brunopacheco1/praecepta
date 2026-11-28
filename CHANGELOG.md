@@ -34,6 +34,13 @@ Versions follow [Semantic Versioning](https://semver.org/); until 1.0, minor ver
   cache that only main saves, so a pull request that changes a POM downloads only what is new. The release
   still resolves everything from Maven Central.
 
+### Fixed
+- **A decision table used in several places of a model is written with ids of its own in each**
+  ([#155](https://github.com/brunopacheco1/praecepta/issues/155)). A model built in code that used one
+  `DecisionTable` instance twice in boxed expressions (two elements of a list, or two decisions) was written by
+  `DmnWriter.write(model)` with the same ids twice, which is not valid DMN. Models read from a file were not
+  affected: the reader makes one instance per table.
+
 ## [0.12.0] - 2026-11-27
 
 A hardening release, with no new DMN features: four fixes, of which two for files that could hang the reader or
