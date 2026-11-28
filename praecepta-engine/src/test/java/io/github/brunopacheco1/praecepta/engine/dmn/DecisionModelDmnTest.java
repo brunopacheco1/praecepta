@@ -533,4 +533,19 @@ class DecisionModelDmnTest {
         var graph = DecisionGraph.builder().model(read(xml)).logValidationReport(false).build();
         assertThat(graph.evaluate(graph.decisions(), Map.of("A", 1))).isEqualTo(Map.of("D", List.of("positive"), "E", List.of("positive")));
     }
+
+    /** The writer asks for the prefixes of tables in the order they were declared; another table there is a bug, said at once. */
+    @Test
+    void a_table_asked_for_out_of_the_order_declared_has_no_prefix() {
+        var model = decisionsOfOneTable("D", "E");
+        var d = model.decisions().get(0).logic();
+        var e = ((DecisionLogic.Table) ((DecisionLogic.BoxedList) model.decisions().get(1).logic()).elements().getFirst()).table();
+        var dTable = ((DecisionLogic.Table) ((DecisionLogic.BoxedList) d).elements().getFirst()).table();
+        var types = new BoxedTypes(new StringBuilder(), Map.of());
+        types.declare("decision_0_", d, true, "decision 'D'");
+
+        assertThatThrownBy(() -> types.prefix(e)).isInstanceOf(IllegalStateException.class);
+        assertThat(types.prefix(dTable)).isEqualTo("decision_0_table_0_");
+        assertThatThrownBy(() -> types.prefix(dTable)).as("each occurrence is written once").isInstanceOf(IllegalStateException.class);
+    }
 }
