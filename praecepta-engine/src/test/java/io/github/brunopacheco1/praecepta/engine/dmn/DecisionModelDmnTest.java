@@ -464,4 +464,73 @@ class DecisionModelDmnTest {
         var graph = DecisionGraph.builder().model(model).logValidationReport(false).build();
         assertThat(graph.evaluate("D", Map.of("A", 1))).isEqualTo(List.of("first", "second"));
     }
+
+    /** A model of an input data A and decisions of the given names, each a boxed list of one decision table. */
+    private static DecisionModel decisionsOfOneTable(String... names) {
+        var decisions = new StringBuilder();
+        for (var name : names) {
+            decisions.append("""
+                    <decision id="%1$s" name="%1$s">
+                      <informationRequirement><requiredInput href="#a"/></informationRequirement>
+                      <list><decisionTable hitPolicy="FIRST">
+                        <input><inputExpression typeRef="number"><text>A</text></inputExpression></input>
+                        <output typeRef="string"/>
+                        <rule><inputEntry><text>&gt; 0</text></inputEntry><outputEntry><text>"positive"</text></outputEntry></rule>
+                      </decisionTable></list>
+                    </decision>
+                    """.formatted(name));
+        }
+        return read(dmn("<inputData id=\"a\" name=\"A\"><variable name=\"A\" typeRef=\"number\"/></inputData>\n" + decisions));
+    }
+
+    /** The decision's logic, a boxed list of the given elements. */
+    private static DecisionModel.Decision withList(DecisionModel.Decision decision, List<DecisionLogic> elements) {
+        var list = (DecisionLogic.BoxedList) decision.logic();
+        return new DecisionModel.Decision(decision.name(), decision.requiredDecisions(), decision.requiredInputs(),
+                decision.requiredKnowledge(), new DecisionLogic.BoxedList(elements, list.type()));
+    }
+
+    /** All the ids of a written model, which must be unique. */
+    private static void assertUniqueIds(String xml) {
+        var ids = new HashSet<String>();
+        Pattern.compile(" id=\"([^\"]*)\"").matcher(xml).results()
+                .forEach(id -> assertThat(ids.add(id.group(1))).as("unique id %s in%n%s", id.group(1), xml).isTrue());
+    }
+
+    /**
+     * A model built in code may use one {@code DecisionTable} instance in several places; each occurrence is written with
+     * ids of its own (#155: they had the same ones), and the model reads back as itself.
+     */
+    @Test
+    void a_decision_table_used_twice_in_a_model_is_written_with_ids_of_its_own_each_time() {
+        var read = decisionsOfOneTable("D");
+        var decision = read.decisions().getFirst();
+        var table = ((DecisionLogic.BoxedList) decision.logic()).elements().getFirst();
+        var model = new DecisionModel(read.name(), read.inputData(), List.of(withList(decision, List.of(table, table))), List.of(),
+                List.of(), Map.of(), read.namespace(), List.of());
+
+        var xml = DmnWriter.write(model);
+
+        assertUniqueIds(xml);
+        assertThat(read(xml)).isEqualTo(model);
+        assertThat(DmnWriter.write(read(xml))).isEqualTo(xml);
+        var graph = DecisionGraph.builder().model(read(xml)).logValidationReport(false).build();
+        assertThat(graph.evaluate("D", Map.of("A", 1))).isEqualTo(List.of("positive", "positive"));
+    }
+
+    /** The same, for one instance in two decisions' boxed expressions: the ids of each decision's table are its own. */
+    @Test
+    void a_decision_table_shared_by_two_decisions_is_written_with_ids_of_its_own_in_each() {
+        var read = decisionsOfOneTable("D", "E");
+        var table = ((DecisionLogic.BoxedList) read.decisions().getFirst().logic()).elements().getFirst();
+        var decisions = read.decisions().stream().map(decision -> withList(decision, List.of(table))).toList();
+        var model = new DecisionModel(read.name(), read.inputData(), decisions, List.of(), List.of(), Map.of(), read.namespace(),
+                List.of());
+
+        var xml = DmnWriter.write(model);
+
+        assertUniqueIds(xml);
+        var graph = DecisionGraph.builder().model(read(xml)).logValidationReport(false).build();
+        assertThat(graph.evaluate(graph.decisions(), Map.of("A", 1))).isEqualTo(Map.of("D", List.of("positive"), "E", List.of("positive")));
+    }
 }
