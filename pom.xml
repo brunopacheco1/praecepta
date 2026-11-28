@@ -104,7 +104,7 @@
 
         <!-- Quarkus extension (#76): the BOM, imported by praecepta-quarkus3 and praecepta-quarkus3-deployment
              only, and the extension's build plugin and annotation processor, released with it -->
-        <quarkus.version>3.40.1.2</quarkus.version>
+        <quarkus.version>4.0.1</quarkus.version>
 
         <!-- Gradle plugin (#18) -->
         <!-- the Gradle API the plugin compiles against, redistributed on Maven Central by gradleplugins.dev
